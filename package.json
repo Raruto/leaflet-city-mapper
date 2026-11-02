@@ -29,7 +29,7 @@
   "license": "GPL-3.0",
   "peerDependencies": {
     "leaflet": "^1.9.3 || ^2.0.0-alpha.1",
-    "leaflet-rotate": "^0.5.2"
+    "leaflet-rotate": "^0.5.3"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^10.3.1",
