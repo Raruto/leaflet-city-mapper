@@ -1,0 +1,28 @@
+{
+  "name": "leaflet-city-mapper",
+  "version": "0.1.0",
+  "description": "WebGPU city scenes, terrain and PMTiles layers for leaflet-rotate",
+  "type": "module",
+  "main": "dist/leaflet-city-mapper.js",
+  "browser": "dist/leaflet-city-mapper.js",
+  "module": "src/index.js",
+  "files": ["dist", "src", "LICENSE", "README.md"],
+  "scripts": {
+    "dev": "node build/dev.js",
+    "build": "node build/build.js",
+    "test": "node build/test.js",
+    "pmtiles": "node build/pmtiles.js"
+  },
+  "keywords": ["leaflet", "leaflet-rotate", "webgpu", "3d", "pmtiles", "terrain"],
+  "license": "GPL-3.0",
+  "peerDependencies": {
+    "leaflet": "^1.9.3 || ^2.0.0-alpha.1",
+    "leaflet-rotate": "^0.5.2"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^10.3.1",
+    "esbuild": "^0.28.2",
+    "leaflet-rotate": "file:../leaflet-rotate",
+    "playwright": "^1.64.1"
+  }
+}
