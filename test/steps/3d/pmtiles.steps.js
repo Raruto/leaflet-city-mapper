@@ -3,11 +3,11 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { Then } from '@cucumber/cucumber';
 
 Then('the native PMTiles methods handle directories, compression and failures', async function () {
-  await this.context.unroute('**/dist/3d/types/*.js');
+  await this.context.unroute('**/dist/types/*.js');
   // Fresh, unmocked modules: a query string bypasses the module cache.
   await this.page.evaluate(async base => {
-    await import(`${base}/dist/3d/types/3d.js?native`);
-    await import(`${base}/dist/3d/types/pmtiles.js?native`);
+    await import(`${base}/dist/types/3d.js?native`);
+    await import(`${base}/dist/types/pmtiles.js?native`);
   }, this.baseUrl);
   const exposesReaderClass = await this.page.evaluate(() => 'PMTiles' in L);
   assert.equal(exposesReaderClass, false, 'PMTiles methods belong to their consuming layers');

@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 
+Then('every local source in the city example is available', async function () {
+  const url = `${this.baseUrl}/examples/leaflet-city-mapper.html`;
+  const response = await this.context.request.get(url);
+  assert.equal(response.status(), 200);
+  const html = await response.text();
+  await response.dispose();
+  const sources = [...html.matchAll(/\b(?:url|bridges):\s*'([^']+)'/g)]
+    .map(([, source]) => new URL(source, url));
+  assert.equal(sources.length, 10);
+  for (const source of sources) {
+    assert.equal(source.origin, new URL(url).origin);
+    const asset = await this.context.request.get(source.href, { headers: { Range: 'bytes=0-0' } });
+    assert.equal(asset.status(), 206, `Missing example asset: ${source.href}`);
+    await asset.dispose();
+  }
+});
+
 Given('the city mapper plugin is loaded after leaflet-rotate', async function () {
   await this.page.goto(`${this.baseUrl}/test/fixtures/plugin.html`);
   await this.page.waitForFunction(() => L.Layer.types);
@@ -13,6 +30,12 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles' } });
     const pending = first.ready instanceof Promise && second.ready instanceof Promise;
     await Promise.all([first.ready, second.ready]);
+    const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles' } });
+    await warm.ready;
+    const plain = new L.Layer();
+    const configured = new L.Layer({ attribution: 'Plain layer' });
+    const Inherited = L.Layer.extend({});
+    const inherited = new Inherited({ source: { type: 'application-specific' } });
     let initializations = 0;
     const Custom = L.Layer.extend({
       initialize(options) {
@@ -32,10 +55,16 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
       initializations,
       marker: marker instanceof L.Marker && marker.getLatLng().equals([55, 10]),
       pitch: typeof L.Map.prototype.getPitch === 'function',
+      warm: warm instanceof L.Layer.types.pmtiles && warm.header.maxZoom === 19,
+      plain: plain instanceof L.Layer && !plain.ready,
+      configured: configured.options.attribution === 'Plain layer',
+      inherited: inherited instanceof Inherited &&
+        inherited.options.source.type === 'application-specific' && !inherited.ready,
     };
   });
   assert.deepEqual(result, {
     lazy: true, pending: true, routed: true, settings: 24, sourceRemoved: true,
     header: 19, custom: true, initializations: 1, marker: true, pitch: true,
+    warm: true, plain: true, configured: true, inherited: true,
   });
 });

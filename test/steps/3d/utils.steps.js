@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { Then } from '@cucumber/cucumber';
-import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../../src/3d/utils/geometry.js';
-import { emptyNode, setParent, traverse } from '../../../src/3d/utils/scene.js';
-import { decodeDirectory, decodeHeader, decompress, tileId } from '../../../src/3d/utils/pmtiles.js';
-import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../../src/3d/utils/model.js';
-import { lightGrid, worldLights } from '../../../src/3d/utils/lighting.js';
-import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../../src/3d/utils/terrain.js';
-import { toLanes, tripsAt, routeGeometry } from '../../../src/3d/utils/traffic.js';
-import { collider, horizontalRay } from '../../../src/3d/utils/walk.js';
-import { materialShaders } from '../../../src/3d/utils/shaders.js';
-import { projectCelestialBody } from '../../../src/3d/utils/sun.js';
+import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../../src/utils/geometry.js';
+import { emptyNode, setParent, traverse } from '../../../src/utils/scene.js';
+import { decodeDirectory, decodeHeader, decompress, tileId } from '../../../src/utils/pmtiles.js';
+import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../../src/utils/model.js';
+import { lightGrid, worldLights } from '../../../src/utils/lighting.js';
+import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../../src/utils/terrain.js';
+import { toLanes, tripsAt, routeGeometry } from '../../../src/utils/traffic.js';
+import { collider, horizontalRay } from '../../../src/utils/walk.js';
+import { materialShaders } from '../../../src/utils/shaders.js';
+import { projectCelestialBody } from '../../../src/utils/sun.js';
 
 const checks = {
   geometry() {
@@ -193,8 +193,8 @@ Then('the standalone 3D {string} utilities preserve their results and errors', a
 
 Then('standalone browser math preserves scene transforms and picking', async function () {
   const result = await this.page.evaluate(async base => {
-    const { emptyNode, setParent, updateWorldMatrix, updateCamera } = await import(`${base}/dist/3d/utils/scene.js`);
-    const { intersectMeshes } = await import(`${base}/dist/3d/utils/picking.js`);
+    const { emptyNode, setParent, updateWorldMatrix, updateCamera } = await import(`${base}/dist/utils/scene.js`);
+    const { intersectMeshes } = await import(`${base}/dist/utils/picking.js`);
     const parent = emptyNode(), child = emptyNode();
     parent.position = [10, 20, 30];
     parent.scale = [2, 3, 4];

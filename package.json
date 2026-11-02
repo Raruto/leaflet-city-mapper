@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "WebGPU city scenes, terrain and PMTiles layers for leaflet-rotate",
   "type": "module",
-  "main": "dist/leaflet-city-mapper.js",
-  "browser": "dist/leaflet-city-mapper.js",
+  "main": "dist/index.js",
+  "browser": "dist/index.js",
   "module": "src/index.js",
   "files": [
     "dist",

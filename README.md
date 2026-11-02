@@ -4,15 +4,7 @@ WebGPU city scenes for **leaflet-rotate**: glTF/GLB models, PMTiles buildings,
 trees and streetlights, terrain, solar lighting, traffic and a walking camera.
 No Three.js, OGL or import map is required.
 
-Extracted from Raruto/leaflet-rotate at `c7fef65`. The original GPL-3.0 license
-and source authorship are retained; this repository starts a new Git history.
-Bearing, pitch, Leaflet overlays, navigation constraints and their regression
-tests remain in leaflet-rotate.
-
 ## Local development
-
-Examples and browser tests load the precompiled leaflet-rotate 0.5.2 release
-from unpkg. No sibling checkout or compilation of leaflet-rotate is required:
 
 ```shell
 npm install
@@ -24,6 +16,9 @@ Open <http://127.0.0.1:8080/examples/paris.html>. WebGPU requires a compatible
 browser/GPU and a secure context (HTTPS or localhost). Internet access is needed
 to load the precompiled Leaflet and leaflet-rotate scripts.
 
+The build compiles every JavaScript file from `src/` to `dist/`, preserving
+names and subdirectories, with minification and source maps but no bundling.
+
 ## Usage
 
 Load precompiled Leaflet and leaflet-rotate, then this plugin:
@@ -31,8 +26,8 @@ Load precompiled Leaflet and leaflet-rotate, then this plugin:
 ```html
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-rotate@0.5.2/dist/leaflet-rotate-src.js"></script>
-<script src="dist/leaflet-city-mapper.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.5.2/dist/leaflet-rotate.js"></script>
+<script src="https://unpkg.com/leaflet-city-mapper/dist/index.js"></script>
 ```
 
 For Leaflet 2.0.0-alpha.1, use `leaflet-global-src.js` and set
@@ -45,7 +40,7 @@ const map = new L.Map('map', {
 const model = new L.Layer({
   source: {
     type: '3d',
-    url: './examples/data/eiffel-tower.glb',
+    url: 'https://unpkg.com/leaflet-city-mapper/examples/data/eiffel-tower.glb',
     center: [48.85826, 2.2945],
   },
 }).addTo(map);
@@ -55,11 +50,11 @@ await model.ready;
 
 `source.type` supports `3d`, `pmtiles`, `terrain`, `sunlight`, `traffic` and
 `walk`. Without a type, `.pmtiles` URLs select a raster archive; other sources
-select `3d`. The router and type modules load on demand from `dist/3d/`, so
+select `3d`. The router and type modules load on demand from `dist/`, so
 deploy that directory alongside the main script. Type-specific methods become
 available after `layer.ready` resolves. Leaflet subclasses are not rerouted.
 
-Generic rendering code lives in `src/3d/`; Paris-specific loaders, routes and
+Generic rendering code lives in `src/`; Paris-specific loaders, routes and
 datasets live in `misc/` and are referenced through the example's `source` options.
 
 ## Paris data

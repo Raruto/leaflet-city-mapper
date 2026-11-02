@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Then } from '@cucumber/cucumber';
-import { along, scheduledTrips, speed, vehicleOffsets } from '../../../src/3d/utils/traffic.js';
+import { along, scheduledTrips, speed, vehicleOffsets } from '../../../src/utils/traffic.js';
 import { trafficHour } from '../../../examples/data/paris-traffic.js';
 
 const [cruise] = JSON.parse(readFileSync(new URL('../../../examples/data/seine-cruises.geojson', import.meta.url))).features;
@@ -75,7 +75,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   await this.page.waitForFunction(() => cruiseBoats?.renderer && map._terrain3D?._terrainReady);
   const result = await this.page.evaluate(async () => {
     const layer = cruiseBoats, owner = L.Layer.types['3d']._renderers.get(map);
-    const { along, scheduledTrips } = await import(new URL('../dist/3d/utils/traffic.js', location.href));
+    const { along, scheduledTrips } = await import(new URL('../dist/utils/traffic.js', location.href));
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;
     const cruiseRoute = cruise.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     const cruiseLengths = cruiseRoute.map((point, i) => i && map.distance(cruiseRoute[i - 1], point));
@@ -241,7 +241,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   // Without a clock the boats run live on the current timetable.
   await this.page.evaluate(() => map.removeLayer(sunlightOverlay));
   assert.equal(await this.page.evaluate(async () => {
-    const { scheduledTrips } = await import(new URL('../dist/3d/utils/traffic.js', location.href));
+    const { scheduledTrips } = await import(new URL('../dist/utils/traffic.js', location.href));
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;
     await new Promise(requestAnimationFrame);
     const boats = cruiseBoats.root.children.find(mesh => mesh.extras.featureFaces.length);

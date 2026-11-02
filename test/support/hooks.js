@@ -85,7 +85,7 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     const response = await route.fetch();
     await route.fulfill({ response, body: `${await response.text()}\n${pmtilesMock}` });
   };
-  await this.context.route('**/dist/3d/types/*.js', mockPMTiles);
+  await this.context.route('**/dist/types/*.js', mockPMTiles);
   this.page = await this.context.newPage();
 });
 

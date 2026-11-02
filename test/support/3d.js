@@ -13,7 +13,7 @@ Before({ tags: '@3d-layer' }, async function () {
 After({ tags: '@3d-layer' }, async function () {
   if (!process.env.COVERAGE_3D) return;
   const entries = await this.page.coverage.stopJSCoverage();
-  for (const entry of entries.filter(entry => entry.url.includes('/dist/3d/'))) {
+  for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
     for (const fn of entry.functions) {
       const range = fn.ranges[0];
       if (!fn.functionName) continue;
@@ -135,9 +135,9 @@ Given('a map with the standalone 3D module and no dependency import map', async 
       <script src="https://unpkg.com/leaflet@${process.env.LEAFLET_VERSION === '2' ? '2.0.0-alpha.1/dist/leaflet-global-src.js' : '1.9/dist/leaflet-src.js'}"></script>
       <script>globalThis.L = globalThis.leaflet || globalThis.L;</script>
       <script src="https://unpkg.com/leaflet-rotate@0.5.2/dist/leaflet-rotate-src.js"></script>
-      <script src="../dist/leaflet-city-mapper-src.js"></script>
+      <script src="../dist/index.js"></script>
       <script>
-        import('../dist/3d/types/terrain.js').then(() => window.test3d = { Layer3D: L.Layer.types['3d'], map: new L.Map('first', {
+        import('../dist/types/terrain.js').then(() => window.test3d = { Layer3D: L.Layer.types['3d'], map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30
         }) });
       </script>`,
@@ -198,6 +198,6 @@ Given('the Eiffel Tower example page is open', { timeout: 60000 }, openEiffelExa
 
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
 Given('the Eiffel Tower example page is open with its offline archives', { timeout: 60000 }, async function () {
-  await this.context.unroute('**/dist/3d/types/*.js');
+  await this.context.unroute('**/dist/types/*.js');
   await openEiffelExample.call(this);
 });
