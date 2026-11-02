@@ -2,7 +2,7 @@
  * Paris road traffic for the 'traffic' layer type: hourly flow measured by the city's permanent road counters
  * (Ville de Paris open data, ODbL), as GeoJSON lanes with a `flow` property (vehicles/hour).
  *
- * @example new L.Layer({ source: { type: 'traffic', url: '../misc/paris-traffic.js', radius: 2000 } })
+ * @example new L.Layer({ source: { type: 'traffic', url: './examples/data/paris-traffic.js', radius: 2000 } })
  */
 const api = 'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/comptages-routiers-permanents';
 const hour = 3600000, week = 7 * 24 * hour;

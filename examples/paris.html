@@ -6,7 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
 		<script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"></script>
-		<script src="../node_modules/leaflet-rotate/dist/leaflet-rotate-src.js"></script>
+		<script src="https://unpkg.com/leaflet-rotate@0.5.2/dist/leaflet-rotate-src.js"></script>
 		<script src="../dist/leaflet-city-mapper-src.js"></script>
 		<style>
 			html, body, #map {
@@ -58,7 +58,7 @@
 						type: 'terrain',
 						url: 'data/paris-terrain.pmtiles',
 						// IGN BD TOPO bridge decks (WFS BDTOPO_V3:construction_surfacique, nature='Pont'), absent from the DEM.
-						bridges: '../misc/paris-bridges.geojson',
+						bridges: './examples/data/paris-bridges.geojson',
 						center: [48.8582601, 2.29449985],
 						ariaLabel: 'IGN terrain with 3D map layers',
 					},
@@ -135,7 +135,7 @@
 				// The GLB is axis-aligned, not north-aligned; its horizontal footprint is slightly undersized.
 				'Eiffel Tower': new L.Layer({
 					source: {
-						url: '../misc/eiffel-tower.glb',
+						url: '../examples/data/eiffel-tower.glb',
 						tooltipContent() {
 							const content = document.createElement('div');
 							content.innerHTML = '<div><b>Eiffel Tower</b><br>Height: 330 m including antennas (300 m structure)<br>Opened: 1889, for the World Exhibition<br>Designer: Gustave Eiffel and his engineering team<br>Location: Champ de Mars, Paris</div>';
@@ -222,7 +222,7 @@
 				'Traffic': new L.Layer({
 					source: {
 						type: 'traffic',
-						url: '../misc/paris-traffic.js',
+						url: './examples/data/paris-traffic.js',
 					},
 					attribution: '<a href="https://opendata.paris.fr/explore/dataset/comptages-routiers-permanents/">Traffic counts: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),

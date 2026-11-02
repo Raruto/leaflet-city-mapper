@@ -180,7 +180,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const map = test3d.map;
     const layer = new L.Layer({ source: { type: '3d',
       center: [48.8582601, 2.29449985],
-      url: '../misc/eiffel-tower.glb',
+      url: '../examples/data/eiffel-tower.glb',
       rotation: [0, 0.8, 0],
       scale: [1.02, 1, 1.01],
       tooltipContent: feature => feature.model === layer.model ? 'Eiffel Tower' : 'Unexpected model' },

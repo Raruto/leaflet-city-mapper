@@ -11,39 +11,32 @@ tests remain in leaflet-rotate.
 
 ## Local development
 
-Keep the two repositories next to each other. The development dependency
-`file:../leaflet-rotate` uses the sibling checkout, not a copied core build:
+Examples and browser tests load the precompiled leaflet-rotate 0.5.2 release
+from unpkg. No sibling checkout or compilation of leaflet-rotate is required:
 
 ```shell
-# In ../leaflet-rotate
-npm ci
-npm run build
-
-# In leaflet-city-mapper
 npm install
 npm run build
 npm run dev
 ```
 
 Open <http://127.0.0.1:8080/examples/paris.html>. WebGPU requires a compatible
-browser/GPU and a secure context (HTTPS or localhost). Build the core again
-after changing leaflet-rotate; its distribution is loaded through node_modules.
+browser/GPU and a secure context (HTTPS or localhost). Internet access is needed
+to load the precompiled Leaflet and leaflet-rotate scripts.
 
 ## Usage
 
-Load Leaflet, the current leaflet-rotate build, then this plugin:
+Load precompiled Leaflet and leaflet-rotate, then this plugin:
 
 ```html
-<link rel="stylesheet" href="node_modules/leaflet/dist/leaflet.css">
-<script src="node_modules/leaflet/dist/leaflet.js"></script>
-<script src="node_modules/leaflet-rotate/dist/leaflet-rotate.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.5.2/dist/leaflet-rotate-src.js"></script>
 <script src="dist/leaflet-city-mapper.js"></script>
 ```
 
 For Leaflet 2.0.0-alpha.1, use `leaflet-global-src.js` and set
 `globalThis.L = globalThis.leaflet` before loading the plugins.
-The current sibling leaflet-rotate checkout is required for the pitch APIs;
-the historical published 0.5.2 build alone is not a substitute.
 
 ```js
 const map = new L.Map('map', {
@@ -52,7 +45,7 @@ const map = new L.Map('map', {
 const model = new L.Layer({
   source: {
     type: '3d',
-    url: 'misc/eiffel-tower.glb',
+    url: './examples/data/eiffel-tower.glb',
     center: [48.85826, 2.2945],
   },
 }).addTo(map);

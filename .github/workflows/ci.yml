@@ -12,20 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: leaflet-city-mapper
-      - uses: actions/checkout@v4
-        with:
-          repository: Raruto/leaflet-rotate
-          path: leaflet-rotate
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: leaflet-city-mapper/package-lock.json
-      - run: npm ci && npm run build
-        working-directory: leaflet-rotate
       - run: npm ci
-        working-directory: leaflet-city-mapper
       - run: npm run build && node build/test.js --tags=@unit
-        working-directory: leaflet-city-mapper
