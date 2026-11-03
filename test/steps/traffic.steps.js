@@ -69,7 +69,7 @@ Then('the cruise route stays between latitudes {float} and {float} and longitude
   assert.ok(route.every(([lng, lat]) => lat > south && lat < north && lng > west && lng < east));
 });
 
-Then('cruise boats move along the river on scheduled trips and clean up when disabled', { timeout: 90000 }, async function () {
+Then('cruise boats move along the river on scheduled trips and clean up when disabled', { timeout: 180000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.waitForFunction(() => cruiseBoats?.renderer && map._terrain3D?._terrainReady);

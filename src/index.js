@@ -28,6 +28,7 @@
  */
 
 const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
+const scriptUrl = document.currentScript?.src || document.baseURI;
 
 // Stand-in while the type module loads: remembers the map, renders nothing.
 const Pending = L.Layer.extend({
@@ -68,7 +69,7 @@ L.Layer.include({
     L.Util.setOptions(layer, core);
     map?.addLayer(layer);
     // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
-    loading = loading.catch(() => {}).then(() => import(`./types/${type}.js`));
+    loading = loading.catch(() => {}).then(() => import(new URL(`./types/${type}.js`, scriptUrl).href));
     const pending = layer.ready = loading.then(() => {
       const map = layer._map;
       map?.removeLayer(layer);

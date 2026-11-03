@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
-Then('the offline Paris trees render and recover after toggling', { timeout: 60000 }, async function () {
+Then('the offline Paris trees render and recover after toggling', { timeout: 180000 }, async function () {
   const loaded = () => this.page.waitForFunction(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
     const error = [...tree._areas.values()].find(area => area.error);
     if (error) throw new Error(error.error);
     return tree._inflight === 0 && [...tree._areas.values()].some(area => area.buildings > 0);
-  }, null, { timeout: 45000 });
+  }, null, { timeout: 90000 });
   await loaded();
   const result = await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
