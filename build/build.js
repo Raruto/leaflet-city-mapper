@@ -13,6 +13,7 @@ const options = {
   format: 'esm',
   minify: true,
   sourcemap: true,
+  define: { 'import.meta': 'null' },
   outbase: 'src',
   outdir: 'dist',
 };

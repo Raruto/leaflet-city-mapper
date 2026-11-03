@@ -28,7 +28,8 @@
  */
 
 const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
-const scriptUrl = (document?.currentScript?.src || (import.meta && import.meta.url) || document?.baseURI).split("/").slice(0,-1).join("/") + '/';
+const scriptUrl = ((document.currentScript && document.currentScript.src) ||
+  (import.meta && import.meta.url) || document.baseURI).split('/').slice(0, -1).join('/') + '/';
 
 // Stand-in while the type module loads: remembers the map, renders nothing.
 const Pending = L.Layer.extend({

@@ -15,7 +15,9 @@ export async function read(backend, offset, length, signal) {
   const response = await fetch(backend.url, {
     headers: { Range: `bytes=${offset}-${offset + length - 1}` }, signal,
   });
-  if (!response.ok) throw new Error(`Unable to read PMTiles: HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new Error(`Unable to read PMTiles: HTTP ${response.status}`);
+  }
   const etag = response.headers.get('ETag');
   if (backend._etag && etag !== backend._etag) {
     throw new Error('PMTiles archive changed; recreate the layer');
@@ -46,7 +48,9 @@ export async function getZxy(backend, z, x, y, signal) {
   signal?.throwIfAborted();
   const header = await backend.getHeader();
   signal?.throwIfAborted();
-  if (z < header.minZoom || z > header.maxZoom) return;
+  if (z < header.minZoom || z > header.maxZoom) {
+    return;
+  }
   let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
   const visited = new Set();
   for (let depth = 0; depth < 4; depth++) {
@@ -63,7 +67,9 @@ export async function getZxy(backend, z, x, y, signal) {
         .then(data => decompress(data, header.internalCompression))
         .then(decodeDirectory)
         .catch(error => {
-          if (backend._directories.get(key) === pending) backend._directories.delete(key);
+          if (backend._directories.get(key) === pending) {
+            backend._directories.delete(key);
+          }
           throw error;
         });
       backend._directories.set(key, pending);
@@ -74,19 +80,30 @@ export async function getZxy(backend, z, x, y, signal) {
        high = entries.length - 1;
     while (low <= high) {
       const mid = (low + high) >> 1;
-      if (entries[mid].tileId <= id) low = mid + 1;
-      else high = mid - 1;
+      if (entries[mid].tileId <= id) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
     }
     const entry = entries[high];
-    if (!entry) return;
+    if (!entry) {
+      return;
+    }
     if (entry.runLength) {
-      if (id - entry.tileId >= entry.runLength) return;
-      if (entry.offset + entry.length > header.tileDataLength) throw new Error('PMTiles tile outside data section');
+      if (id - entry.tileId >= entry.runLength) {
+        return;
+      }
+      if (entry.offset + entry.length > header.tileDataLength) {
+        throw new Error('PMTiles tile outside data section');
+      }
       const data = await decompress(await backend._read(header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
       signal?.throwIfAborted();
       return { data };
     }
-    if (entry.offset + entry.length > header.leafDirectoryLength) throw new Error('PMTiles directory outside leaf section');
+    if (entry.offset + entry.length > header.leafDirectoryLength) {
+      throw new Error('PMTiles directory outside leaf section');
+    }
     offset = header.leafDirectoryOffset + entry.offset;
     length = entry.length;
   }
