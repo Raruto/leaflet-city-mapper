@@ -6,13 +6,13 @@
 **Your data, on a rotated and pitched Leaflet map:** a small 3D rendering engine (WebGPU) packaged onto standard `L.Layer`. Available sources: extruded GeoJSON, glTF models, PMTiles and terrain layers.
 
 <p align="center">
-    <a href="https://raruto.github.io/leaflet-rotate/examples/leaflet-city-mapper.html"><img src="https://raruto.github.io/img/leaflet-city-mapper.png" alt="Leaflet 3D City Mapper" /></a>
+    <a href="https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html"><img src="https://raruto.github.io/img/leaflet-city-mapper.png" alt="Leaflet 3D City Mapper" /></a>
 </p>
 
 _For a working example see one of the following demos:_
 
-- [City of Paris in 3D](examples/leaflet-city-mapper.html)
-- [Ancient Rome in 3D](examples/leaflet-city-mapper-geojson.html)
+- [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
+- [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-geojson.html)
 
 ## How to use
 
