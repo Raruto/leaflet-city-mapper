@@ -1,7 +1,7 @@
 {
   "name": "leaflet-city-mapper",
   "version": "0.1.0",
-  "description": "WebGPU city scenes, terrain and PMTiles layers for leaflet-rotate",
+  "description": "A small 3D rendering engine for leaflet",
   "type": "module",
   "main": "dist/index.js",
   "browser": "dist/index.js",
