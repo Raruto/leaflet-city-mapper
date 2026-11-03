@@ -8,6 +8,7 @@ import { limbs } from './limbs.js';
 import { moves } from './moves.js';
 import { parts } from './parts.js';
 import { wrap } from './wrap.js';
+import { getElevation } from './getElevation.js';
 
 export function installWalk(layer, {
     speed = 70,
@@ -41,7 +42,7 @@ export function installWalk(layer, {
   const local = () => {
     const map = layer._map, crs = map.options.crs, origin = crs.project(layer.location), metres = Math.cos(layer.location.lat * Math.PI / 180);
     const p = crs.project(state.latlng), terrain = map._terrain3D?._terrainReady && map._terrain3D;
-    const ground = (terrain && terrain._getElevation(state.latlng)) || 0;
+    const ground = (terrain && getElevation(terrain, state.latlng)) || 0;
     return [(p.x - origin.x) * metres, ground - layer.root.position[1], -(p.y - origin.y) * metres];
   };
   const place = () => {

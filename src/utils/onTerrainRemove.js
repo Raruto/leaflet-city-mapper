@@ -1,4 +1,5 @@
 import { destroyTexture } from './destroyTexture.js';
+import { conformModelToTerrain } from './conformModelToTerrain.js';
 import { disposeMesh } from './disposeMesh.js';
 import { setRasterTerrain } from './rasterTiles.js';
 import { removeRasterTile } from './removeRasterTile.js';
@@ -13,7 +14,10 @@ export function onTerrainRemove(backend, map) {
   });
   for (const tile of backend._rasterTiles.keys()) removeRasterTile(backend, tile);
   if (map._terrain3D === backend) delete map._terrain3D;
-  for (const layer of Object.values(map._layers)) setTerrainHeight(layer);
+  for (const layer of Object.values(map._layers)) {
+    conformModelToTerrain(layer, null);
+    setTerrainHeight(layer);
+  }
   map.fire('terrainchange');
   backend._terrainTiles.clear();
   backend._terrainOriginElevation = 0;

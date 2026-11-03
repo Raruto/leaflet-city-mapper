@@ -1,9 +1,16 @@
 import { computeBounds } from "./computeBounds.js";
 
+const sub = (a, b) => a.map((v, i) => v - b[i]);
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a.reduce((sum, v, i) => sum + v * b[i], 0);
+
 /** Nearest triangle hit per mesh, sorted by world-space distance. */
 
 export function intersectMeshes(ray, meshes, night = 0) {
-  const hits = [], a = [0, 0, 0], b = [0, 0, 0], c = [0, 0, 0], sub = (a, b) => a.map((v, i) => v - b[i]), cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a.reduce((sum, v, i) => sum + v * b[i], 0);
+  const hits = [],
+  a = [0, 0, 0],
+  b = [0, 0, 0],
+  c = [0, 0, 0];
   for (const mesh of meshes) {
     // Test in mesh-local space; compare distances only after returning to shared world space.
     const inverse = new DOMMatrix(mesh.worldMatrix).inverse();
@@ -24,7 +31,9 @@ export function intersectMeshes(ray, meshes, night = 0) {
       localDirection.z
     ];
     const directionLength = Math.hypot(...direction) || 1;
-    direction[0] /= directionLength; direction[1] /= directionLength; direction[2] /= directionLength;
+    direction[0] /= directionLength;
+    direction[1] /= directionLength;
+    direction[2] /= directionLength;
     // AABB slab test reuses the same local ray as the triangle test.
     if (!mesh.geometry.bounds) {
       computeBounds(mesh.geometry);
@@ -61,7 +70,10 @@ export function intersectMeshes(ray, meshes, night = 0) {
       c[1] = position.data[ci + 1];
       c[2] = position.data[ci + 2];
       // Moller-Trumbore: barycentric triangle coordinates and local ray distance.
-      const e = sub(b, a), f = sub(c, a), p = cross(direction, f), det = dot(e, p);
+      const e = sub(b, a),
+            f = sub(c, a),
+            p = cross(direction, f),
+            det = dot(e, p);
       if (mesh.program.cullFace !== null ? det < 1e-9 : Math.abs(det) < 1e-9) {
         continue;
       }

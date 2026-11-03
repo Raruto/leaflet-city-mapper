@@ -6,6 +6,7 @@ import { setParent } from './setParent.js';
 import { textureSampler } from './textureSampler.js';
 import { vertexNormals } from './vertexNormals.js';
 import { createProgram } from './createProgram.js';
+import { conformModelToTerrain } from './conformModelToTerrain.js';
 
 /** glTF/GLB model loading. */
 /** Load the configured GLB/glTF (static triangles) under `root`; GPU resources need attachment. */
@@ -93,7 +94,7 @@ export async function loadModel(backend) {
       occlusionTexture: textureFor(material.occlusionTexture),
       emissive: material.emissiveFactor || [0, 0, 0],
       occlusionStrength: material.occlusionTexture?.strength ?? 1,
-      alphaMode: material.alphaMode || 'OPAQUE',
+      alphaMode: backend.options.alphaMode || material.alphaMode || 'OPAQUE',
       alphaCutoff: material.alphaCutoff ?? 0.5,
       doubleSided: material.doubleSided,
     };
@@ -210,4 +211,5 @@ export async function loadModel(backend) {
     backend.model.scale[0] = x; backend.model.scale[1] = y; backend.model.scale[2] = z;
   }
   setParent(backend.model, backend.root);
+  conformModelToTerrain(backend, backend._map?._terrain3D);
 }

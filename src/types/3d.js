@@ -34,6 +34,8 @@
  * @property {string} [type] 'pmtiles' (raster tiles), '3d' (WebGPU scene) or 'terrain'; see L.Layer.types.
  * @property {number[]} [center] Local origin [lat,lng]; defaults to the first map center.
  * @property {number} [terrainOffset=0] Vertical offset in metres when terrain is enabled.
+ * @property {boolean} [terrainConform=false] Fit the lower model geometry to local terrain elevation.
+ * @property {'OPAQUE'|'MASK'|'BLEND'} [alphaMode] Override every glTF material's alpha mode.
  * @property {number[]} [rotation] Model Euler rotation [x,y,z] in radians, YXZ order.
  * @property {number[]} [scale] Model scale [x,y,z]; independent of geographic scaling.
  * @property {string} [url] GLB/glTF model URL (loaded before ready), or PMTiles URL containing

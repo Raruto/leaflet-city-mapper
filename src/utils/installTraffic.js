@@ -14,6 +14,7 @@ import { underEntry } from './underEntry.js';
 import { tooltip } from './tooltip.js';
 import { speed } from './speed.js';
 import { vehicles } from './vehicles.js';
+import { getElevation } from './getElevation.js';
 
 export function installTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
@@ -60,7 +61,7 @@ export function installTraffic(layer, { url, vehicle = 'car', side, outline, spe
   const ground = () => {
     const terrain = layer._map._terrain3D?._terrainReady && layer._map._terrain3D, base = layer.root.position[1];
     for (const lane of lanes) lane.points.forEach((point, i) => {
-      const elevation = terrain && (lane.elevation ?? terrain._getElevation(lane.latlngs[i]));
+      const elevation = terrain && (lane.elevation ?? getElevation(terrain, lane.latlngs[i]));
       point[2] = Number.isFinite(elevation) && Number.isFinite(base) ? elevation - base : 0;
     });
     lanesDirty = true;

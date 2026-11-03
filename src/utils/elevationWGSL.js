@@ -1,5 +1,5 @@
 /**
- * WGSL twin of _getElevation for the vertex shader: bilinear DEM pixels, or the first valid
+ * WGSL twin of getElevation for the vertex shader: bilinear DEM pixels, or the first valid
  * neighbour near no-data (stored as -1e9), else `base`. Expects `dem: texture_2d<f32>`.
  */
 export const elevationWGSL = `

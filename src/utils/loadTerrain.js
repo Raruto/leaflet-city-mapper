@@ -1,4 +1,6 @@
 import { addBridges } from './addBridges.js';
+import { conformModelToTerrain } from './conformModelToTerrain.js';
+import { getElevation } from './getElevation.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
 import { update } from './update.js';
 
@@ -41,8 +43,11 @@ export async function loadTerrain(backend) {
       .then(response => { if (!response.ok) throw new Error(`Bridges: HTTP ${response.status}`); return response.json(); });
     if (controller.signal.aborted || backend._map !== map) return;
     backend._terrainReady = true;
-    backend._terrainOriginElevation = backend._getElevation(backend.location) ?? 0;
-    for (const layer of Object.values(map._layers)) setTerrainHeight(layer);
+    backend._terrainOriginElevation = getElevation(backend, backend.location) ?? 0;
+    for (const layer of Object.values(map._layers)) {
+      setTerrainHeight(layer);
+      conformModelToTerrain(layer, backend);
+    }
     if (bridges) addBridges(backend, bridges);
     map.fire('terrainchange');
     update(backend);

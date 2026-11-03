@@ -1,9 +1,10 @@
 /** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
 export function updateCamera(camera) {
   const z = camera.position.map((v, i) => v - camera.target[i]);
   const zLength = Math.hypot(...z) || 1;
-  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   for (let i = 0; i < 3; i++) {
     z[i] /= zLength;
   }
