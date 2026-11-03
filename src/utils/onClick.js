@@ -1,6 +1,6 @@
-import { findFeature } from './findFeature';
-import { setHighlight } from './setHighlight';
-import { showFeature } from './showFeature';
+import { findFeature } from './findFeature.js';
+import { setHighlight } from './setHighlight.js';
+import { showFeature } from './showFeature.js';
 
 /** Emit click without moving the map or pinning the tooltip. */
 

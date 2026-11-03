@@ -1,9 +1,9 @@
-import { CELL } from './CELL';
-import { collider } from './collider';
-import { computeBounds } from './computeBounds';
-import { horizontalRay } from './horizontalRay';
-import { traverse } from './traverse';
-import { updateWorldMatrix } from './updateWorldMatrix';
+import { CELL } from './CELL.js';
+import { collider } from './collider.js';
+import { computeBounds } from './computeBounds.js';
+import { horizontalRay } from './horizontalRay.js';
+import { traverse } from './traverse.js';
+import { updateWorldMatrix } from './updateWorldMatrix.js';
 
 // Horizontal normal of the nearest wall faced within `reach` metres of the feet at world (x, y, z), walking along
 // the unit (dx, dz); knee and chest rays, so arches and tree crowns above the head let the walker through.

@@ -1,5 +1,5 @@
-import { bindSunlight } from './bindSunlight';
-import { destroyTexture } from './destroyTexture';
+import { bindSunlight } from './bindSunlight.js';
+import { destroyTexture } from './destroyTexture.js';
 
 
 export function resizeSunlight(backend, size) {

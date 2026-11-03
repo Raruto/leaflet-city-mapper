@@ -1,5 +1,5 @@
-import { emptyNode } from './emptyNode';
-import { createProgram } from './createProgram';
+import { emptyNode } from './emptyNode.js';
+import { createProgram } from './createProgram.js';
 
 /**
  * Add a non-indexed, vertex-coloured mesh from flat vec3 arrays `{ position, normal, color }` in layer-local metres.

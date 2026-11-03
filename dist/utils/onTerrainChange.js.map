@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/onTerrainChange.js"],
-  "sourcesContent": ["import { releaseArea } from \"./releaseArea\";\nimport { updateArea } from \"./updateArea\";\n\n/** GeoJSON source areas: loading, building and releasing. */\n\nexport function onTerrainChange(backend) {\n  if (!backend._map) return;\n  for (const area of backend._areas.values()) releaseArea(backend, area);\n  backend._areas.clear();\n  updateArea(backend);\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,gBAC5B,OAAS,cAAAC,MAAkB,eAIpB,SAASC,EAAgBC,EAAS,CACvC,GAAKA,EAAQ,KACb,WAAWC,KAAQD,EAAQ,OAAO,OAAO,EAAGH,EAAYG,EAASC,CAAI,EACrED,EAAQ,OAAO,MAAM,EACrBF,EAAWE,CAAO,EACpB",
+  "sourcesContent": ["import { releaseArea } from \"./releaseArea.js\";\nimport { updateArea } from \"./updateArea.js\";\n\n/** GeoJSON source areas: loading, building and releasing. */\n\nexport function onTerrainChange(backend) {\n  if (!backend._map) return;\n  for (const area of backend._areas.values()) releaseArea(backend, area);\n  backend._areas.clear();\n  updateArea(backend);\n}\n"],
+  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,cAAAC,MAAkB,kBAIpB,SAASC,EAAgBC,EAAS,CACvC,GAAKA,EAAQ,KACb,WAAWC,KAAQD,EAAQ,OAAO,OAAO,EAAGH,EAAYG,EAASC,CAAI,EACrED,EAAQ,OAAO,MAAM,EACrBF,EAAWE,CAAO,EACpB",
   "names": ["releaseArea", "updateArea", "onTerrainChange", "backend", "area"]
 }

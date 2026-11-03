@@ -1,4 +1,4 @@
-import { update } from './update';
+import { update } from './update.js';
 
 /** Highlight a source vertex range in the shader; vertex colors stay untouched. */
 

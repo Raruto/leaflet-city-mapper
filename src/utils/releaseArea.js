@@ -1,6 +1,6 @@
-import { removeProgram } from './removeProgram';
-import { setHighlight } from './setHighlight';
-import { showFeature } from './showFeature';
+import { removeProgram } from './removeProgram.js';
+import { setHighlight } from './setHighlight.js';
+import { showFeature } from './showFeature.js';
 
 /** Cancel pending work and dispose this block's GPU data, including any hover highlight. */
 

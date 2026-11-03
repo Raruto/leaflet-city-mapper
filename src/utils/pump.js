@@ -1,13 +1,13 @@
-import { emptyNode } from "./emptyNode";
-import { isClockWise } from "./isClockWise";
-import { lampPostGeometry } from "./lampPostGeometry";
-import { lightGeometry } from "./lightGeometry";
-import { parseColor } from "./parseColor";
-import { treeGeometry } from "./treeGeometry";
-import { triangulate } from "./triangulate";
-import { createProgram } from './createProgram';
-import { updateStatus } from "./releaseArea";
-import { loadSource } from './loadSource';
+import { emptyNode } from "./emptyNode.js";
+import { isClockWise } from "./isClockWise.js";
+import { lampPostGeometry } from "./lampPostGeometry.js";
+import { lightGeometry } from "./lightGeometry.js";
+import { parseColor } from "./parseColor.js";
+import { treeGeometry } from "./treeGeometry.js";
+import { triangulate } from "./triangulate.js";
+import { createProgram } from './createProgram.js';
+import { updateStatus } from "./releaseArea.js";
+import { loadSource } from './loadSource.js';
 
 /** Start at most two load/build tasks; cancelled tasks still free their slot in finally. */
 

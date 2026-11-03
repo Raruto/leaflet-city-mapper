@@ -1,4 +1,4 @@
-import { removeProgram } from './removeProgram';
+import { removeProgram } from './removeProgram.js';
 
 
 export function disposeMesh(backend, mesh) {

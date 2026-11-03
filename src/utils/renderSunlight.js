@@ -1,6 +1,6 @@
-import { computeBounds } from './computeBounds';
-import { updateCamera } from './updateCamera';
-import { resizeSunlight } from './resizeSunlight';
+import { computeBounds } from './computeBounds.js';
+import { updateCamera } from './updateCamera.js';
+import { resizeSunlight } from './resizeSunlight.js';
 
 /** One shared directional depth map. Off-screen but loaded geometry can cast shadows. */
 

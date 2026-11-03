@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/onZoomAnim.js"],
-  "sourcesContent": ["import { update } from \"./update\";\n\n\nexport function onZoomAnim() {\n  update(this);\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,WAGhB,SAASC,GAAa,CAC3BD,EAAO,IAAI,CACb",
+  "sourcesContent": ["import { update } from \"./update.js\";\n\n\nexport function onZoomAnim() {\n  update(this);\n}\n"],
+  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAGhB,SAASC,GAAa,CAC3BD,EAAO,IAAI,CACb",
   "names": ["update", "onZoomAnim"]
 }

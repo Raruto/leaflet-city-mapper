@@ -1,4 +1,4 @@
-import { destroyTexture } from './destroyTexture';
+import { destroyTexture } from './destroyTexture.js';
 
 export function removeRasterTile(backend, tile) {
   backend._terrainRequest?.abort();

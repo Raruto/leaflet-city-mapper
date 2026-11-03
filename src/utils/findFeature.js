@@ -1,4 +1,4 @@
-import { raycast } from './raycast';
+import { raycast } from './raycast.js';
 
 /**
  * Translate a geometry hit into a configured model or batched source feature.

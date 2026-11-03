@@ -1,4 +1,4 @@
-import { getTileLevel } from "./getTileLevel";
+import { getTileLevel } from "./getTileLevel.js";
 
 /** Preserve the outgoing tile level before Leaflet changes its logical zoom. */
 

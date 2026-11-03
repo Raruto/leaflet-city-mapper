@@ -1,4 +1,4 @@
-import { hull } from "./hull";
+import { hull } from "./hull.js";
 import { box, glass, mirror } from "./paints.js";
 import { white } from "./white.js";
 

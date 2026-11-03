@@ -1,8 +1,8 @@
-import { lightGrid } from './lightGrid';
-import { traverse } from './traverse';
-import { worldLights } from './worldLights';
-import { destroyTexture } from './destroyTexture';
-import { bindSunlight } from './bindSunlight';
+import { lightGrid } from './lightGrid.js';
+import { traverse } from './traverse.js';
+import { worldLights } from './worldLights.js';
+import { destroyTexture } from './destroyTexture.js';
+import { bindSunlight } from './bindSunlight.js';
 
 /** A cached spatial grid limits fragment lighting to nearby lamps, without dropping dense cells. */
 

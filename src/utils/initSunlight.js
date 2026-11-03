@@ -1,4 +1,4 @@
-import { resizeSunlight } from './resizeSunlight';
+import { resizeSunlight } from './resizeSunlight.js';
 
 /** Sunlight shadow maps and night point lights. */
 

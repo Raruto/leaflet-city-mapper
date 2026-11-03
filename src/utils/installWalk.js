@@ -1,13 +1,13 @@
-import * as createMesh from './createMesh';
-import * as disposeMesh from './disposeMesh';
-import * as render from './render';
-import * as update from "./update";
-import { build } from './build';
-import { hit } from './hit';
-import { limbs } from './limbs';
-import { moves } from './moves';
-import { parts } from './parts';
-import { wrap } from './wrap';
+import * as createMesh from './createMesh.js';
+import * as disposeMesh from './disposeMesh.js';
+import * as render from './render.js';
+import * as update from "./update.js";
+import { build } from './build.js';
+import { hit } from './hit.js';
+import { limbs } from './limbs.js';
+import { moves } from './moves.js';
+import { parts } from './parts.js';
+import { wrap } from './wrap.js';
 
 export function installWalk(layer, { speed, distance, position }) {
   const keys = new Set();

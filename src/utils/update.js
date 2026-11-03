@@ -1,4 +1,4 @@
-import { render } from "./render";
+import { render } from "./render.js";
 
 /** Scene graph, shared camera and frame rendering. */
 /** Content changes: render once on the next animation frame. */

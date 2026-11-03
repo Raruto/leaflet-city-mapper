@@ -1,5 +1,5 @@
-import { pump } from "./pump";
-import { releaseArea } from "./releaseArea";
+import { pump } from "./pump.js";
+import { releaseArea } from "./releaseArea.js";
 
 /** Cover the visible ground bounds and one bordering block, clipped to the archive. */
 

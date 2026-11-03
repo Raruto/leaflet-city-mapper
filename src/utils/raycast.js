@@ -1,7 +1,7 @@
-import { intersectMeshes } from './intersectMeshes';
-import { traverse } from './traverse';
-import { updateCamera } from './updateCamera';
-import { updateWorldMatrix } from './updateWorldMatrix';
+import { intersectMeshes } from './intersectMeshes.js';
+import { traverse } from './traverse.js';
+import { updateCamera } from './updateCamera.js';
+import { updateWorldMatrix } from './updateWorldMatrix.js';
 
 /** Raycasting, hover/click highlight and tooltips. */
 /**

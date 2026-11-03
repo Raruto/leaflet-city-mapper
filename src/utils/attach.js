@@ -1,16 +1,16 @@
-import { emptyNode } from './emptyNode';
-import { setParent } from './setParent';
-import { traverse } from './traverse';
-import { createProgram } from './createProgram';
-import { endZoom } from './endZoom';
-import { initSunlight } from './initSunlight';
-import { onMapChange } from './onMapChange';
-import { onZoomAnim } from './onZoomAnim';
-import { removeProgram } from './removeProgram';
-import { render } from './render';
-import { startZoom } from './startZoom';
-import { update } from './update';
-import { updateArea } from './updateArea';
+import { emptyNode } from './emptyNode.js';
+import { setParent } from './setParent.js';
+import { traverse } from './traverse.js';
+import { createProgram } from './createProgram.js';
+import { endZoom } from './endZoom.js';
+import { initSunlight } from './initSunlight.js';
+import { onMapChange } from './onMapChange.js';
+import { onZoomAnim } from './onZoomAnim.js';
+import { removeProgram } from './removeProgram.js';
+import { render } from './render.js';
+import { startZoom } from './startZoom.js';
+import { update } from './update.js';
+import { updateArea } from './updateArea.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
 /**

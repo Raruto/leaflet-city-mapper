@@ -1,4 +1,4 @@
-import { update } from "./update";
+import { update } from "./update.js";
 
 /** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */
 

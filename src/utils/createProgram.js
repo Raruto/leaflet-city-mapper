@@ -1,4 +1,4 @@
-import { materialShaders } from './materialShaders';
+import { materialShaders } from './materialShaders.js';
 
 
 export function createProgram(backend, material = {}) {

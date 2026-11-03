@@ -1,14 +1,14 @@
-import { computeBounds } from "./computeBounds";
-import { traverse } from "./traverse";
-import { updateCamera } from "./updateCamera";
-import { updateWorldMatrix } from "./updateWorldMatrix";
-import { getTileLevel } from "./getTileLevel";
-import { destroyTexture } from './destroyTexture';
-import { drawGeometry } from './drawGeometry';
-import { updatePointLights } from './updatePointLights';
-import { renderSunlight } from './renderSunlight';
-import { sortMeshes } from "./sortMeshes";
-import { update } from "./update";
+import { computeBounds } from "./computeBounds.js";
+import { traverse } from "./traverse.js";
+import { updateCamera } from "./updateCamera.js";
+import { updateWorldMatrix } from "./updateWorldMatrix.js";
+import { getTileLevel } from "./getTileLevel.js";
+import { destroyTexture } from './destroyTexture.js';
+import { drawGeometry } from './drawGeometry.js';
+import { updatePointLights } from './updatePointLights.js';
+import { renderSunlight } from './renderSunlight.js';
+import { sortMeshes } from "./sortMeshes.js";
+import { update } from "./update.js";
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.

@@ -1,4 +1,4 @@
-import { box } from "./box";
+import { box } from "./box.js";
 
 export const mirror = (x0, x1, z0, z1, ...rest) => [
   [box(x0, x1, z0, z1), ...rest],

@@ -1,6 +1,6 @@
-import { findFeature } from './findFeature';
-import { setHighlight } from './setHighlight';
-import { showFeature } from './showFeature';
+import { findFeature } from './findFeature.js';
+import { setHighlight } from './setHighlight.js';
+import { showFeature } from './showFeature.js';
 
 /** Hover is transient; featurehover also reports misses with feature:null. */
 

@@ -1,12 +1,12 @@
-import { decodeModel } from './decodeModel';
-import { emptyNode } from './emptyNode';
-import { nodeMatrix } from './nodeMatrix';
-import { readAccessor } from './readAccessor';
-import { setParent } from './setParent';
-import { textureSampler } from './textureSampler';
-import { vertexNormals } from './vertexNormals';
-import { createProgram } from './createProgram';
-import { removeProgram } from './removeProgram';
+import { decodeModel } from './decodeModel.js';
+import { emptyNode } from './emptyNode.js';
+import { nodeMatrix } from './nodeMatrix.js';
+import { readAccessor } from './readAccessor.js';
+import { setParent } from './setParent.js';
+import { textureSampler } from './textureSampler.js';
+import { vertexNormals } from './vertexNormals.js';
+import { createProgram } from './createProgram.js';
+import { removeProgram } from './removeProgram.js';
 
 /** glTF/GLB model loading. */
 /** Load the configured GLB/glTF (static triangles) under `root`; GPU resources need attachment. */

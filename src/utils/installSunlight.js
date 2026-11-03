@@ -1,8 +1,8 @@
-import { update as updateScene } from "./update";
-import { atmosphere } from './atmosphere';
-import { moonPosition } from './moonPosition';
-import { projectCelestialBody } from './projectCelestialBody';
-import { solarPosition } from './solarPosition';
+import { update as updateScene } from "./update.js";
+import { atmosphere } from './atmosphere.js';
+import { moonPosition } from './moonPosition.js';
+import { projectCelestialBody } from './projectCelestialBody.js';
+import { solarPosition } from './solarPosition.js';
 
 export function installSunlight(map) {
   const control = new L.Control({ position: 'bottomright' });

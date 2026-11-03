@@ -1,4 +1,4 @@
-import { update } from "./update";
+import { update } from "./update.js";
 
 
 export function onZoomAnim() {

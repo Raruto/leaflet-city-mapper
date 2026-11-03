@@ -1,4 +1,4 @@
-import { getZxy } from './getZxy';
+import { getZxy } from './getZxy.js';
 
 
 export async function loadSource(backend, area) {

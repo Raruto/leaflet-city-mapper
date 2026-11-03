@@ -1,16 +1,16 @@
-import * as createMesh from './createMesh';
-import * as disposeMesh from './disposeMesh';
-import * as setHighlight from './setHighlight';
-import * as showFeature from './showFeature';
-import * as render from './render';
-import * as update from "./update";
-import { along } from './along';
-import { build } from './build';
-import { computeBounds } from './computeBounds';
-import { routeGeometry } from './routeGeometry';
-import { toLanes } from './toLanes';
-import { tripsAt } from './tripsAt';
-import { underEntry } from './underEntry';
+import * as createMesh from './createMesh.js';
+import * as disposeMesh from './disposeMesh.js';
+import * as setHighlight from './setHighlight.js';
+import * as showFeature from './showFeature.js';
+import * as render from './render.js';
+import * as update from "./update.js";
+import { along } from './along.js';
+import { build } from './build.js';
+import { computeBounds } from './computeBounds.js';
+import { routeGeometry } from './routeGeometry.js';
+import { toLanes } from './toLanes.js';
+import { tripsAt } from './tripsAt.js';
+import { underEntry } from './underEntry.js';
 
 export function installTraffic(layer, { url, model, lights, side, outline, velocity }) {
   // The 'sunlight' layer on the same map drives the simulation time; without one, vehicles run live.

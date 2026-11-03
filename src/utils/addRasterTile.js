@@ -1,7 +1,7 @@
-import { createProgram } from './createProgram';
-import { destroyTexture } from './destroyTexture';
-import { terrainAtlas } from './terrainAtlas';
-import { terrainGrid } from './terrainGrid';
+import { createProgram } from './createProgram.js';
+import { destroyTexture } from './destroyTexture.js';
+import { terrainAtlas } from './terrainAtlas.js';
+import { terrainGrid } from './terrainGrid.js';
 
 export async function addRasterTile(backend, layer, coords, tile) {
   const [ready, bitmap] = await Promise.all([backend._terrainPromise, createImageBitmap(tile)]);

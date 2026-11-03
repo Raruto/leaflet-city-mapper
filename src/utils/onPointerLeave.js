@@ -1,5 +1,5 @@
-import { setHighlight } from './setHighlight';
-import { showFeature } from './showFeature';
+import { setHighlight } from './setHighlight.js';
+import { showFeature } from './showFeature.js';
 
 /** Clear hover, highlight and tooltip without retaining a selected feature. */
 

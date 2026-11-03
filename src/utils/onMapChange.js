@@ -1,5 +1,5 @@
-import { update } from "./update";
-import { render } from "./render";
+import { update } from "./update.js";
+import { render } from "./render.js";
 
 /** Map movement: render within the frame of Leaflet's CSS transforms, coalescing same-tick events. */
 
