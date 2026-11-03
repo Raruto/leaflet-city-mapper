@@ -5,8 +5,7 @@
 export function underEntry(layer, element) {
   const map = layer._map;
   const place = () => {
-    const input = [...map.getContainer().querySelectorAll('.leaflet-control-layers-selector')]
-      .find(input => input.layerId === globalThis.L.Util.stamp(layer));
+    const input = [...map.getContainer().querySelectorAll('.leaflet-control-layers-selector')].find(input => input.layerId === L.Util.stamp(layer));
     input?.closest('label').after(element);
     return Boolean(input);
   };

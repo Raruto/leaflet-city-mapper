@@ -5,15 +5,24 @@ import { traverse, updateWorldMatrix } from '../utils/scene.js';
 import { build } from '../utils/vehicles.js';
 
 // W/S (↑/↓) run forward/back along the heading, A/D (←/→) turn: [forward, turn].
-const moves = { KeyW: [1, 0], ArrowUp: [1, 0], KeyS: [-1, 0], ArrowDown: [-1, 0], KeyD: [0, 1], ArrowRight: [0, 1], KeyA: [0, -1], ArrowLeft: [0, -1] };
+const moves = {
+  KeyW:       [1, 0],
+  ArrowUp:    [1, 0],
+  KeyS:       [-1, 0],
+  ArrowDown:  [-1, 0],
+  KeyD:       [0, 1],
+  ArrowRight: [0, 1],
+  KeyA:       [0, -1],
+  ArrowLeft:  [0, -1]
+};
+
 const wrap = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
 
 // Horizontal normal of the nearest wall faced within `reach` metres of the feet at world (x, y, z), walking along
 // the unit (dx, dz); knee and chest rays, so arches and tree crowns above the head let the walker through.
 // ponytail: traffic vehicles and boats move on the GPU and are not obstacles.
 function hit(layer, x, y, z, dx, dz, reach) {
-  const types = globalThis.L.Layer.types, skip = other => other === layer ||
-    ['terrain', 'traffic'].some(name => types[name] && other instanceof types[name]);
+  const types = L.Layer.types, skip = other => other === layer || ['terrain', 'traffic'].some(name => types[name] && other instanceof types[name]);
   updateWorldMatrix(layer.scene);
   let best = reach, found = null;
   for (const other of layer._shared._layers) {
@@ -44,7 +53,7 @@ function hit(layer, x, y, z, dx, dz, reach) {
 }
 
 function installWalk(layer, { speed, distance, position }) {
-  const L = globalThis.L, keys = new Set();
+  const keys = new Set();
   // Map button (leaflet-bar look) toggling the walk; the key hint shows beside it while walking.
   const control = new L.Control({ position });
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');

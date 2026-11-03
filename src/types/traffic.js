@@ -12,7 +12,6 @@ const tooltip = ({ properties: p }) => {
 };
 
 function installTraffic(layer, { url, model, lights, side, outline, velocity }) {
-  const L = globalThis.L;
   // The 'sunlight' layer on the same map drives the simulation time; without one, vehicles run live.
   const now = () => {
     let control = { live: true };

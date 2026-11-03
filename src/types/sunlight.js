@@ -2,7 +2,6 @@ import { atmosphere, moonPosition, solarPosition, projectCelestialBody } from '.
 import { underEntry } from '../utils/control.js';
 
 function installSunlight(map) {
-  const L = globalThis.L;
   const control = new L.Control({ position: 'bottomright' });
   control.live = true;
   let date, slider, output, status, timer;

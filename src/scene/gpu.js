@@ -13,31 +13,42 @@ export async function attach(backend, map) {
     await shared._rendererReady.promise;
   }
   if (!shared) {
-    const rendererReady = Promise.withResolvers();
     shared = backend;
-    backend._rendererReady = rendererReady;
-    rendererReady.promise.catch(() => {});
+    backend._rendererReady = Promise.withResolvers();
+    backend._rendererReady.promise.catch(() => {});
     L.Layer.types['3d']._renderers.set(map, shared);
     const fail = error => {
-      rendererReady.reject(error);
+      backend._rendererReady.reject(error);
       L.Layer.types['3d']._renderers.delete(map);
       throw error;
     };
     const canvas = document.createElement('canvas');
-    if (!navigator.gpu) fail(new Error('Layer3D requires WebGPU'));
+    if (!navigator.gpu) {
+      fail(new Error('Layer3D requires WebGPU'));
+    }
     const adapter = await navigator.gpu.requestAdapter().catch(fail);
-    if (!adapter) fail(new Error('Unable to acquire a WebGPU adapter'));
+    if (!adapter) {
+      fail(new Error('Unable to acquire a WebGPU adapter'));
+    }
     const device = await adapter.requestDevice().catch(fail);
     device.addEventListener('uncapturederror', event => {
       const owner = L.Layer.types['3d']._renderers.get(map);
-      if (owner?.renderer?.device !== device) return;
-      for (const layer of owner?._layers || []) layer.fire('error', { error: event.error });
+      if (owner?.renderer?.device !== device) {
+        return;
+      }
+      for (const layer of owner?._layers || []) {
+        layer.fire('error', { error: event.error });
+      }
     });
     device.lost.then(info => {
       const owner = L.Layer.types['3d']._renderers.get(map);
-      if (!owner || owner.renderer?.device !== device) return;
+      if (!owner || owner.renderer?.device !== device) {
+        return;
+      }
       const error = new Error(`WebGPU device lost: ${info.message || info.reason}`);
-      for (const layer of owner._layers) layer.fire('error', { error });
+      for (const layer of owner._layers) {
+        layer.fire('error', { error });
+      }
     });
     const context = canvas.getContext('webgpu');
     if (!context) {
@@ -46,10 +57,10 @@ export async function attach(backend, map) {
     }
     const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format, alphaMode: 'premultiplied' });
-    backend._shared = backend;
-    backend._layers = new Set();
+    backend._shared      = backend;
+    backend._layers      = new Set();
     backend._sceneOrigin = backend.location;
-    backend.scene = emptyNode();
+    backend.scene        = emptyNode();
     // Perspective camera state: fov in degrees, near/far in scene metres.
     backend.camera = {
       position:             [0, 0, 0],
@@ -63,7 +74,13 @@ export async function attach(backend, map) {
       near:                 0.1,
       far:                  10000,
     };
-    backend.renderer = { device, context, format, canvas, dpr: Math.min(window.devicePixelRatio, 2) };
+    backend.renderer = {
+      device,
+      context,
+      format,
+      canvas,
+      dpr: Math.min(window.devicePixelRatio, 2)
+    };
     backend._initSunlight();
     const emptyImage = document.createElement('canvas');
     emptyImage.width = 1;
@@ -95,7 +112,7 @@ export async function attach(backend, map) {
     map.on('zoomstart', shared._startZoom, shared);
     map.on('zoomanim', shared.update, shared);
     map.on('zoomend', shared._endZoom, shared);
-    rendererReady.resolve();
+    backend._rendererReady.resolve();
     delete shared._rendererReady;
     shared._render();
     L.Layer.types['3d']._renderers.set(map, shared);
@@ -197,13 +214,17 @@ export function destroyTexture(backend, texture) {
 }
 
 export function createProgram(backend, material = {}) {
-  const device = backend.renderer.device;
-  const sparkle = Boolean(backend.options.nightSparkle);
-  const shaders = materialShaders(material, sparkle, material.terrain ? L.Layer.types.terrain.elevationWGSL : '');
-  const { bindings, textured, hasTerrain } = shaders;
-  const vertex = device.createShaderModule({ code: shaders.vertex });
-  const fragment = device.createShaderModule({ code: shaders.fragment });
-  Promise.all([vertex.getCompilationInfo(), fragment.getCompilationInfo()]).then(infos => {
+  const shaders  = materialShaders(
+    material,
+    !!backend.options.nightSparkle,
+    material.terrain ? L.Layer.types.terrain.elevationWGSL : ''
+  );
+  const vertex   = backend.renderer.device.createShaderModule({ code: shaders.vertex });
+  const fragment = backend.renderer.device.createShaderModule({ code: shaders.fragment });
+  Promise.all([
+    vertex.getCompilationInfo(),
+    fragment.getCompilationInfo()
+  ]).then(infos => {
     const errors = infos.flatMap(info => info.messages).filter(message => message.type === 'error');
     if (errors.length) {
       backend.fire('error', {
@@ -215,7 +236,7 @@ export function createProgram(backend, material = {}) {
     { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },
     { arrayStride: 12, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
     material.vertexColors ? { arrayStride: 12, attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x3' }] } : null,
-    textured              ? { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x2' }] }  : null,
+    shaders.textured      ? { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x2' }] }  : null,
   ];
   const bindGroupEntries = [{
     binding: 0,
@@ -226,14 +247,14 @@ export function createProgram(backend, material = {}) {
     visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
     buffer: { type: 'uniform' },
   }];
-  if (hasTerrain) {
+  if (shaders.hasTerrain) {
     bindGroupEntries.push({
       binding: 2,
       visibility: GPUShaderStage.VERTEX,
       texture: { sampleType: 'unfilterable-float', viewDimension: '2d' },
     });
   }
-  for (const texture of bindings) {
+  for (const texture of shaders.bindings) {
     bindGroupEntries.push({
       binding: texture.texture,
       visibility: GPUShaderStage.FRAGMENT,
@@ -245,13 +266,13 @@ export function createProgram(backend, material = {}) {
       sampler: { type: 'filtering' },
     });
   }
-  const bindGroupLayout = device.createBindGroupLayout({ entries: bindGroupEntries });
-  const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, backend.renderer.sunlight.layout] });
+  const bindGroupLayout = backend.renderer.device.createBindGroupLayout({ entries: bindGroupEntries });
+  const pipelineLayout = backend.renderer.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, backend.renderer.sunlight.layout] });
   return {
-    device,
+    device: backend.renderer.device,
     vertex,
     fragment,
-    bindings,
+    bindings: shaders.bindings,
     vertexBuffers,
     bindGroupLayout,
     pipelineLayout,
@@ -262,7 +283,7 @@ export function createProgram(backend, material = {}) {
     depthTest: material.depthTest !== false,
     terrain: material.terrain,
     nightLight: Boolean(material.nightLight),
-    nightSparkle: sparkle,
+    nightSparkle: !!backend.options.nightSparkle,
     uniforms: {
       baseColor: { value: material.color || [1, 1, 1] },
       metallic: { value: material.metallic ?? 0 },
