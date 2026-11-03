@@ -1,4 +1,5 @@
 import { update } from './update.js';
+import { setTerrainHeight } from './setTerrainHeight.js';
 
 export async function _loadTerrain(backend) {
   if (backend._terrainLoading || !backend._map) return;
@@ -39,7 +40,7 @@ export async function _loadTerrain(backend) {
     if (controller.signal.aborted || backend._map !== map) return;
     backend._terrainReady = true;
     backend._terrainOriginElevation = backend._getElevation(backend.location) ?? 0;
-    for (const layer of Object.values(map._layers)) layer._setTerrainHeight?.();
+    for (const layer of Object.values(map._layers)) setTerrainHeight(layer);
     if (bridges) backend._addBridges(bridges);
     map.fire('terrainchange');
     update(backend);

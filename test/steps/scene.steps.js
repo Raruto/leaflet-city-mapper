@@ -38,6 +38,10 @@ Then('layer-owned objects preserve values and visibility without engine classes'
       objects.every(object => Object.getPrototypeOf(object) === Object.prototype &&
         Object.values(object).every(value => typeof value !== 'function')) &&
       !Object.keys(L.Layer.types['3d'].prototype).some(name => /Methods|Prototype/.test(name));
+    const prototype = L.Layer.types['3d'].prototype;
+    const noLayerHelpers = ['add', 'remove', '_setTerrainHeight', '_lampPostGeometry', '_lightGeometry']
+      .every(name => !Object.prototype.hasOwnProperty.call(prototype, name)) &&
+      prototype.remove === L.Layer.prototype.remove;
     const independent = scene.position !== layer.root.position &&
       scene.children !== layer.root.children && scene.worldMatrix !== layer.root.worldMatrix;
     const nodes = [
@@ -62,7 +66,8 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     const hiddenMesh = nativeChecks.group();
     Object.assign(hiddenMesh, { geometry: mesh.geometry, program: mesh.program, id: 4 });
     nativeChecks.graph.setParent(hiddenMesh, hidden);
-    layer.add(scene);
+    nativeChecks.graph.setParent(scene, layer.root);
+    nativeChecks.render.update(layer);
     nativeChecks.render.render(layer._shared);
     const meshes = [];
     nativeChecks.graph.traverse(scene, node => {
@@ -76,7 +81,7 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
     mesh.program.pipelineCache.clear();
     layer.remove();
-    return { worldCameraRay, singularTransform, sorted, noEngine, independent };
+    return { worldCameraRay, singularTransform, sorted, noEngine, noLayerHelpers, independent };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
@@ -128,7 +133,8 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     await Promise.all([first, second].map(nativeChecks.ready));
     const backend = first;
     const object = nativeChecks.group();
-    second.add(object);
+    nativeChecks.graph.setParent(object, second.root);
+    nativeChecks.render.update(second);
     const shared = first._shared === first && second._shared === first &&
       L.Layer.types['3d']._renderers.get(map) === first &&
       first.renderer === second.renderer && first.camera === second.camera &&

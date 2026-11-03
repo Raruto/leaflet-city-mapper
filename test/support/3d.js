@@ -108,7 +108,8 @@ export async function prepare3DChecks(page) {
       },
       mesh(layer, attributes, program) {
         const mesh = gpu.createMesh(layer, attributes, program?._layerMaterial);
-        layer.remove(mesh);
+        graph.setParent(mesh, null);
+        render.update(layer);
         if (program) {
           mesh.program.pipelineCache.clear();
           mesh.program = program;

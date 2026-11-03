@@ -52,7 +52,8 @@ Then('3D click reports the picked object without changing the map view', { timeo
         color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
       });
       nativeChecks.graph.setParent(mesh, layer.model);
-      layer.add(layer.model);
+      nativeChecks.graph.setParent(layer.model, layer.root);
+      nativeChecks.render.update(layer);
     }
     origin.remove();
     const container = map.getContainer();

@@ -1,2 +1,2 @@
-import{destroyTexture as i}from"./destroyTexture.js";function o(e,r){e._terrainRequest?.abort();const t=e._rasterTiles.get(r);t&&(e.remove(t),i(e,t.texture.texture),e._rasterTiles.delete(r),r.style.visibility=r._terrainVisibility,delete r._terrainVisibility)}export{o as removeRasterTile};
+import{destroyTexture as i}from"./destroyTexture.js";import{setParent as s}from"./setParent.js";import{update as o}from"./update.js";function a(r,t){r._terrainRequest?.abort();const e=r._rasterTiles.get(t);e&&(s(e,null),o(r),i(r,e.texture.texture),r._rasterTiles.delete(t),t.style.visibility=t._terrainVisibility,delete t._terrainVisibility)}export{a as removeRasterTile};
 //# sourceMappingURL=removeRasterTile.js.map

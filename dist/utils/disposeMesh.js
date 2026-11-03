@@ -1,2 +1,2 @@
-function o(r,e){if(e){r.remove(e);for(const t of Object.values(e.geometry.attributes))t.buffer.destroy();e.program.pipelineCache.clear()}}export{o as disposeMesh};
+import{setParent as o}from"./setParent.js";import{update as i}from"./update.js";function p(r,t){if(t){o(t,null),i(r);for(const e of Object.values(t.geometry.attributes))e.buffer.destroy();t.program.pipelineCache.clear()}}export{p as disposeMesh};
 //# sourceMappingURL=disposeMesh.js.map

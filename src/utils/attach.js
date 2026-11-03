@@ -10,6 +10,7 @@ import { render } from './render.js';
 import { startZoom } from './startZoom.js';
 import { update } from './update.js';
 import { updateArea } from './updateArea.js';
+import { setTerrainHeight } from './setTerrainHeight.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
 /**
@@ -135,7 +136,7 @@ export async function attach(backend, map) {
   backend.root.position[0] = (point.x - origin.x) * metres;
   backend.root.position[1] = backend._terrainBaseY;
   backend.root.position[2] = -(point.y - origin.y) * metres;
-  backend._setTerrainHeight();
+  setTerrainHeight(backend);
   // Each group's metres are measured at its own latitude, not the shared camera origin.
   backend.root.scale.fill(metres / Math.cos(backend.location.lat * Math.PI / 180));
   backend._shared = shared;

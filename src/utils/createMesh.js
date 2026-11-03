@@ -1,5 +1,7 @@
 import { emptyNode } from './emptyNode.js';
 import { createProgram } from './createProgram.js';
+import { setParent } from './setParent.js';
+import { update } from './update.js';
 
 /**
  * Add a non-indexed, vertex-coloured mesh from flat vec3 arrays `{ position, normal, color }` in layer-local metres.
@@ -21,6 +23,7 @@ export function createMesh(backend, data, material = {}, usage = 0) {
     program: createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
     id: L.Layer.types['3d']._nextId++, renderOrder: 0, extras: {},
   };
-  backend.add(mesh);
+  setParent(mesh, backend.root);
+  update(backend);
   return mesh;
 }

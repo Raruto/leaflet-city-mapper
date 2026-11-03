@@ -1,5 +1,7 @@
 import { setHighlight } from './setHighlight.js';
 import { showFeature } from './showFeature.js';
+import { setParent } from './setParent.js';
+import { update } from './update.js';
 
 /** Cancel pending work and dispose this block's GPU data, including any hover highlight. */
 
@@ -11,7 +13,8 @@ export function releaseArea(backend, area) {
       backend.hoveredFeature = null;
       showFeature(backend, null);
     }
-    backend.remove(area.mesh);
+    setParent(area.mesh, null);
+    update(backend);
     const geometry = area.mesh.geometry;
     for (const attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
     area.mesh.program.pipelineCache.clear();

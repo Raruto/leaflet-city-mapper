@@ -2,6 +2,8 @@ import { createProgram } from './createProgram.js';
 import { destroyTexture } from './destroyTexture.js';
 import { terrainAtlas } from './terrainAtlas.js';
 import { terrainGrid } from './terrainGrid.js';
+import { setParent } from './setParent.js';
+import { update } from './update.js';
 
 export async function addRasterTile(backend, layer, coords, tile) {
   const [ready, bitmap] = await Promise.all([backend._terrainPromise, createImageBitmap(tile)]);
@@ -111,7 +113,8 @@ export async function addRasterTile(backend, layer, coords, tile) {
     id: L.Layer.types['3d']._nextId++,
     renderOrder: -1,
   };
-  backend.add(mesh);
+  setParent(mesh, backend.root);
+  update(backend);
   backend._rasterTiles.set(tile, mesh);
   tile._terrainVisibility = tile.style.visibility;
 }

@@ -58,14 +58,17 @@ Then('configured models preserve external assets and can be detached and reattac
     const factors = style.color.join() === '0.6,0.3,0.1' && style.metallic === 0.5 &&
       style.roughness === 0.4 && style.occlusionStrength === 0.6;
     const normals = [...mesh.geometry.attributes.normal.data].join() === '0,0,1,0,0,1,0,0,1';
-    layer.add(model);
+    nativeChecks.graph.setParent(model, layer.root);
+    nativeChecks.render.update(layer);
     nativeChecks.render.render(layer._shared);
     const uploaded = style.baseTexture.uploaded === style.baseTexture.image &&
       style.metalTexture.uploaded === style.metalTexture.image;
     const program = mesh.program;
-    layer.remove(model);
+    nativeChecks.graph.setParent(model, null);
+    nativeChecks.render.update(layer);
     const retained = !model.parent && mesh.program === program && program.device === device;
-    layer.add(model);
+    nativeChecks.graph.setParent(model, layer.root);
+    nativeChecks.render.update(layer);
     const reattached = model.parent === layer.root;
     layer.remove();
     return { waitsForMap, attached, maps, factors, normals, uploaded, retained, reattached };
@@ -265,7 +268,8 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const pitch = map.getPitch(), bearing = map.getBearing();
     layer.model.visible = false;
     map.setPitch(0); map.setBearing(0); map.setView(layer.location, 17, { animate: false });
-    layer.add(probe);
+    nativeChecks.graph.setParent(probe, layer.root);
+    nativeChecks.render.update(layer);
     const sample = () => nativeChecks.pixels(layer,
       Math.floor(layer.renderer.canvas.width / 2), Math.floor(layer.renderer.canvas.height / 2), 1, 1);
     const firstPixel = await sample();

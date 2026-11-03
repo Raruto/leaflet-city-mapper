@@ -263,34 +263,6 @@ L.Layer.types['3d'] = L.Layer.extend({
     this.renderer = this.scene = this.camera = null;
   },
 
-  /**
-   * Adds a scene node or mesh in layer-local coordinates and schedules a redraw.
-   * Requires initialization and a compatible scene node.
-   * @param {Object} object
-   * @returns {L.Layer} This layer.
-   */
-  add(object) {
-    setParent(object, this.root);
-    return update.update(this);
-  },
-
-  _setTerrainHeight() {
-    if (!this.root || !this.location) return;
-    this._terrainBaseY ??= this.root.position[1];
-    this.root.position[1] = this._terrainBaseY + (this._map?._terrain3D?._getElevation(this.location) ?? 0);
-  },
-
-  /**
-   * Without an argument, removes this Leaflet layer. With an object, only detaches it:
-   * geometry/program resources are not disposed, so it can be added again.
-   * @param {Object} [object]
-   * @returns {L.Layer}
-   */
-  remove(object) {
-    if (object === undefined) return L.Layer.prototype.remove.call(this);
-    setParent(object, null);
-    return update.update(this);
-  },
 });
 
 L.Layer.types['3d']._nextId = 0;

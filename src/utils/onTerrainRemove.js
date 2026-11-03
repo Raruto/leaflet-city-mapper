@@ -1,5 +1,6 @@
 import { destroyTexture } from './destroyTexture.js';
 import { disposeMesh } from './disposeMesh.js';
+import { setTerrainHeight } from './setTerrainHeight.js';
 
 export function onTerrainRemove(backend, map) {
   backend._terrainController?.abort();
@@ -8,7 +9,7 @@ export function onTerrainRemove(backend, map) {
   map.eachLayer(layer => layer._setTerrain3D?.(null));
   for (const tile of backend._rasterTiles.keys()) backend.removeRasterTile(tile);
   if (map._terrain3D === backend) delete map._terrain3D;
-  for (const layer of Object.values(map._layers)) layer._setTerrainHeight?.();
+  for (const layer of Object.values(map._layers)) setTerrainHeight(layer);
   map.fire('terrainchange');
   backend._terrainTiles.clear();
   backend._terrainOriginElevation = 0;

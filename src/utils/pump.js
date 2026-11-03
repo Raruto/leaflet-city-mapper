@@ -8,6 +8,8 @@ import { triangulate } from "./triangulate.js";
 import { createProgram } from './createProgram.js';
 import { updateStatus } from "./releaseArea.js";
 import { loadSource } from './loadSource.js';
+import { setParent } from './setParent.js';
+import { update } from './update.js';
 
 /** Start at most two load/build tasks; cancelled tasks still free their slot in finally. */
 
@@ -191,7 +193,8 @@ export function pump(backend) {
           skipped,
           done: true
         });
-        backend.add(area.mesh);
+        setParent(area.mesh, backend.root);
+        update(backend);
       } catch (error) {
         if (area.request.signal.aborted) return;
         area.error = error.message;
