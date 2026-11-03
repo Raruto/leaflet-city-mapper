@@ -1,12 +1,13 @@
-import { createMesh } from '../utils/createMesh.js';
-import { triangulate } from '../utils/triangulate.js';
+import { createMesh } from './createMesh';
+import { triangulate } from './triangulate';
 
 /**
  * Bare-earth DEMs drop bridges: `_getElevation` returns the deck height inside these polygons (GeoJSON
  * Polygon/MultiPolygon with Z, e.g. IGN BD TOPO), and one mesh draws the 1.2 m thick decks.
  * ponytail: anything under a deck (quays, boats asking `_getElevation`) also gets the deck height.
  */
-export function _addBridges(backend, geojson) {
+
+export function addBridges(backend, geojson) {
   const map = backend._map, crs = map.options.crs, zoom = backend._terrainZoom;
   const origin = crs.project(backend.location), metres = Math.cos(backend.location.lat * Math.PI / 180);
   const base = backend.root.position[1], position = [], normal = [], color = [];

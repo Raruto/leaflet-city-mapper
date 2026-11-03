@@ -1,7 +1,8 @@
-import { update } from './update.js';
-import { setTerrainHeight } from './setTerrainHeight.js';
+import { setTerrainHeight } from './setTerrainHeight';
+import { update } from './update';
 
-export async function _loadTerrain(backend) {
+
+export async function loadTerrain(backend) {
   if (backend._terrainLoading || !backend._map) return;
   backend._terrainLoading = true;
   backend._terrainReady = false;
