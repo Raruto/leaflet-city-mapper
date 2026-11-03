@@ -9,7 +9,7 @@
     <a href="https://raruto.github.io/leaflet-rotate/examples/leaflet-city-mapper-geojson.html"><img src="https://github.com/user-attachments/assets/63f49617-0e90-4c0b-a0b2-d4a040e69105" alt="Leaflet 3D City Mapper" /></a>
 </p>
 
-_For a working example see the following demos:_
+_For a working example see one of the following demos:_
 
 - [Paris City in 3D](examples/leaflet-city-mapper.html)
 - [Ancient Rome in 3D](examples/leaflet-city-mapper-geojson.html)
