@@ -4,9 +4,12 @@ import { showFeature } from './showFeature.js';
 
 /** Hover is transient; featurehover also reports misses with feature:null. */
 
-export function onPointerMove(backend, event) {
-  backend.hoveredFeature = findFeature(backend, event);
-  setHighlight(backend, backend.hoveredFeature);
-  showFeature(backend, backend.hoveredFeature, event);
-  backend.fire('featurehover', { feature: backend.hoveredFeature, originalEvent: event });
+export function onPointerMove(layer, event) {
+  layer.hoveredFeature = findFeature(layer, event);
+  setHighlight(layer, layer.hoveredFeature);
+  showFeature(layer, layer.hoveredFeature, event);
+  layer.fire('featurehover', {
+    feature: layer.hoveredFeature,
+    originalEvent: event
+  });
 }

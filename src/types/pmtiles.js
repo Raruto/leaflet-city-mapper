@@ -1,13 +1,10 @@
-import './3d.js';
 import { read } from '../utils/read.js';
 import { getHeader } from '../utils/getHeader.js';
 import { getZxy } from '../utils/getZxy.js';
 import { onPMTileAdd } from '../utils/onPMTileAdd.js';
 import { onPMTileRemove } from '../utils/onPMTileRemove.js';
-import { setPMTileOpacity } from '../utils/setPMTileOpacity.js';
-import { setPMTileZIndex } from '../utils/setPMTileZIndex.js';
 import { initPMTileLayer } from '../utils/initPMTileLayer.js';
-import { setRasterTerrain, updateRasterTiles } from '../utils/rasterTiles.js';
+import { updateRasterTiles } from '../utils/rasterTiles.js';
 
 /** Raster PMTiles rendered as textured meshes in the shared WebGPU canvas. */
 L.Layer.types.pmtiles = L.Layer.extend({

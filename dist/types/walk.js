@@ -1,2 +1,2 @@
-import"./3d.js";import{installWalk as e}from"../utils/installWalk.js";L.Layer.types.walk=L.Layer.types["3d"].extend({initialize(t){return e(this,t)}});
+import{installWalk as t}from"../utils/installWalk.js";L.Layer.types.walk=L.Layer.types["3d"].extend({initialize(e){return t(this,e)}});
 //# sourceMappingURL=walk.js.map

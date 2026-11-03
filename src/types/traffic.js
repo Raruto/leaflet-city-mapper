@@ -1,4 +1,3 @@
-import './3d.js';
 import { installTraffic } from '../utils/installTraffic.js';
 
 /**

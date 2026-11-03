@@ -530,23 +530,31 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       { local: [-60.11847686767578, 0, -60.60499954223633], latlng: [48.8582480, 2.2933119] }
     ];
     const [northwest, northeast, southeast, southwest] = feet.map(({ latlng }) => latlng);
-    const terrainClearances = [];
-    for (let row = 0; row <= 4; row++) {
-      for (let column = 0; column <= 4; column++) {
-        const x = column / 4, y = row / 4;
-        const latlng = [
-          (northwest[0] * (1 - x) + northeast[0] * x) * (1 - y) +
-            (southwest[0] * (1 - x) + southeast[0] * x) * y,
-          (northwest[1] * (1 - x) + northeast[1] * x) * (1 - y) +
-            (southwest[1] * (1 - x) + southeast[1] * x) * y,
-        ];
-        const elevation = map._terrain3D._getElevation(latlng);
-        if (!Number.isFinite(elevation)) throw new Error(`Missing terrain under Eiffel Tower at ${latlng}`);
-        terrainClearances.push(eiffel.root.position[1] - elevation);
+    nativeChecks.graph.updateWorldMatrix(backend._shared.scene);
+    const terrain = map._terrain3D, crs = map.options.crs;
+    const sceneOrigin = crs.project(backend._shared._sceneOrigin);
+    const metres = Math.cos(backend._shared._sceneOrigin.lat * Math.PI / 180);
+    const pixelScale = crs.scale(terrain._terrainZoom);
+    const terrainConformanceErrors = [];
+    nativeChecks.graph.traverse(eiffel.model, object => {
+      const geometry = object.geometry, positions = geometry?.attributes.position.data;
+      const base = geometry?._terrainBasePositions, world = object.worldMatrix;
+      if (!base) return;
+      for (let i = 0; i < positions.length; i += 3) {
+        const baseY = world[1] * base[i] + world[5] * base[i + 1] + world[9] * base[i + 2] + world[13];
+        if (Math.abs(baseY - eiffel.root.position[1]) > 0.05) continue;
+        const x = world[0] * positions[i] + world[4] * positions[i + 1] + world[8] * positions[i + 2] + world[12];
+        const y = world[1] * positions[i] + world[5] * positions[i + 1] + world[9] * positions[i + 2] + world[13];
+        const z = world[2] * positions[i] + world[6] * positions[i + 1] + world[10] * positions[i + 2] + world[14];
+        const point = crs.transformation.transform(
+          new L.Point(sceneOrigin.x + x / metres, sceneOrigin.y - z / metres), pixelScale);
+        const elevation = terrain._getElevation(point);
+        if (Number.isFinite(elevation)) terrainConformanceErrors.push(Math.abs(y - elevation));
       }
-    }
-    const terrainClearance = Math.min(...terrainClearances);
+    });
+    const terrainConformanceError = Math.max(...terrainConformanceErrors);
     const footprintErrors = [];
+    let maskDepthWrite = eiffel.options.alphaMode === 'MASK' && eiffel.options.terrainConform;
     let baseLayer;
     map.eachLayer(layer => {
       if (layer instanceof L.Layer.types.pmtiles && layer._map) baseLayer = layer;
@@ -576,6 +584,11 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         footprintErrors.push(geographic.distanceTo(new L.LatLng(...foot.latlng)));
       }
     }
+    nativeChecks.graph.traverse(eiffel.model, object => {
+      if (object.program && (object.program._layerMaterial.alphaMode !== 'MASK' || !object.program.depthWrite)) {
+        maskDepthWrite = false;
+      }
+    });
 
     const zoomErrors = [];
     let animatedFrames = 0;
@@ -644,7 +657,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     await Promise.all([tower, eiffel, ...other3d, baseLayer].map(layer => layer._added.promise));
     return {
       height, meshes, errors, footprintErrors, zoomErrors, animatedFrames, hiddenFrames,
-      topClipY, baseClipY, terrainClearance, visiblePixels, clickThrough, removed, sharedCanvasRemains,
+      topClipY, baseClipY, terrainConformanceError, terrainConformanceSamples: terrainConformanceErrors.length,
+      maskDepthWrite, visiblePixels, clickThrough, removed, sharedCanvasRemains,
       restored: tower.renderer.width === map.getSize().x && tower.renderer.height === map.getSize().y,
       latitude: eiffel.location.lat,
       longitude: eiffel.location.lng
@@ -657,7 +671,10 @@ Then('the tower is rendered at its geographic position through camera changes', 
   assert.ok(result.height > 299 && result.height < 301, JSON.stringify(result));
   assert.ok(result.topClipY < 0.9, `Eiffel Tower top is too close to the viewport edge: ${result.topClipY}`);
   assert.ok(result.baseClipY > -0.9, `Eiffel Tower base is too close to the viewport edge: ${result.baseClipY}`);
-  assert.ok(result.terrainClearance > 0, `Eiffel Tower feet intersect terrain: ${result.terrainClearance}`);
+  assert.ok(result.terrainConformanceSamples > 0, 'No Eiffel Tower ground vertices were conformed');
+  assert.ok(result.terrainConformanceError < 0.1,
+    `Eiffel Tower ground vertices are not attached to terrain: ${result.terrainConformanceError}`);
+  assert.equal(result.maskDepthWrite, true, 'Eiffel Tower alpha mask must write depth for correct occlusion');
   assert.ok(result.meshes > 1, JSON.stringify(result));
   assert.ok(Math.max(...result.errors) < 1.5, `Logical coordinate rounding errors: ${result.errors}`);
   assert.ok(Math.max(...result.footprintErrors) < 0.5, `Footprint errors in metres: ${result.footprintErrors}`);

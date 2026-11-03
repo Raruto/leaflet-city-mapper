@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/onPointerMove.js"],
-  "sourcesContent": ["import { findFeature } from './findFeature.js';\nimport { setHighlight } from './setHighlight.js';\nimport { showFeature } from './showFeature.js';\n\n/** Hover is transient; featurehover also reports misses with feature:null. */\n\nexport function onPointerMove(backend, event) {\n  backend.hoveredFeature = findFeature(backend, event);\n  setHighlight(backend, backend.hoveredFeature);\n  showFeature(backend, backend.hoveredFeature, event);\n  backend.fire('featurehover', { feature: backend.hoveredFeature, originalEvent: event });\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,gBAAAC,MAAoB,oBAC7B,OAAS,eAAAC,MAAmB,mBAIrB,SAASC,EAAcC,EAASC,EAAO,CAC5CD,EAAQ,eAAiBJ,EAAYI,EAASC,CAAK,EACnDJ,EAAaG,EAASA,EAAQ,cAAc,EAC5CF,EAAYE,EAASA,EAAQ,eAAgBC,CAAK,EAClDD,EAAQ,KAAK,eAAgB,CAAE,QAASA,EAAQ,eAAgB,cAAeC,CAAM,CAAC,CACxF",
-  "names": ["findFeature", "setHighlight", "showFeature", "onPointerMove", "backend", "event"]
+  "sourcesContent": ["import { findFeature } from './findFeature.js';\nimport { setHighlight } from './setHighlight.js';\nimport { showFeature } from './showFeature.js';\n\n/** Hover is transient; featurehover also reports misses with feature:null. */\n\nexport function onPointerMove(layer, event) {\n  layer.hoveredFeature = findFeature(layer, event);\n  setHighlight(layer, layer.hoveredFeature);\n  showFeature(layer, layer.hoveredFeature, event);\n  layer.fire('featurehover', {\n    feature: layer.hoveredFeature,\n    originalEvent: event\n  });\n}\n"],
+  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,gBAAAC,MAAoB,oBAC7B,OAAS,eAAAC,MAAmB,mBAIrB,SAASC,EAAcC,EAAOC,EAAO,CAC1CD,EAAM,eAAiBJ,EAAYI,EAAOC,CAAK,EAC/CJ,EAAaG,EAAOA,EAAM,cAAc,EACxCF,EAAYE,EAAOA,EAAM,eAAgBC,CAAK,EAC9CD,EAAM,KAAK,eAAgB,CACzB,QAASA,EAAM,eACf,cAAeC,CACjB,CAAC,CACH",
+  "names": ["findFeature", "setHighlight", "showFeature", "onPointerMove", "layer", "event"]
 }

@@ -1,2 +1,2 @@
-import{findFeature as o}from"./findFeature.js";import{setHighlight as t}from"./setHighlight.js";import{showFeature as i}from"./showFeature.js";function m(r,e){r.hoveredFeature=o(r,e),t(r,r.hoveredFeature),i(r,r.hoveredFeature,e),r.fire("featurehover",{feature:r.hoveredFeature,originalEvent:e})}export{m as onPointerMove};
+import{findFeature as r}from"./findFeature.js";import{setHighlight as t}from"./setHighlight.js";import{showFeature as i}from"./showFeature.js";function m(e,o){e.hoveredFeature=r(e,o),t(e,e.hoveredFeature),i(e,e.hoveredFeature,o),e.fire("featurehover",{feature:e.hoveredFeature,originalEvent:o})}export{m as onPointerMove};
 //# sourceMappingURL=onPointerMove.js.map

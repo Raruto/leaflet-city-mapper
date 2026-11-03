@@ -1,7 +1,7 @@
 
-export function destroyTexture(backend, texture) {
-  backend.renderer.device.queue.onSubmittedWorkDone().then(() => texture.destroy(), error => {
-    backend.fire('error', { error });
+export function destroyTexture(layer, texture) {
+  layer.renderer.device.queue.onSubmittedWorkDone().then(() => texture.destroy(), error => {
+    layer.fire('error', { error });
     texture.destroy();
   });
 }

@@ -1,4 +1,3 @@
-import './3d.js';
 import './pmtiles.js';
 import { removeRasterTile } from '../utils/removeRasterTile.js';
 import { elevationWGSL } from '../utils/elevationWGSL.js';

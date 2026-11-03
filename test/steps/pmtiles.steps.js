@@ -6,7 +6,6 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   await this.context.unroute('**/dist/types/*.js');
   // Fresh, unmocked modules: a query string bypasses the module cache.
   await this.page.evaluate(async base => {
-    await import(`${base}/dist/types/3d.js?native`);
     await import(`${base}/dist/types/pmtiles.js?native`);
   }, this.baseUrl);
   const exposesReaderClass = await this.page.evaluate(() => 'PMTiles' in L);

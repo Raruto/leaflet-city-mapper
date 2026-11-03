@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/types/geojson.js"],
-  "sourcesContent": ["import './3d.js';\r\nimport { onTerrainChange } from \"../utils/onTerrainChange.js\";\r\nimport { setGeoJSONData } from '../utils/setGeoJSONData.js';\r\n\r\n/** One GeoJSON batch, independent of the viewport, using the existing extrusion pipeline. */\r\nL.Layer.types.geojson = L.Layer.types['3d'].extend({\r\n  _geojson: true,\r\n  getEvents() { return { terrainchange: () => onTerrainChange(this) }; },\r\n  setData(data) { return setGeoJSONData(this, data); },\r\n});\r\n"],
-  "mappings": "AAAA,MAAO,UACP,OAAS,mBAAAA,MAAuB,8BAChC,OAAS,kBAAAC,MAAsB,6BAG/B,EAAE,MAAM,MAAM,QAAU,EAAE,MAAM,MAAM,IAAI,EAAE,OAAO,CACjD,SAAU,GACV,WAAY,CAAE,MAAO,CAAE,cAAe,IAAMD,EAAgB,IAAI,CAAE,CAAG,EACrE,QAAQE,EAAM,CAAE,OAAOD,EAAe,KAAMC,CAAI,CAAG,CACrD,CAAC",
+  "sourcesContent": ["import { onTerrainChange } from \"../utils/onTerrainChange.js\";\r\nimport { setGeoJSONData } from '../utils/setGeoJSONData.js';\r\n\r\n/** One GeoJSON batch, independent of the viewport, using the existing extrusion pipeline. */\r\nL.Layer.types.geojson = L.Layer.types['3d'].extend({\r\n  _geojson: true,\r\n  getEvents() { return { terrainchange: () => onTerrainChange(this) }; },\r\n  setData(data) { return setGeoJSONData(this, data); },\r\n});\r\n"],
+  "mappings": "AAAA,OAAS,mBAAAA,MAAuB,8BAChC,OAAS,kBAAAC,MAAsB,6BAG/B,EAAE,MAAM,MAAM,QAAU,EAAE,MAAM,MAAM,IAAI,EAAE,OAAO,CACjD,SAAU,GACV,WAAY,CAAE,MAAO,CAAE,cAAe,IAAMD,EAAgB,IAAI,CAAE,CAAG,EACrE,QAAQE,EAAM,CAAE,OAAOD,EAAe,KAAMC,CAAI,CAAG,CACrD,CAAC",
   "names": ["onTerrainChange", "setGeoJSONData", "data"]
 }

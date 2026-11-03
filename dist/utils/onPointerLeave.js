@@ -1,2 +1,2 @@
-import{setHighlight as r}from"./setHighlight.js";import{showFeature as o}from"./showFeature.js";function u(e){e.hoveredFeature=null,r(e,null),o(e,null),e.fire("featurehover",{feature:null})}export{u as onPointerLeave};
+import{setHighlight as o}from"./setHighlight.js";import{showFeature as t}from"./showFeature.js";function n(e){e.hoveredFeature=null,o(e,null),t(e,null),e.fire("featurehover",{feature:null})}export{n as onPointerLeave};
 //# sourceMappingURL=onPointerLeave.js.map

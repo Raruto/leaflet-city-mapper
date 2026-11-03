@@ -1,4 +1,3 @@
-import './3d.js';
 import { onTerrainChange } from "../utils/onTerrainChange.js";
 import { setGeoJSONData } from '../utils/setGeoJSONData.js';
 

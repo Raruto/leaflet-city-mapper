@@ -3,9 +3,9 @@ import { showFeature } from './showFeature.js';
 
 /** Clear hover, highlight and tooltip without retaining a selected feature. */
 
-export function onPointerLeave(backend) {
-  backend.hoveredFeature = null;
-  setHighlight(backend, null);
-  showFeature(backend, null);
-  backend.fire('featurehover', { feature: null });
+export function onPointerLeave(layer) {
+  layer.hoveredFeature = null;
+  setHighlight(layer, null);
+  showFeature(layer, null);
+  layer.fire('featurehover', { feature: null });
 }

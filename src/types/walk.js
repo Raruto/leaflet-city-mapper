@@ -1,4 +1,3 @@
-import './3d.js';
 import { installWalk } from '../utils/installWalk.js';
 
 /**
