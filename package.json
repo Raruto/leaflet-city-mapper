@@ -10,7 +10,8 @@
     "dev": "node build/dev.js",
     "build": "node build/build.js",
     "test": "node build/test.js",
-    "pmtiles": "node build/pmtiles.js"
+    "pmtiles": "node build/pmtiles.js",
+    "version": "npm run build && git add -A dist"
   },
   "repository": {
 		"type": "git",
