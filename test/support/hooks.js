@@ -90,7 +90,7 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
 });
 
 After({ tags: 'not @unit' }, async function () {
-  await this.context.close();
+  await this.context?.close();
 });
 
 // Firefox may take several seconds to create its first WebGPU adapter.
