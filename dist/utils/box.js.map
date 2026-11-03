@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/box.js"],
+  "sourcesContent": ["export const box = (x0, x1, z0, z1) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];\n"],
+  "mappings": "AAAO,MAAMA,EAAM,CAACC,EAAIC,EAAIC,EAAIC,IAAO,CAAC,CAACH,EAAIE,CAAE,EAAG,CAACD,EAAIC,CAAE,EAAG,CAACD,EAAIE,CAAE,EAAG,CAACH,EAAIG,CAAE,CAAC",
+  "names": ["box", "x0", "x1", "z0", "z1"]
+}

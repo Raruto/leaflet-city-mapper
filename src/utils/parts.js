@@ -1,4 +1,4 @@
-import { box } from './paints.js';
+import { box } from "./box.js";
 import { trousers, shirt, skin, dark } from "./skin.js";
 
 
