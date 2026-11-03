@@ -1,3 +1,9 @@
+const toSRGB  =        value => value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+const channel = (n, h, l, a) => {
+  const k = (n + h * 12) % 12;
+  return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+};
+
 /**
  * HSL inputs are linear-space to preserve the original building styling.
  * Numeric/CSS/RGB inputs are already sRGB; CSS alpha is not used for extrusion.
@@ -6,25 +12,35 @@
  */
 export function parseColor(value) {
   if (value && typeof value === 'object' && 'h' in value) {
-    const { h, s, l } = value;
-    const a = s * Math.min(l, 1 - l);
-    const channel = n => {
-      const k = (n + h * 12) % 12;
-      return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    const a = value.s * Math.min(value.l, 1 - value.l);
+    return {
+      r: toSRGB(channel(0, value.h, value.l, a)),
+      g: toSRGB(channel(8, value.h, value.l, a)),
+      b: toSRGB(channel(4, value.h, value.l, a))
     };
-    const toSRGB = value => value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
-    return { r: toSRGB(channel(0)), g: toSRGB(channel(8)), b: toSRGB(channel(4)) };
   }
-  if (value && typeof value === 'object' && 'r' in value) return value;
-  if (typeof value === 'number') return {
-    r: (value >> 16 & 255) / 255, g: (value >> 8 & 255) / 255, b: (value & 255) / 255,
-  };
-  if (typeof value !== 'string' || !CSS.supports('color', value)) throw new Error('Invalid 3D color');
+  if (value && typeof value === 'object' && 'r' in value) {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return {
+      r: (value >> 16 & 255) / 255,
+      g: (value >> 8 & 255) / 255,
+      b: (value & 255) / 255,
+    };
+  }
+  if (typeof value !== 'string' || !CSS.supports('color', value)) {
+    throw new Error('Invalid 3D color');
+  }
   const context = document.createElement('canvas').getContext('2d');
   context.fillStyle = value;
   context.fillRect(0, 0, 1, 1);
   const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
-  return { r: r / 255, g: g / 255, b: b / 255 };
+  return {
+    r: r / 255,
+    g: g / 255,
+    b: b / 255
+  };
 }
 
 /**

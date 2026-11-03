@@ -202,7 +202,7 @@ L.Layer.types['3d'] = L.Layer.extend({
     if (shared === this) {
       map.off('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, this);
       map.off('zoomstart', render.startZoom, this);
-      map.off('zoomanim', render.update, this);
+      map.off('zoomanim', render.onZoomAnim, this);
       map.off('zoomend', render.endZoom, this);
       cancelAnimationFrame(this._frame);
       this._frame = null;
@@ -218,7 +218,7 @@ L.Layer.types['3d'] = L.Layer.extend({
         L.Layer.types['3d']._renderers.set(map, next);
         map.on('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, next);
         map.on('zoomstart', render.startZoom, next);
-        map.on('zoomanim', render.update, next);
+        map.on('zoomanim', render.onZoomAnim, next);
         map.on('zoomend', render.endZoom, next);
         render.update(next);
       } else {
@@ -230,8 +230,14 @@ L.Layer.types['3d'] = L.Layer.extend({
         this._zoomTransitions = null;
         this.renderer.canvas.remove();
         const renderer = this.renderer;
-        const resources = [renderer.depthTexture, renderer.roofFallbackTexture.texture, renderer.uniformBuffer,
-          renderer.sunlight?.texture, renderer.sunlight?.buffer, renderer.sunlight?.lights].filter(Boolean);
+        const resources = [
+          renderer.depthTexture,
+          renderer.roofFallbackTexture.texture,
+          renderer.uniformBuffer,
+          renderer.sunlight?.texture,
+          renderer.sunlight?.buffer,
+          renderer.sunlight?.lights
+        ].filter(Boolean);
         renderer.device.queue.onSubmittedWorkDone().then(() => {
           for (const resource of resources) resource.destroy();
           renderer.device.destroy();

@@ -1,4 +1,5 @@
-import { lightGrid, worldLights } from '../utils/lighting.js';
+import { worldLights } from '../utils/worldLights.js';
+import { lightGrid } from '../utils/lighting.js';
 import { computeBounds } from '../utils/geometry.js';
 import { traverse, updateCamera } from '../utils/scene.js';
 import { destroyTexture } from './gpu.js';

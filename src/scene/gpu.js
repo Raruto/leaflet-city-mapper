@@ -1,7 +1,7 @@
 import { materialShaders } from '../utils/shaders.js';
 import { emptyNode, setParent, traverse } from '../utils/scene.js';
 import { initSunlight } from './lighting.js';
-import { onMapChange, startZoom, endZoom, render, update } from './render.js';
+import { onMapChange, onZoomAnim, startZoom, endZoom, render, update } from './render.js';
 import { updateArea } from './sources.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
@@ -113,7 +113,7 @@ export async function attach(backend, map) {
     pane.append(canvas);
     map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange, shared);
     map.on('zoomstart', startZoom, shared);
-    map.on('zoomanim', update, shared);
+    map.on('zoomanim', onZoomAnim, shared);
     map.on('zoomend', endZoom, shared);
     backend._rendererReady.resolve();
     delete shared._rendererReady;

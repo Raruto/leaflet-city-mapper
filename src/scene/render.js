@@ -20,7 +20,8 @@ export function update(backend) {
 }
 
 /** Map movement: render within the frame of Leaflet's CSS transforms, coalescing same-tick events. */
-export function onMapChange(backend) {
+export function onMapChange() {
+  const backend = this;
   if (backend._queued) return;
   backend._queued = true;
   queueMicrotask(() => {
@@ -29,6 +30,10 @@ export function onMapChange(backend) {
     if (backend._map._animatingZoom) update(backend);
     else render(backend);
   });
+}
+
+export function onZoomAnim() {
+  update(this);
 }
 
 /** Find a raster tile's active CSS level to reproduce Leaflet's animated scale/rounding. */
@@ -43,12 +48,14 @@ export function getTileLevel(backend) {
 }
 
 /** Preserve the outgoing tile level before Leaflet changes its logical zoom. */
-export function startZoom(backend) {
+export function startZoom() {
+  const backend = this;
   backend._zoomLevel = getTileLevel(backend);
 }
 
 /** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */
-export function endZoom(backend) {
+export function endZoom() {
+  const backend = this;
   for (const animation of backend._zoomTransitions?.keys() || []) animation.finish();
   backend._zoomTransitions = null;
   backend._zoomLevel = null;

@@ -1,0 +1,2 @@
+function A(t,R,g,j,k,r,o){const n=R*9,f=t[n+3]-t[n],c=t[n+4]-t[n+1],i=t[n+5]-t[n+2],x=t[n+6]-t[n],s=t[n+7]-t[n+1],z=t[n+8]-t[n+2],q=-o*s,h=o*x-r*z,b=r*s,e=f*q+c*h+i*b;if(Math.abs(e)<1e-9)return-1;const u=g-t[n],y=j-t[n+1],a=k-t[n+2],p=(u*q+y*h+a*b)/e;if(p<0||p>1)return-1;const l=y*i-a*c,m=a*f-u*i,w=u*c-y*f,M=(r*l+o*w)/e;return M<0||p+M>1?-1:(x*l+s*m+z*w)/e}export{A as horizontalRay};
+//# sourceMappingURL=horizontalRay.js.map

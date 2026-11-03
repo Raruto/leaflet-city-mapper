@@ -7,10 +7,12 @@ import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, l
 import { emptyNode, setParent, traverse } from '../../src/utils/scene.js';
 import { decodeDirectory, decodeHeader, decompress, tileId } from '../../src/utils/pmtiles.js';
 import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../src/utils/model.js';
-import { lightGrid, worldLights } from '../../src/utils/lighting.js';
+import { lightGrid } from '../../src/utils/lighting.js';
+import { worldLights } from '../../src/utils/worldLights.js';
 import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../src/utils/terrain.js';
 import { toLanes, tripsAt, routeGeometry } from '../../src/utils/traffic.js';
-import { collider, horizontalRay } from '../../src/utils/walk.js';
+import { collider } from '../../src/utils/walk.js';
+import { horizontalRay } from '../../src/utils/horizontalRay.js';
 import { materialShaders } from '../../src/utils/shaders.js';
 import { projectCelestialBody } from '../../src/utils/sun.js';
 

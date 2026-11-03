@@ -110,7 +110,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
         const outer = reverse ? [...contour].reverse() : contour;
         const inner = reverse ? holes.map(hole => [...hole].reverse()) : holes;
         const points = [outer, ...inner].flat();
-        const triangles = layer._triangulate(outer, inner);
+        const triangles = nativeChecks.geometry.triangulate(outer, inner);
         const area = triangles.reduce((sum, [a, b, c]) => {
           const [p, q, r] = [points[a], points[b], points[c]];
           return sum + Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / 2;
@@ -119,7 +119,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
       }
     }
     let invalidRejected = false;
-    try { layer._triangulate([{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 }, { x: 2, y: 0 }]); }
+    try { nativeChecks.geometry.triangulate([{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 }, { x: 2, y: 0 }]); }
     catch (error) { invalidRejected = error instanceof Error; }
     // Interleaved positions, normalized byte normals, and a sparse position override.
     const buffer = new ArrayBuffer(72);
@@ -240,7 +240,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     nativeChecks.render.render(layer._shared);
     const list = [];
     nativeChecks.graph.traverse(layer.model, mesh => {
-      if (mesh.program?.transparent) list.push(mesh);
+      if (mesh.program?.transparent && mesh._visibleInFrame) list.push(mesh);
     });
     nativeChecks.render.sortMeshes(list);
     const depths = list.map(mesh => {

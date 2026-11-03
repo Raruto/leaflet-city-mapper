@@ -1,4 +1,5 @@
-import { CELL, collider, horizontalRay, parts, limbs } from '../utils/walk.js';
+import { horizontalRay } from '../utils/horizontalRay.js';
+import { CELL, collider, parts, limbs } from '../utils/walk.js';
 import './3d.js';
 import { computeBounds } from '../utils/geometry.js';
 import { traverse, updateWorldMatrix } from '../utils/scene.js';

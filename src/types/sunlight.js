@@ -1,5 +1,5 @@
 import { atmosphere, moonPosition, solarPosition, projectCelestialBody } from '../utils/sun.js';
-import { underEntry } from '../utils/control.js';
+import { underEntry } from '../utils/underEntry.js';
 import { update as updateScene } from '../scene/render.js';
 
 function installSunlight(map) {
