@@ -36,11 +36,12 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {
   const result = await this.page.evaluate(async () => {
     const lazy = Object.keys(L.Layer.types).length === 0;
-    const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24 } });
-    const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles' } });
+    const archive = { getHeader: async () => ({ maxZoom: 19 }) };
+    const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
+    const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
     const pending = first.ready instanceof Promise && second.ready instanceof Promise;
     await Promise.all([first.ready, second.ready]);
-    const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles' } });
+    const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles', archive } });
     await warm.ready;
     const plain = new L.Layer();
     const configured = new L.Layer({ attribution: 'Plain layer' });

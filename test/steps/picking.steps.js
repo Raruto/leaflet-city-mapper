@@ -7,7 +7,7 @@ Then('DOM tooltip content stays inside the map without interpreting text as HTML
     container.style.cursor = 'crosshair';
     const node = document.createElement('div');
     node.textContent = '<img src=x onerror=alert(1)>';
-    const layer = new L.Layer({ source: { type: '3d', tooltipContent: () => node } }).addTo(map);
+    const layer = new L.Layer({ source: { type: '3d', tooltip: () => node } }).addTo(map);
     await nativeChecks.ready(layer);
     const rect = container.getBoundingClientRect();
     const feature = { id: 'dom', model: {}, properties: {} };
@@ -40,8 +40,8 @@ Then('3D click reports the picked object without changing the map view', { timeo
     map.options.zoomAnimation = false;
     map.options.maxZoom = 24;
     const origin = new L.Layer({ source: { type: '3d' } }).addTo(map);
-    const far = new L.Layer({ source: { type: '3d', center: [48.85835, 2.29465], tooltipContent: () => 'Far' } }).addTo(map);
-    const near = new L.Layer({ source: { type: '3d', center: [48.85835, 2.29465], tooltipContent: () => 'Near' } }).addTo(map);
+    const far = new L.Layer({ source: { type: '3d', center: [48.85835, 2.29465], tooltip: () => 'Far' } }).addTo(map);
+    const near = new L.Layer({ source: { type: '3d', center: [48.85835, 2.29465], tooltip: () => 'Near' } }).addTo(map);
     await Promise.all([origin, far, near].map(nativeChecks.ready));
     for (const [layer, height] of [[far, 0], [near, 20]]) {
       layer.model = nativeChecks.group();
@@ -117,8 +117,8 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     const map = test3d.map;
     const layer = new L.Layer({ source: { type: '3d',
       url: 'paris-buildings.pmtiles',
-      featureStyle: () => ({ top: 10 }),
-      tooltipContent: feature => `Height: ${feature.properties.height} m` } }).addTo(map);
+      style: () => ({ top: 10 }),
+      tooltip: feature => `Height: ${feature.properties.height} m` } }).addTo(map);
     await nativeChecks.ready(layer);
     const container = map.getContainer();
     container.style.cursor = 'crosshair';
@@ -156,8 +156,8 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     const leaveCleared = tooltip.hidden && container.style.cursor === 'crosshair' && !layer.highlightedFeature;
     const other = new L.Layer({ source: { type: '3d',
       center: [map.getCenter().lat, map.getCenter().lng],
-      url: 'paris-buildings.pmtiles', featureStyle: () => ({ top: 10 }),
-      tooltipContent: () => 'Other feature' } }).addTo(map);
+      url: 'paris-buildings.pmtiles', style: () => ({ top: 10 }),
+      tooltip: () => 'Other feature' } }).addTo(map);
     await nativeChecks.ready(other);
     nativeChecks.picking.showFeature(layer, feature, position);
     nativeChecks.picking.showFeature(other, feature, position);

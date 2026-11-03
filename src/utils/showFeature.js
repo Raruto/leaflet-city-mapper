@@ -4,7 +4,7 @@ export function showFeature(backend, feature, event) {
   const tooltip = backend._tooltip;
   if (!tooltip) return;
   if (feature) {
-    tooltip.replaceChildren(backend.options.tooltipContent(feature));
+    tooltip.replaceChildren(backend.options.tooltip(feature));
     tooltip.hidden = false;
     const rect = backend.container.getBoundingClientRect();
     const x = event.clientX - rect.left, y = event.clientY - rect.top;

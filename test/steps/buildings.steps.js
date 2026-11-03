@@ -124,7 +124,7 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
   const result = await this.page.evaluate(async invalid => {
     const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
-    layer.options.featureStyle = () => ({ top: 10 });
+    layer.options.style = () => ({ top: 10 });
     const anchor = layer.location, west = anchor.lng, south = anchor.lat;
     let geometry = { type: 'Polygon', coordinates: [[[west, south]]] };
     if (invalid === 'geometry') geometry = { type: 'LineString', coordinates: [[west, south], [west + 0.001, south]] };
@@ -159,11 +159,11 @@ Then('building style for {int} storeys, {int} floors and ground {int} is {string
       const layer = layers._layers.find(entry => entry.layer instanceof L.Layer.types['3d'] &&
         !(entry.layer instanceof L.Layer.types.terrain) && entry.layer.url).layer;
       const feature = { properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } };
-      const style = layer.options.featureStyle(feature);
+      const style = layer.options.style(feature);
       return style === null ? null : {
         heights: `${style.top}/${style.bottom}`,
         color: nativeChecks.geometry.parseColor(style.color),
-        text: layer.options.tooltipContent(feature).textContent,
+        text: layer.options.tooltip(feature).textContent,
       };
     }, { storeys, floors, ground });
     if (expected === 'skip') { assert.equal(result, null); return; }
@@ -292,22 +292,22 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
     const point = map.project(new L.LatLng(48.8585, 2.2955), coords.z).divideBy(256).floor();
     Object.assign(coords, { x: point.x, y: point.y });
     const area = { coords, request: new AbortController() };
-    const original = buildings.options.featureStyle;
+    const original = buildings.options.style;
     let content;
     try {
-      buildings.options.featureStyle = feature => ({ top: feature.properties.height, bottom: 7, color: 0xff0000 });
+      buildings.options.style = feature => ({ top: feature.properties.height, bottom: 7, color: 0xff0000 });
       content = await nativeChecks.loadBlock(buildings, area, [{ ...feature, id: 'custom-volume',
         properties: { height: 22 } }]);
       const geometry = content.mesh.geometry;
       const heights = geometry.attributes.position.data.filter((_, i) => i % 3 === 1);
-      buildings.options.featureStyle = () => ({ top: 3, bottom: 4 });
+      buildings.options.style = () => ({ top: 3, bottom: 4 });
       const invalid = await nativeChecks.loadBlock(buildings, { coords, request: new AbortController() }, [feature]);
       const error = invalid.error;
       return { top: Math.max(...heights), bottom: Math.min(...heights),
         color: Array.from(geometry.attributes.color.data.slice(0, 3)),
         id: content.mesh.extras.featureFaces[0].id, error };
     } finally {
-      buildings.options.featureStyle = original;
+      buildings.options.style = original;
       nativeChecks.sources.releaseArea(buildings, content);
     }
   }, this.sampleBuildings[0]);

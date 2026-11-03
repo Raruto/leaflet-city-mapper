@@ -1,0 +1,2 @@
+function o(r,e){if(e._terrain3D&&e._terrain3D!==r)throw new Error("Only one terrain layer can be active per map");e._terrain3D=r,L.Layer.types["3d"].prototype.onAdd.call(r,e),r._terrainPromise=r.root?r._loadTerrain():new Promise(i=>r.once("ready",()=>r._loadTerrain().then(i),r)),e.eachLayer(i=>i._setTerrain3D?.(r)),e.fire("terrainchange")}export{o as onTerrainAdd};
+//# sourceMappingURL=onTerrainAdd.js.map

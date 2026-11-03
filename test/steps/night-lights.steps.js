@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
-// The lamp style lives in the example page, as the Streetlights layer featureStyle.
+// The lamp style lives in the example page, as the Streetlights layer style.
 const lamp = (page, properties = {}) =>
-  page.evaluate(properties => streetlights.options.featureStyle({ properties }), properties);
+  page.evaluate(properties => streetlights.options.style({ properties }), properties);
 
 Then('a lamp {int} m high with {int} lm at {int} K is {int} m high, lights {float} m scaled by the flux and is warm white',
   async function (height, flux, kelvin, top, radius) {
@@ -64,7 +64,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
         [...layer._areas.values()].every(area => area.done || area.error)));
   }, null, { timeout: 60000 });
   const result = await this.page.evaluate(async () => {
-    const { featureStyle: lampStyle, tooltipContent: lampTooltip } = streetlights.options;
+    const { style: lampStyle, tooltip: lampTooltip } = streetlights.options;
     const layer = streetlights, owner = L.Layer.types['3d']._renderers.get(map);
     const { device, context, canvas, format } = owner.renderer;
     const gpuErrors = [];

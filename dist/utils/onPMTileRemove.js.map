@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/onPMTileRemove.js"],
+  "sourcesContent": ["export function onPMTileRemove(backend, map) {\n  backend._setTerrain3D(null);\n  if (backend._container) L.TileLayer.prototype.onRemove.call(backend, map);\n}\n"],
+  "mappings": "AAAO,SAASA,EAAeC,EAASC,EAAK,CAC3CD,EAAQ,cAAc,IAAI,EACtBA,EAAQ,YAAY,EAAE,UAAU,UAAU,SAAS,KAAKA,EAASC,CAAG,CAC1E",
+  "names": ["onPMTileRemove", "backend", "map"]
+}

@@ -180,7 +180,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       url: '../examples/data/eiffel-tower.glb',
       rotation: [0, 0.8, 0],
       scale: [1.02, 1, 1.01],
-      tooltipContent: feature => feature.model === layer.model ? 'Eiffel Tower' : 'Unexpected model' },
+      tooltip: feature => feature.model === layer.model ? 'Eiffel Tower' : 'Unexpected model' },
       attribution: 'Test model attribution' }).addTo(map);
     await nativeChecks.ready(layer);
     const geometry = nativeChecks.bounds(layer.model, layer);

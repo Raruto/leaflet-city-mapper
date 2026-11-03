@@ -13,7 +13,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     const ring = [[-60, -60], [60, -60], [60, 60], [-60, 60], [-60, -60]]
       .map(offset => map.unproject(boundary.add(offset), zoom)).map(p => [p.lng, p.lat]);
     const area = { coords: { z: zoom, x: boundary.x / 256 - 1, y: boundary.y / 256 - 1 }, request: new AbortController() };
-    layer.options.featureStyle = () => ({ top: 20, color: 0x00ff00 });
+    layer.options.style = () => ({ top: 20, color: 0x00ff00 });
     await nativeChecks.loadBlock(layer, area, [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]);
     const mesh = area.mesh;
     const canvas = document.createElement('canvas');
@@ -179,7 +179,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     const raster = new L.Layer({ source: { type: 'pmtiles', url: 'fixture-raster.pmtiles',
       archive: { getHeader: async () => ({ ...header, tileType: 2 }), getZxy: async () => ({ data: image }) } } });
     const buildings = new L.Layer({ source: { type: '3d', url: 'fixture-buildings.pmtiles', roofTexture: true,
-      featureStyle: () => ({ top: 15 }), archive: {
+      style: () => ({ top: 15 }), archive: {
         getHeader: async () => header,
         getZxy: async () => ({ data: new TextEncoder().encode(JSON.stringify({
           type: 'FeatureCollection', features: [feature],

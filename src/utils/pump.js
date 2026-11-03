@@ -71,12 +71,12 @@ export function pump(backend) {
             // Overlapping archive blocks may contain the same polygon; its first vertex owns it.
             if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) continue;
           }
-          const style = backend.options.featureStyle(feature);
+          const style = backend.options.style(feature);
           if (style === null) {
             skipped++;
             continue;
           }
-          if (!style || typeof style !== 'object') throw new Error('featureStyle must return an extrusion style or null');
+          if (!style || typeof style !== 'object') throw new Error('style must return an extrusion style or null');
           const { top, bottom = 0, color = 0xd9b38c } = style;
           if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
             throw new Error('Invalid extrusion heights: expected top > bottom >= 0');

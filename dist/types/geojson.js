@@ -1,2 +1,2 @@
-import"./3d.js";import{onTerrainChange as r}from"../utils/onTerrainChange.js";import{updateArea as a}from"../utils/updateArea.js";import{releaseArea as s}from"../utils/releaseArea.js";L.Layer.types.geojson=L.Layer.types["3d"].extend({_geojson:!0,getEvents(){return{terrainchange:()=>r(this)}},setData(e){this.options.data=e,delete this.options.url;for(const t of this._areas.values())s(this,t);return this._areas.clear(),a(this),this}});
+import"./3d.js";import{onTerrainChange as t}from"../utils/onTerrainChange.js";import{setGeoJSONData as r}from"../utils/setGeoJSONData.js";L.Layer.types.geojson=L.Layer.types["3d"].extend({_geojson:!0,getEvents(){return{terrainchange:()=>t(this)}},setData(e){return r(this,e)}});
 //# sourceMappingURL=geojson.js.map

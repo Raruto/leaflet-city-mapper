@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/_registerTerrainTile.js"],
+  "sourcesContent": ["export function _registerTerrainTile(backend, coords, tile) {\n  if (!backend._terrain3D) return;\n  const terrain = backend._terrain3D;\n  terrain.addRasterTile(backend, coords, tile).catch(error => {\n    if (backend._terrain3D === terrain && tile.isConnected) backend.fire('tileerror', { tile, coords, error });\n  });\n}\n"],
+  "mappings": "AAAO,SAASA,EAAqBC,EAASC,EAAQC,EAAM,CAC1D,GAAI,CAACF,EAAQ,WAAY,OACzB,MAAMG,EAAUH,EAAQ,WACxBG,EAAQ,cAAcH,EAASC,EAAQC,CAAI,EAAE,MAAME,GAAS,CACtDJ,EAAQ,aAAeG,GAAWD,EAAK,aAAaF,EAAQ,KAAK,YAAa,CAAE,KAAAE,EAAM,OAAAD,EAAQ,MAAAG,CAAM,CAAC,CAC3G,CAAC,CACH",
+  "names": ["_registerTerrainTile", "backend", "coords", "tile", "terrain", "error"]
+}

@@ -37,8 +37,8 @@ const buildings = new L.Layer({
   source: {
     type: 'geojson',
     url: GeoJSON,
-    featureStyle: ({ properties }) => ({ top: properties.height, color: properties.color }),
-    tooltipContent: ({ properties }) => `${properties.name}: ${properties.height} m`,
+    style: ({ properties }) => ({ top: properties.height, color: properties.color }),
+    tooltip: ({ properties }) => `${properties.name}: ${properties.height} m`,
   },
 }).addTo(map);
 ```

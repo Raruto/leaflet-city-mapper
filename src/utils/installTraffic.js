@@ -1,9 +1,9 @@
-import * as createMesh from './createMesh.js';
+import * as createMeshApi from './createMesh.js';
 import * as disposeMesh from './disposeMesh.js';
 import * as setHighlight from './setHighlight.js';
 import * as showFeature from './showFeature.js';
 import * as render from './render.js';
-import * as update from "./update.js";
+import { update as updateScene } from './update.js';
 import { along } from './along.js';
 import { build } from './build.js';
 import { computeBounds } from './computeBounds.js';
@@ -28,7 +28,7 @@ export function installTraffic(layer, { url, model, lights, side, outline, veloc
   const params = new ArrayBuffer(16), paramFloats = new Float32Array(params), paramInts = new Uint32Array(params);
 
   const createMesh = (data, featureFaces, material, usage = 0) => {
-    const result = createMesh_1.createMesh(layer, data, material, usage);
+    const result = createMeshApi.createMesh(layer, data, material, usage);
     result.extras.featureFaces = featureFaces;
     return result;
   };
@@ -274,7 +274,7 @@ export function installTraffic(layer, { url, model, lights, side, outline, veloc
         return lights.map(({ position: [lx, ly, lz], ...light }) => ({ ...light, position: [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz] }));
       });
     }
-    if (mesh || changed) update.update(layer);
+    if (mesh || changed) updateScene(layer);
     if (live && valid) frame = requestAnimationFrame(tick);
   };
   let loaded, file;

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/setPMTileZIndex.js"],
+  "sourcesContent": ["import { update as updateScene } from './update.js';\n\nexport function setPMTileZIndex(backend, zIndex) {\n  L.TileLayer.prototype.setZIndex.call(backend, zIndex);\n  const renderer = L.Layer.types['3d']._renderers.get(backend._map);\n  if (renderer) updateScene(renderer);\n  return backend;\n}\n"],
+  "mappings": "AAAA,OAAS,UAAUA,MAAmB,cAE/B,SAASC,EAAgBC,EAASC,EAAQ,CAC/C,EAAE,UAAU,UAAU,UAAU,KAAKD,EAASC,CAAM,EACpD,MAAMC,EAAW,EAAE,MAAM,MAAM,IAAI,EAAE,WAAW,IAAIF,EAAQ,IAAI,EAChE,OAAIE,GAAUJ,EAAYI,CAAQ,EAC3BF,CACT",
+  "names": ["updateScene", "setPMTileZIndex", "backend", "zIndex", "renderer"]
+}

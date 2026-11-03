@@ -48,7 +48,7 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
     const center = map.getCenter(), zoom = 16;
     const tile = map.project(center, zoom).divideBy(256).floor();
     const style = { top: 20, trunkRadius: 0.5, crownRadius: 4, crownBottom: 7, color: 0x55863d };
-    layer.options.featureStyle = feature => feature.properties.skip ? null : style;
+    layer.options.style = feature => feature.properties.skip ? null : style;
     const feature = { type: 'Feature', id: 123, properties: { genre: 'Platanus' },
       geometry: { type: 'Point', coordinates: [center.lng, center.lat] } };
     const area = () => ({ coords: { z: zoom, x: tile.x, y: tile.y }, request: new AbortController() });
@@ -125,9 +125,9 @@ Then('tree inventory attributes control dimensions, crowns and tooltip estimates
     const properties = { typeemplacement: 'Arbre', hauteurenm: 20, circonferenceencm: 185,
       genre: 'Platanus', espece: 'x hispanica', libellefrancais: '<img src=x onerror=alert(1)>',
       stadedeveloppement: 'Adulte', remarquable: 'OUI' };
-    const style = p => tree.options.featureStyle({ properties: { ...properties, ...p } });
-    const tooltip = tree.options.tooltipContent({ properties });
-    const missing = tree.options.tooltipContent({ properties: { ...properties, hauteurenm: 0, circonferenceencm: null } });
+    const style = p => tree.options.style({ properties: { ...properties, ...p } });
+    const tooltip = tree.options.tooltip({ properties });
+    const missing = tree.options.tooltip({ properties: { ...properties, hauteurenm: 0, circonferenceencm: null } });
     return {
       enabled: map.hasLayer(tree), source: tree.options.url,
       measured: style({}), conifer: style({ genre: 'Picea' }), palm: style({ genre: 'Phoenix' }),

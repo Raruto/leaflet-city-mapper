@@ -30,7 +30,7 @@ L.Layer.types.traffic = L.Layer.types['3d'].extend({
       throw new Error(`Unknown vehicle: ${vehicle}`);
     }
     L.Layer.types['3d'].prototype.initialize.call(this, {
-      tooltipContent: tooltip,
+      tooltip: tooltip,
       nightLight: Boolean(vehicles[vehicle].lights),
       ...options
     });

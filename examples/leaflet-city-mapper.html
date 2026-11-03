@@ -71,7 +71,7 @@
 						url: 'data/paris-buildings.pmtiles',
 						roofTexture: true,
 						ariaLabel: '3D view of the Eiffel Tower and Paris buildings',
-						featureStyle({ properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } }) {
+						style({ properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } }) {
 							if (!Number.isFinite(storeys) || storeys < 0 || ![0, 1].includes(ground) ||
 								(ground === 0 && (!Number.isFinite(floors) || floors <= 0 || floors > storeys + 1))) return null;
 							// approximate height at 3 m/storey
@@ -83,7 +83,7 @@
 									l: 0.76 - Math.min(storeys / 40, 1) * 0.28 }
 							};
 						},
-						tooltipContent({ properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } }) {
+						tooltip({ properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } }) {
 							const content = document.createElement('div');
 							content.innerHTML = `<b>Building</b><br>Estimated height: ${(storeys + 1) * 3} m · ${storeys} storeys${Number.isFinite(floors) ? ` · ${floors} ground floors` : ''}${ground === 0 ? ' · elevated ground floor' : ''}`;
 							return content;
@@ -96,7 +96,7 @@
 					source: {
 						type: '3d',
 						url: 'data/paris-trees.pmtiles',
-						featureStyle({ properties: p }) {
+						style({ properties: p }) {
 							if (p.typeemplacement !== 'Arbre') return null;
 							const estimatedHeight = ({ 'Jeune (arbre)': 4, 'Jeune (arbre)Adulte': 8,
 								Adulte: 15, Mature: 20 })[p.stadedeveloppement] || 10;
@@ -113,7 +113,7 @@
 								color: conifer ? 0x315e45 : palm ? 0x688d42 : 0x55863d,
 							};
 						},
-						tooltipContent({ properties: p }) {
+						tooltip({ properties: p }) {
 							const content = document.createElement('div');
 							content.style.whiteSpace = 'pre-line';
 							content.textContent = [
@@ -136,7 +136,7 @@
 				'Eiffel Tower': new L.Layer({
 					source: {
 						url: 'data/eiffel-tower.glb',
-						tooltipContent() {
+						tooltip() {
 							const content = document.createElement('div');
 							content.innerHTML = '<div><b>Eiffel Tower</b><br>Height: 330 m including antennas (300 m structure)<br>Opened: 1889, for the World Exhibition<br>Designer: Gustave Eiffel and his engineering team<br>Location: Champ de Mars, Paris</div>';
 							return content;
@@ -153,7 +153,7 @@
 						type: '3d',
 						url: 'data/paris-streetlights.pmtiles',
 						nightLight: true,
-						featureStyle({ properties: p }) {
+						style({ properties: p }) {
 							const positive = (value, maximum) => {
 								const number = Number(value);
 								return Number.isFinite(number) && number > 0 && number <= maximum ? number : null;
@@ -181,7 +181,7 @@
 							b: (a[1][2] + (b[1][2] - a[1][2]) * fraction) / 255 },
 						};
 						},
-						tooltipContent({ properties: p }) {
+						tooltip({ properties: p }) {
 							const content = document.createElement('div');
 							content.style.whiteSpace = 'pre-line';
 							const positive = (value, maximum) => {

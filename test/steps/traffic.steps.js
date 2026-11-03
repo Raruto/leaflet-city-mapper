@@ -137,7 +137,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const cpuMatchesGpu = boats().geometry.attributes.position.data.every((value, i) => Math.abs(value - positions[i]) < 1e-3);
     const finite = positions.every(Number.isFinite) && layer.root.children.every(mesh =>
       Object.values(mesh.geometry.attributes).every(attribute => [...attribute.data].every(Number.isFinite)));
-    const tooltip = layer.options.tooltipContent({ properties: properties[0] }).textContent;
+    const tooltip = layer.options.tooltip({ properties: properties[0] }).textContent;
     const shared = layer.renderer === streetlights.renderer;
     const noDuplicateNodes = new Set(boats().extras.featureFaces.map(face => face.id)).size === twoTrips;
     select('2026-06-21', 600);

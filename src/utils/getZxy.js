@@ -7,7 +7,7 @@ import { getHeader } from './getHeader.js';
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 
 export async function getZxy(backend, z, x, y, signal) {
-  if (backend.options.archive?.getZxy) {
+  if (backend.options.archive && backend.options.archive !== backend && backend.options.archive.getZxy) {
     return backend.options.archive.getZxy(z, x, y, signal);
   }
   const id = tileId(z, x, y);

@@ -26,7 +26,7 @@
  *
  * @example
  * new L.Layer({ source: { url: 'tower.glb', center: [48.8582601, 2.29449985] } }).addTo(map);
- * new L.Layer({ source: { type: '3d', url: 'buildings.pmtiles', featureStyle }, attribution }).addTo(map);
+ * new L.Layer({ source: { type: '3d', url: 'buildings.pmtiles', style }, attribution }).addTo(map);
  * new L.Layer({ source: { type: 'terrain', url: 'terrain.pmtiles' } }).addTo(map);
  * new L.Layer({ source: { url: 'orthophotos.pmtiles', maxZoom: 24 } }).addTo(map);
  *
@@ -37,8 +37,8 @@
  * @property {number[]} [scale] Model scale [x,y,z]; independent of geographic scaling.
  * @property {string} [url] GLB/glTF model URL (loaded before ready), or PMTiles URL containing
  * Polygon/MultiPolygon or tree/light Point GeoJSON ('3d'), raster tiles ('pmtiles') or Float32 DEM ('terrain').
- * @property {function(Object): (ExtrusionStyle|null)} [featureStyle] Source styling; null skips.
- * @property {function(PickedFeature): (Node|string)} [tooltipContent] No HTML string evaluation.
+ * @property {function(Object): (ExtrusionStyle|null)} [style] Source styling; null skips.
+ * @property {function(PickedFeature): (Node|string)} [tooltip] No HTML string evaluation.
  * @property {string} [ariaLabel='3D scene'] Shared canvas accessible name.
  * @property {boolean} [nightLight=false] Point sources: emissive bulbs and local illumination.
  * @property {boolean} [nightSparkle=false] Model: sparse luminous points at night.
@@ -71,7 +71,7 @@
  * @property {boolean} [done] Geometry built successfully, including empty blocks.
  * @property {Object|null} [mesh] One batched GPU mesh per non-empty block.
  * @property {number} [buildings] Emitted feature count, not number of triangles.
- * @property {number} [skipped] Features intentionally skipped by featureStyle.
+ * @property {number} [skipped] Features intentionally skipped by style.
  * @property {string} [error] Failed load/build message; reported through error and progress.
  */
 
@@ -159,14 +159,14 @@ L.Layer.types['3d'] = L.Layer.extend({
       const center = map.getCenter();
       this.location = new L.LatLng(center.lat, center.lng);
     }
-    if (this.url || this._geojson || this.options.tooltipContent || this.modelUrl) {
+    if (this.url || this._geojson || this.options.tooltip || this.modelUrl) {
       this.container = map.getContainer();
       this._pointerEvents ||= {
         mousemove: event => onPointerMove.onPointerMove(this, event),
         click: event => onClick.onClick(this, event),
         mouseleave: () => onPointerLeave.onPointerLeave(this),
       };
-      if (this.options.tooltipContent) {
+      if (this.options.tooltip) {
         this._tooltip = L.DomUtil.create('div', 'leaflet-3d-tooltip', this.container);
         this._tooltip.hidden = true;
         this._tooltip.setAttribute('role', 'tooltip');

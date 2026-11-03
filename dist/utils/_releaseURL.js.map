@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/_releaseURL.js"],
+  "sourcesContent": ["export function _releaseURL(tile) {\n  if (tile.objectURL) {\n    URL.revokeObjectURL(tile.objectURL);\n    tile.objectURL = null;\n  }\n}\n"],
+  "mappings": "AAAO,SAASA,EAAYC,EAAM,CAC5BA,EAAK,YACP,IAAI,gBAAgBA,EAAK,SAAS,EAClCA,EAAK,UAAY,KAErB",
+  "names": ["_releaseURL", "tile"]
+}

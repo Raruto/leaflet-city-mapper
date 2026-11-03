@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/setPMTileOpacity.js"],
+  "sourcesContent": ["import { update as updateScene } from './update.js';\n\nexport function setPMTileOpacity(backend, opacity) {\n  L.TileLayer.prototype.setOpacity.call(backend, opacity);\n  const renderer = L.Layer.types['3d']._renderers.get(backend._map);\n  if (renderer) updateScene(renderer);\n  return backend;\n}\n"],
+  "mappings": "AAAA,OAAS,UAAUA,MAAmB,cAE/B,SAASC,EAAiBC,EAASC,EAAS,CACjD,EAAE,UAAU,UAAU,WAAW,KAAKD,EAASC,CAAO,EACtD,MAAMC,EAAW,EAAE,MAAM,MAAM,IAAI,EAAE,WAAW,IAAIF,EAAQ,IAAI,EAChE,OAAIE,GAAUJ,EAAYI,CAAQ,EAC3BF,CACT",
+  "names": ["updateScene", "setPMTileOpacity", "backend", "opacity", "renderer"]
+}

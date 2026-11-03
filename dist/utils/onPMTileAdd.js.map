@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/onPMTileAdd.js"],
+  "sourcesContent": ["export function onPMTileAdd(backend, map) {\n  if (backend.header) {\n    L.TileLayer.prototype.onAdd.call(backend, map);\n    backend._setTerrain3D(map._terrain3D);\n  } else {\n    backend.ready = backend.ready.then(layer => {\n      if (backend._map === map && map.hasLayer(backend) && !backend._container) {\n        L.TileLayer.prototype.onAdd.call(backend, map);\n        backend._setTerrain3D(map._terrain3D);\n      }\n      return layer;\n    });\n  }\n}\n"],
+  "mappings": "AAAO,SAASA,EAAYC,EAASC,EAAK,CACpCD,EAAQ,QACV,EAAE,UAAU,UAAU,MAAM,KAAKA,EAASC,CAAG,EAC7CD,EAAQ,cAAcC,EAAI,UAAU,GAEpCD,EAAQ,MAAQA,EAAQ,MAAM,KAAKE,IAC7BF,EAAQ,OAASC,GAAOA,EAAI,SAASD,CAAO,GAAK,CAACA,EAAQ,aAC5D,EAAE,UAAU,UAAU,MAAM,KAAKA,EAASC,CAAG,EAC7CD,EAAQ,cAAcC,EAAI,UAAU,GAE/BC,EACR,CAEL",
+  "names": ["onPMTileAdd", "backend", "map", "layer"]
+}

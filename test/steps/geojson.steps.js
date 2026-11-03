@@ -23,8 +23,8 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const layer = new L.Layer({ source: {
       type: 'geojson',
       ...(input === 'inline' ? { data } : { url: '/buildings.geojson' }),
-      featureStyle: feature => ({ top: feature.properties.height }),
-      tooltipContent: feature => feature.id,
+      style: feature => ({ top: feature.properties.height }),
+      tooltip: feature => feature.id,
     } });
     layer.on('error', ({ error }) => errors.push(error.message));
     const completed = () => new Promise(resolve => {
@@ -82,9 +82,9 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
     for (const source of [
       {}, { data: null }, { data: {}, url: '/buildings.geojson' },
       { url: '/missing.geojson' }, { url: '/broken.geojson' },
-      { data: { type: 'FeatureCollection', features: [] }, featureStyle: null },
+      { data: { type: 'FeatureCollection', features: [] }, style: null },
     ]) {
-      const layer = new L.Layer({ source: { type: 'geojson', featureStyle: () => ({ top: 10 }), ...source } });
+      const layer = new L.Layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
       const failed = new Promise(resolve => layer.once('error', ({ error }) => resolve(error.message)));
       layer.addTo(map);
       failures.push(await failed);
@@ -103,7 +103,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       }, { once: true });
     });
     const layer = new L.Layer({ source: {
-      type: 'geojson', url: '/slow.geojson', featureStyle: () => ({ top: 10 }),
+      type: 'geojson', url: '/slow.geojson', style: () => ({ top: 10 }),
     } });
     const errors = [];
     layer.on('error', ({ error }) => errors.push(error.message));
@@ -124,7 +124,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
     'GeoJSON source requires either data or url', 'Unable to load GeoJSON: HTTP 404',
   ]);
   assert.ok(result.failures[4].length > 0, 'Invalid JSON emits an error');
-  assert.equal(result.failures[5], 'featureStyle must be a function');
+  assert.equal(result.failures[5], 'style must be a function');
   assert.equal(result.aborted, true);
   assert.equal(result.loaded, 0);
   assert.deepEqual(result.errors, []);

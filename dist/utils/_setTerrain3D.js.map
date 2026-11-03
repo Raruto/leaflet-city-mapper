@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/_setTerrain3D.js"],
+  "sourcesContent": ["export function _setTerrain3D(backend, terrain) {\n  if (backend._terrain3D === terrain) return;\n  for (const { el } of Object.values(backend._tiles || {})) backend._terrain3D?.removeRasterTile(el);\n  backend._terrain3D = terrain || null;\n  if (backend._terrain3D) {\n    for (const { coords, el } of Object.values(backend._tiles || {})) {\n      if (el.done) backend._registerTerrainTile(coords, el);\n    }\n  }\n}\n"],
+  "mappings": "AAAO,SAASA,EAAcC,EAASC,EAAS,CAC9C,GAAID,EAAQ,aAAeC,EAC3B,UAAW,CAAE,GAAAC,CAAG,IAAK,OAAO,OAAOF,EAAQ,QAAU,CAAC,CAAC,EAAGA,EAAQ,YAAY,iBAAiBE,CAAE,EAEjG,GADAF,EAAQ,WAAaC,GAAW,KAC5BD,EAAQ,WACV,SAAW,CAAE,OAAAG,EAAQ,GAAAD,CAAG,IAAK,OAAO,OAAOF,EAAQ,QAAU,CAAC,CAAC,EACzDE,EAAG,MAAMF,EAAQ,qBAAqBG,EAAQD,CAAE,EAG1D",
+  "names": ["_setTerrain3D", "backend", "terrain", "el", "coords"]
+}
