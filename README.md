@@ -23,7 +23,7 @@ Load leaflet and leaflet-rotate first, then this plugin:
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate.js"></script>
-<script src="https://unpkg.com/leaflet-city-mapper@0.1.0/dist/leaflet-city-mapper.js"></script>
+<script src="https://unpkg.com/leaflet-city-mapper@0.0.1/dist/leaflet-city-mapper.js"></script>
 ```
 And then set an approriate `source` param to layer constructor:
 
