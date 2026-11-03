@@ -113,7 +113,7 @@ export async function attach(backend, map) {
     canvas.className = 'leaflet-3d';
     canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none';
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', backend.options.ariaLabel);
+    canvas.setAttribute('aria-label', backend.options.ariaLabel ?? '3D scene');
     let pane = map.getPane('webgpuPane');
     if (!pane) {
       pane = map.createPane('webgpuPane', map.getContainer());

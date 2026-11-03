@@ -38,7 +38,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     let done = completed();
     layer.addTo(map);
     const first = await done;
-    const area = layer._areas.get('geojson');
+    let area = layer._areas.get('geojson');
     const mesh = area.mesh;
     const face = mesh.extras.featureFaces[0];
     const identity = face.id === 'office' && face.properties.height === 25;
@@ -47,6 +47,19 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     map.setBearing(90);
     map.setPitch(60);
     const retained = layer._areas.get('geojson') === area;
+    const previousArea = area;
+    const terrainUpdated = await new Promise(resolve => {
+      const progress = () => {
+        const refreshed = layer._areas.get('geojson');
+        if (refreshed !== previousArea && refreshed?.mesh) {
+          layer.off('progress', progress);
+          resolve(previousArea.request.signal.aborted);
+        }
+      };
+      layer.on('progress', progress);
+    });
+    map.fire('terrainchange');
+    area = layer._areas.get('geojson');
     done = completed();
     layer.setData({ type: 'FeatureCollection', features: [] });
     const empty = await done;
@@ -62,12 +75,12 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const tooltip = Boolean(layer._tooltip);
     layer.remove();
     map.remove();
-    return { first, empty, replaced, readded, identity, geometry, retained, released, removed, tooltip, errors };
+    return { first, empty, replaced, readded, identity, geometry, retained, terrainUpdated, released, removed, tooltip, errors };
   }, input);
   const progress = loaded => ({ loaded, errors: [] });
   assert.deepEqual(result, {
     first: progress(1), empty: progress(0), replaced: progress(1), readded: progress(1),
-    identity: true, geometry: true, retained: true, released: true, removed: true, tooltip: true, errors: [],
+    identity: true, geometry: true, retained: true, terrainUpdated: true, released: true, removed: true, tooltip: true, errors: [],
   });
 });
 
