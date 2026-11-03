@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdtemp, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
@@ -90,7 +90,7 @@ const archive = { bbox: [-180, -85, 180, 85], minZoom: 1, maxZoom: 1, concurrenc
 
 Given('a 4-tile archive has been built', async function () {
   this.directory = await mkdtemp(join(tmpdir(), 'leaflet-pmtiles-builder-'));
-  this.build = builder(pathToFileURL(`${this.directory}\\`));
+  this.build = builder(pathToFileURL(`${this.directory}${sep}`));
   await this.build('fixture', archive);
   this.archive = await readFile(join(this.directory, 'paris-fixture.pmtiles'));
 });
