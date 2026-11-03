@@ -24,7 +24,7 @@ async function getBrowser() {
   const launchOptions = engine === chromium && process.platform === 'linux' && process.env.CI
     ? {
       ...options,
-      args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan'],
+      args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--disable-vulkan-surface'],
     }
     : options;
   browser = await engine.launch(launchOptions);
