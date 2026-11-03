@@ -135,7 +135,7 @@ Given('a map with the standalone 3D module and no dependency import map', async 
       <script src="https://unpkg.com/leaflet@${process.env.LEAFLET_VERSION === '2' ? '2.0.0-alpha.1/dist/leaflet-global-src.js' : '1.9/dist/leaflet-src.js'}"></script>
       <script>globalThis.L = globalThis.leaflet || globalThis.L;</script>
       <script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js"></script>
-      <script src="../dist/index.js"></script>
+      <script src="../dist/leaflet-city-mapper.js"></script>
       <script>
         import('../dist/types/terrain.js').then(() => window.test3d = { Layer3D: L.Layer.types['3d'], map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30

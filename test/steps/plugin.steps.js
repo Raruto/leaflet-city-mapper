@@ -29,7 +29,7 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
   });
   if (leaflet2) await this.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
   await this.page.addScriptTag({ url: 'https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js' });
-  await this.page.addScriptTag({ url: `${this.baseUrl}/dist/index.js` });
+  await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
   await this.page.waitForFunction(() => L.Layer.types);
 });
 

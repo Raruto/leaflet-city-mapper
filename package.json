@@ -1,32 +1,39 @@
 {
   "name": "leaflet-city-mapper",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "A small 3D rendering engine for leaflet",
   "type": "module",
-  "main": "dist/index.js",
-  "browser": "dist/index.js",
+  "main": "dist/leaflet-city-mapper.js",
+  "browser": "dist/leaflet-city-mapper.js",
   "module": "src/index.js",
-  "files": [
-    "dist",
-    "src",
-    "LICENSE",
-    "README.md"
-  ],
   "scripts": {
     "dev": "node build/dev.js",
     "build": "node build/build.js",
     "test": "node build/test.js",
     "pmtiles": "node build/pmtiles.js"
   },
-  "keywords": [
-    "leaflet",
+  "repository": {
+		"type": "git",
+		"url": "https://github.com/Raruto/leaflet-city-mapper.git"
+	},
+	"keywords": [
+		"leaflet",
     "leaflet-rotate",
+		"3d",
+		"rotation",
     "webgpu",
-    "3d",
-    "pmtiles",
-    "terrain"
-  ],
+    "terrain",
+    "pmtiles"
+	],
+  "author": {
+		"name": "Raruto",
+		"url": "https://github.com/Raruto/leaflet-city-mapper"
+	},
   "license": "GPL-3.0",
+  "bugs": {
+		"url": "https://github.com/Raruto/leaflet-city-mapper/issues"
+	},
+	"homepage": "https://github.com/Raruto/leaflet-city-mapper#readme",
   "peerDependencies": {
     "leaflet": "^1.9.3 || ^2.0.0-alpha.1",
     "leaflet-rotate": "^0.5.3"
