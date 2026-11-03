@@ -177,7 +177,8 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       while (!condition()) {
         if (performance.now() > deadline) throw new Error(`Terrain fixture did not settle: ${JSON.stringify({
           meshes: terrain._rasterTiles.size, tiles: raster._rasterTiles.size,
-          loaded: [...raster._rasterTiles.values()].filter(tile => tile.done).length, inflight: buildings._inflight,
+          loaded: [...raster._rasterTiles.values()].filter(tile => tile.done).length,
+          inflight: buildings._inflight, errors,
         })}`);
         await new Promise(requestAnimationFrame);
       }

@@ -8,6 +8,7 @@ import { updatePointLights } from './updatePointLights.js';
 import { renderSunlight } from './renderSunlight.js';
 import { sortMeshes } from "./sortMeshes.js";
 import { update } from "./update.js";
+import { getRasterTileSize } from "./rasterTiles.js";
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
@@ -154,11 +155,11 @@ export function render(backend) {
     const selection = rasters.map(layer => `${L.Util.stamp(layer)}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
     // Retain the geographically aligned atlas until a tile batch finishes loading.
     if (!backend._roofRaster || backend._roofRaster.selection !== selection ||
-      (!rasters.some(layer => layer.isLoading()) && backend._roofRaster.signature !== signature)) {
+      (!rasters.some(layer => layer._loadingTiles > 0) && backend._roofRaster.signature !== signature)) {
       const zoom = tiles.length ? Math.max(...tiles.map(({ tile }) => tile.coords.z)) : map.getZoom();
       const bounds = new L.Bounds();
       for (const { tile: { coords }, layer } of tiles) {
-        const size = layer.getTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
+        const size = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
         bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size));
         bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size));
       }
@@ -286,7 +287,7 @@ export function render(backend) {
           source.uploaded = source.image;
         }
         opacities[i * 64] = layer.options.opacity;
-        const tileSize = layer.getTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
+        const tileSize = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
         const offset = new L.Point(coords.x, coords.y).scaleBy(tileSize).subtract(min);
         const x = offset.x * width / size.x, y = offset.y * height / size.y;
         atlasPass.setViewport(x, y, Math.min(tileSize.x * width / size.x, width - x),

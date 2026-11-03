@@ -1,3 +1,3 @@
-export function onRemoveSun(backend) {
-  backend.control.remove();
+export function onRemoveSun(layer) {
+  layer.control.remove();
 }

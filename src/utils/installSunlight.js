@@ -45,10 +45,14 @@ export function installSunlight(map) {
       const sun = map._sunlight = solarPosition(control.time, center.lat, center.lng);
       Object.assign(sun, atmosphere(sun.altitude));
       sun.moon = moonPosition(control.time, center.lat, center.lng);
-      status.textContent = sun.altitude <= 0 ? 'Night · no direct sunlight' :
-        sun.altitude < 3 ? 'Low sun · shadows paused' : `Sun altitude ${sun.altitude.toFixed(1)}°`;
+      status.textContent = sun.altitude <= 0
+        ? 'Night · no direct sunlight'
+        : sun.altitude < 3
+          ? 'Low sun · shadows paused'
+          : `Sun altitude ${sun.altitude.toFixed(1)}°`;
       map.fire('simulationtimechange', { time: new Date(control.time), live: control.live });
-      updateSky(); render();
+      updateSky();
+      render();
     } catch (error) {
       delete map._sunlight;
       updateSky();
@@ -56,21 +60,6 @@ export function installSunlight(map) {
       status.textContent = `Error: ${error.message}`;
       console.error('Solar simulation', error);
     }
-  };
-  const selectTime = () => {
-    control.live = false;
-    if (!date.value || !date.validity.valid) {
-      control.time = new Date(NaN);
-      map.fire('simulationtimechange', { time: null, live: false });
-      delete map._sunlight;
-      updateSky();
-      render();
-      status.textContent = 'Error: choose a valid solar date';
-      return;
-    }
-    control.time = new Date(`${date.value}T00:00:00Z`);
-    control.time.setUTCMinutes(Number(slider.value));
-    update();
   };
   control.onAdd = () => {
     const container = L.DomUtil.create('div', 'sunlight-control');
@@ -102,8 +91,21 @@ export function installSunlight(map) {
     note.style.color = '#555';
     note.textContent = 'Indicative · loaded geometry only. Streetlight illumination is estimated, not measured lux.';
     container.append(date, slider, timeRow, status, note);
-    slider.oninput = selectTime;
-    date.onchange = selectTime;
+    date.onchange = slider.oninput = () => {
+      control.live = false;
+      if (!date.value || !date.validity.valid) {
+        control.time = new Date(NaN);
+        map.fire('simulationtimechange', { time: null, live: false });
+        delete map._sunlight;
+        updateSky();
+        render();
+        status.textContent = 'Error: choose a valid solar date';
+        return;
+      }
+      control.time = new Date(`${date.value}T00:00:00Z`);
+      control.time.setUTCMinutes(Number(slider.value));
+      update();
+    };
     L.DomEvent.disableClickPropagation(container);
     L.DomEvent.disableScrollPropagation(container);
     update();

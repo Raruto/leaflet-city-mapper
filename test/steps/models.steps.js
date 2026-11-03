@@ -529,8 +529,23 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       { local: [-60.118438720703125, 0, 60.605037689208984], latlng: [48.8574753, 2.2945144] },
       { local: [-60.11847686767578, 0, -60.60499954223633], latlng: [48.8582480, 2.2933119] }
     ];
-    const terrainClearance = Math.min(...feet.map(({ latlng }) =>
-      eiffel.root.position[1] - map._terrain3D._getElevation(latlng)));
+    const [northwest, northeast, southeast, southwest] = feet.map(({ latlng }) => latlng);
+    const terrainClearances = [];
+    for (let row = 0; row <= 4; row++) {
+      for (let column = 0; column <= 4; column++) {
+        const x = column / 4, y = row / 4;
+        const latlng = [
+          (northwest[0] * (1 - x) + northeast[0] * x) * (1 - y) +
+            (southwest[0] * (1 - x) + southeast[0] * x) * y,
+          (northwest[1] * (1 - x) + northeast[1] * x) * (1 - y) +
+            (southwest[1] * (1 - x) + southeast[1] * x) * y,
+        ];
+        const elevation = map._terrain3D._getElevation(latlng);
+        if (!Number.isFinite(elevation)) throw new Error(`Missing terrain under Eiffel Tower at ${latlng}`);
+        terrainClearances.push(eiffel.root.position[1] - elevation);
+      }
+    }
+    const terrainClearance = Math.min(...terrainClearances);
     const footprintErrors = [];
     let baseLayer;
     map.eachLayer(layer => {

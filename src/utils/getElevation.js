@@ -1,5 +1,5 @@
-import { bridgeElevation } from './bridgeElevation';
-import { terrainElevation } from './terrainElevation';
+import { bridgeElevation } from './bridgeElevation.js';
+import { terrainElevation } from './terrainElevation.js';
 
 /** @param {L.LatLng|L.Point} location LatLng, or a pixel point at the terrain zoom. */
 

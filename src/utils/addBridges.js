@@ -1,5 +1,5 @@
-import { createMesh } from './createMesh';
-import { triangulate } from './triangulate';
+import { createMesh } from './createMesh.js';
+import { triangulate } from './triangulate.js';
 
 /**
  * Bare-earth DEMs drop bridges: `_getElevation` returns the deck height inside these polygons (GeoJSON

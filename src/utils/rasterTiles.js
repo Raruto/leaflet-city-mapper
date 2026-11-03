@@ -68,7 +68,7 @@ export function setRasterTerrain(backend, terrain) {
   backend._terrain3D = terrain || null;
   if (terrain) {
     for (const tile of backend._rasterTiles.values()) {
-      if (tile.done) backend._registerTerrainTile(tile.coords, tile);
+      if (tile.done) registerTerrainTile(backend, tile.coords, tile);
     }
   }
 }
@@ -125,7 +125,7 @@ function loadRasterTile(backend, tile) {
     }
     createRasterMesh(backend, tile);
     tile.done = true;
-    backend._registerTerrainTile(tile.coords, tile);
+    registerTerrainTile(backend, tile.coords, tile);
     backend.fire('tileload', { tile, coords: tile.coords });
     update(backend);
   }).catch(error => {
