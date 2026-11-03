@@ -1,11 +1,12 @@
 import { build } from './build.js';
 import { startServer } from './server.js';
 
-const server = await startServer(8080);
+const options = { watch: true };
+const server = await startServer(8080, options);
 let stopBuild;
 
 try {
-  stopBuild = await build({ watch: true });
+  stopBuild = await build(options);
   console.log('Serving on http://127.0.0.1:8080');
 } catch (error) {
   await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));

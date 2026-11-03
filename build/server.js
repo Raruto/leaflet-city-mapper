@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +31,7 @@ const escapeHtml = value => value.replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[char]);
 
-export function startServer(port = 8080) {
+export function startServer(port = 8080, { watch = false } = {}) {
   const server = createServer(async (request, response) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.writeHead(405, { Allow: 'GET, HEAD' }).end();
@@ -70,6 +70,16 @@ export function startServer(port = 8080) {
       }
       if (!content.isFile()) {
         response.writeHead(404).end();
+        return;
+      }
+      if (watch && extname(target).toLowerCase() === '.html') {
+        const body = (await readFile(target, 'utf8'))
+          .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, '/');
+        response.writeHead(200, {
+          'Content-Type': types['.html'],
+          'Content-Length': Buffer.byteLength(body),
+        });
+        response.end(request.method === 'HEAD' ? undefined : body);
         return;
       }
       const headers = {

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
+import { readFile } from 'node:fs/promises';
 import { Then } from '@cucumber/cucumber';
+import { startServer } from '../../build/server.js';
 import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../src/utils/geometry.js';
 import { emptyNode, setParent, traverse } from '../../src/utils/scene.js';
 import { decodeDirectory, decodeHeader, decompress, tileId } from '../../src/utils/pmtiles.js';
@@ -13,6 +15,38 @@ import { materialShaders } from '../../src/utils/shaders.js';
 import { projectCelestialBody } from '../../src/utils/sun.js';
 
 const checks = {
+  async 'dev-server'() {
+    for (const watch of [false, true]) {
+      const server = await startServer(0, { watch });
+      const baseUrl = `http://127.0.0.1:${server.address().port}`;
+      try {
+        for (const name of ['leaflet-city-mapper', 'leaflet-city-mapper-geojson']) {
+          const url = `${baseUrl}/examples/${name}.html`;
+          const original = await readFile(new URL(`../../examples/${name}.html`, import.meta.url), 'utf8');
+          const response = await fetch(url);
+          assert.equal(response.status, 200);
+          const body = await response.text();
+          assert.equal(body, watch
+            ? original.replace(/https:\/\/unpkg\.com\/leaflet-city-mapper@\d+\.\d+\.\d+\//g, '/')
+            : original);
+          const head = await fetch(url, { method: 'HEAD' });
+          assert.equal(head.status, 200);
+          assert.equal(Number(head.headers.get('content-length')), Buffer.byteLength(body));
+          assert.equal(await head.text(), '');
+        }
+        const response = await fetch(`${baseUrl}/dist/leaflet-city-mapper.js`);
+        assert.equal(response.status, 200);
+        assert.equal(await response.text(),
+          await readFile(new URL('../../dist/leaflet-city-mapper.js', import.meta.url), 'utf8'));
+      } finally {
+        await new Promise((resolve, reject) => {
+          server.close(error => error ? reject(error) : resolve());
+          server.closeAllConnections();
+        });
+      }
+    }
+  },
+
   geometry() {
     assert.deepEqual(parseColor(0xff8000), { r: 1, g: 128 / 255, b: 0 });
     const ring = coordinates => coordinates.map(([x, y]) => ({ x, y }));

@@ -15,6 +15,7 @@ Feature: Standalone 3D utilities
       | walking  |
       | shaders  |
       | sky      |
+      | dev-server |
 
   @3d-layer
   Scenario: Browser math utilities preserve transforms, camera projection and ray intersections
