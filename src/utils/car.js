@@ -1,4 +1,9 @@
-import { paints, mirror, tyre, box, glass, headlight, taillight } from "./paints.js";
+import { paints } from './paints.js';
+import { mirror } from './mirror.js';
+import { tyre, glass } from './glass.js';
+import { box } from './box.js';
+import { headlight } from './headlight.js';
+import { taillight } from './taillight.js';
 
 export const car = i => {
   const paint = paints[i % paints.length];

@@ -1,2 +1,2 @@
-function r(h,s,t,o){const[n,c,M]=h,l=n*Math.cos(o)-M*Math.sin(o),u=-n*Math.sin(o)*Math.cos(t)+c*Math.sin(t)-M*Math.cos(o)*Math.cos(t),a=-n*Math.sin(o)*Math.sin(t)-c*Math.cos(t)-M*Math.cos(o)*Math.sin(t);if(a<=0)return null;const y=s.x/2+s.y*1.5*l/a,f=s.y/2-s.y*1.5*u/a;return{left:y,top:f}}export{r as projectCelestialBody};
+function h(t,s,o,M){const a=-t.x*Math.sin(M)*Math.sin(o)-t.y*Math.cos(o)-t.z*Math.cos(M)*Math.sin(o);return a>0?{left:s.x/2+s.y*1.5*(t.x*Math.cos(M)-t.z*Math.sin(M))/a,top:s.y/2-s.y*1.5*(-t.x*Math.sin(M)*Math.cos(o)+t.y*Math.sin(o)-t.z*Math.cos(M)*Math.cos(o))/a}:null}export{h as projectCelestialBody};
 //# sourceMappingURL=projectCelestialBody.js.map

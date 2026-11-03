@@ -1,5 +1,7 @@
 import { hull } from "./hull.js";
-import { box, glass, mirror } from "./paints.js";
+import { box } from './box.js';
+import { glass } from './glass.js';
+import { mirror } from './mirror.js';
 import { white } from "./white.js";
 
 // Panoramic river cruiser, about 60 × 11 m: glass saloon, open upper deck with benches, wheelhouse forward.

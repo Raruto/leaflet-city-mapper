@@ -4,7 +4,9 @@ import { parseColor } from "./parseColor.js";
 
 export function lampPostGeometry(point, style, addTriangle) {
   const color = parseColor(0x50565a), radius = style.poleRadius;
-  if (!Number.isFinite(radius) || radius <= 0) throw new Error('Invalid lamp pole radius');
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error('Invalid lamp pole radius');
+  }
   const ring = r => Array.from({ length: 6 }, (_, i) => ({
     x: point.x + Math.cos(i * Math.PI / 3) * r,
     y: point.y + Math.sin(i * Math.PI / 3) * r, ground: point.ground, uv: [3, 3],

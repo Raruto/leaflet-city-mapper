@@ -1,5 +1,5 @@
 import { car } from "./car.js";
-import { boat } from "./white.js";
+import { boat } from "./boat.js";
 
 /**
  * `side`: default offset (metres) to the right of the lane centreline. `model(i)` gives the prisms of the i-th vehicle.
