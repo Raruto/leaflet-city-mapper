@@ -6,7 +6,6 @@ import { endZoom } from './endZoom.js';
 import { initSunlight } from './initSunlight.js';
 import { onMapChange } from './onMapChange.js';
 import { onZoomAnim } from './onZoomAnim.js';
-import { removeProgram } from './removeProgram.js';
 import { render } from './render.js';
 import { startZoom } from './startZoom.js';
 import { update } from './update.js';
@@ -196,7 +195,7 @@ export async function attach(backend, map) {
           uploaded: null,
         };
       }
-      removeProgram(object.program);
+      object.program.pipelineCache.clear();
       object.program = createProgram(backend, material);
       object.device = device;
     }

@@ -1,4 +1,3 @@
-import { removeProgram } from './removeProgram.js';
 import { setHighlight } from './setHighlight.js';
 import { showFeature } from './showFeature.js';
 
@@ -15,7 +14,7 @@ export function releaseArea(backend, area) {
     backend.remove(area.mesh);
     const geometry = area.mesh.geometry;
     for (const attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
-    removeProgram(area.mesh.program);
+    area.mesh.program.pipelineCache.clear();
   }
 }
 /** Emit a snapshot for consumers; ready does not wait for all neighborhood tasks. */

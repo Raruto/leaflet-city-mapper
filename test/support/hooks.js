@@ -80,7 +80,7 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
   const pmtilesMock = `const prototype = L.Layer.types?.['3d']?.prototype;
     if (prototype && !prototype._testArchive) {
       const initialize = prototype.initialize;
-      prototype.initialize = function (options) {
+      prototype.initialize = function (options = {}) {
         if (options.url && !/\\.(glb|gltf)(?:[?#]|$)/i.test(options.url) && !options.archive) {
           const url = new URL(options.url, document.baseURI).href;
           options = { ...options, archive: {

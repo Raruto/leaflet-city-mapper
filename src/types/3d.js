@@ -112,7 +112,7 @@ L.Layer.types['3d'] = L.Layer.extend({
    * `scene`, `camera` and `renderer` alias its resources while attached.
    *
    */
-  initialize(options) {
+  initialize(options = {}) {
     L.Util.setOptions(this, options);
     // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
     const isModel = !this._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);

@@ -73,7 +73,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const actualStyle = lampStyle(features[0]);
     const surfaceOnly = features.every(feature => lampStyle(feature) !== null);
     const poles = [];
-    layer._lampPostGeometry({ x: 10, y: 20, ground: 3 }, { top: 8, poleRadius: 0.12 },
+    nativeChecks.geometry.lampPostGeometry({ x: 10, y: 20, ground: 3 }, { top: 8, poleRadius: 0.12 },
       (a, ah, b, bh, c, ch) => poles.push([a, ah], [b, bh], [c, ch]));
     const poleBounds = [Math.min(...poles.map(([p, h]) => p.ground + h)),
       Math.max(...poles.map(([p, h]) => p.ground + h))];
@@ -89,7 +89,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const tooltip = lampTooltip({ properties: { foyer: '<img src=x onerror=alert(1)>', support_hauteur: '7',
       lampe_flux: 'None', lampe_temperature_couleur: '2700', lib_regime: 'HORAIRE EP' } });
     const geometry = [];
-    layer._lightGeometry({ x: 10, y: 20, ground: 3 }, { top: 8, lightRadius: 12, color: 0xffcc88 },
+    nativeChecks.geometry.lightGeometry({ x: 10, y: 20, ground: 3 }, { top: 8, lightRadius: 12, color: 0xffcc88 },
       (a, ah, b, bh, c, ch) => geometry.push([a, ah], [b, bh], [c, ch]));
     const emitterHeight = geometry.every(([point, height]) => Math.abs(point.ground + height - 11) <= 0.651);
     const date = sunlightOverlay.control.getContainer().querySelector('input[type=date]');

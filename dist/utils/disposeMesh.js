@@ -1,2 +1,2 @@
-import{removeProgram as e}from"./removeProgram.js";function i(o,r){if(r){o.remove(r);for(const t of Object.values(r.geometry.attributes))t.buffer.destroy();e(r.program)}}export{i as disposeMesh};
+function o(r,e){if(e){r.remove(e);for(const t of Object.values(e.geometry.attributes))t.buffer.destroy();e.program.pipelineCache.clear()}}export{o as disposeMesh};
 //# sourceMappingURL=disposeMesh.js.map

@@ -1,6 +1,3 @@
-import { removeProgram } from './removeProgram.js';
-
-
 export function disposeMesh(backend, mesh) {
   if (!mesh) {
     return;
@@ -9,5 +6,5 @@ export function disposeMesh(backend, mesh) {
   for (const attribute of Object.values(mesh.geometry.attributes)) {
     attribute.buffer.destroy();
   }
-  removeProgram(mesh.program);
+  mesh.program.pipelineCache.clear();
 }

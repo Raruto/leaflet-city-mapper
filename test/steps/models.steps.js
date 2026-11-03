@@ -161,7 +161,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     })();
     for (const mesh of [first, second]) {
       for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-      nativeChecks.gpu.removeProgram(mesh.program);
+      mesh.program.pipelineCache.clear();
     }
     configured.remove();
     layer.remove();
@@ -253,7 +253,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const doubleSidedPasses = list.length > 0 && list.every(mesh =>
       mesh.program._layerMaterial.doubleSided && !mesh.program.depthWrite && mesh.program.cullMode === 'none');
     for (const [mesh, program] of programs) {
-      nativeChecks.gpu.removeProgram(mesh.program);
+      mesh.program.pipelineCache.clear();
       mesh.program = program;
     }
     nativeChecks.render.render(layer._shared);

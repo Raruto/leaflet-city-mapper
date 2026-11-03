@@ -1,0 +1,2 @@
+import{installSunlight as l}from"./installSunlight.js";import{underEntry as i}from"./underEntry.js";function a(o,r){o.control=o.control||l(r),o.control._map||o.control.addTo(r);const t=o.control.getContainer(),n=i(o,t);t.classList.toggle("leaflet-control",!n),t.classList.toggle("leaflet-bar",!n),Object.assign(t.style,n?{background:"",padding:"2px 0 6px 20px",margin:"0"}:{background:"#fff",padding:"8px",margin:""})}export{a as onAddSun};
+//# sourceMappingURL=onAddSun.js.map

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/onRemoveSun.js"],
+  "sourcesContent": ["export function onRemoveSun(backend) {\n  backend.control.remove();\n}\n"],
+  "mappings": "AAAO,SAASA,EAAYC,EAAS,CACnCA,EAAQ,QAAQ,OAAO,CACzB",
+  "names": ["onRemoveSun", "backend"]
+}

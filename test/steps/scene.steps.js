@@ -69,12 +69,12 @@ Then('layer-owned objects preserve values and visibility without engine classes'
       if (programs.includes(node.program)) meshes.push(node);
       if (node !== hiddenMesh && node.geometry?.attributes) {
         for (const attribute of Object.values(node.geometry.attributes)) attribute.buffer.destroy();
-        nativeChecks.gpu.removeProgram(node.program);
+        node.program.pipelineCache.clear();
       }
     });
     const sorted = nativeChecks.render.sortMeshes(meshes).map(node => programs.indexOf(node.program) + 1).join() === '2,3,1';
     for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-    nativeChecks.gpu.removeProgram(mesh.program);
+    mesh.program.pipelineCache.clear();
     layer.remove();
     return { worldCameraRay, singularTransform, sorted, noEngine, independent };
   });

@@ -38,15 +38,14 @@ AfterAll(function () {
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
-    const [createMesh, createProgram, destroyTexture, disposeMesh, removeProgram,
+    const [createMesh, createProgram, destroyTexture, disposeMesh,
       findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
       renderModule, update, sortMeshes, pump, releaseArea, emptyNode, setParent, traverse,
-      updateWorldMatrix, updateCamera, parseColor, triangulate] = await Promise.all([
+      updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry] = await Promise.all([
       import('/dist/utils/createMesh.js'),
       import('/dist/utils/createProgram.js'),
       import('/dist/utils/destroyTexture.js'),
       import('/dist/utils/disposeMesh.js'),
-      import('/dist/utils/removeProgram.js'),
       import('/dist/utils/findFeature.js'),
       import('/dist/utils/raycast.js'),
       import('/dist/utils/onClick.js'),
@@ -65,6 +64,8 @@ export async function prepare3DChecks(page) {
       import('/dist/utils/updateCamera.js'),
       import('/dist/utils/parseColor.js'),
       import('/dist/utils/triangulate.js'),
+      import('/dist/utils/lampPostGeometry.js'),
+      import('/dist/utils/lightGeometry.js'),
     ]);
     const graph = {
       emptyNode: emptyNode.emptyNode,
@@ -78,7 +79,6 @@ export async function prepare3DChecks(page) {
       createProgram: createProgram.createProgram,
       destroyTexture: destroyTexture.destroyTexture,
       disposeMesh: disposeMesh.disposeMesh,
-      removeProgram: removeProgram.removeProgram,
     };
     const picking = {
       findFeature: findFeature.findFeature,
@@ -100,6 +100,8 @@ export async function prepare3DChecks(page) {
       geometry: {
         parseColor: parseColor.parseColor,
         triangulate: triangulate.triangulate,
+        lampPostGeometry: lampPostGeometry.lampPostGeometry,
+        lightGeometry: lightGeometry.lightGeometry,
       },
       group() {
         return graph.emptyNode();
@@ -108,7 +110,7 @@ export async function prepare3DChecks(page) {
         const mesh = gpu.createMesh(layer, attributes, program?._layerMaterial);
         layer.remove(mesh);
         if (program) {
-          gpu.removeProgram(mesh.program);
+          mesh.program.pipelineCache.clear();
           mesh.program = program;
         }
         return mesh;

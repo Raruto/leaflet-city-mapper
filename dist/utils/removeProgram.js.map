@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/removeProgram.js"],
-  "sourcesContent": ["\nexport function removeProgram(program) {\n  program.pipelineCache.clear();\n}\n"],
-  "mappings": "AACO,SAASA,EAAcC,EAAS,CACrCA,EAAQ,cAAc,MAAM,CAC9B",
-  "names": ["removeProgram", "program"]
-}

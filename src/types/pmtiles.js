@@ -30,7 +30,7 @@ L.Layer.types.pmtiles = L.TileLayer.extend({
   _abortLoading()                    { return _abortLoading(this); },
   _setTerrain3D(terrain)             { return _setTerrain3D(this, terrain); },
   _registerTerrainTile(coords, tile) { return _registerTerrainTile(this, coords, tile); },
-  _releaseURL: _releaseURL,
+  _releaseURL:                       _releaseURL,
   _releaseTile(event)                { return _releaseTile(this, event); },
 });
 

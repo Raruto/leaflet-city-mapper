@@ -6,7 +6,6 @@ import { setParent } from './setParent.js';
 import { textureSampler } from './textureSampler.js';
 import { vertexNormals } from './vertexNormals.js';
 import { createProgram } from './createProgram.js';
-import { removeProgram } from './removeProgram.js';
 
 /** glTF/GLB model loading. */
 /** Load the configured GLB/glTF (static triangles) under `root`; GPU resources need attachment. */
@@ -187,7 +186,9 @@ export async function loadModel(backend) {
       for (const resource of resources) {
         if (resource.attributes) {
           for (const attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
-        } else removeProgram(resource);
+        } else {
+          resource.pipelineCache.clear();
+        }
       }
       throw error;
     }

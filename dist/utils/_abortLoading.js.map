@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/_abortLoading.js"],
-  "sourcesContent": ["export function _abortLoading(backed) {\n  // Requests can still be pending while an image with no src reports complete.\n  for (const { coords, el } of Object.values(backed._tiles)) {\n    if (coords.z !== backed._tileZoom) backed._releaseTile({ tile: el });\n  }\n  L.TileLayer.prototype._abortLoading.call(backed);\n}\n"],
-  "mappings": "AAAO,SAASA,EAAcC,EAAQ,CAEpC,SAAW,CAAE,OAAAC,EAAQ,GAAAC,CAAG,IAAK,OAAO,OAAOF,EAAO,MAAM,EAClDC,EAAO,IAAMD,EAAO,WAAWA,EAAO,aAAa,CAAE,KAAME,CAAG,CAAC,EAErE,EAAE,UAAU,UAAU,cAAc,KAAKF,CAAM,CACjD",
-  "names": ["_abortLoading", "backed", "coords", "el"]
+  "sourcesContent": ["export function _abortLoading(layer) {\n  // Requests can still be pending while an image with no src reports complete.\n  for (const { coords, el } of Object.values(layer._tiles)) {\n    if (coords.z !== layer._tileZoom) layer._releaseTile({ tile: el });\n  }\n  L.TileLayer.prototype._abortLoading.call(layer);\n}\n"],
+  "mappings": "AAAO,SAASA,EAAcC,EAAO,CAEnC,SAAW,CAAE,OAAAC,EAAQ,GAAAC,CAAG,IAAK,OAAO,OAAOF,EAAM,MAAM,EACjDC,EAAO,IAAMD,EAAM,WAAWA,EAAM,aAAa,CAAE,KAAME,CAAG,CAAC,EAEnE,EAAE,UAAU,UAAU,cAAc,KAAKF,CAAK,CAChD",
+  "names": ["_abortLoading", "layer", "coords", "el"]
 }

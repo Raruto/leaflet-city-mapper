@@ -9,7 +9,13 @@ import { moves } from './moves.js';
 import { parts } from './parts.js';
 import { wrap } from './wrap.js';
 
-export function installWalk(layer, { speed, distance, position }) {
+export function installWalk(layer, {
+    speed = 70,
+    distance = 20,
+    position = 'bottomright',
+    ...options
+  } = {}) {
+  L.Layer.types['3d'].prototype.initialize.call(layer, options);
   const keys = new Set();
   // Map button (leaflet-bar look) toggling the walk; the key hint shows beside it while walking.
   const control = new L.Control({ position });

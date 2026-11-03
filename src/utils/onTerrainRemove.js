@@ -1,6 +1,5 @@
 import { destroyTexture } from './destroyTexture.js';
 import { disposeMesh } from './disposeMesh.js';
-import { removeProgram } from './removeProgram.js';
 
 export function onTerrainRemove(backend, map) {
   backend._terrainController?.abort();
@@ -14,7 +13,9 @@ export function onTerrainRemove(backend, map) {
   backend._terrainTiles.clear();
   backend._terrainOriginElevation = 0;
   backend._terrainPromise = null;
-  if (backend._rasterProgram) removeProgram(backend._rasterProgram);
+  if (backend._rasterProgram) {
+    backend._rasterProgram.pipelineCache.clear();
+  }
   backend._rasterProgram = null;
   if (backend._dem) destroyTexture(backend, backend._dem.texture);
   backend._dem = null;

@@ -1,2 +1,2 @@
-import{underEntry as e}from"../utils/underEntry.js";import{installSunlight as r}from"../utils/installSunlight.js";L.Layer.types.sunlight=L.Layer.extend({onAdd(n){this.control=this.control||r(n),this.control._map||this.control.addTo(n);const t=this.control.getContainer(),o=e(this,t);t.classList.toggle("leaflet-control",!o),t.classList.toggle("leaflet-bar",!o),Object.assign(t.style,o?{background:"",padding:"2px 0 6px 20px",margin:"0"}:{background:"#fff",padding:"8px",margin:""})},onRemove(){this.control.remove()}});
+import{onAddSun as n}from"../utils/onAddSun.js";import{onRemoveSun as o}from"../utils/onRemoveSun.js";L.Layer.types.sunlight=L.Layer.extend({onAdd(e){return n(this,e)},onRemove(){return o(this)}});
 //# sourceMappingURL=sunlight.js.map

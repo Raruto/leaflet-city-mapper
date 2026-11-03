@@ -52,7 +52,13 @@ L.Layer.include({
       return;
     }
     const layer = this;
-    const { source: { type = /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles' : '3d', ...source }, ...core } = options;
+    const {
+      source: {
+        type = /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles' : '3d',
+        ...source
+      },
+      ...core
+    } = options;
     const settings = { ...source, ...core };
     // A stand-in created by the entry point before this module loaded may already be on a map.
     const map = layer._map;

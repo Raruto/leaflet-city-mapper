@@ -27,6 +27,9 @@ export function pump(backend) {
         if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
           throw new Error('Invalid GeoJSON response');
         }
+        if (backend._geojson && typeof backend.options.style !== 'function') {
+          throw new Error('style must be a function');
+        }
         const features = data.features;
         const positions = [], normals = [], colors = [], uvs = [], featureFaces = [], lights = [];
         const supports = new Set();

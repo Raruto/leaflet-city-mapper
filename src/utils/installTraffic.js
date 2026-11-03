@@ -11,8 +11,18 @@ import { routeGeometry } from './routeGeometry.js';
 import { toLanes } from './toLanes.js';
 import { tripsAt } from './tripsAt.js';
 import { underEntry } from './underEntry.js';
+import { tooltip } from './tooltip.js';
+import { speed } from './speed.js';
+import { vehicles } from './vehicles.js';
 
-export function installTraffic(layer, { url, model, lights, side, outline, velocity }) {
+export function installTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
+  const { model, lights, side: defaultSide } = vehicles[vehicle];
+  side ??= defaultSide;
+  L.Layer.types['3d'].prototype.initialize.call(layer, {
+    tooltip,
+    nightLight: Boolean(lights),
+    ...options,
+  });
   // The 'sunlight' layer on the same map drives the simulation time; without one, vehicles run live.
   const now = () => {
     let control = { live: true };

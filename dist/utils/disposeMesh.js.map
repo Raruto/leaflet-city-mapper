@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/disposeMesh.js"],
-  "sourcesContent": ["import { removeProgram } from './removeProgram.js';\n\n\nexport function disposeMesh(backend, mesh) {\n  if (!mesh) {\n    return;\n  }\n  backend.remove(mesh);\n  for (const attribute of Object.values(mesh.geometry.attributes)) {\n    attribute.buffer.destroy();\n  }\n  removeProgram(mesh.program);\n}\n"],
-  "mappings": "AAAA,OAAS,iBAAAA,MAAqB,qBAGvB,SAASC,EAAYC,EAASC,EAAM,CACzC,GAAKA,EAGL,CAAAD,EAAQ,OAAOC,CAAI,EACnB,UAAWC,KAAa,OAAO,OAAOD,EAAK,SAAS,UAAU,EAC5DC,EAAU,OAAO,QAAQ,EAE3BJ,EAAcG,EAAK,OAAO,EAC5B",
-  "names": ["removeProgram", "disposeMesh", "backend", "mesh", "attribute"]
+  "sourcesContent": ["export function disposeMesh(backend, mesh) {\n  if (!mesh) {\n    return;\n  }\n  backend.remove(mesh);\n  for (const attribute of Object.values(mesh.geometry.attributes)) {\n    attribute.buffer.destroy();\n  }\n  mesh.program.pipelineCache.clear();\n}\n"],
+  "mappings": "AAAO,SAASA,EAAYC,EAASC,EAAM,CACzC,GAAKA,EAGL,CAAAD,EAAQ,OAAOC,CAAI,EACnB,UAAWC,KAAa,OAAO,OAAOD,EAAK,SAAS,UAAU,EAC5DC,EAAU,OAAO,QAAQ,EAE3BD,EAAK,QAAQ,cAAc,MAAM,EACnC",
+  "names": ["disposeMesh", "backend", "mesh", "attribute"]
 }

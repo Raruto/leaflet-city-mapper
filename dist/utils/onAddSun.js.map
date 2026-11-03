@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/onAddSun.js"],
+  "sourcesContent": ["import { installSunlight } from './installSunlight.js';\nimport { underEntry } from './underEntry.js';\n\nexport function onAddSun(backend, map) {\n  backend.control = backend.control || installSunlight(map);\n  if (!backend.control._map) {\n    backend.control.addTo(map);\n  }\n  // Shown under this layer's entry in the layers control; a standalone control without one.\n  const container = backend.control.getContainer(), nested = underEntry(backend, container);\n  container.classList.toggle('leaflet-control', !nested);\n  container.classList.toggle('leaflet-bar', !nested);\n  Object.assign(container.style, nested\n    ? { background: '', padding: '2px 0 6px 20px', margin: '0' }\n    : { background: '#fff', padding: '8px', margin: '' }\n  );\n}\n"],
+  "mappings": "AAAA,OAAS,mBAAAA,MAAuB,uBAChC,OAAS,cAAAC,MAAkB,kBAEpB,SAASC,EAASC,EAASC,EAAK,CACrCD,EAAQ,QAAUA,EAAQ,SAAWH,EAAgBI,CAAG,EACnDD,EAAQ,QAAQ,MACnBA,EAAQ,QAAQ,MAAMC,CAAG,EAG3B,MAAMC,EAAYF,EAAQ,QAAQ,aAAa,EAAGG,EAASL,EAAWE,EAASE,CAAS,EACxFA,EAAU,UAAU,OAAO,kBAAmB,CAACC,CAAM,EACrDD,EAAU,UAAU,OAAO,cAAe,CAACC,CAAM,EACjD,OAAO,OAAOD,EAAU,MAAOC,EAC3B,CAAE,WAAY,GAAI,QAAS,iBAAkB,OAAQ,GAAI,EACzD,CAAE,WAAY,OAAQ,QAAS,MAAO,OAAQ,EAAG,CACrD,CACF",
+  "names": ["installSunlight", "underEntry", "onAddSun", "backend", "map", "container", "nested"]
+}
