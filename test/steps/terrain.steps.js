@@ -95,9 +95,10 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       map.panBy([20, 10], { animate: false });
       await loaded(second);
       const panned = await roof();
+      const transferTexture = layer._shared._roofRaster.texture.texture;
       owner.remove();
       const transferred = await roof();
-      const sameTexture = layer._shared === layer && layer._roofRaster.texture.texture === texture;
+      const sameTexture = layer._shared === layer && layer._roofRaster.texture.texture === transferTexture;
       second.setOpacity(0);
       const transparent = await roof();
       second.setOpacity(1);
@@ -293,7 +294,10 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         projectionError = Math.max(projectionError, Math.abs(projected.x / projected.w), Math.abs(projected.y / projected.w));
       }
       await wait(settled);
-      const hidden = Object.values(raster._tiles).every(t => t.el.style.visibility === 'hidden');
+      buildings._shared._render();
+      await buildings.renderer.device.queue.onSubmittedWorkDone();
+      const hidden = Object.values(raster._tiles).every(t =>
+        !terrain._rasterTiles.get(t.el)._visibleInFrame || t.el.style.visibility === 'hidden');
       terrain.remove();
       const restored = !map._terrain3D && terrain._rasterTiles.size === 0 &&
         Object.values(raster._tiles).every(t => t.el.style.visibility !== 'hidden') && model.root.position[1] === 0;

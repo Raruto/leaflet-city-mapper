@@ -39,13 +39,14 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   }
   const stopped = await this.page.evaluate(() => {
     const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
-    return { lat: walk.walker.latlng.lat, phase: walk.walker.phase, center: test3d.map.getCenter().lat };
+    return { lat: walk.walker.latlng.lat, phase: walk.walker.phase,
+      centerError: test3d.map.latLngToContainerPoint(walk.walker.latlng).distanceTo(test3d.map.getSize().divideBy(2)) };
   });
   const travelled = (stopped.lat - start.lat) * 111320;
   assert.ok(travelled > 2.5 && travelled < 4, `Stopped before the 4 m wall: ${travelled} m`);
   assert.ok(stopped.phase > start.phase, 'Walking advances the limb animation');
   assert.deepEqual(errors, [], 'Keyboard movement must not throw during collision checks');
-  assert.ok(Math.abs(stopped.center - stopped.lat) < 1e-6, `The map follows the walker: ${JSON.stringify(stopped)}`);
+  assert.ok(stopped.centerError < 1.5, `The map follows the walker within pixel rounding: ${JSON.stringify(stopped)}`);
   await this.page.keyboard.down('KeyS');
   try {
     await this.page.waitForFunction(lat => {

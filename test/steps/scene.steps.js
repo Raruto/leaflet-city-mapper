@@ -299,7 +299,10 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await terrainControl.uncheck();
   await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => entry.layer.model).layer;
-    window.exampleOverlayBefore = { tower, model: tower.model, canvas: tower.renderer.canvas };
+    // The Walk button is not managed by the overlays control under test.
+    const walk = Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    walk.remove();
+    window.exampleOverlayBefore = { tower, model: tower.model, canvas: tower.renderer.canvas, walk };
   });
   await towerControl.uncheck();
   const towerDisabled = await this.page.evaluate(() => {
@@ -351,6 +354,11 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
       document.querySelectorAll('.leaflet-3d').length === 1;
   });
   this.exampleOverlayChecks = { towerDisabled, treesRetained, allDisabled, towerRestored, bothRestored };
+  await this.page.evaluate(async () => {
+    const { walk } = window.exampleOverlayBefore;
+    walk.addTo(map);
+    await walk._added.promise;
+  });
 });
 
 Then('the 3D canvas and model attribution follow the enabled overlays', function () {
