@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/mirror.js"],
-  "sourcesContent": ["import { box } from \"./box\";\n\nexport const mirror = (x0, x1, z0, z1, ...rest) => [[box(x0, x1, z0, z1), ...rest], [box(-x1, -x0, z0, z1), ...rest]];\n"],
-  "mappings": "AAAA,OAAS,OAAAA,MAAW,QAEb,MAAMC,EAAS,CAACC,EAAIC,EAAIC,EAAIC,KAAOC,IAAS,CAAC,CAACN,EAAIE,EAAIC,EAAIC,EAAIC,CAAE,EAAG,GAAGC,CAAI,EAAG,CAACN,EAAI,CAACG,EAAI,CAACD,EAAIE,EAAIC,CAAE,EAAG,GAAGC,CAAI,CAAC",
+  "sourcesContent": ["import { box } from \"./box\";\n\nexport const mirror = (x0, x1, z0, z1, ...rest) => [\n  [box(x0, x1, z0, z1), ...rest],\n  [box(-x1, -x0, z0, z1), ...rest]\n];\n"],
+  "mappings": "AAAA,OAAS,OAAAA,MAAW,QAEb,MAAMC,EAAS,CAACC,EAAIC,EAAIC,EAAIC,KAAOC,IAAS,CACjD,CAACN,EAAIE,EAAIC,EAAIC,EAAIC,CAAE,EAAG,GAAGC,CAAI,EAC7B,CAACN,EAAI,CAACG,EAAI,CAACD,EAAIE,EAAIC,CAAE,EAAG,GAAGC,CAAI,CACjC",
   "names": ["box", "mirror", "x0", "x1", "z0", "z1", "rest"]
 }
