@@ -10,6 +10,4 @@ export function removeRasterTile(backend, tile) {
   update(backend);
   destroyTexture(backend, mesh.texture.texture);
   backend._rasterTiles.delete(tile);
-  tile.style.visibility = tile._terrainVisibility;
-  delete tile._terrainVisibility;
 }

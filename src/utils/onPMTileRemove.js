@@ -1,4 +1,7 @@
+import { releaseRasterTiles } from './rasterTiles.js';
+
 export function onPMTileRemove(backend, map) {
-  backend._setTerrain3D(null);
-  if (backend._container) L.TileLayer.prototype.onRemove.call(backend, map);
+  releaseRasterTiles(backend);
+  backend._terrain3D = null;
+  L.Layer.types['3d'].prototype.onRemove.call(backend, map);
 }

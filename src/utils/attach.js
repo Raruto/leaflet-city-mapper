@@ -215,5 +215,5 @@ export async function attach(backend, map) {
     }
   });
   update(shared);
-  if (backend.header || backend._geojson) updateArea(backend);
+  if ((backend.header && !(backend instanceof L.Layer.types.pmtiles)) || backend._geojson) updateArea(backend);
 }

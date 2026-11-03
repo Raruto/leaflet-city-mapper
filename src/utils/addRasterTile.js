@@ -6,10 +6,10 @@ import { setParent } from './setParent.js';
 import { update } from './update.js';
 
 export async function addRasterTile(backend, layer, coords, tile) {
-  const [ready, bitmap] = await Promise.all([backend._terrainPromise, createImageBitmap(tile)]);
+  const ready = await backend._terrainPromise;
   if (!ready || !backend._map || backend._map._terrain3D !== backend || layer._terrain3D !== backend ||
-    tile.request.signal.aborted || !tile.isConnected || backend._rasterTiles.has(tile)) {
-    bitmap.close();
+    tile.request.signal.aborted || !layer._rasterTiles.has(`${coords.z}/${coords.x}/${coords.y}`) ||
+    backend._rasterTiles.has(tile)) {
     return;
   }
   // Match DEM pixel spacing, capped at 64 subdivisions per tile.
@@ -24,16 +24,16 @@ export async function addRasterTile(backend, layer, coords, tile) {
   const texture = {
     device,
     texture: device.createTexture({
-      size: [tile.width, tile.height],
+      size: [tile.image.width, tile.image.height],
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     }),
     sampler: device.createSampler({ addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' }),
     samplerOptions: { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
-    image: tile, format: 'rgba8unorm', srgb: false, flipY: false, uploaded: tile,
+    image: tile.image, format: 'rgba8unorm', srgb: false, flipY: false, uploaded: tile.image,
   };
-  device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: texture.texture }, [tile.width, tile.height]);
-  bitmap.close();
+  device.queue.copyExternalImageToTexture({ source: tile.image }, { texture: texture.texture },
+    [tile.image.width, tile.image.height]);
   if (!backend._rasterProgram || backend._rasterProgram.device !== device) {
     // DEM atlas over the archive's tile grid; invalid or missing samples become -1e9 (the shader's no-data).
     // ponytail: one texture, capped by maxTextureDimension2D (32×32 DEM tiles at 8192 px); split it for larger archives.
@@ -111,10 +111,9 @@ export async function addRasterTile(backend, layer, coords, tile) {
     tile,
     opacity: layer.options.opacity ?? 1,
     id: L.Layer.types['3d']._nextId++,
-    renderOrder: -1,
+    renderOrder: layer.options.zIndex || 0,
   };
   setParent(mesh, backend.root);
   update(backend);
   backend._rasterTiles.set(tile, mesh);
-  tile._terrainVisibility = tile.style.visibility;
 }

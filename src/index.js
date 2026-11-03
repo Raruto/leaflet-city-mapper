@@ -10,7 +10,7 @@
  *
  * Folder layout:
  * - types/: one module per `source.type`, the only files imported by this router:
- *   - 'pmtiles': raster PMTiles basemap (an L.TileLayer), draped on the terrain when present;
+ *   - 'pmtiles': raster PMTiles basemap rendered in the shared WebGPU canvas;
  *   - '3d': shared WebGPU scene with a GLB/glTF model, PMTiles GeoJSON features, or empty;
  *   - 'geojson': inline or URL-backed GeoJSON features rendered by the shared 3D scene;
  *   - 'terrain': Float32 PMTiles DEM that deforms raster tiles, buildings and the camera, plus optional bridge decks;

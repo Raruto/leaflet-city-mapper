@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/_releaseTile.js"],
-  "sourcesContent": ["export function _releaseTile(backend, { tile }) {\n  backend._terrain3D?.removeRasterTile(tile);\n  tile.request.abort();\n  backend._releaseURL(tile);\n}\n"],
-  "mappings": "AAAO,SAASA,EAAaC,EAAS,CAAE,KAAAC,CAAK,EAAG,CAC9CD,EAAQ,YAAY,iBAAiBC,CAAI,EACzCA,EAAK,QAAQ,MAAM,EACnBD,EAAQ,YAAYC,CAAI,CAC1B",
-  "names": ["_releaseTile", "backend", "tile"]
-}

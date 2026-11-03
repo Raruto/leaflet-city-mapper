@@ -58,7 +58,9 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     const marker = new L.Marker([55, 10]);
     return {
       lazy, pending,
-      routed: first instanceof L.TileLayer && second instanceof L.Layer.types.pmtiles,
+      routed: first instanceof L.Layer.types.pmtiles && first instanceof L.Layer &&
+        !(first instanceof L.TileLayer) && !(first instanceof L.GridLayer) &&
+        second instanceof L.Layer.types.pmtiles,
       settings: first.options.maxZoom,
       sourceRemoved: first.options.source === undefined,
       header: first.header.maxZoom,

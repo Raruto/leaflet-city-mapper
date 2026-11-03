@@ -1,2 +1,2 @@
-function i(r,e){r.header?(L.TileLayer.prototype.onAdd.call(r,e),r._setTerrain3D(e._terrain3D)):r.ready=r.ready.then(t=>(r._map===e&&e.hasLayer(r)&&!r._container&&(L.TileLayer.prototype.onAdd.call(r,e),r._setTerrain3D(e._terrain3D)),t))}export{i as onPMTileAdd};
+import{attach as i}from"./attach.js";import{updateRasterTiles as f}from"./rasterTiles.js";function s(r,t){r.location||(r.location=t.getCenter());const e=i(r,t);e.then(()=>{r._added.resolve(),r._setTerrain3D(t._terrain3D)}).catch(o=>r.fire("error",{error:o})),Promise.all([e,r.ready]).then(()=>{r._map===t&&t.hasLayer(r)&&f(r)}).catch(o=>r.fire("error",{error:o}))}export{s as onPMTileAdd};
 //# sourceMappingURL=onPMTileAdd.js.map

@@ -282,13 +282,13 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       }
       const atlas = owner._roofRaster.texture;
       const tiles = Object.values(map._layers)
-        .filter(layer => layer instanceof L.Layer.types.pmtiles && layer._tiles && layer.options.opacity > 0)
-        .flatMap(layer => Object.values(layer._tiles)
-          .filter(tile => tile.el.done && !tile.el.request.signal.aborted && tile.el.isConnected)
-          .map(tile => ({ ...tile, layer })));
-      const zoom = Math.max(...tiles.map(tile => tile.coords.z));
+        .filter(layer => layer instanceof L.Layer.types.pmtiles && layer._rasterTiles && layer.options.opacity > 0)
+        .flatMap(layer => [...layer._rasterTiles.values()]
+          .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
+          .map(tile => ({ tile, layer })));
+      const zoom = Math.max(...tiles.map(({ tile }) => tile.coords.z));
       const bounds = new L.Bounds();
-      for (const { coords, layer } of tiles) {
+      for (const { tile: { coords }, layer } of tiles) {
         const size = layer.getTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
         bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size));
         bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size));
@@ -311,17 +311,18 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d', { willReadFrequently: true });
       let best;
-      for (const tile of tiles.filter(tile => tile.coords.z === zoom && tile.layer.options.opacity === 1)) {
-        canvas.width = tile.el.naturalWidth;
-        canvas.height = tile.el.naturalHeight;
-        context.drawImage(tile.el, 0, 0);
+      for (const item of tiles.filter(item => item.tile.coords.z === zoom && item.layer.options.opacity === 1)) {
+        const { tile } = item;
+        canvas.width = tile.image.width;
+        canvas.height = tile.image.height;
+        context.drawImage(tile.image, 0, 0);
         const expected = quadrants(context.getImageData(0, 0, canvas.width, canvas.height).data,
           canvas.width, canvas.height, canvas.width * 4, 4);
         const contrast = Math.max(...expected.flatMap(a => expected.map(b => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]))));
-        if (!best || contrast > best.contrast) best = { tile, expected, contrast };
+        if (!best || contrast > best.contrast) best = { tile: item, expected, contrast };
       }
       const tileSize = best.tile.layer.getTileSize();
-      const offset = new L.Point(best.tile.coords.x, best.tile.coords.y).scaleBy(tileSize).subtract(bounds.min);
+      const offset = new L.Point(best.tile.tile.coords.x, best.tile.tile.coords.y).scaleBy(tileSize).subtract(bounds.min);
       const x = Math.ceil(offset.x * scaleX), y = Math.ceil(offset.y * scaleY);
       const width = Math.floor((offset.x + tileSize.x) * scaleX) - x;
       const height = Math.floor((offset.y + tileSize.y) * scaleY) - y;
@@ -340,14 +341,14 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       }
       await device.queue.onSubmittedWorkDone();
       device.removeEventListener('uncapturederror', onGpuError);
-      const terrainTiles = tiles.filter(tile => terrain._rasterTiles.has(tile.el));
+      const terrainTiles = tiles.filter(({ tile }) => terrain._rasterTiles.has(tile));
       return {
         image: atlas.image,
         atlasSize: [atlas.width, atlas.height],
         uploads,
         tiles: tiles.length,
         terrainTiles: terrainTiles.length,
-        duplicatedTerrainTiles: terrainTiles.filter(tile => owner._roofTiles.has(tile.el)).length,
+        duplicatedTerrainTiles: terrainTiles.filter(({ tile }) => owner._roofTiles.has(tile)).length,
         roofTiles: owner._roofTiles.size,
         contrast: best.contrast,
         colorError: Math.max(...actual.flatMap((quadrant, i) => quadrant.map((value, c) => Math.abs(value - best.expected[i][c])))),
@@ -390,7 +391,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       const crs = map.options.crs;
       const coordsByTile = new Map();
       for (const layer of Object.values(map._layers)) {
-        for (const tile of Object.values(layer._tiles || {})) coordsByTile.set(tile.el, tile.coords);
+        for (const tile of layer._rasterTiles?.values() || []) coordsByTile.set(tile, tile.coords);
       }
       const renderUploads = [];
       const copyExternal = device.queue.copyExternalImageToTexture;
@@ -414,8 +415,8 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       for (const [tile, mesh] of terrain._rasterTiles) {
         const coords = coordsByTile.get(tile);
         if (!coords) { missingCoords++; continue; }
-        if (mesh.texture.uploaded !== tile) notUploaded++;
-        if (mesh.texture.texture.width !== tile.width || mesh.texture.texture.height !== tile.height) wrongSize++;
+        if (mesh.texture.uploaded !== tile.image) notUploaded++;
+        if (mesh.texture.texture.width !== tile.image.width || mesh.texture.texture.height !== tile.image.height) wrongSize++;
         const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - terrain._terrainZoom)));
         const { position, uv } = mesh.geometry.attributes;
         grids.add(mesh.geometry.attributes);
@@ -444,7 +445,8 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
         meshes: terrain._rasterTiles.size, vertices: vertices.length, maxError, relief,
         missingCoords, wrongVertexCount, notUploaded, wrongSize, raisedGrid,
         grids: grids.size, divisionLevels: divisionLevels.size,
-        terrainUploadsDuringRender: renderUploads.filter(source => terrain._rasterTiles.has(source)).length,
+        terrainUploadsDuringRender: renderUploads.filter(source =>
+          [...terrain._rasterTiles.keys()].some(tile => tile.image === source)).length,
       };
     });
   } finally {

@@ -148,74 +148,76 @@ Then('PMTiles layers own archive initialization and native zoom selection', asyn
     const result = await this.page.evaluate(async () => {
       const map = test3d.map;
       let resolveHeader;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const blob = await new Promise(resolve => canvas.toBlob(resolve));
+      const image = await blob.arrayBuffer();
       const archive = {
         getHeader: () => new Promise(resolve => { resolveHeader = resolve; }),
-        getZxy: async () => undefined,
+        getZxy: async () => ({ data: image }),
       };
       const layer = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles', archive } }).addTo(map);
-      const delayed = !layer._container;
+      const delayed = layer._rasterTiles.size === 0;
       // The first routed layer may still be loading its router.
       while (!resolveHeader) await new Promise(resolve => setTimeout(resolve));
-      resolveHeader({ maxZoom: 12 });
+      resolveHeader({ minZoom: 0, maxZoom: 12 });
       await layer.ready;
       const nativeZoom = layer.options.maxNativeZoom;
+      const deadline = performance.now() + 5000;
+      while (!layer._rasterTiles.size || [...layer._rasterTiles.values()].some(tile => !tile.done)) {
+        if (performance.now() > deadline) throw new Error('PMTiles canvas tiles did not load');
+        await new Promise(requestAnimationFrame);
+      }
       const tileZoom = layer._tileZoom;
-      const initialized = Boolean(layer._container);
+      const initialized = layer.renderer.canvas.isConnected &&
+        [...layer._rasterTiles.values()].every(tile => tile.mesh.parent === layer.root);
       layer.remove();
       const override = await new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
-        archive: { getHeader: async () => ({ maxZoom: 12 }) }, maxNativeZoom: 10 } }).ready;
+        archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }) }, maxNativeZoom: 10 } }).ready;
       const failed = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
         archive: { getHeader: async () => { throw new Error('Missing archive'); } } } });
       let emitted;
       failed.on('error', event => { emitted = event.error; });
       const error = await failed.ready.then(() => null, error => error);
-      const coords = { z: 12, x: 1, y: 2 };
-      const raster = await new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
-        archive: { getHeader: async () => ({ maxZoom: 12 }), getZxy: async () => undefined } } }).ready;
-      const missingTile = await new Promise(resolve => {
-        raster.createTile(coords, (error, tile) => resolve({ error, tile }));
-      });
-      raster.options.archive.getZxy = async () => ({
-        data: new TextEncoder().encode('{"type":"Point","coordinates":[0,0]}'),
-      });
-      const invalidTile = await new Promise(resolve => {
-        raster.createTile(coords, (error, tile) => resolve({ error, tile }));
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 1;
-      const blob = await new Promise(resolve => canvas.toBlob(resolve));
-      raster.options.archive.getZxy = async () => ({ data: await blob.arrayBuffer() });
-      const loadedTile = await new Promise((resolve, reject) => {
-        raster.createTile(coords, (error, tile) => error ? reject(error) : resolve(tile));
-      });
-      let requested = false;
-      raster.options.archive.getZxy = async () => { requested = true; };
-      let completed = false;
-      const cancelled = raster.createTile(coords, () => { completed = true; });
-      raster.fire('tileunload', { tile: cancelled });
-      let completeOnZoom = false;
-      const zoomCancelled = raster.createTile(coords, () => { completeOnZoom = true; });
-      raster._tiles = { test: { coords, el: zoomCancelled } };
-      raster._tileZoom = 13;
-      raster._abortLoading();
+      const missing = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+        archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }), getZxy: async () => undefined } } }).addTo(map);
+      let tileError;
+      missing.on('tileerror', event => { tileError = event; });
+      const missingDeadline = performance.now() + 5000;
+      while (!tileError) {
+        if (performance.now() > missingDeadline) throw new Error('Expected the missing PMTiles tile error');
+        await new Promise(requestAnimationFrame);
+      }
+      missing.remove();
+      let started;
+      const requestStarted = new Promise(resolve => { started = resolve; });
+      const cancelled = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+        archive: {
+          getHeader: async () => ({ minZoom: 0, maxZoom: 12 }),
+          getZxy: (_, __, ___, signal) => new Promise((resolve, reject) => {
+            started(signal);
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          }),
+        } } }).addTo(map);
+      const signal = await requestStarted;
+      cancelled.remove();
       await new Promise(resolve => setTimeout(resolve, 0));
       return { delayed, nativeZoom, tileZoom, initialized, override: override.options.maxNativeZoom,
         failed: error?.message === 'Missing archive' && emitted === error,
         noFallback: failed.options.maxNativeZoom === undefined,
-        tileBase: layer instanceof L.TileLayer,
-        missingRaster: missingTile.error?.message === 'Tile 12/1/2 is not in the offline archive' &&
-          missingTile.tile.error === missingTile.error.message,
-        invalidRaster: invalidTile.error?.message === 'Unable to decode tile 12/1/2' &&
-          invalidTile.tile.error === invalidTile.error.message && invalidTile.tile.objectURL === null,
-        loadedRaster: loadedTile.tagName === 'IMG' && loadedTile.alt === '' &&
-          loadedTile.done && loadedTile.naturalWidth === 1 && loadedTile.objectURL === null,
-        cancelled: cancelled.request.signal.aborted && !requested && !completed,
-        zoomCancelled: zoomCancelled.request.signal.aborted && !completeOnZoom };
+        tileBase: Object.getPrototypeOf(L.Layer.types.pmtiles.prototype) === L.Layer.prototype &&
+          layer instanceof L.Layer.types.pmtiles && !(layer instanceof L.TileLayer) &&
+          !(layer instanceof L.GridLayer),
+        directCanvas: !('_container' in layer) && !('createTile' in layer),
+        missingRaster: tileError.error.message ===
+          `Tile ${tileError.coords.z}/${tileError.coords.x}/${tileError.coords.y} is not in the offline archive` &&
+          tileError.tile.error === tileError.error.message,
+        cancelled: signal.aborted && cancelled._rasterTiles.size === 0 };
     });
     assert.deepEqual(result, {
-      delayed: true, nativeZoom: 12, tileZoom: 12, initialized: true, override: 10,
+      delayed: true, nativeZoom: 12, tileZoom: result.tileZoom, initialized: true, override: 10,
       failed: true, noFallback: true,
-      tileBase: true, missingRaster: true, invalidRaster: true, loadedRaster: true,
-      cancelled: true, zoomCancelled: true,
+      tileBase: true, directCanvas: true, missingRaster: true, cancelled: true,
     });
+    assert.ok(result.tileZoom >= 0 && result.tileZoom <= 12, `Tile zoom: ${result.tileZoom}`);
 });

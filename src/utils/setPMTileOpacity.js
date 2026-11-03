@@ -1,8 +1,7 @@
-import { update as updateScene } from './update.js';
+import { setRasterOpacity } from './rasterTiles.js';
 
 export function setPMTileOpacity(backend, opacity) {
-  L.TileLayer.prototype.setOpacity.call(backend, opacity);
-  const renderer = L.Layer.types['3d']._renderers.get(backend._map);
-  if (renderer) updateScene(renderer);
+  backend.options.opacity = opacity;
+  setRasterOpacity(backend, opacity);
   return backend;
 }

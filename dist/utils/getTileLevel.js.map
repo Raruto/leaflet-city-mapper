@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/getTileLevel.js"],
-  "sourcesContent": ["/** Find a raster tile's active CSS level to reproduce Leaflet's animated scale/rounding. */\n\nexport function getTileLevel(backend) {\n  let level;\n  backend._map.eachLayer(layer => {\n    if (!level && layer instanceof L.TileLayer && layer._levels) {\n      level = layer._levels[layer._tileZoom];\n    }\n  });\n  return level;\n}\n"],
-  "mappings": "AAEO,SAASA,EAAaC,EAAS,CACpC,IAAIC,EACJ,OAAAD,EAAQ,KAAK,UAAUE,GAAS,CAC1B,CAACD,GAASC,aAAiB,EAAE,WAAaA,EAAM,UAClDD,EAAQC,EAAM,QAAQA,EAAM,SAAS,EAEzC,CAAC,EACMD,CACT",
-  "names": ["getTileLevel", "backend", "level", "layer"]
-}

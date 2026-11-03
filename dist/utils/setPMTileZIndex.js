@@ -1,2 +1,2 @@
-import{update as p}from"./update.js";function o(e,t){L.TileLayer.prototype.setZIndex.call(e,t);const r=L.Layer.types["3d"]._renderers.get(e._map);return r&&p(r),e}export{o as setPMTileZIndex};
+import{setRasterZIndex as o}from"./rasterTiles.js";function i(t,e){return t.options.zIndex=e,o(t,e),t}export{i as setPMTileZIndex};
 //# sourceMappingURL=setPMTileZIndex.js.map

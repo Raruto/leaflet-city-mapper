@@ -2,7 +2,6 @@ import { computeBounds } from "./computeBounds.js";
 import { traverse } from "./traverse.js";
 import { updateCamera } from "./updateCamera.js";
 import { updateWorldMatrix } from "./updateWorldMatrix.js";
-import { getTileLevel } from "./getTileLevel.js";
 import { destroyTexture } from './destroyTexture.js';
 import { drawGeometry } from './drawGeometry.js';
 import { updatePointLights } from './updatePointLights.js';
@@ -60,18 +59,6 @@ export function render(backend) {
   // Match the map's CSS camera: a perspective distance of 1.5 viewport heights.
   let pixelsPerMeter = map.options.crs.scale(map.getZoom()) / (40075016.68557849 * Math.cos(backend._sceneOrigin.lat * Math.PI / 180));
   let origin = map.project(backend._sceneOrigin).subtract(map.getPixelOrigin());
-  const level = backend._zoomLevel?.el.isConnected ? backend._zoomLevel : getTileLevel(backend);
-  if (level && map._animatingZoom) {
-    backend._zoomLevel = level;
-  }
-  // Leaflet's logical zoom jumps before its tile CSS transition finishes.
-  // Use the rendered tile transform, including its rounding, on every animation frame.
-  if (level) {
-    const transform = new DOMMatrix(map._animatingZoom ? getComputedStyle(level.el).transform : level.el.style.transform);
-    const point = map.project(backend._sceneOrigin, level.zoom).subtract(level.origin);
-    origin = new L.Point(point.x * transform.a + transform.e, point.y * transform.d + transform.f);
-    pixelsPerMeter *= map.getZoomScale(level.zoom, map.getZoom()) * transform.a;
-  }
   const distance = size.y * 1.5 / pixelsPerMeter;
   const center = map.containerPointToLayerPoint(size.divideBy(2));
   const target = [
@@ -158,18 +145,19 @@ export function render(backend) {
   });
   const renderer = backend.renderer;
   if ([...backend._layers].some(layer => layer.options.roofTexture)) {
-    const rasters = Object.values(map._layers).filter(layer => layer instanceof L.Layer.types.pmtiles && layer._tiles && layer.options.opacity > 0);
-    const tiles = rasters.flatMap(layer => Object.values(layer._tiles)
-      .filter(tile => tile.el.done && !tile.el.request.signal.aborted && tile.el.isConnected)
-      .map(tile => ({ ...tile, layer })));
-    const signature = tiles.map(({ el, coords, layer }) => `${L.Util.stamp(el)}:${coords.z}:${coords.x}:${coords.y}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
+    const rasters = Object.values(map._layers).filter(layer => layer instanceof L.Layer.types.pmtiles && layer._rasterTiles && layer.options.opacity > 0);
+    const tiles = rasters.flatMap(layer => [...layer._rasterTiles.values()]
+      .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
+      .map(tile => ({ tile, layer })));
+    const signature = tiles.map(({ tile, layer }) =>
+      `${L.Util.stamp(tile.image)}:${tile.coords.z}:${tile.coords.x}:${tile.coords.y}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
     const selection = rasters.map(layer => `${L.Util.stamp(layer)}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
     // Retain the geographically aligned atlas until a tile batch finishes loading.
     if (!backend._roofRaster || backend._roofRaster.selection !== selection ||
       (!rasters.some(layer => layer.isLoading()) && backend._roofRaster.signature !== signature)) {
-      const zoom = tiles.length ? Math.max(...tiles.map(tile => tile.coords.z)) : map.getZoom();
+      const zoom = tiles.length ? Math.max(...tiles.map(({ tile }) => tile.coords.z)) : map.getZoom();
       const bounds = new L.Bounds();
-      for (const { coords, layer } of tiles) {
+      for (const { tile: { coords }, layer } of tiles) {
         const size = layer.getTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
         bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size));
         bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size));
@@ -256,7 +244,7 @@ export function render(backend) {
       // Raster tiles keep their GPU copy; terrain meshes already own one for the same image.
       const roofTiles = backend._roofTiles ||= new Map();
       for (const [el, source] of roofTiles) {
-        if (!tiles.some(tile => tile.el === el) || map._terrain3D?._rasterTiles.has(el)) {
+        if (!tiles.some(({ tile }) => tile === el) || map._terrain3D?._rasterTiles.has(el)) {
           source.texture.destroy();
           roofTiles.delete(el);
         }
@@ -276,22 +264,24 @@ export function render(backend) {
         }],
       });
       atlasPass.setPipeline(renderer.roofBlit.pipeline);
-      tiles.sort((a, b) => (a.layer.options.zIndex || 0) - (b.layer.options.zIndex || 0) || a.coords.z - b.coords.z);
-      for (const [i, { coords, el, layer }] of tiles.entries()) {
-        let source = map._terrain3D?._rasterTiles.get(el)?.texture || roofTiles.get(el);
+      tiles.sort((a, b) => (a.layer.options.zIndex || 0) - (b.layer.options.zIndex || 0) ||
+        a.tile.coords.z - b.tile.coords.z);
+      for (const [i, { tile, layer }] of tiles.entries()) {
+        const { coords, image } = tile;
+        let source = map._terrain3D?._rasterTiles.get(tile)?.texture || roofTiles.get(tile);
         if (!source) {
           source = {
             texture: device.createTexture({
-              size: [el.naturalWidth, el.naturalHeight],
+              size: [image.width, image.height],
               format: 'rgba8unorm',
               usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
             }),
-            image: el, uploaded: null,
+            image, uploaded: null,
           };
-          roofTiles.set(el, source);
+          roofTiles.set(tile, source);
         }
         if (source.uploaded !== source.image) {
-          device.queue.copyExternalImageToTexture({ source: el }, { texture: source.texture },
+          device.queue.copyExternalImageToTexture({ source: image }, { texture: source.texture },
             [source.texture.width, source.texture.height]);
           source.uploaded = source.image;
         }
@@ -327,7 +317,6 @@ export function render(backend) {
   traverse(backend.scene, mesh => { if (!mesh.visible) return true; if (mesh.geometry && mesh._visibleInFrame) meshes.push(mesh); });
   sortMeshes(meshes);
   const encoder = renderer.device.createCommandEncoder();
-  const pendingRasterTiles = [];
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
   // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).
   const shadowMeshes = [];
@@ -379,7 +368,6 @@ export function render(backend) {
   pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
   pass.setBindGroup(1, renderer.sunlight.bindGroup);
   for (const mesh of meshes) {
-    if (mesh.tile && mesh.tile.style.visibility !== 'hidden') pendingRasterTiles.push(mesh.tile);
     const world = mesh.worldMatrix;
     if (mesh.texture) {
       mesh.program.uniforms.baseTexture.value = mesh.texture;
@@ -405,14 +393,5 @@ export function render(backend) {
   pass.end();
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
   renderer.device.queue.submit([encoder.finish()]);
-  if (pendingRasterTiles.length) {
-    renderer.device.queue.onSubmittedWorkDone().then(() => {
-      for (const tile of pendingRasterTiles) {
-        if (tile.isConnected && tile._terrainVisibility !== undefined) tile.style.visibility = 'hidden';
-      }
-    }, error => {
-      for (const layer of backend._layers || []) layer.fire('error', { error });
-    });
-  }
   if (map._animatingZoom) update(backend);
 }

@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/onPMTileAdd.js"],
-  "sourcesContent": ["export function onPMTileAdd(backend, map) {\n  if (backend.header) {\n    L.TileLayer.prototype.onAdd.call(backend, map);\n    backend._setTerrain3D(map._terrain3D);\n  } else {\n    backend.ready = backend.ready.then(layer => {\n      if (backend._map === map && map.hasLayer(backend) && !backend._container) {\n        L.TileLayer.prototype.onAdd.call(backend, map);\n        backend._setTerrain3D(map._terrain3D);\n      }\n      return layer;\n    });\n  }\n}\n"],
-  "mappings": "AAAO,SAASA,EAAYC,EAASC,EAAK,CACpCD,EAAQ,QACV,EAAE,UAAU,UAAU,MAAM,KAAKA,EAASC,CAAG,EAC7CD,EAAQ,cAAcC,EAAI,UAAU,GAEpCD,EAAQ,MAAQA,EAAQ,MAAM,KAAKE,IAC7BF,EAAQ,OAASC,GAAOA,EAAI,SAASD,CAAO,GAAK,CAACA,EAAQ,aAC5D,EAAE,UAAU,UAAU,MAAM,KAAKA,EAASC,CAAG,EAC7CD,EAAQ,cAAcC,EAAI,UAAU,GAE/BC,EACR,CAEL",
-  "names": ["onPMTileAdd", "backend", "map", "layer"]
+  "sourcesContent": ["import { attach } from './attach.js';\nimport { updateRasterTiles } from './rasterTiles.js';\n\nexport function onPMTileAdd(backend, map) {\n  if (!backend.location) backend.location = map.getCenter();\n  const attached = attach(backend, map);\n  attached.then(() => {\n    backend._added.resolve();\n    backend._setTerrain3D(map._terrain3D);\n  })\n    .catch(error => backend.fire('error', { error }));\n  Promise.all([attached, backend.ready]).then(() => {\n    if (backend._map === map && map.hasLayer(backend)) updateRasterTiles(backend);\n  }).catch(error => backend.fire('error', { error }));\n}\n"],
+  "mappings": "AAAA,OAAS,UAAAA,MAAc,cACvB,OAAS,qBAAAC,MAAyB,mBAE3B,SAASC,EAAYC,EAASC,EAAK,CACnCD,EAAQ,WAAUA,EAAQ,SAAWC,EAAI,UAAU,GACxD,MAAMC,EAAWL,EAAOG,EAASC,CAAG,EACpCC,EAAS,KAAK,IAAM,CAClBF,EAAQ,OAAO,QAAQ,EACvBA,EAAQ,cAAcC,EAAI,UAAU,CACtC,CAAC,EACE,MAAME,GAASH,EAAQ,KAAK,QAAS,CAAE,MAAAG,CAAM,CAAC,CAAC,EAClD,QAAQ,IAAI,CAACD,EAAUF,EAAQ,KAAK,CAAC,EAAE,KAAK,IAAM,CAC5CA,EAAQ,OAASC,GAAOA,EAAI,SAASD,CAAO,GAAGF,EAAkBE,CAAO,CAC9E,CAAC,EAAE,MAAMG,GAASH,EAAQ,KAAK,QAAS,CAAE,MAAAG,CAAM,CAAC,CAAC,CACpD",
+  "names": ["attach", "updateRasterTiles", "onPMTileAdd", "backend", "map", "attached", "error"]
 }

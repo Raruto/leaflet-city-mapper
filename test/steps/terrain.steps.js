@@ -53,8 +53,12 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     const loaded = async raster => {
       await raster.ready;
       const deadline = performance.now() + 5000;
-      while (!Object.values(raster._tiles).length || Object.values(raster._tiles).some(t => !t.el.done)) {
-        if (performance.now() > deadline) throw new Error('Roof imagery did not load');
+      while (!raster._rasterTiles.size || [...raster._rasterTiles.values()].some(tile => !tile.done)) {
+        if (performance.now() > deadline) throw new Error(`Roof imagery did not load: ${JSON.stringify({
+          tiles: [...raster._rasterTiles.values()].map(({ coords, error, done }) => ({ coords, error, done })),
+          renderer: Boolean(raster.renderer), shared: Boolean(raster._shared), hasLayer: map.hasLayer(raster),
+          attachedMap: raster._map === map, header: raster.header, zoom: raster._tileZoom,
+        })}`);
         await new Promise(requestAnimationFrame);
       }
     };
@@ -63,6 +67,8 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       const before = await roof();
       release();
       await loaded(first);
+      const directCanvas = !(first instanceof L.GridLayer) && first.renderer.canvas === owner.renderer.canvas &&
+        first.root.children.some(mesh => mesh.tile) && !first._container;
       const textured = await roof();
       const texture = layer._shared._roofRaster.texture.texture;
       const signature = layer._shared._roofRaster.signature;
@@ -104,7 +110,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       second.setOpacity(1);
       const restored = await roof();
       return { before, textured, westRed, rotated, wall, highlighted, empty, switched, stacked, reordered, zoomed, panned, transferred,
-        transparent, restored, reused, sameTexture };
+        transparent, restored, reused, sameTexture, directCanvas };
     } finally {
       release(); first.remove(); second.remove();
       nativeChecks.sources.releaseArea(layer, area); layer.remove(); owner.remove();
@@ -123,6 +129,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
   assert.ok(result.highlighted.every(pixel => pixel[1] > pixel[0] && pixel[2] > pixel[0]), 'Highlight overrides imagery');
   assert.equal(result.reused, true);
   assert.equal(result.sameTexture, true);
+  assert.equal(result.directCanvas, true);
 });
 
 Then('terrain enabled {string} raster loading preserves imagery, elevations and removal', { timeout: 30000 }, async function (order) {
@@ -169,8 +176,8 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       const deadline = performance.now() + 12000;
       while (!condition()) {
         if (performance.now() > deadline) throw new Error(`Terrain fixture did not settle: ${JSON.stringify({
-          meshes: terrain._rasterTiles.size, tiles: Object.values(raster._tiles).length,
-          loaded: Object.values(raster._tiles).filter(t => t.el.done).length, inflight: buildings._inflight,
+          meshes: terrain._rasterTiles.size, tiles: raster._rasterTiles.size,
+          loaded: [...raster._rasterTiles.values()].filter(tile => tile.done).length, inflight: buildings._inflight,
         })}`);
         await new Promise(requestAnimationFrame);
       }
@@ -196,9 +203,9 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       if (order === 'before') terrain.addTo(map);
       raster.addTo(map);
       await raster.ready;
-      await wait(() => Object.values(raster._tiles).length > 0 && Object.values(raster._tiles).every(t => t.el.done));
+      await wait(() => raster._rasterTiles.size > 0 && [...raster._rasterTiles.values()].every(tile => tile.done));
       if (order === 'after') terrain.addTo(map);
-      const initiallyFlat = Object.values(raster._tiles).every(t => t.el.style.visibility !== 'hidden');
+      const initiallyFlat = [...raster._rasterTiles.values()].every(tile => tile.image);
       terrain._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
       nativeChecks.render.render(buildings._shared);
       const partialElevation = terrain._getElevation(map.getCenter());
@@ -206,12 +213,12 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       terrain._terrainTiles.delete(`${coords.x}/${coords.y}`);
       release();
       await terrain._terrainPromise;
-      const settled = () => terrain._rasterTiles.size === Object.values(raster._tiles).length &&
+      const settled = () => terrain._rasterTiles.size === raster._rasterTiles.size &&
         buildings._inflight === 0 && [...buildings._areas.values()].every(area => area.done);
       await wait(settled);
       let elevationError = 0, deformation = 0, buildingError = 0, uvError = 0;
       for (const [tile, mesh] of terrain._rasterTiles) {
-        const tileCoords = Object.values(raster._tiles).find(t => t.el === tile).coords;
+        const tileCoords = tile.coords;
         const positions = mesh.geometry.attributes.position.data;
         const uv = mesh.geometry.attributes.uv.data;
         const heights = await nativeChecks.terrainHeights(terrain,
@@ -263,8 +270,8 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       map.setPitch(0); map.setBearing(0);
       await wait(settled);
       nativeChecks.render.render(buildings._shared);
-      const tile = Object.values(raster._tiles).find(t => t.coords.x === coords.x && t.coords.y === coords.y);
-      const mesh = terrain._rasterTiles.get(tile.el);
+      const tile = [...raster._rasterTiles.values()].find(t => t.coords.x === coords.x && t.coords.y === coords.y);
+      const mesh = terrain._rasterTiles.get(tile);
       const pixels = [];
       const heights = await nativeChecks.terrainHeights(terrain,
         [16, 48].map(row => ({ mesh, u: 0.5, v: row / 64 })));
@@ -295,11 +302,10 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       await wait(settled);
       nativeChecks.render.render(buildings._shared);
       await buildings.renderer.device.queue.onSubmittedWorkDone();
-      const hidden = Object.values(raster._tiles).every(t =>
-        !terrain._rasterTiles.get(t.el)._visibleInFrame || t.el.style.visibility === 'hidden');
+      const hidden = terrain._rasterTiles.size === raster._rasterTiles.size;
       terrain.remove();
       const restored = !map._terrain3D && terrain._rasterTiles.size === 0 &&
-        Object.values(raster._tiles).every(t => t.el.style.visibility !== 'hidden') && model.root.position[1] === 0;
+        [...raster._rasterTiles.values()].every(tile => tile.mesh.parent === raster.root) && model.root.position[1] === 0;
       // Remove while elevation requests are pending; their callbacks must not hide restored tiles.
       pending = new Promise(resolve => { release = resolve; });
       terrain.addTo(map);
@@ -309,7 +315,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       await cancelledLoad;
       await new Promise(requestAnimationFrame);
       const cancelled = terrain._rasterTiles.size === 0 &&
-        Object.values(raster._tiles).every(t => t.el.style.visibility !== 'hidden');
+        [...raster._rasterTiles.values()].every(tile => tile.mesh.parent === raster.root);
       terrain.addTo(map);
       await terrain._terrainPromise;
       await wait(settled);
