@@ -3,6 +3,8 @@ import './3d.js';
 import { computeBounds } from '../utils/geometry.js';
 import { traverse, updateWorldMatrix } from '../utils/scene.js';
 import { build } from '../utils/vehicles.js';
+import * as gpu from '../scene/gpu.js';
+import * as render from '../scene/render.js';
 
 // W/S (↑/↓) run forward/back along the heading, A/D (←/→) turn: [forward, turn].
 const moves = {
@@ -91,7 +93,7 @@ function installWalk(layer, { speed, distance, position }) {
       mesh.rotation[0] = sign * swing * Math.sin(state.phase);
       mesh.rotation[1] = yaw;
     });
-    layer.update();
+    render.update(layer);
   };
 
   const step = now => {
@@ -100,7 +102,7 @@ function installWalk(layer, { speed, distance, position }) {
     last = now;
     if (!layer.renderer) return;
     let changed = false;
-    if (!meshes) { meshes = limbs.map(([part]) => layer._createMesh(build(parts[part]))); changed = true; }
+    if (!meshes) { meshes = limbs.map(([part]) => gpu.createMesh(layer, build(parts[part]))); changed = true; }
     let forward = 0, turn = 0;
     for (const key of keys) { forward += moves[key]?.[0] || 0; turn += moves[key]?.[1] || 0; }
     forward = Math.sign(forward); turn = Math.sign(turn);
@@ -191,7 +193,9 @@ function installWalk(layer, { speed, distance, position }) {
     keys.clear(); drag = null;
     L.DomEvent.off(document, 'keydown keyup', onKey);
     L.DomEvent.off(window, 'blur', onBlur);
-    for (const mesh of meshes || []) layer._disposeMesh(mesh);
+    for (const mesh of meshes || []) {
+      gpu.disposeMesh(layer, mesh);
+    }
     meshes = null;
     button.setAttribute('aria-pressed', 'false');
     button.style.background = '#fff';

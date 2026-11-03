@@ -1,5 +1,7 @@
 import { computeBounds } from '../utils/geometry.js';
 import { traverse, updateWorldMatrix, updateCamera } from '../utils/scene.js';
+import { destroyTexture, drawGeometry } from './gpu.js';
+import { renderSunlight, updatePointLights } from './lighting.js';
 
 /** Scene graph, shared camera and frame rendering. */
 /** Content changes: render once on the next animation frame. */
@@ -7,12 +9,12 @@ export function update(backend) {
   const shared = backend._shared;
   if (!shared) return backend;
   if (shared !== backend) {
-    shared.update();
+    update(shared);
     return backend;
   }
   backend._frame ||= requestAnimationFrame(() => {
     backend._frame = null;
-    if (backend._shared === backend && backend.renderer) backend._render();
+    if (backend._shared === backend && backend.renderer) render(backend);
   });
   return backend;
 }
@@ -24,8 +26,8 @@ export function onMapChange(backend) {
   queueMicrotask(() => {
     backend._queued = false;
     if (backend._shared !== backend || !backend.renderer) return;
-    if (backend._map._animatingZoom) backend.update();
-    else backend._render();
+    if (backend._map._animatingZoom) update(backend);
+    else render(backend);
   });
 }
 
@@ -42,7 +44,7 @@ export function getTileLevel(backend) {
 
 /** Preserve the outgoing tile level before Leaflet changes its logical zoom. */
 export function startZoom(backend) {
-  backend._zoomLevel = backend._getTileLevel();
+  backend._zoomLevel = getTileLevel(backend);
 }
 
 /** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */
@@ -50,7 +52,16 @@ export function endZoom(backend) {
   for (const animation of backend._zoomTransitions?.keys() || []) animation.finish();
   backend._zoomTransitions = null;
   backend._zoomLevel = null;
-  backend.update();
+  update(backend);
+}
+
+export function sortMeshes(meshes) {
+  return meshes.sort((a, b) => Number(a.program.transparent) - Number(b.program.transparent) ||
+    (a.program.transparent
+      ? (a.renderOrder || 0) - (b.renderOrder || 0) ||
+      b._sortDepth - a._sortDepth || a.id - b.id
+      : a.id - b.id)
+  );
 }
 
 /**
@@ -91,7 +102,7 @@ export function render(backend) {
     backend.renderer.canvas.height       = Math.round(size.y * backend.renderer.dpr);
     backend.renderer.canvas.style.width  = `${size.x}px`;
     backend.renderer.canvas.style.height = `${size.y}px`;
-    if (backend.renderer.depthTexture) backend._destroyTexture(backend.renderer.depthTexture);
+    if (backend.renderer.depthTexture) destroyTexture(backend, backend.renderer.depthTexture);
     backend.renderer.depthTexture = backend.renderer.device.createTexture({
       size: [backend.renderer.canvas.width, backend.renderer.canvas.height],
       format: 'depth24plus',
@@ -103,7 +114,7 @@ export function render(backend) {
   // Match the map's CSS camera: a perspective distance of 1.5 viewport heights.
   let pixelsPerMeter = map.options.crs.scale(map.getZoom()) / (40075016.68557849 * Math.cos(backend._sceneOrigin.lat * Math.PI / 180));
   let origin         = map.project(backend._sceneOrigin).subtract(map.getPixelOrigin());
-  const level        = backend._zoomLevel?.el.isConnected ? backend._zoomLevel : backend._getTileLevel();
+  const level        = backend._zoomLevel?.el.isConnected ? backend._zoomLevel : getTileLevel(backend);
   if (level && map._animatingZoom) {
     backend._zoomLevel = level;
   }
@@ -234,7 +245,7 @@ export function render(backend) {
       matrix.m41 = (origin.x - min.x) / size.x; matrix.m43 = (origin.y - min.y) / size.y;
       const texture = backend._roofRaster?.texture;
       if (texture && (texture.width !== width || texture.height !== height)) {
-        backend._destroyTexture(texture.texture);
+        destroyTexture(backend, texture.texture);
         texture.texture = renderer.device.createTexture({
           size: [width, height],
           format: 'rgba8unorm',
@@ -361,7 +372,7 @@ export function render(backend) {
       opacityBuffer.destroy();
     }
   } else if (backend._roofRaster) {
-    backend._destroyTexture(backend._roofRaster.texture.texture);
+    destroyTexture(backend, backend._roofRaster.texture.texture);
     backend._roofRaster = null;
     for (const source of backend._roofTiles?.values() || []) source.texture.destroy();
     backend._roofTiles = null;
@@ -369,12 +380,7 @@ export function render(backend) {
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   const meshes = [];
   traverse(backend.scene, mesh => { if (!mesh.visible) return true; if (mesh.geometry && mesh._visibleInFrame) meshes.push(mesh); });
-  meshes.sort((a, b) => Number(a.program.transparent) - Number(b.program.transparent) ||
-    (a.program.transparent
-      ? (a.renderOrder || 0) - (b.renderOrder || 0) ||
-      b._sortDepth - a._sortDepth || a.id - b.id
-      : a.id - b.id)
-  );
+  sortMeshes(meshes);
   const encoder = renderer.device.createCommandEncoder();
   const pendingRasterTiles = [];
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
@@ -390,7 +396,7 @@ export function render(backend) {
     }
   }
   if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
-    if (renderer.uniformBuffer) backend._destroyTexture(renderer.uniformBuffer);
+    if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
     renderer.uniformBuffer = renderer.device.createBuffer({
       size: Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -408,9 +414,9 @@ export function render(backend) {
   frameData[55] = night * night * (3 - 2 * night);
   frameData.set(sunlight?.tint || [1, 1, 1], 56);
   frameData[59] = 0;
-  if (night > 0) backend._updatePointLights();
+  if (night > 0) updatePointLights(backend);
   renderer.uniformSlot = 1;
-  backend._renderSunlight(encoder, shadowMeshes, sunlight);
+  renderSunlight(backend, encoder, shadowMeshes, sunlight);
   const pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: renderer.context.getCurrentTexture().createView(),
@@ -445,10 +451,10 @@ export function render(backend) {
     const frontFace = determinant < 0 ? 'cw' : 'ccw';
     const program = mesh.program;
     if (program.transparent && program._layerMaterial.doubleSided) {
-      backend._drawGeometry(mesh, pass, 'front', frontFace);
-      backend._drawGeometry(mesh, pass, 'back', frontFace);
+      drawGeometry(backend, mesh, pass, 'front', frontFace);
+      drawGeometry(backend, mesh, pass, 'back', frontFace);
     } else {
-      backend._drawGeometry(mesh, pass, program.cullMode, frontFace);
+      drawGeometry(backend, mesh, pass, program.cullMode, frontFace);
     }
   }
   pass.end();
@@ -463,5 +469,5 @@ export function render(backend) {
       for (const layer of backend._layers || []) layer.fire('error', { error });
     });
   }
-  if (map._animatingZoom) backend.update();
+  if (map._animatingZoom) update(backend);
 }

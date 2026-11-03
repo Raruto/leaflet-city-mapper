@@ -20,13 +20,13 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     layer.camera.up.splice(0, 3, 0, 1, 0);
     layer.camera.aspect = rect.width / rect.height;
     const center = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
-    const hit = layer.raycast(center, [mesh], false)[0];
+    const hit = nativeChecks.picking.raycast(layer, center, [mesh], false)[0];
     const worldCameraRay = hit?.object === mesh && hit.faceIndex === 0 &&
       hit.point.every((value, index) => Math.abs(value - [0.25, 0.25, -1][index]) < 1e-8);
     const matrix = mesh.worldMatrix;
     mesh.worldMatrix = new Array(16).fill(0);
     let singularTransform = false;
-    try { layer.raycast(center, [mesh], false); } catch (error) {
+    try { nativeChecks.picking.raycast(layer, center, [mesh], false); } catch (error) {
       singularTransform = error.message === 'Singular 3D transform';
     }
     mesh.worldMatrix = matrix;
@@ -51,35 +51,30 @@ Then('layer-owned objects preserve values and visibility without engine classes'
         position: [0, 0, 0, 1, 0, 0, 0, 1, 0],
         normal: [0, 0, 1, 0, 0, 1, 0, 0, 1],
         color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
-      }, layer._createProgram({ vertexColors: true }));
+      }, nativeChecks.gpu.createProgram(layer, { vertexColors: true }));
       node.program.transparent = properties.program.transparent;
       // The shared renderer computes depth from geometry centers, not authored node origins.
       node.position[0] = 0; node.position[1] = 0; node.position[2] = properties.id === 3 ? -100 : 0;
       programs.push(node.program);
-      layer.setParent(node, scene);
+      nativeChecks.graph.setParent(node, scene);
     }
-    const hidden = nativeChecks.group(); hidden.visible = false; layer.setParent(hidden, scene);
+    const hidden = nativeChecks.group(); hidden.visible = false; nativeChecks.graph.setParent(hidden, scene);
     const hiddenMesh = nativeChecks.group();
     Object.assign(hiddenMesh, { geometry: mesh.geometry, program: mesh.program, id: 4 });
-    layer.setParent(hiddenMesh, hidden);
+    nativeChecks.graph.setParent(hiddenMesh, hidden);
     layer.add(scene);
-    const order = [];
-    const draw = layer._drawGeometry;
-    layer._drawGeometry = function (mesh, ...args) {
-      if (programs.includes(mesh.program)) order.push(programs.indexOf(mesh.program) + 1);
-      return draw.call(this, mesh, ...args);
-    };
-    layer._shared._render();
-    layer._drawGeometry = draw;
-    const sorted = order.join() === '2,3,1';
-    layer.traverse(scene, node => {
+    nativeChecks.render.render(layer._shared);
+    const meshes = [];
+    nativeChecks.graph.traverse(scene, node => {
+      if (programs.includes(node.program)) meshes.push(node);
       if (node !== hiddenMesh && node.geometry?.attributes) {
         for (const attribute of Object.values(node.geometry.attributes)) attribute.buffer.destroy();
-        layer._removeProgram(node.program);
+        nativeChecks.gpu.removeProgram(node.program);
       }
     });
+    const sorted = nativeChecks.render.sortMeshes(meshes).map(node => programs.indexOf(node.program) + 1).join() === '2,3,1';
     for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-    layer._removeProgram(mesh.program);
+    nativeChecks.gpu.removeProgram(mesh.program);
     layer.remove();
     return { worldCameraRay, singularTransform, sorted, noEngine, independent };
   });
@@ -139,7 +134,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
       first.renderer === second.renderer && first.camera === second.camera &&
       first.scene === second.scene && first.root !== second.root &&
       first.root.parent === second.root.parent && document.querySelectorAll('.leaflet-3d').length === 1;
-    first._shared._render();
+    nativeChecks.render.render(first._shared);
     const worldPoint = new DOMPoint(10, 0, 20, 1).matrixTransform(new DOMMatrix(second.root.worldMatrix));
     const world = [worldPoint.x / worldPoint.w, worldPoint.y / worldPoint.w, worldPoint.z / worldPoint.w];
     const screenPoint = new DOMPoint(...world, 1).matrixTransform(new DOMMatrix(second.camera.projectionViewMatrix));
@@ -161,7 +156,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     renderer.device.destroy = function () { disposals++; destroy(); };
     const sceneOrigin = first.location;
     const matrix = [...first.camera.projectionViewMatrix];
-    first.update();
+    nativeChecks.render.update(first);
     first.remove();
     await new Promise(requestAnimationFrame);
     const retained = second.renderer === renderer && renderer.canvas.isConnected && disposals === 0 &&

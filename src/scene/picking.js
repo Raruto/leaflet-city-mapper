@@ -1,5 +1,6 @@
 import { intersectMeshes } from '../utils/picking.js';
 import { traverse, updateWorldMatrix, updateCamera } from '../utils/scene.js';
+import { update } from './render.js';
 
 /** Raycasting, hover/click highlight and tooltips. */
 /**
@@ -14,6 +15,7 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   if (!backend.renderer) {
     return [];
   }
+  backend._beforeRaycast?.();
   const rect = backend._map.getContainer().getBoundingClientRect();
   updateWorldMatrix(backend.scene);
   updateCamera(backend.camera);
@@ -61,7 +63,7 @@ export function raycast(backend, event, objects = backend.root.children, recursi
  */
 export function findFeature(backend, event) {
   if (!backend.root || !backend.camera) return null;
-  for (const hit of backend.raycast(event, backend.root.children, Boolean(backend.model))) {
+  for (const hit of raycast(backend, event, backend.root.children, Boolean(backend.model))) {
     if (backend.model) {
       let object = hit.object;
       while (object && object !== backend.model) object = object.parent;
@@ -94,7 +96,7 @@ export function setHighlight(backend, feature) {
   if (backend.highlightedFeature) backend.highlightedFeature.mesh.highlight = null;
   backend.highlightedFeature = feature;
   if (feature) feature.mesh.highlight = [feature.vertexStart, feature.vertexEnd];
-  backend.update();
+  update(backend);
 }
 
 /** Update tooltip content/position and arbitrate cursor ownership across shared layers. */
@@ -126,25 +128,25 @@ export function showFeature(backend, feature, event) {
 
 /** Hover is transient; featurehover also reports misses with feature:null. */
 export function onPointerMove(backend, event) {
-  backend.hoveredFeature = backend._findFeature(event);
-  backend._setHighlight(backend.hoveredFeature);
-  backend._showFeature(backend.hoveredFeature, event);
+  backend.hoveredFeature = findFeature(backend, event);
+  setHighlight(backend, backend.hoveredFeature);
+  showFeature(backend, backend.hoveredFeature, event);
   backend.fire('featurehover', { feature: backend.hoveredFeature, originalEvent: event });
 }
 
 /** Emit click without moving the map or pinning the tooltip. */
 export function onClick(backend, event) {
-  const feature = backend._findFeature(event);
+  const feature = findFeature(backend, event);
   backend.hoveredFeature = feature;
-  backend._setHighlight(feature);
-  backend._showFeature(feature, event);
+  setHighlight(backend, feature);
+  showFeature(backend, feature, event);
   backend.fire('featureclick', { feature, originalEvent: event });
 }
 
 /** Clear hover, highlight and tooltip without retaining a selected feature. */
 export function onPointerLeave(backend) {
   backend.hoveredFeature = null;
-  backend._setHighlight(null);
-  backend._showFeature(null);
+  setHighlight(backend, null);
+  showFeature(backend, null);
   backend.fire('featurehover', { feature: null });
 }

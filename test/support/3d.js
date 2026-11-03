@@ -37,8 +37,18 @@ AfterAll(function () {
 });
 
 export async function prepare3DChecks(page) {
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    const [gpu, lighting, picking, render, sources, graph, geometry] = await Promise.all([
+      import('/dist/scene/gpu.js'),
+      import('/dist/scene/lighting.js'),
+      import('/dist/scene/picking.js'),
+      import('/dist/scene/render.js'),
+      import('/dist/scene/sources.js'),
+      import('/dist/utils/scene.js'),
+      import('/dist/utils/geometry.js'),
+    ]);
     window.nativeChecks = {
+      gpu, lighting, picking, render, sources, graph, geometry,
       group() {
         return {
           position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1],
@@ -46,10 +56,10 @@ export async function prepare3DChecks(page) {
         };
       },
       mesh(layer, attributes, program) {
-        const mesh = layer._createMesh(attributes, program?._layerMaterial);
+        const mesh = gpu.createMesh(layer, attributes, program?._layerMaterial);
         layer.remove(mesh);
         if (program) {
-          layer._removeProgram(mesh.program);
+          gpu.removeProgram(mesh.program);
           mesh.program = program;
         }
         return mesh;
@@ -60,7 +70,7 @@ export async function prepare3DChecks(page) {
           device, format, alphaMode: 'premultiplied',
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         });
-        layer._shared._render();
+        render.render(layer._shared);
         const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
         const buffer = device.createBuffer({
           size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
@@ -151,24 +161,28 @@ export async function prepare3DChecks(page) {
       },
       async loadBlock(layer, area, features) {
         while (layer._inflight) await new Promise(requestAnimationFrame);
-        const getZxy = layer.getZxy;
-        layer.getZxy = async () => ({
-          data: new TextEncoder().encode(JSON.stringify({ type: 'FeatureCollection', features })),
-        });
+        const geojson = layer._geojson, data = layer.options.data, url = layer.options.url;
+        layer._geojson = true;
+        layer.options.data = { type: 'FeatureCollection', features };
+        delete layer.options.url;
         layer._areas.set('fixture', area);
         try {
-          layer._pump();
+          sources.pump(layer);
           while (layer._inflight) await new Promise(requestAnimationFrame);
           return area;
         } finally {
-          layer.getZxy = getZxy;
+          layer._geojson = geojson;
+          if (data === undefined) delete layer.options.data;
+          else layer.options.data = data;
+          if (url === undefined) delete layer.options.url;
+          else layer.options.url = url;
           layer._areas.delete('fixture');
         }
       },
       bounds(root, backend) {
-        backend._updateWorldMatrix(root, true);
+        graph.updateWorldMatrix(root, true);
         const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-        backend.traverse(root, mesh => {
+        graph.traverse(root, mesh => {
           if (!mesh.geometry) return;
           const position = mesh.geometry.attributes.position;
           for (let i = 0; i < position.count; i++) {
@@ -191,7 +205,7 @@ export async function prepare3DChecks(page) {
         };
         try {
           const rect = backend._map.getContainer().getBoundingClientRect();
-          return backend.raycast({
+          return picking.raycast(backend, {
             clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
           }, [mesh], false).map(hit => hit.point);
         } finally {

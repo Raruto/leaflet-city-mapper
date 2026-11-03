@@ -1,5 +1,6 @@
 import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../utils/model.js';
 import { emptyNode, setParent } from '../utils/scene.js';
+import { createProgram, removeProgram } from './gpu.js';
 
 /** glTF/GLB model loading. */
 /** Load the configured GLB/glTF (static triangles) under `root`; GPU resources need attachment. */
@@ -130,7 +131,7 @@ export async function loadModel(backend) {
           if ([style.baseTexture, style.metalTexture, style.emissiveTexture, style.occlusionTexture].some(Boolean) && !attributes.uv) {
             throw new Error('Textured model mesh requires UV coordinates');
           }
-          const program = backend._createProgram(style);
+          const program = createProgram(backend, style);
           resources.push(program);
           const device = backend.renderer.device;
           if (attributes.index?.data instanceof Uint8Array) {
@@ -179,7 +180,7 @@ export async function loadModel(backend) {
       for (const resource of resources) {
         if (resource.attributes) {
           for (const attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
-        } else backend._removeProgram(resource);
+        } else removeProgram(resource);
       }
       throw error;
     }

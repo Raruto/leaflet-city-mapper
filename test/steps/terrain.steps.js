@@ -36,7 +36,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     const first = new L.Layer({ source: { type: 'pmtiles', url: 'roof-first.pmtiles', archive: archive(false) } });
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'roof-second.pmtiles', archive: archive(true) } });
     const sample = async (offset, height) => {
-      layer._shared._render();
+      nativeChecks.render.render(layer._shared);
       const crs = map.options.crs;
       const origin = crs.project(layer.location);
       const point = crs.project(map.unproject(boundary.add(offset), zoom));
@@ -73,9 +73,9 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       map.setPitch(55); map.setBearing(35);
       const rotated = await roof();
       const wall = await sample([0, 60], 10);
-      layer._setHighlight({ mesh, ...mesh.extras.featureFaces[0] });
+      nativeChecks.picking.setHighlight(layer, { mesh, ...mesh.extras.featureFaces[0] });
       const highlighted = await roof();
-      layer._setHighlight(null);
+      nativeChecks.picking.setHighlight(layer, null);
       map.setPitch(0); map.setBearing(0);
       first.remove();
       const empty = await roof();
@@ -107,7 +107,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
         transparent, restored, reused, sameTexture };
     } finally {
       release(); first.remove(); second.remove();
-      layer._releaseArea(area); layer.remove(); owner.remove();
+      nativeChecks.sources.releaseArea(layer, area); layer.remove(); owner.remove();
     }
   });
   const green = pixel => pixel[1] > 100 && pixel[0] < 5 && pixel[2] < 5 && pixel[3] === 255;
@@ -148,8 +148,6 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
     const getHeader = L.Layer.types.pmtiles.prototype.getHeader;
     const getZxy = L.Layer.types.pmtiles.prototype.getZxy;
-    const buildingHeader = L.Layer.types['3d'].prototype.getHeader;
-    const buildingTile = L.Layer.types['3d'].prototype.getZxy;
     let release;
     let pending = new Promise(resolve => { release = resolve; });
     L.Layer.types.pmtiles.prototype.getHeader = function () {
@@ -167,10 +165,6 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       }
       return { data: values.buffer };
     };
-    L.Layer.types['3d'].prototype.getHeader = async () => header;
-    L.Layer.types['3d'].prototype.getZxy = async () => ({
-      data: new TextEncoder().encode(JSON.stringify({ type: 'FeatureCollection', features: [feature] })),
-    });
     const wait = async condition => {
       const deadline = performance.now() + 12000;
       while (!condition()) {
@@ -185,7 +179,12 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     const raster = new L.Layer({ source: { type: 'pmtiles', url: 'fixture-raster.pmtiles',
       archive: { getHeader: async () => ({ ...header, tileType: 2 }), getZxy: async () => ({ data: image }) } } });
     const buildings = new L.Layer({ source: { type: '3d', url: 'fixture-buildings.pmtiles', roofTexture: true,
-      featureStyle: () => ({ top: 15 }) } }).addTo(map);
+      featureStyle: () => ({ top: 15 }), archive: {
+        getHeader: async () => header,
+        getZxy: async () => ({ data: new TextEncoder().encode(JSON.stringify({
+          type: 'FeatureCollection', features: [feature],
+        })) }),
+      } } }).addTo(map);
     const modelLocation = map.unproject(center.add([20, 20]), zoom);
     const model = new L.Layer({ source: { type: '3d', center: [modelLocation.lat, modelLocation.lng] } }).addTo(map);
     const errors = [];
@@ -201,7 +200,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       if (order === 'after') terrain.addTo(map);
       const initiallyFlat = Object.values(raster._tiles).every(t => t.el.style.visibility !== 'hidden');
       terrain._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
-      buildings._shared._render();
+      nativeChecks.render.render(buildings._shared);
       const partialElevation = terrain._getElevation(map.getCenter());
       const partialCameraY = buildings.camera.target[1];
       terrain._terrainTiles.delete(`${coords.x}/${coords.y}`);
@@ -244,7 +243,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       }
       const modelError = Math.abs(model.root.position[1] - height(map.project(model.location, zoom)));
       map.setPitch(0); map.setBearing(0);
-      buildings._shared._render();
+      nativeChecks.render.render(buildings._shared);
       const roofMesh = [...buildings._areas.values()].find(area => area.mesh).mesh;
       const roofPositions = roofMesh.geometry.attributes.position.data;
       const roofCenter = [0, 1, 2].map(axis =>
@@ -263,7 +262,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       map.setView(map.unproject(coords.add([0.5, 0.5]).multiplyBy(256), zoom), zoom, { animate: false });
       map.setPitch(0); map.setBearing(0);
       await wait(settled);
-      buildings._shared._render();
+      nativeChecks.render.render(buildings._shared);
       const tile = Object.values(raster._tiles).find(t => t.coords.x === coords.x && t.coords.y === coords.y);
       const mesh = terrain._rasterTiles.get(tile.el);
       const pixels = [];
@@ -285,7 +284,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         map.setPitch(pitch);
         map.setBearing(pitch * 2);
         map.panBy([12, 8], { animate: false });
-        buildings._shared._render();
+        nativeChecks.render.render(buildings._shared);
         const camera = buildings.camera;
         const distance = Math.hypot(...camera.position.map((v, i) => v - camera.target[i]));
         cameraError = Math.max(cameraError, Math.abs(
@@ -294,7 +293,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         projectionError = Math.max(projectionError, Math.abs(projected.x / projected.w), Math.abs(projected.y / projected.w));
       }
       await wait(settled);
-      buildings._shared._render();
+      nativeChecks.render.render(buildings._shared);
       await buildings.renderer.device.queue.onSubmittedWorkDone();
       const hidden = Object.values(raster._tiles).every(t =>
         !terrain._rasterTiles.get(t.el)._visibleInFrame || t.el.style.visibility === 'hidden');
@@ -323,8 +322,6 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       raster.remove(); terrain.remove(); buildings.remove(); model.remove();
       L.Layer.types.pmtiles.prototype.getHeader = getHeader;
       L.Layer.types.pmtiles.prototype.getZxy = getZxy;
-      L.Layer.types['3d'].prototype.getHeader = buildingHeader;
-      L.Layer.types['3d'].prototype.getZxy = buildingTile;
     }
   }, order);
   for (const name of ['initiallyFlat', 'hidden', 'restored', 'cancelled', 'reattached']) assert.equal(result[name], true, name);
@@ -348,11 +345,11 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
     const first = new L.Layer({ source: { type: '3d' } }).addTo(map), second = new L.Layer({ source: { type: '3d' } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
     let samples = 0, frozen = true, transferred = false, resumed = false;
-    const render = first._render;
-    first._render = function () {
-      render.call(this);
-      if (!map._animatingZoom || !this._zoomTransitions?.size) return;
-      const animation = this._zoomTransitions.keys().next().value;
+    const { device } = first.renderer;
+    const submit = device.queue.submit;
+    device.queue.submit = function (...args) {
+      if (!map._animatingZoom || !first._zoomTransitions?.size) return submit.apply(this, args);
+      const animation = first._zoomTransitions.keys().next().value;
       const time = animation.currentTime;
       const before = getComputedStyle(animation.effect.target).transform;
       const deadline = performance.now() + 40;
@@ -360,13 +357,14 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
       frozen &&= animation.currentTime === time && animation.playState === 'paused' &&
         getComputedStyle(animation.effect.target).transform === before;
       samples++;
+      return submit.apply(this, args);
     };
     await new Promise(resolve => {
       map.once('zoomend', resolve);
       map.setZoomAround(map.getSize().divideBy(2), 18, { animate: true });
     });
     const cleaned = !first._zoomTransitions;
-    first._render = render;
+    delete device.queue.submit;
     await new Promise(resolve => setTimeout(resolve, 300));
     const moved = new Promise(resolve => map.once('zoomend', resolve));
     map.setZoomAround(map.getSize().divideBy(2), 17, { animate: true });

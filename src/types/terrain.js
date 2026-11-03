@@ -2,6 +2,8 @@ import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '..
 import { triangulate } from '../utils/geometry.js';
 import './3d.js';
 import './pmtiles.js';
+import * as gpu from '../scene/gpu.js';
+import * as render from '../scene/render.js';
 
 /**
  * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
@@ -42,16 +44,16 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
     this._terrainTiles.clear();
     this._terrainOriginElevation = 0;
     this._terrainPromise = null;
-    if (this._rasterProgram) this._removeProgram(this._rasterProgram);
+    if (this._rasterProgram) gpu.removeProgram(this._rasterProgram);
     this._rasterProgram = null;
-    if (this._dem) this._destroyTexture(this._dem.texture);
+    if (this._dem) gpu.destroyTexture(this, this._dem.texture);
     this._dem = null;
     for (const grid of this._terrainGrids?.values() || []) {
-      for (const attribute of Object.values(grid)) this._destroyTexture(attribute.buffer);
+      for (const attribute of Object.values(grid)) gpu.destroyTexture(this, attribute.buffer);
     }
     this._terrainGrids = null;
     this._bridges = null;
-    this._disposeMesh(this._bridgeMesh);
+    gpu.disposeMesh(this, this._bridgeMesh);
     this._bridgeMesh = null;
     L.Layer.types['3d'].prototype.onRemove.call(this, map);
   },
@@ -98,7 +100,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
       for (const layer of Object.values(map._layers)) layer._setTerrainHeight?.();
       if (bridges) this._addBridges(bridges);
       map.fire('terrainchange');
-      this.update();
+      render.update(this);
       this.fire('terrainready');
       return true;
     } catch (error) {
@@ -174,7 +176,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
         }
       }
     }
-    if (position.length) this._bridgeMesh = this._createMesh({ position, normal, color });
+    if (position.length) this._bridgeMesh = gpu.createMesh(this, { position, normal, color });
   },
 
   async addRasterTile(layer, coords, tile) {
@@ -211,7 +213,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
       // ponytail: one texture, capped by maxTextureDimension2D (32×32 DEM tiles at 8192 px); split it for larger archives.
       const bounds = this._terrainBounds, columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
       const { elevations, low, high } = terrainAtlas(this._terrainTiles, bounds);
-      if (this._dem) this._destroyTexture(this._dem.texture);
+      if (this._dem) gpu.destroyTexture(this, this._dem.texture);
       this._dem = {
         texture: device.createTexture({
           size: [columns * 256, rows * 256],
@@ -224,7 +226,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
       device.queue.writeTexture({ texture: this._dem.texture }, elevations,
         { bytesPerRow: columns * 1024 }, [columns * 256, rows * 256]);
       this._terrainGrids = new Map();
-      this._rasterProgram = this._createProgram({
+      this._rasterProgram = gpu.createProgram(this, {
         baseTexture: texture,
         unlit: true,
         alphaMode: 'BLEND',
@@ -295,7 +297,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
     const mesh = this._rasterTiles.get(tile);
     if (!mesh) return;
     this.remove(mesh);
-    this._destroyTexture(mesh.texture.texture);
+    gpu.destroyTexture(this, mesh.texture.texture);
     this._rasterTiles.delete(tile);
     tile.style.visibility = tile._terrainVisibility;
     delete tile._terrainVisibility;

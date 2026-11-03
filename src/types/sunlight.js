@@ -1,5 +1,6 @@
 import { atmosphere, moonPosition, solarPosition, projectCelestialBody } from '../utils/sun.js';
 import { underEntry } from '../utils/control.js';
+import { update as updateScene } from '../scene/render.js';
 
 function installSunlight(map) {
   const control = new L.Control({ position: 'bottomright' });
@@ -30,7 +31,7 @@ function installSunlight(map) {
       disc.style.left = `${left}px`; disc.style.top = `${top}px`;
     }
   };
-  const render = () => L.Layer.types['3d']?._renderers.get(map)?.update();
+  const render = () => updateScene(L.Layer.types['3d']?._renderers.get(map));
   const update = () => {
     try {
       if (control.live) control.time = new Date();

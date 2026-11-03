@@ -1,5 +1,8 @@
 import { materialShaders } from '../utils/shaders.js';
 import { emptyNode, setParent, traverse } from '../utils/scene.js';
+import { initSunlight } from './lighting.js';
+import { onMapChange, startZoom, endZoom, render, update } from './render.js';
+import { updateArea } from './sources.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
 /**
@@ -81,7 +84,7 @@ export async function attach(backend, map) {
       canvas,
       dpr: Math.min(window.devicePixelRatio, 2)
     };
-    backend._initSunlight();
+    initSunlight(backend);
     const emptyImage = document.createElement('canvas');
     emptyImage.width = 1;
     emptyImage.height = 1;
@@ -108,13 +111,13 @@ export async function attach(backend, map) {
       pane.style.zIndex = 450;
     }
     pane.append(canvas);
-    map.on('move zoom rotate pitch resize viewreset layeradd layerremove', shared._onMapChange, shared);
-    map.on('zoomstart', shared._startZoom, shared);
-    map.on('zoomanim', shared.update, shared);
-    map.on('zoomend', shared._endZoom, shared);
+    map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange, shared);
+    map.on('zoomstart', startZoom, shared);
+    map.on('zoomanim', update, shared);
+    map.on('zoomend', endZoom, shared);
     backend._rendererReady.resolve();
     delete shared._rendererReady;
-    shared._render();
+    render(shared);
     L.Layer.types['3d']._renderers.set(map, shared);
   }
   const origin = map.options.crs.project(shared._sceneOrigin);
@@ -184,8 +187,8 @@ export async function attach(backend, map) {
           uploaded: null,
         };
       }
-      backend._removeProgram(object.program);
-      object.program = backend._createProgram(material);
+      removeProgram(object.program);
+      object.program = createProgram(backend, material);
       object.device = device;
     }
     if (object.texture && object.texture.device !== shared.renderer.device) {
@@ -202,8 +205,8 @@ export async function attach(backend, map) {
       };
     }
   });
-  shared.update();
-  if (backend.header || backend._geojson) backend._updateArea();
+  update(shared);
+  if (backend.header || backend._geojson) updateArea(backend);
 }
 
 export function destroyTexture(backend, texture) {
@@ -322,7 +325,7 @@ export function createMesh(backend, data, material = {}, usage = 0) {
     ...emptyNode(),
     device,
     geometry: { device, attributes, drawRange: { start: 0, count: attributes.position.count } },
-    program: backend._createProgram({ vertexColors: true, doubleSided: true, ...material }),
+    program: createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
     id: L.Layer.types['3d']._nextId++, renderOrder: 0, extras: {},
   };
   backend.add(mesh);
@@ -330,10 +333,14 @@ export function createMesh(backend, data, material = {}, usage = 0) {
 }
 
 export function disposeMesh(backend, mesh) {
-  if (!mesh) return;
+  if (!mesh) {
+    return;
+  }
   backend.remove(mesh);
-  for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-  backend._removeProgram(mesh.program);
+  for (const attribute of Object.values(mesh.geometry.attributes)) {
+    attribute.buffer.destroy();
+  }
+  removeProgram(mesh.program);
 }
 
 /** Upload retained CPU data and draw one mesh in the active WebGPU render pass. */

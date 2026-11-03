@@ -3,6 +3,9 @@ import { computeBounds } from '../utils/geometry.js';
 import { along, speed, toLanes, tripsAt, routeGeometry } from '../utils/traffic.js';
 import { build, vehicles } from '../utils/vehicles.js';
 import { underEntry } from '../utils/control.js';
+import * as gpuApi from '../scene/gpu.js';
+import * as picking from '../scene/picking.js';
+import * as render from '../scene/render.js';
 
 const tooltip = ({ properties: p }) => {
   const content = document.createElement('div');
@@ -27,18 +30,18 @@ function installTraffic(layer, { url, model, lights, side, outline, velocity }) 
   const params = new ArrayBuffer(16), paramFloats = new Float32Array(params), paramInts = new Uint32Array(params);
 
   const createMesh = (data, featureFaces, material, usage = 0) => {
-    const result = layer._createMesh(data, material, usage);
+    const result = gpuApi.createMesh(layer, data, material, usage);
     result.extras.featureFaces = featureFaces;
     return result;
   };
   const dispose = object => {
     if (!object) return;
     if (layer.highlightedFeature?.mesh === object) {
-      layer._setHighlight(null);
+      picking.setHighlight(layer, null);
       layer.hoveredFeature = null;
-      layer._showFeature(null);
+      picking.showFeature(layer, null);
     }
-    layer._disposeMesh(object);
+    gpuApi.disposeMesh(layer, object);
   };
   const fail = error => {
     status.textContent = `Error: ${error.message}`;
@@ -232,11 +235,7 @@ function installTraffic(layer, { url, model, lights, side, outline, velocity }) 
       }
     });
   };
-  const raycast = layer.raycast;
-  layer.raycast = function (...args) {
-    place();
-    return raycast.apply(this, args);
-  };
+  layer._beforeRaycast = place;
 
   const tick = () => {
     frame = undefined;
@@ -275,7 +274,7 @@ function installTraffic(layer, { url, model, lights, side, outline, velocity }) 
         return lights.map(({ position: [lx, ly, lz], ...light }) => ({ ...light, position: [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz] }));
       });
     }
-    if (mesh || changed) layer.update();
+    if (mesh || changed) render.update(layer);
     if (live && valid) frame = requestAnimationFrame(tick);
   };
   let loaded, file;
@@ -330,6 +329,7 @@ function installTraffic(layer, { url, model, lights, side, outline, velocity }) 
     cancelAnimationFrame(frame); frame = undefined;
     layer._map.off('simulationtimechange layerremove', update).off('terrainchange', terrain);
     dispose(mesh); dispose(route); mesh = route = null;
+    delete layer._beforeRaycast;
     destroyGpu();
     lanes = []; trips = []; tripsKey = loaded = null;
   });

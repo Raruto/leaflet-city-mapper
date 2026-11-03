@@ -9,7 +9,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
     map.setBearing(0);
     const wall = new L.Layer({ source: { type: '3d' } }).addTo(map);
     await nativeChecks.ready(wall);
-    wall._createMesh({
+    nativeChecks.gpu.createMesh(wall, {
       position: [-10, 0, -4, 10, 0, -4, 10, 4, -4, -10, 0, -4, 10, 4, -4, -10, 4, -4],
       normal: Array(6).fill([0, 0, 1]).flat(),
       color: Array(18).fill(0.5),

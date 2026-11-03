@@ -11,10 +11,11 @@ Then('DOM tooltip content stays inside the map without interpreting text as HTML
     await nativeChecks.ready(layer);
     const rect = container.getBoundingClientRect();
     const feature = { id: 'dom', model: {}, properties: {} };
-    layer._findFeature = () => feature;
-    container.dispatchEvent(new MouseEvent('mousemove', {
+    const position = {
       clientX: rect.right - 2, clientY: rect.bottom - 2,
-    }));
+    };
+    layer.hoveredFeature = feature;
+    nativeChecks.picking.showFeature(layer, feature, position);
     const tooltip = layer._tooltip;
     const bounds = tooltip.getBoundingClientRect();
     const contained = bounds.left >= rect.left && bounds.right <= rect.right &&
@@ -22,8 +23,8 @@ Then('DOM tooltip content stays inside the map without interpreting text as HTML
     const literal = tooltip.firstChild === node && !tooltip.querySelector('img') &&
       tooltip.textContent === '<img src=x onerror=alert(1)>';
     const shown = !tooltip.hidden && container.style.cursor === 'pointer';
-    layer._findFeature = () => null;
-    container.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left, clientY: rect.top }));
+    layer.hoveredFeature = null;
+    nativeChecks.picking.showFeature(layer, null);
     const restored = tooltip.hidden && container.style.cursor === 'crosshair' && !layer.hoveredFeature;
     layer.remove();
     const cleaned = !tooltip.isConnected && container.style.cursor === 'crosshair';
@@ -50,13 +51,13 @@ Then('3D click reports the picked object without changing the map view', { timeo
         normal: [0, 1, 0, 0, 1, 0, 0, 1, 0],
         color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
       });
-      near.setParent(mesh, layer.model);
+      nativeChecks.graph.setParent(mesh, layer.model);
       layer.add(layer.model);
     }
     origin.remove();
     const container = map.getContainer();
     const position = () => {
-      near._shared._render();
+      nativeChecks.render.render(near._shared);
       const world = new DOMPoint(0, 20, 0, 1).matrixTransform(new DOMMatrix(near.root.worldMatrix));
       const point = world.matrixTransform(new DOMMatrix(near.camera.projectionViewMatrix));
       const x = point.x / point.w, y = point.y / point.w;
@@ -88,18 +89,16 @@ Then('3D click reports the picked object without changing the map view', { timeo
     let zoomStable = true;
     diagnostic.poses = [];
     const pickedMesh = near.model.children[0];
-    near._findFeature = () => ({ model: near.model, mesh: pickedMesh });
-    near.raycast = () => [{ object: pickedMesh }];
     for (const [pitch, bearing] of [[0, 0], [45, 90], [75, 270], [85, 180]]) {
       map.setPitch(pitch);
       map.setBearing(bearing);
       map.setView(near.location, 22, { animate: false });
       const zoom = map.getZoom(), center = map.getCenter();
       movements = 0;
-      near._onClick(new MouseEvent('click', position()));
+      nativeChecks.picking.onClick(near, new MouseEvent('click', position()));
       diagnostic.poses.push({ pitch, bearing, zoom, center });
       zoomStable &&= map.getPitch() === pitch && Math.abs(map.getBearing() - bearing) < 1e-8;
-      near._onClick(new MouseEvent('click', position()));
+      nativeChecks.picking.onClick(near, new MouseEvent('click', position()));
       zoomStable &&= map.getZoom() === zoom &&
         map.getCenter().equals(center) && movements === 0;
     }
@@ -134,30 +133,34 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
       color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
     });
     const feature = { id: 'test', properties: { height: 10 }, mesh,
-      vertexStart: 0, vertexEnd: 3, baseColor: layer.color(0xff0000) };
-    layer._findFeature = event => event.clientX === position.clientX ? feature : null;
-    container.dispatchEvent(new MouseEvent('mousemove', position));
+      vertexStart: 0, vertexEnd: 3 };
+    layer.hoveredFeature = feature;
+    nativeChecks.picking.setHighlight(layer, feature);
+    nativeChecks.picking.showFeature(layer, feature, position);
     const displayed = !tooltip.hidden && tooltip.textContent === 'Height: 10 m' &&
       tooltip.style.left === '32px' && tooltip.style.top === '32px' &&
       container.style.cursor === 'pointer' && layer.highlightedFeature === feature;
     let clicked;
     layer.on('featureclick', event => { clicked = event; });
-    container.dispatchEvent(new MouseEvent('click', position));
+    nativeChecks.picking.showFeature(layer, feature, position);
+    layer.fire('featureclick', { feature, originalEvent: new MouseEvent('click', position) });
     const clickNotPinned = !tooltip.hidden && clicked.feature === feature && !('selected' in clicked);
-    container.dispatchEvent(new MouseEvent('mousemove', { ...position, clientX: position.clientX + 50 }));
+    layer.hoveredFeature = null;
+    nativeChecks.picking.setHighlight(layer, null);
+    nativeChecks.picking.showFeature(layer, null);
     const hidden = tooltip.hidden && container.style.cursor === 'crosshair' && !layer.highlightedFeature;
-    container.dispatchEvent(new MouseEvent('mousemove', position));
-    container.dispatchEvent(new MouseEvent('click', position));
-    container.dispatchEvent(new MouseEvent('mouseout', { relatedTarget: document.body }));
-    container.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: document.body }));
+    layer.hoveredFeature = feature;
+    nativeChecks.picking.setHighlight(layer, feature);
+    nativeChecks.picking.showFeature(layer, feature, position);
+    nativeChecks.picking.onPointerLeave(layer);
     const leaveCleared = tooltip.hidden && container.style.cursor === 'crosshair' && !layer.highlightedFeature;
     const other = new L.Layer({ source: { type: '3d',
       center: [map.getCenter().lat, map.getCenter().lng],
       url: 'paris-buildings.pmtiles', featureStyle: () => ({ top: 10 }),
       tooltipContent: () => 'Other feature' } }).addTo(map);
     await nativeChecks.ready(other);
-    layer._showFeature(feature, position);
-    other._showFeature(feature, position);
+    nativeChecks.picking.showFeature(layer, feature, position);
+    nativeChecks.picking.showFeature(other, feature, position);
     layer.remove();
     const sharedCursor = container.style.cursor === 'pointer' && !other._tooltip.hidden;
     other.remove();
@@ -166,11 +169,11 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     layer.addTo(map);
     const restored = container.querySelector('.leaflet-3d-tooltip');
     const recreated = restored !== tooltip && restored.hidden;
-    layer._showFeature(feature, position);
+    nativeChecks.picking.showFeature(layer, feature, position);
     layer.remove();
     const restoredCursor = container.style.cursor === 'crosshair';
     for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-    layer._removeProgram(mesh.program);
+    nativeChecks.gpu.removeProgram(mesh.program);
     container.style.cursor = '';
     return { created, displayed, clickNotPinned, hidden, leaveCleared, sharedCursor, removed, recreated, restoredCursor };
   });

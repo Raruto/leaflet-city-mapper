@@ -15,8 +15,8 @@
  * data/model -> ready. Removal cancels source work and detaches this layer only;
  * the last removal destroys the context. Model CPU arrays/images survive for re-add.
  *
- * This file holds the Leaflet lifecycle and explicit delegates to scene/ operations.
- * Stateless computations live in utils/; scene/ owns loading, GPU resources and interaction.
+ * This file holds the Leaflet lifecycle; scene/ owns operations and receives the layer explicitly.
+ * Stateless computations live in utils/.
  * PMTiles v3 reading is implemented directly by this layer. Models are static triangles, without
  * animation, skinning, morph targets, normal maps or required extensions.
  *
@@ -73,71 +73,17 @@
  * @property {number} [buildings] Emitted feature count, not number of triangles.
  * @property {number} [skipped] Features intentionally skipped by featureStyle.
  * @property {string} [error] Failed load/build message; reported through error and progress.
- *
- * @since leaflet-rotate (v0.6.0)
  */
 
-import * as shapes from '../utils/geometry.js';
 import * as gpu from '../scene/gpu.js';
-import * as lighting from '../scene/lighting.js';
 import * as model from '../scene/model.js';
 import * as picking from '../scene/picking.js';
 import * as pmtiles from '../scene/pmtiles.js';
-import * as archive from '../utils/pmtiles.js';
 import * as render from '../scene/render.js';
 import * as graph from '../utils/scene.js';
 import * as sources from '../scene/sources.js';
 
 L.Layer.types['3d'] = L.Layer.extend({
-  color(value) { return shapes.parseColor(value); },
-  _setVertexColor(mesh, start, end, color) { shapes.setVertexColor(mesh, start, end, color); return this.update(); },
-  _triangulate(contour, holes) { return shapes.triangulate(contour, holes); },
-  _isClockWise(points) { return shapes.isClockWise(points); },
-  _treeGeometry(point, style, addTriangle) { return shapes.treeGeometry(point, style, addTriangle); },
-  _lightGeometry(point, style, addTriangle) { return shapes.lightGeometry(point, style, addTriangle); },
-  _lampPostGeometry(point, style, addTriangle) { return shapes.lampPostGeometry(point, style, addTriangle); },
-  _attach(map) { return gpu.attach(this, map); },
-  _destroyTexture(texture) { return gpu.destroyTexture(this, texture); },
-  _createProgram(material) { return gpu.createProgram(this, material); },
-  _removeProgram(program) { return gpu.removeProgram(program); },
-  _createMesh(data, material, usage) { return gpu.createMesh(this, data, material, usage); },
-  _disposeMesh(mesh) { return gpu.disposeMesh(this, mesh); },
-  _computeBounds(geometry) { return shapes.computeBounds(geometry); },
-  _drawGeometry(mesh, pass, cullMode, frontFace) { return gpu.drawGeometry(this, mesh, pass, cullMode, frontFace); },
-  _initSunlight() { return lighting.initSunlight(this); },
-  _resizeSunlight(size) { return lighting.resizeSunlight(this, size); },
-  _bindSunlight() { return lighting.bindSunlight(this); },
-  _updatePointLights() { return lighting.updatePointLights(this); },
-  _renderSunlight(encoder, meshes, sunlight) { return lighting.renderSunlight(this, encoder, meshes, sunlight); },
-  _loadModel() { return model.loadModel(this); },
-  raycast(event, objects, recursive) { return picking.raycast(this, event, objects, recursive); },
-  _findFeature(event) { return picking.findFeature(this, event); },
-  _setHighlight(feature) { return picking.setHighlight(this, feature); },
-  _showFeature(feature, event) { return picking.showFeature(this, feature, event); },
-  _onPointerMove(event) { return picking.onPointerMove(this, event); },
-  _onClick(event) { return picking.onClick(this, event); },
-  _onPointerLeave() { return picking.onPointerLeave(this); },
-  _read(offset, length, signal) { return pmtiles.read(this, offset, length, signal); },
-  _decompress(data, compression) { return archive.decompress(data, compression); },
-  getHeader() { return pmtiles.getHeader(this); },
-  getZxy(z, x, y, signal) { return pmtiles.getZxy(this, z, x, y, signal); },
-  update() { return render.update(this); },
-  _onMapChange() { return render.onMapChange(this); },
-  _getTileLevel() { return render.getTileLevel(this); },
-  _startZoom() { return render.startZoom(this); },
-  _endZoom() { return render.endZoom(this); },
-  _render() { return render.render(this); },
-  setParent(node, parent) { return graph.setParent(node, parent); },
-  traverse(node, callback) { return graph.traverse(node, callback); },
-  _updateWorldMatrix(node) { return graph.updateWorldMatrix(node); },
-  _updateCamera(camera) { return graph.updateCamera(camera); },
-  _onTerrainChange() { return sources.onTerrainChange(this); },
-  _updateArea() { return sources.updateArea(this); },
-  _pump() { return sources.pump(this); },
-  _loadSource(area) { return sources.loadSource(this, area); },
-  _releaseArea(area) { return sources.releaseArea(this, area); },
-  _updateStatus(enabled) { return sources.updateStatus(this, enabled); },
-
   statics: {
     /** Rendering owner per map; entries are removed on the last layer removal. */
     _renderers: new WeakMap(),
@@ -159,9 +105,9 @@ L.Layer.types['3d'] = L.Layer.extend({
   initialize(options) {
     L.Util.setOptions(this, options);
     // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
-    const model = !this._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);
-    this.modelUrl = model ? this.options.url : null;
-    this.url = this.options.url && !model && !this._geojson ? new URL(this.options.url, document.baseURI).href : null;
+    const isModel = !this._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);
+    this.modelUrl = isModel ? this.options.url : null;
+    this.url = this.options.url && !isModel && !this._geojson ? new URL(this.options.url, document.baseURI).href : null;
     this._directories = new Map();
     if (this.options.center) {
       this.location = new L.LatLng(this.options.center[0], this.options.center[1]);
@@ -182,14 +128,14 @@ L.Layer.types['3d'] = L.Layer.extend({
         };
         if (this.url || this._geojson) {
           this.group = this.root;
-          if (this.url) this.header = await this.getHeader();
+          if (this.url) this.header = await pmtiles.getHeader(this);
         }
         if (this._map) {
-          await this._attach(this._map);
+          await gpu.attach(this, this._map);
           this._added.resolve();
         }
-        if (this.modelUrl) await this._loadModel();
-        if (this._shared) this.update();
+        if (this.modelUrl) await model.loadModel(this);
+        if (this._shared) render.update(this);
         this.fire('ready');
       } catch (error) {
         this.fire('error', { error });
@@ -205,6 +151,11 @@ L.Layer.types['3d'] = L.Layer.extend({
     }
     if (this.url || this._geojson || this.options.tooltipContent || this.modelUrl) {
       this.container = map.getContainer();
+      this._pointerEvents ||= {
+        mousemove: event => picking.onPointerMove(this, event),
+        click: event => picking.onClick(this, event),
+        mouseleave: () => picking.onPointerLeave(this),
+      };
       if (this.options.tooltipContent) {
         this._tooltip = L.DomUtil.create('div', 'leaflet-3d-tooltip', this.container);
         this._tooltip.hidden = true;
@@ -212,26 +163,22 @@ L.Layer.types['3d'] = L.Layer.extend({
         this._tooltip.setAttribute('aria-live', 'polite');
         this._tooltip.style.cssText = 'position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none';
       }
-      L.DomEvent.on(this.container, {
-        mousemove: this._onPointerMove,
-        click: this._onClick,
-        mouseleave: this._onPointerLeave,
-      }, this);
+      L.DomEvent.on(this.container, this._pointerEvents);
     }
     if (this.root) {
-      this._attach(map).then(() => this._added.resolve(), error => this.fire('error', { error }));
+      gpu.attach(this, map).then(() => this._added.resolve(), error => this.fire('error', { error }));
     }
   },
 
   /** Reconcile source coverage when the visible ground footprint changes. */
   getEvents() {
     return this.url ? {
-      moveend:       this._updateArea,
-      zoomend:       this._updateArea,
-      rotate:        this._updateArea,
-      pitch:         this._updateArea,
-      resize:        this._updateArea,
-      terrainchange: this._onTerrainChange,
+      moveend:       () => sources.updateArea(this),
+      zoomend:       () => sources.updateArea(this),
+      rotate:        () => sources.updateArea(this),
+      pitch:         () => sources.updateArea(this),
+      resize:        () => sources.updateArea(this),
+      terrainchange: () => sources.onTerrainChange(this),
     } : {};
   },
 
@@ -239,28 +186,24 @@ L.Layer.types['3d'] = L.Layer.extend({
   onRemove(map) {
     this._added = Promise.withResolvers();
     if (this.container) {
-      this._onPointerLeave();
-      L.DomEvent.off(this.container, {
-        mousemove:  this._onPointerMove,
-        click:      this._onClick,
-        mouseleave: this._onPointerLeave,
-      }, this);
+      picking.onPointerLeave(this);
+      L.DomEvent.off(this.container, this._pointerEvents);
       this.container = null;
     }
-    for (const area of this._areas.values()) this._releaseArea(area);
+    for (const area of this._areas.values()) sources.releaseArea(this, area);
     this._areas.clear();
     this._tooltip?.remove();
     this._tooltip = null;
-    if (this.url || this._geojson) this._updateStatus(false);
+    if (this.url || this._geojson) sources.updateStatus(this, false);
     const shared = this._shared;
     if (!shared) return;
-    this.setParent(this.root, null);
+    graph.setParent(this.root, null);
     shared._layers.delete(this);
     if (shared === this) {
-      map.off('move zoom rotate pitch resize viewreset layeradd layerremove', this._onMapChange, this);
-      map.off('zoomstart', this._startZoom, this);
-      map.off('zoomanim', this.update, this);
-      map.off('zoomend', this._endZoom, this);
+      map.off('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, this);
+      map.off('zoomstart', render.startZoom, this);
+      map.off('zoomanim', render.update, this);
+      map.off('zoomend', render.endZoom, this);
       cancelAnimationFrame(this._frame);
       this._frame = null;
       this._queued = false;
@@ -273,15 +216,15 @@ L.Layer.types['3d'] = L.Layer.extend({
         }
         for (const layer of next._layers) layer._shared = next;
         L.Layer.types['3d']._renderers.set(map, next);
-        map.on('move zoom rotate pitch resize viewreset layeradd layerremove', next._onMapChange, next);
-        map.on('zoomstart', next._startZoom, next);
-        map.on('zoomanim', next.update, next);
-        map.on('zoomend', next._endZoom, next);
-        next.update();
+        map.on('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, next);
+        map.on('zoomstart', render.startZoom, next);
+        map.on('zoomanim', render.update, next);
+        map.on('zoomend', render.endZoom, next);
+        render.update(next);
       } else {
-        if (this._roofRaster) this._destroyTexture(this._roofRaster.texture.texture);
+        if (this._roofRaster) gpu.destroyTexture(this, this._roofRaster.texture.texture);
         this._roofRaster = null;
-        for (const source of this._roofTiles?.values() || []) this._destroyTexture(source.texture);
+        for (const source of this._roofTiles?.values() || []) gpu.destroyTexture(this, source.texture);
         this._roofTiles = null;
         for (const animation of this._zoomTransitions?.keys() || []) animation.play();
         this._zoomTransitions = null;
@@ -299,7 +242,7 @@ L.Layer.types['3d'] = L.Layer.extend({
         L.Layer.types['3d']._renderers.delete(map);
         for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete this[key];
       }
-    } else shared.update();
+    } else render.update(shared);
     this._shared = null;
     this.renderer = this.scene = this.camera = null;
   },
@@ -311,8 +254,8 @@ L.Layer.types['3d'] = L.Layer.extend({
    * @returns {L.Layer} This layer.
    */
   add(object) {
-    this.setParent(object, this.root);
-    return this.update();
+    graph.setParent(object, this.root);
+    return render.update(this);
   },
 
   _setTerrainHeight() {
@@ -329,8 +272,8 @@ L.Layer.types['3d'] = L.Layer.extend({
    */
   remove(object) {
     if (object === undefined) return L.Layer.prototype.remove.call(this);
-    this.setParent(object, null);
-    return this.update();
+    graph.setParent(object, null);
+    return render.update(this);
   },
 });
 

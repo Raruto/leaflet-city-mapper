@@ -1,17 +1,28 @@
 import { parseColor, triangulate, isClockWise, treeGeometry, lightGeometry, lampPostGeometry } from '../utils/geometry.js';
 import { emptyNode } from '../utils/scene.js';
+import { createProgram, removeProgram } from './gpu.js';
+import { getZxy } from './pmtiles.js';
+import { setHighlight, showFeature } from './picking.js';
 
 /** GeoJSON source areas: loading, building and releasing. */
 export function onTerrainChange(backend) {
   if (!backend._map) return;
-  for (const area of backend._areas.values()) backend._releaseArea(area);
+  for (const area of backend._areas.values()) releaseArea(backend, area);
   backend._areas.clear();
-  backend._updateArea();
+  updateArea(backend);
 }
 
 /** Cover the visible ground bounds and one bordering block, clipped to the archive. */
 export function updateArea(backend) {
-  if (!backend._map || !backend.header) return;
+  if (!backend._map || !backend._shared) return;
+  if (backend._geojson) {
+    if (!backend._areas.has('geojson')) {
+      backend._areas.set('geojson', { request: new AbortController() });
+    }
+    pump(backend);
+    return;
+  }
+  if (!backend.header) return;
   const z = backend.header.minZoom;
   const center = backend._map.project(backend._map.getCenter(), z).divideBy(256).floor();
   const bounds = backend._map.getBounds();
@@ -27,7 +38,7 @@ export function updateArea(backend) {
   }
   for (const [key, area] of backend._areas) {
     if (!wanted.has(key)) {
-      backend._releaseArea(area);
+      releaseArea(backend, area);
       backend._areas.delete(key);
     }
   }
@@ -36,12 +47,26 @@ export function updateArea(backend) {
     Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y))) {
     if (!backend._areas.has(key)) backend._areas.set(key, { coords, request: new AbortController() });
   }
-  backend._pump();
+  pump(backend);
 }
 
 export async function loadSource(backend, area) {
+  if (backend._geojson) {
+    const { data, url } = backend.options;
+    if (typeof backend.options.featureStyle !== 'function') {
+      throw new Error('featureStyle must be a function');
+    }
+    if ((data !== undefined) === (url !== undefined)) {
+      throw new Error('GeoJSON source requires either data or url');
+    }
+    if (data !== undefined) return data;
+    if (typeof url !== 'string' || !url.trim()) throw new Error('Invalid GeoJSON URL');
+    const response = await fetch(new URL(url, document.baseURI), { signal: area.request.signal });
+    if (!response.ok) throw new Error(`Unable to load GeoJSON: HTTP ${response.status}`);
+    return response.json();
+  }
   const { z, x, y } = area.coords;
-  const result = await backend.getZxy(z, x, y, area.request.signal);
+  const result = await getZxy(backend, z, x, y, area.request.signal);
   return result ? JSON.parse(new TextDecoder().decode(result.data))
     : { type: 'FeatureCollection', features: [] };
 }
@@ -58,7 +83,7 @@ export function pump(backend) {
     (async () => {
       try {
         const coords = area.coords;
-        const data = await backend._loadSource(area);
+        const data = await loadSource(backend, area);
         if (area.request.signal.aborted) return;
         if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
           throw new Error('Invalid GeoJSON response');
@@ -212,7 +237,7 @@ export function pump(backend) {
             ...emptyNode(),
             device,
             geometry:    meshGeometry,
-            program:     backend._createProgram({ vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
+            program:     createProgram(backend, { vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
               ...(backend.options.nightLight ? { nightLight: true, alphaMode: 'BLEND', doubleSided: true } : {}) }),
             id:          L.Layer.types['3d']._nextId++,
             renderOrder: 0,
@@ -230,10 +255,10 @@ export function pump(backend) {
       }
     })().finally(() => {
       backend._inflight--;
-      backend._pump();
+      pump(backend);
     });
   }
-  backend._updateStatus();
+  updateStatus(backend);
 }
 
 /** Cancel pending work and dispose this block's GPU data, including any hover highlight. */
@@ -241,14 +266,14 @@ export function releaseArea(backend, area) {
   area.request.abort();
   if (area.mesh) {
     if (backend.highlightedFeature?.mesh === area.mesh) {
-      backend._setHighlight(null);
+      setHighlight(backend, null);
       backend.hoveredFeature = null;
-      backend._showFeature(null);
+      showFeature(backend, null);
     }
     backend.remove(area.mesh);
     const geometry = area.mesh.geometry;
     for (const attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
-    backend._removeProgram(area.mesh.program);
+    removeProgram(area.mesh.program);
   }
 }
 

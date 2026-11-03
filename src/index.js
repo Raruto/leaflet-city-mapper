@@ -18,7 +18,7 @@
  *   - 'traffic': vehicles moving along GeoJSON lanes (measured flow or timetable);
  *   - 'walk': third-person pedestrian moved with the keyboard, the camera following behind.
  * - scene/: named operations for GPU resources, model/archive loading, lighting, sources, picking
- *   and rendering. They receive the layer explicitly; types/3d.js declares its delegates, without mixins.
+ *   and rendering. They receive the layer explicitly; types/3d.js owns only the Leaflet lifecycle.
  * - utils/: computations and scene-data helpers, independent of Leaflet layers and GPU devices.
  *   Geometry, decoders, lighting grids, terrain sampling, traffic and collisions can be tested in Node;
  *   scene transforms/picking use browser DOMMatrix/DOMPoint, and CSS colors use a canvas.

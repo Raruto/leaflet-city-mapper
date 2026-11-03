@@ -19,7 +19,7 @@ Then('cancelled building downloads recover without errors or stale meshes', asyn
     let hold = true;
     const requests = [];
     layer.on('error', () => errors++);
-    layer.getZxy = async (z, x, y, signal) => {
+    layer.options.archive.getZxy = async (z, x, y, signal) => {
       requests.push(`${x}/${y}`);
       active++;
       maximum = Math.max(maximum, active);
@@ -73,7 +73,7 @@ Then('building blocks cover pitched views and retain overlapping areas', async f
     const idle = async () => { while (layer._inflight) await new Promise(requestAnimationFrame); };
     await idle();
     let requests = 0;
-    layer.getZxy = async () => { requests++; return undefined; };
+    layer.options.archive.getZxy = async () => { requests++; return undefined; };
     const checks = [];
     const verify = async change => {
       const previous = new Map(layer._areas), before = requests;
@@ -134,13 +134,14 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
     ] };
     const data = invalid === 'collection' ? { type: 'Feature', properties: {} }
       : { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry }] };
-    layer.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(data)) });
+    layer.options.archive ||= {};
+    layer.options.archive.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(data)) });
     const point = test3d.map.project(anchor, 16).divideBy(256).floor();
     const area = { coords: { z: 16, x: point.x, y: point.y }, request: new AbortController() };
     const errors = [];
     layer.on('error', event => errors.push(event.error.message));
     layer._areas.set('invalid-fixture', area);
-    layer._pump();
+    nativeChecks.sources.pump(layer);
     while (layer._inflight) await new Promise(requestAnimationFrame);
     const result = { error: area.error, events: errors, attached: layer.root.children.length, done: Boolean(area.done) };
     layer.remove();
@@ -161,7 +162,7 @@ Then('building style for {int} storeys, {int} floors and ground {int} is {string
       const style = layer.options.featureStyle(feature);
       return style === null ? null : {
         heights: `${style.top}/${style.bottom}`,
-        color: layer.color(style.color),
+        color: nativeChecks.geometry.parseColor(style.color),
         text: layer.options.tooltipContent(feature).textContent,
       };
     }, { storeys, floors, ground });
@@ -242,7 +243,7 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
     });
     const backend = tower;
     const mesh = buildings.group.children[0];
-    backend._updateWorldMatrix(mesh, true);
+    nativeChecks.graph.updateWorldMatrix(mesh, true);
     const origin = map.options.crs.project(tower.location);
     const metres = Math.cos(tower.location.lat * Math.PI / 180);
     const hits = (lat, lon) => {
@@ -256,14 +257,14 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
       [(elevated.x - origin.x) * metres, 0, -(elevated.y - origin.y) * metres],
       [0, 1, 0], backend).map(point => point[1]);
     const geometry = mesh.geometry;
-    backend._computeBounds(geometry);
+    const heights = geometry.attributes.position.data.filter((_, i) => i % 3 === 1);
     return {
       holes: hits(48.8587, 2.2957),
       underside,
       roof: hits(48.85855, 2.29555),
       multipart: [hits(48.8587, 2.2962), hits(48.8587, 2.2967)],
-      min: geometry.bounds.min[1],
-      max: geometry.bounds.max[1],
+      min: Math.min(...heights),
+      max: Math.max(...heights),
       sharedScene: buildings.root.parent === buildings.scene &&
         Object.values(map._layers).filter(layer => layer instanceof L.Layer.types['3d'])
           .every(layer => layer.renderer === buildings.renderer),
@@ -298,16 +299,16 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
       content = await nativeChecks.loadBlock(buildings, area, [{ ...feature, id: 'custom-volume',
         properties: { height: 22 } }]);
       const geometry = content.mesh.geometry;
-      L.Layer.types['3d'].prototype._computeBounds(geometry);
+      const heights = geometry.attributes.position.data.filter((_, i) => i % 3 === 1);
       buildings.options.featureStyle = () => ({ top: 3, bottom: 4 });
       const invalid = await nativeChecks.loadBlock(buildings, { coords, request: new AbortController() }, [feature]);
       const error = invalid.error;
-      return { top: geometry.bounds.max[1], bottom: geometry.bounds.min[1],
+      return { top: Math.max(...heights), bottom: Math.min(...heights),
         color: Array.from(geometry.attributes.color.data.slice(0, 3)),
         id: content.mesh.extras.featureFaces[0].id, error };
     } finally {
       buildings.options.featureStyle = original;
-      buildings._releaseArea(content);
+      nativeChecks.sources.releaseArea(buildings, content);
     }
   }, this.sampleBuildings[0]);
   assert.deepEqual(genericStyle, { top: 22, bottom: 7, color: [1, 0, 0], id: 'custom-volume',

@@ -11,7 +11,7 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     const select = minute => {
       input.value = String(minute);
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      owner._render();
+      nativeChecks.render.render(owner);
     };
     owner.renderer.context.configure({ device, format: owner.renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
@@ -68,7 +68,7 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     map.setPitch(0);
     const hiddenAtZeroPitch = sun.hidden && moon.hidden;
     map.removeLayer(sunlightOverlay);
-    owner._render();
+    nativeChecks.render.render(owner);
     const restored = Array.from(owner.renderer.uniformData.slice(56, 59));
     const skyRestored = !map.getContainer().style.getPropertyValue('--leaflet-sky-background');
     return { day, night, daySky, nightSky, nightTint, sunVisible, sunMoved, sunBehind,
@@ -144,7 +144,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
   });
   const result = await this.page.evaluate(async () => {
     const owner = L.Layer.types['3d']._renderers.get(map), renderer = owner.renderer;
-    owner._render();
+    nativeChecks.render.render(owner);
     await renderer.device.queue.onSubmittedWorkDone();
     const { device, sunlight } = renderer;
     const depth = device.createBuffer({ size: sunlight.size ** 2 * 4,
@@ -159,13 +159,10 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     depth.unmap(); depth.destroy();
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
-    const original = owner._renderSunlight;
     const capture = async disabled => {
-      owner._renderSunlight = function () {
-        original.apply(this, arguments);
-        if (disabled) device.queue.writeBuffer(sunlight.buffer, 64, new Float32Array([0]));
-      };
-      owner._render();
+      const altitude = map._sunlight.altitude;
+      if (disabled) map._sunlight.altitude = 2;
+      nativeChecks.render.render(owner);
       const width = renderer.canvas.width, height = renderer.canvas.height;
       const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
       const buffer = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -176,16 +173,15 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
       await buffer.mapAsync(GPUMapMode.READ);
       const pixels = new Uint8Array(buffer.getMappedRange()).slice();
       buffer.unmap(); buffer.destroy();
+      map._sunlight.altitude = altitude;
       return pixels;
     };
     let darker = 0;
-    try {
-      const shadowed = await capture(false), unshadowed = await capture(true);
-      for (let i = 0; i < shadowed.length; i += 4) {
-        if (shadowed[i] + shadowed[i + 1] + shadowed[i + 2] + 10 <
-          unshadowed[i] + unshadowed[i + 1] + unshadowed[i + 2]) darker++;
-      }
-    } finally { owner._renderSunlight = original; owner._render(); }
+    const shadowed = await capture(false), unshadowed = await capture(true);
+    for (let i = 0; i < shadowed.length; i += 4) {
+      if (shadowed[i] + shadowed[i + 1] + shadowed[i + 2] + 10 <
+        unshadowed[i] + unshadowed[i + 1] + unshadowed[i + 2]) darker++;
+    }
     return {
       altitude: map._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
       covered, darker,
@@ -202,7 +198,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
   await this.page.waitForFunction(() => map._sunlight.altitude < 0);
   assert.equal(await this.page.evaluate(() => {
     const owner = L.Layer.types['3d']._renderers.get(map);
-    owner._render();
+    nativeChecks.render.render(owner);
     return owner.renderer.uniformData[51];
   }), 0);
   assert.deepEqual(gpuErrors, []);

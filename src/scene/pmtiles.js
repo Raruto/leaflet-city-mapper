@@ -39,14 +39,18 @@ export async function read(backend, offset, length, signal) {
 
 /** Cache header initialization; failures remain visible to all callers. */
 export function getHeader(backend) {
-  return backend._header ||= backend._read(0, 127).then(decodeHeader);
+  if (backend.options.archive) return backend.options.archive.getHeader();
+  return backend._header ||= read(backend, 0, 127).then(decodeHeader);
 }
 
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 export async function getZxy(backend, z, x, y, signal) {
+  if (backend.options.archive?.getZxy) {
+    return backend.options.archive.getZxy(z, x, y, signal);
+  }
   const id = tileId(z, x, y);
   signal?.throwIfAborted();
-  const header = await backend.getHeader();
+  const header = await getHeader(backend);
   signal?.throwIfAborted();
   if (z < header.minZoom || z > header.maxZoom) {
     return;
@@ -63,7 +67,7 @@ export async function getZxy(backend, z, x, y, signal) {
       if (backend._directories.size >= 32) {
         backend._directories.delete(backend._directories.keys().next().value);
       }
-      const pending = backend._read(offset, length)
+      const pending = read(backend, offset, length)
         .then(data => decompress(data, header.internalCompression))
         .then(decodeDirectory)
         .catch(error => {
@@ -97,7 +101,7 @@ export async function getZxy(backend, z, x, y, signal) {
       if (entry.offset + entry.length > header.tileDataLength) {
         throw new Error('PMTiles tile outside data section');
       }
-      const data = await decompress(await backend._read(header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
+      const data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
       signal?.throwIfAborted();
       return { data };
     }

@@ -1,6 +1,7 @@
 import { lightGrid, worldLights } from '../utils/lighting.js';
 import { computeBounds } from '../utils/geometry.js';
 import { traverse, updateCamera } from '../utils/scene.js';
+import { destroyTexture } from './gpu.js';
 
 /** Sunlight shadow maps and night point lights. */
 export function initSunlight(backend) {
@@ -18,19 +19,19 @@ export function initSunlight(backend) {
   const values = new Float32Array(20);
   values.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   device.queue.writeBuffer(buffer, 0, values);
-  backend._resizeSunlight(1);
+  resizeSunlight(backend, 1);
 }
 
 export function resizeSunlight(backend, size) {
   const device = backend.renderer.device, sun = backend.renderer.sunlight;
   if (sun.size === size) return;
-  if (sun.texture) backend._destroyTexture(sun.texture);
+  if (sun.texture) destroyTexture(backend, sun.texture);
   sun.size = size;
   sun.texture = device.createTexture({
     size: [size, size], format: 'depth32float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
   });
-  backend._bindSunlight();
+  bindSunlight(backend);
 }
 
 export function bindSunlight(backend) {
@@ -66,9 +67,9 @@ export function updatePointLights(backend) {
   });
   const { data, count } = lightGrid(packed, device.limits.maxStorageBufferBindingSize);
   if (sun.lights.size < data.byteLength) {
-    backend._destroyTexture(sun.lights);
+    destroyTexture(backend, sun.lights);
     sun.lights = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    backend._bindSunlight();
+    bindSunlight(backend);
   }
   device.queue.writeBuffer(sun.lights, 0, data);
   sun.lightCount = count;
@@ -88,7 +89,7 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   }
   const values = new Float32Array(20);
   sun.enabled = true;
-  backend._resizeSunlight(Math.min(2048, device.limits.maxTextureDimension2D));
+  resizeSunlight(backend, Math.min(2048, device.limits.maxTextureDimension2D));
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   for (const mesh of meshes) {
     if (!mesh.geometry.bounds) computeBounds(mesh.geometry);

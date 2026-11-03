@@ -76,12 +76,12 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
         Math.max(...zs) - Math.min(...zs), Math.max(...trunkXs) - Math.min(...trunkXs)];
       const normalLengths = [];
       for (let i = 0; i < normals.length; i += 3) normalLengths.push(Math.hypot(...normals.slice(i, i + 3)));
-      layer._shared._updateWorldMatrix(layer.root, true);
+      nativeChecks.graph.updateWorldMatrix(layer.root, true);
       const intersections = nativeChecks.intersections(mesh, [0, 100, 0], [0, -1, 0], layer);
       const face = mesh.extras.featureFaces[0];
       const before = [...colors];
-      layer._setHighlight({ ...face, mesh });
-      layer._setHighlight(null);
+      nativeChecks.picking.setHighlight(layer, { ...face, mesh });
+      nativeChecks.picking.setHighlight(layer, null);
       style.crownShape = 'cone';
       const cone = await load([feature]);
       const outside = await load([feature], { ...area(), coords: { z: zoom, x: tile.x + 1, y: tile.y } });
@@ -98,7 +98,7 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
       };
     } finally {
       map._terrain3D = previousTerrain;
-      for (const block of areas) layer._releaseArea(block);
+      for (const block of areas) nativeChecks.sources.releaseArea(layer, block);
       layer.remove();
     }
   });

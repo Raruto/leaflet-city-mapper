@@ -10,11 +10,11 @@ When('I pan the shared WebGPU renderer', async function () {
       const modelLayer = layers._layers.find(({ layer }) => layer.modelUrl)?.layer;
       const owner = modelLayer?._shared;
       if (!owner?.renderer?.device) throw new Error('The WebGPU model renderer is not ready');
-      owner._render();
+      nativeChecks.render.render(owner);
       await owner.renderer.device.queue.onSubmittedWorkDone();
       let probe;
       let sortProbe;
-      modelLayer.traverse(modelLayer.model, mesh => {
+      nativeChecks.graph.traverse(modelLayer.model, mesh => {
         if (!probe && mesh.geometry && mesh.program.bindings.length && mesh._visibleInFrame) probe = mesh;
         if (!sortProbe && mesh.geometry && mesh.program.transparent && mesh._visibleInFrame) sortProbe = mesh;
       });
@@ -53,7 +53,7 @@ When('I pan the shared WebGPU renderer', async function () {
       await renderer.device.queue.onSubmittedWorkDone();
       const secondErrors = measure();
       let meshes = 0, visibleMeshes = 0;
-      owner.traverse(owner.scene, mesh => {
+      nativeChecks.graph.traverse(owner.scene, mesh => {
         if (!mesh.geometry) return;
         meshes++;
         if (mesh._visibleInFrame) visibleMeshes++;
@@ -62,13 +62,13 @@ When('I pan the shared WebGPU renderer', async function () {
         beforeWorldMatrix.every((value, i) => value === worldMatrix[i]);
       const originalX = probe.position[0];
       probe.position[0] += 1;
-      owner._updateWorldMatrix(owner.scene);
+      nativeChecks.graph.updateWorldMatrix(owner.scene);
       const transformInvalidated = beforeWorldMatrix.some((value, i) => value !== worldMatrix[i]);
       probe.position[0] = originalX + 1000000;
-      owner._render();
+      nativeChecks.render.render(owner);
       const probeCulled = !probe._visibleInFrame;
       probe.position[0] = originalX;
-      owner._updateWorldMatrix(owner.scene);
+      nativeChecks.graph.updateWorldMatrix(owner.scene);
       return {
         firstErrors, secondErrors, meshes, visibleMeshes, probeCulled, sortDepthError,
         canvasReused: canvas === owner.renderer.canvas,
@@ -126,14 +126,9 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
       const onGpuError = event => gpuErrors.push(event.error.message);
       device.addEventListener('uncapturederror', onGpuError);
       let renders = 0, uniformWrites = 0, otherWrites = 0, buffers = new Set();
-      const render = owner._render;
-      owner._render = function () {
-        renders++;
-        return render.apply(this, arguments);
-      };
       const writeBuffer = device.queue.writeBuffer;
       device.queue.writeBuffer = function (buffer) {
-        if (buffer === owner.renderer.uniformBuffer) uniformWrites++;
+        if (buffer === owner.renderer.uniformBuffer) { uniformWrites++; renders++; }
         else if (buffers.has(buffer)) otherWrites++;
         return writeBuffer.apply(this, arguments);
       };
@@ -152,8 +147,8 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         // Content updates from every shared layer coalesce into the owner's next animation frame.
         await frame();
         renders = 0;
-        for (let i = 0; i < 5; i++) owner.update();
-        for (const layer of owner._layers) layer.update();
+        for (let i = 0; i < 5; i++) nativeChecks.render.update(owner);
+        for (const layer of owner._layers) nativeChecks.render.update(layer);
         const deferredRenders = renders;
         await frame();
         const frameRenders = renders;
@@ -173,7 +168,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         const panTotals = { renders, uniformWrites };
 
         let drawn = 0, sharedBindings = 0, ownBuffers = 0;
-        owner.traverse(owner.scene, mesh => {
+        nativeChecks.graph.traverse(owner.scene, mesh => {
           if (!mesh.geometry) return;
           if (mesh.uniformBuffer) ownBuffers++;
           if (!mesh._visibleInFrame) return;
@@ -190,10 +185,10 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         await frame();
         otherWrites = 0;
         buffers = new Set(Object.values(target.geometry.attributes).map(attribute => attribute.buffer));
-        buildings._setHighlight({ mesh: target, ...feature });
+        nativeChecks.picking.setHighlight(buildings, { mesh: target, ...feature });
         await frame();
         const highlight = { range: target.highlight, expected: [feature.vertexStart, feature.vertexEnd] };
-        buildings._setHighlight(null);
+        nativeChecks.picking.setHighlight(buildings, null);
         await frame();
         highlight.cleared = target.highlight;
         highlight.writes = otherWrites;
@@ -220,7 +215,6 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
           animating, zoomTickRenders, zoomFrameRenders, gpuErrors,
         };
       } finally {
-        delete owner._render;
         delete device.queue.writeBuffer;
         device.removeEventListener('uncapturederror', onGpuError);
       }
@@ -279,9 +273,9 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
         return createTexture.call(this, { ...descriptor, usage: descriptor.usage | GPUTextureUsage.COPY_SRC });
       };
       try {
-        owner._destroyTexture(owner._roofRaster.texture.texture);
+        nativeChecks.gpu.destroyTexture(owner, owner._roofRaster.texture.texture);
         owner._roofRaster = null;
-        owner._render();
+        nativeChecks.render.render(owner);
       } finally {
         delete device.createTexture;
         delete device.queue.copyExternalImageToTexture;
@@ -405,7 +399,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
         return copyExternal.apply(this, arguments);
       };
       try {
-        owner._render();
+        nativeChecks.render.render(owner);
       } finally {
         delete device.queue.copyExternalImageToTexture;
       }

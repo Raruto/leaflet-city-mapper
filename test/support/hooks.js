@@ -77,17 +77,26 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `for (const prototype of [L.Layer.types?.pmtiles?.prototype, L.Layer.types?.['3d']?.prototype].filter(Boolean)) {
-      prototype.getHeader = async function () {
-        return ['buildings', 'trees', 'streetlights'].some(name => this.url.endsWith('/paris-' + name + '.pmtiles'))
-          ? { minZoom: 16, maxZoom: 16, minLon: 2.2424, minLat: 48.8162, maxLon: 2.416, maxLat: 48.9022 }
-          : { minZoom: 11, maxZoom: 19 };
+  const pmtilesMock = `const prototype = L.Layer.types?.['3d']?.prototype;
+    if (prototype && !prototype._testArchive) {
+      const initialize = prototype.initialize;
+      prototype.initialize = function (options) {
+        if (options.url && !/\\.(glb|gltf)(?:[?#]|$)/i.test(options.url) && !options.archive) {
+          const url = new URL(options.url, document.baseURI).href;
+          options = { ...options, archive: {
+            getHeader: async () => ['buildings', 'trees', 'streetlights'].some(name => url.endsWith('/paris-' + name + '.pmtiles'))
+              ? { minZoom: 16, maxZoom: 16, minLon: 2.2424, minLat: 48.8162, maxLon: 2.416, maxLat: 48.9022 }
+              : { minZoom: 11, maxZoom: 19 },
+            getZxy: async (z, x, y) => {
+              const tile = await window.pmtilesTile?.(url, z, x, y);
+              if (tile?.error) throw new Error(tile.error);
+              return tile ? { data: new TextEncoder().encode(tile).buffer } : undefined;
+            },
+          } };
+        }
+        return initialize.call(this, options);
       };
-      prototype.getZxy = async function (z, x, y) {
-        const tile = await window.pmtilesTile?.(this.url, z, x, y);
-        if (tile?.error) throw new Error(tile.error);
-        return tile ? { data: new TextEncoder().encode(tile).buffer } : undefined;
-      };
+      prototype._testArchive = true;
     }`;
   const mockPMTiles = async route => {
     const response = await route.fetch();

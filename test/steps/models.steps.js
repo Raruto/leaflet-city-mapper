@@ -48,7 +48,7 @@ Then('configured models preserve external assets and can be detached and reattac
     await loaded;
     const model = layer.model;
     let mesh;
-    layer.traverse(model, node => { if (node.geometry) mesh = node; });
+    nativeChecks.graph.traverse(model, node => { if (node.geometry) mesh = node; });
     const style = mesh.program._layerMaterial, device = layer.renderer.device;
     const attached = model.parent === layer.root && !('ready' in layer);
     const maps = style.baseTexture.format === 'rgba8unorm-srgb' &&
@@ -59,7 +59,7 @@ Then('configured models preserve external assets and can be detached and reattac
       style.roughness === 0.4 && style.occlusionStrength === 0.6;
     const normals = [...mesh.geometry.attributes.normal.data].join() === '0,0,1,0,0,1,0,0,1';
     layer.add(model);
-    layer._shared._render();
+    nativeChecks.render.render(layer._shared);
     const uploaded = style.baseTexture.uploaded === style.baseTexture.image &&
       style.metalTexture.uploaded === style.metalTexture.image;
     const program = mesh.program;
@@ -79,12 +79,9 @@ Then('configured models preserve external assets and can be detached and reattac
   }));
   const missingUV = await this.page.evaluate(async () => {
     const layer = new L.Layer({ source: { type: '3d', url: 'manual/no-uv.gltf' } }).addTo(test3d.map);
-    let programs = 0;
-    const createProgram = layer._createProgram;
-    layer._createProgram = function (...args) { programs++; return createProgram.apply(this, args); };
     const error = await nativeChecks.ready(layer).then(() => null, error => error);
     const result = error?.message === 'Textured model mesh requires UV coordinates' &&
-      programs === 0 && !layer.model && layer.root.children.length === 0;
+      !layer.model && layer.root.children.length === 0;
     layer.remove();
     return result;
   });
@@ -156,15 +153,15 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     const decoded = [...first.geometry.attributes.position.data].join() === '0,0,0,2,0,0,0,1,0' &&
       [...first.geometry.attributes.normal.data].join() === '0,0,1,0,0,1,0,0,1' &&
       first !== second && first.geometry !== second.geometry;
-    layer._updateWorldMatrix(first.parent);
-    layer._updateWorldMatrix(second.parent);
+    nativeChecks.graph.updateWorldMatrix(first.parent);
+    nativeChecks.graph.updateWorldMatrix(second.parent);
     const transformed = (() => {
       const point = new DOMPoint(2, 0, 0, 1).matrixTransform(new DOMMatrix(first.worldMatrix));
       return [point.x / point.w, point.y / point.w, point.z / point.w].join() === '3,2,3';
     })();
     for (const mesh of [first, second]) {
       for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
-      layer._removeProgram(mesh.program);
+      nativeChecks.gpu.removeProgram(mesh.program);
     }
     configured.remove();
     layer.remove();
@@ -192,9 +189,9 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const rotation = layer.model.rotation[1];
     const scale = [...layer.model.scale];
     const attribution = map.attributionControl.getContainer().textContent.includes('Test model attribution');
-    layer._shared._render();
+    nativeChecks.render.render(layer._shared);
     let texturedMeshes = 0, transparentMeshes = 0;
-    layer.traverse(layer.model, mesh => {
+    nativeChecks.graph.traverse(layer.model, mesh => {
       if (!mesh.program) return;
       const style = mesh.program._layerMaterial;
       if (style.baseTexture) {
@@ -205,10 +202,9 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       }
       if (style.alphaMode === 'BLEND' && mesh.program.transparent && !mesh.program.depthWrite) transparentMeshes++;
     });
-    const drawGeometry = layer._drawGeometry;
     const texturedPixels = await nativeChecks.pixels(layer);
     const textures = new Map();
-    layer.traverse(layer.model, mesh => {
+    nativeChecks.graph.traverse(layer.model, mesh => {
       const texture = mesh.program?.uniforms.baseTexture?.value;
       if (!texture || textures.has(texture)) return;
       textures.set(texture, texture.image);
@@ -222,7 +218,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     });
     const plainPixels = await nativeChecks.pixels(layer);
     for (const [texture, image] of textures) { texture.image = image; texture.needsUpdate = true; }
-    layer._shared._render();
+    nativeChecks.render.render(layer._shared);
     let changedPixels = 0;
     for (let i = 0; i < texturedPixels.length; i += 4) {
       if (Math.abs(texturedPixels[i] - plainPixels[i]) +
@@ -231,27 +227,22 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     }
     const realisticMaterials = texturedMeshes > 0 && transparentMeshes > 0 && changedPixels > 100;
     const programs = new Map();
-    const passes = new Map();
     let linearTextures = true;
-    layer.traverse(layer.model, mesh => {
+    nativeChecks.graph.traverse(layer.model, mesh => {
       if (!mesh.program) return;
       programs.set(mesh, mesh.program);
       const style = { ...mesh.program._layerMaterial, alphaMode: 'BLEND', doubleSided: true };
-      mesh.program = layer._createProgram(style);
+      mesh.program = nativeChecks.gpu.createProgram(layer, style);
       if (style.baseTexture && style.baseTexture.format !== 'rgba8unorm-srgb') {
         linearTextures = false;
       }
     });
+    nativeChecks.render.render(layer._shared);
     const list = [];
-    layer._drawGeometry = function (mesh, pass, cullMode, frontFace) {
-      if (mesh.program.transparent) {
-        if (!passes.has(mesh)) passes.set(mesh, []);
-        passes.get(mesh).push(cullMode);
-        if (!list.includes(mesh)) list.push(mesh);
-      }
-      return drawGeometry.call(this, mesh, pass, cullMode, frontFace);
-    };
-    layer._shared._render();
+    nativeChecks.graph.traverse(layer.model, mesh => {
+      if (mesh.program?.transparent) list.push(mesh);
+    });
+    nativeChecks.render.sortMeshes(list);
     const depths = list.map(mesh => {
       const world = new DOMPoint(...mesh.geometry.bounds.center, 1).matrixTransform(new DOMMatrix(mesh.worldMatrix));
       const point = world.matrixTransform(new DOMMatrix(layer.camera.projectionViewMatrix));
@@ -259,21 +250,18 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     });
     const transparentOrder = depths.length > 1 && depths.every((depth, i) =>
       !i || depths[i - 1] >= depth) && Math.max(...depths) > Math.min(...depths);
-    const doubleSidedPasses = passes.size > 0 && [...passes].every(([mesh, faces]) => {
-      return faces.length === 2 && faces[0] === 'front' && faces[1] === 'back' &&
-        !mesh.program.depthWrite && mesh.program.cullMode === 'none';
-    });
-    layer._drawGeometry = drawGeometry;
+    const doubleSidedPasses = list.length > 0 && list.every(mesh =>
+      mesh.program._layerMaterial.doubleSided && !mesh.program.depthWrite && mesh.program.cullMode === 'none');
     for (const [mesh, program] of programs) {
-      layer._removeProgram(mesh.program);
+      nativeChecks.gpu.removeProgram(mesh.program);
       mesh.program = program;
     }
-    layer._shared._render();
+    nativeChecks.render.render(layer._shared);
     const probe = nativeChecks.mesh(layer, {
       position: [-20, 2, -20, 20, 2, -20, 0, 2, 20, -20, 0, -20, 20, 0, -20, 0, 0, 20],
       normal: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
       color: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-    }, layer._createProgram({ vertexColors: true, alphaMode: 'MASK', doubleSided: true }));
+    }, nativeChecks.gpu.createProgram(layer, { vertexColors: true, alphaMode: 'MASK', doubleSided: true }));
     const pitch = map.getPitch(), bearing = map.getBearing();
     layer.model.visible = false;
     map.setPitch(0); map.setBearing(0); map.setView(layer.location, 17, { animate: false });
@@ -290,14 +278,14 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const secondPixel = await sample();
     const depthOrderIndependent = firstPixel.every((value, index) => value === secondPixel[index]) &&
       firstPixel[0] > firstPixel[2] && firstPixel[3] === 255;
-    layer._disposeMesh(probe);
+    nativeChecks.gpu.disposeMesh(layer, probe);
     layer.model.visible = true;
     map.setPitch(pitch); map.setBearing(bearing);
-    layer._shared._render();
+    nativeChecks.render.render(layer._shared);
     const container = map.getContainer();
     const rect = container.getBoundingClientRect();
     let position;
-    layer.traverse(layer.model, object => {
+    nativeChecks.graph.traverse(layer.model, object => {
       if (position || !object.geometry) return;
       const vertices = object.geometry.attributes.position;
       for (let i = 0; i < Math.min(vertices.count, 90); i++) {
@@ -309,14 +297,14 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
         if (Math.abs(x) >= 1 || Math.abs(y) >= 1) continue;
         const candidate = { clientX: Math.floor(rect.left + (x + 1) * rect.width / 2),
           clientY: Math.floor(rect.top + (1 - y) * rect.height / 2) };
-        if (layer._findFeature(candidate)?.model === layer.model) {
+        if (nativeChecks.picking.findFeature(layer, candidate)?.model === layer.model) {
           position = candidate;
           break;
         }
       }
     });
     if (!position) throw new Error('No visible model mesh was picked');
-    const hit = layer._findFeature(position);
+    const hit = nativeChecks.picking.findFeature(layer, position);
     const material = hit.mesh.program;
     container.dispatchEvent(new MouseEvent('mousemove', position));
     const tooltip = layer._tooltip;
@@ -336,13 +324,13 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     await layer._added.promise;
     const retained = layer.model.parent === layer.root;
     const tooltipRecreated = layer._tooltip !== tooltip && layer._tooltip.hidden;
-    layer._shared._render();
-    const restoredHit = layer._findFeature(position);
+    nativeChecks.render.render(layer._shared);
+    const restoredHit = nativeChecks.picking.findFeature(layer, position);
     const restoredGPU = restoredHit?.model === layer.model &&
       restoredHit.mesh.geometry.device === layer.renderer.device &&
       restoredHit.mesh.program.device === layer.renderer.device;
     let restoredTextures = true;
-    layer.traverse(layer.model, mesh => {
+    nativeChecks.graph.traverse(layer.model, mesh => {
       const texture = mesh.program?.uniforms.baseTexture?.value;
       if (texture && texture.device !== layer.renderer.device) restoredTextures = false;
     });
@@ -409,10 +397,10 @@ Then('the failed model has no attached geometry', function () {
 When('I hover and click the Eiffel Tower in the 3D example', { timeout: 60000 }, async function () {
   const target = await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => entry.layer.model).layer;
-    tower._shared._render();
+    nativeChecks.render.render(tower._shared);
     const rect = map.getContainer().getBoundingClientRect();
     let target;
-    tower.traverse(tower.model, mesh => {
+    nativeChecks.graph.traverse(tower.model, mesh => {
       if (target || !mesh.geometry) return;
       const { position, index } = mesh.geometry.attributes;
       const count = index?.count || position.count;
@@ -431,9 +419,9 @@ When('I hover and click the Eiffel Tower in the 3D example', { timeout: 60000 },
           y: Math.round(rect.top + (1 - y) * rect.height / 2),
         };
         const event = { clientX: candidate.x, clientY: candidate.y };
-        const hit = tower._findFeature(event);
+        const hit = nativeChecks.picking.findFeature(tower, event);
         if (hit?.model !== tower.model ||
-            tower.raycast(event, tower.scene.children, true)[0]?.object !== hit.mesh) continue;
+            nativeChecks.picking.raycast(tower, event, tower.scene.children, true)[0]?.object !== hit.mesh) continue;
         const crs = map.options.crs;
         const origin = crs.project(tower._shared._sceneOrigin);
         const metres = Math.cos(tower._shared._sceneOrigin.lat * Math.PI / 180);
@@ -513,7 +501,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     const bounds = nativeChecks.bounds(eiffel.model, backend);
     const height = bounds.max[1] - bounds.min[1];
     let meshes = 0;
-    backend.traverse(eiffel.model, object => { if (object.geometry) meshes++; });
+    nativeChecks.graph.traverse(eiffel.model, object => { if (object.geometry) meshes++; });
     const errors = [];
     // Outer ground corners: OSM nodes 33388343, 33388336, 33388327 and 33388350.
     const feet = [
@@ -575,12 +563,11 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     let animatedFrames = 0;
     let hiddenFrames = 0;
     const shared = tower._shared;
-    const render = shared._render;
-    shared._render = function (...args) {
-      render.apply(this, args);
-      if (!map._animatingZoom) return;
+    const queue = shared.renderer.device.queue;
+    const writeBuffer = queue.writeBuffer;
+    const observeZoom = () => {
       animatedFrames++;
-      if (this.renderer.canvas.hidden) hiddenFrames++;
+      if (shared.renderer.canvas.hidden) hiddenFrames++;
       const level = tower._shared._zoomLevel;
       const probe = document.createElement('span');
       probe.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0';
@@ -606,6 +593,11 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       }
       probe.remove();
     };
+    queue.writeBuffer = function (buffer, ...args) {
+      const result = writeBuffer.call(this, buffer, ...args);
+      if (buffer === shared.renderer.uniformBuffer && map._animatingZoom) observeZoom();
+      return result;
+    };
     map.setView(tower.location, 16, { animate: false });
     map.setPitch(45);
     map.setBearing(30);
@@ -617,7 +609,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         map.setZoomAround(new L.Point(320, 220), zoom, { animate: true });
       });
     }
-    shared._render = render;
+    delete queue.writeBuffer;
 
     map.setView(tower.location, 17, { animate: false });
     map.setPitch(60);

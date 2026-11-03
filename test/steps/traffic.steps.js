@@ -106,7 +106,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
       container.querySelector('input[type=date]').value = day;
       const slider = container.querySelector('input[type=range]');
       slider.value = String(minute); slider.dispatchEvent(new Event('input', { bubbles: true }));
-      owner._render();
+      nativeChecks.render.render(owner);
     };
     select('2026-11-02', 120);
     const nightCount = boatCount();
@@ -127,7 +127,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const positions = await gpuPositions();
     const heights = boats().extras.featureFaces.map(face => positions[face.vertexStart * 3 + 1] + layer.root.position[1]);
     // The CPU copy used for picking must match the compute pass.
-    layer.raycast({ clientX: 0, clientY: 0 });
+    nativeChecks.picking.raycast(layer, { clientX: 0, clientY: 0 });
     const cpuMatchesGpu = boats().geometry.attributes.position.data.every((value, i) => Math.abs(value - positions[i]) < 1e-3);
     const finite = positions.every(Number.isFinite) && layer.root.children.every(mesh =>
       Object.values(mesh.geometry.attributes).every(attribute => [...attribute.data].every(Number.isFinite)));
@@ -152,7 +152,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     select('2026-11-02', 1290);
     const closed = boatCount() === 0 && layer.root.children.length === 1 && layer.root.children[0] === route;
     select('2026-11-02', 600);
-    layer._setHighlight({ ...boats().extras.featureFaces[0], mesh: boats() });
+    nativeChecks.picking.setHighlight(layer, { ...boats().extras.featureFaces[0], mesh: boats() });
     select('2026-11-02', 660);
     const clearedHighlight = !layer.highlightedFeature;
     const date = sunlightOverlay.control.getContainer().querySelector('input[type=date]');
@@ -164,7 +164,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const capture = async () => {
-      owner._render();
+      nativeChecks.render.render(owner);
       const width = renderer.canvas.width, height = renderer.canvas.height;
       const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
       const buffer = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });

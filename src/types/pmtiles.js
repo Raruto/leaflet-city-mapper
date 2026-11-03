@@ -1,6 +1,7 @@
 import './3d.js';
 import { read, getHeader, getZxy } from '../scene/pmtiles.js';
 import { decompress } from '../utils/pmtiles.js';
+import { update as updateScene } from '../scene/render.js';
 
 /** A raster TileLayer backed by the shared PMTiles reader. */
 L.Layer.types.pmtiles = L.TileLayer.extend({
@@ -14,7 +15,7 @@ L.Layer.types.pmtiles = L.TileLayer.extend({
     this.url = new URL(options.url, document.baseURI).href;
     this._directories = new Map();
     this.on('tileunload', this._releaseTile, this);
-    this.on('load tileunload', () => L.Layer.types['3d']._renderers.get(this._map)?.update());
+    this.on('load tileunload', () => updateScene(L.Layer.types['3d']._renderers.get(this._map)));
     this.ready = Promise.resolve(this.options.archive || this).then(async archive => {
       const header = await archive.getHeader();
       this.options.archive = archive;
@@ -50,13 +51,13 @@ L.Layer.types.pmtiles = L.TileLayer.extend({
 
   setOpacity(opacity) {
     L.TileLayer.prototype.setOpacity.call(this, opacity);
-    L.Layer.types['3d']._renderers.get(this._map)?.update();
+    updateScene(L.Layer.types['3d']._renderers.get(this._map));
     return this;
   },
 
   setZIndex(zIndex) {
     L.TileLayer.prototype.setZIndex.call(this, zIndex);
-    L.Layer.types['3d']._renderers.get(this._map)?.update();
+    updateScene(L.Layer.types['3d']._renderers.get(this._map));
     return this;
   },
 

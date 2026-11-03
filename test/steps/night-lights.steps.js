@@ -97,12 +97,12 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const select = minute => {
       date.value = '2026-06-21'; slider.value = String(minute);
       slider.dispatchEvent(new Event('input', { bubbles: true }));
-      owner._render();
+      nativeChecks.render.render(owner);
     };
     context.configure({ device, format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const capture = async () => {
-      owner._render();
+      nativeChecks.render.render(owner);
       const bytesPerRow = Math.ceil(canvas.width * 4 / 256) * 256;
       const buffer = device.createBuffer({ size: bytesPerRow * canvas.height,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -131,7 +131,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const lampPixels = brighter(lit, unlit);
     const tower = layers._layers.find(entry => entry.name === 'Eiffel Tower').layer;
     const programs = new Set();
-    tower.traverse(tower.root, mesh => { if (mesh.program) programs.add(mesh.program); });
+    nativeChecks.graph.traverse(tower.root, mesh => { if (mesh.program) programs.add(mesh.program); });
     for (const program of programs) program.nightSparkle = false;
     const darkTower = await capture();
     tower.root.visible = false;
@@ -165,10 +165,10 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const dayLampPixels = brighter(dayLit, dayWithoutLamps) + brighter(dayWithoutLamps, dayLit);
     select(0);
     map.removeLayer(sunlightOverlay);
-    owner._render();
+    nativeChecks.render.render(owner);
     const disabledStrength = owner.renderer.uniformData[55];
     map.addLayer(sunlightOverlay);
-    owner._render();
+    nativeChecks.render.render(owner);
     window.oldLightMeshes = [...layer.root.children];
     return {
       count: features.length, ids: features.every(f => f.id === f.properties.foyer),
