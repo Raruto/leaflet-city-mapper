@@ -11,7 +11,7 @@
 
 _For a working example see one of the following demos:_
 
-- [Paris City in 3D](examples/leaflet-city-mapper.html)
+- [City of Paris in 3D](examples/leaflet-city-mapper.html)
 - [Ancient Rome in 3D](examples/leaflet-city-mapper-geojson.html)
 
 ## How to use

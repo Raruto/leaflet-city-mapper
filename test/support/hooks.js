@@ -21,7 +21,13 @@ async function getBrowser() {
     // Windows throttles requestAnimationFrame in windows it considers occluded.
     ? [firefox, { firefoxUserPrefs: { 'widget.windows.window_occlusion_tracking.enabled': false } }]
     : [chromium, testBrowser === 'chrome' || testBrowser === 'msedge' ? { channel: testBrowser } : {}];
-  browser = await engine.launch(options);
+  const launchOptions = engine === chromium && process.platform === 'linux' && process.env.CI
+    ? {
+      ...options,
+      args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan'],
+    }
+    : options;
+  browser = await engine.launch(launchOptions);
   // Headless Firefox (and some GPUs/drivers) expose no WebGPU adapter: retry with a window when one can open.
   // Without any adapter the @3d-layer scenarios fail instead of being skipped.
   const page = await browser.newPage();
@@ -29,7 +35,7 @@ async function getBrowser() {
   const webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
   await page.close();
   if (webgpu) return;
-  const headed = await engine.launch({ ...options, headless: false }).catch(() => null);
+  const headed = await engine.launch({ ...launchOptions, headless: false }).catch(() => null);
   if (headed) {
     await browser.close();
     browser = headed;
