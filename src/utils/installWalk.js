@@ -1,4 +1,3 @@
-import * as gpu from '../utils/gpu';
 import * as createMesh from './createMesh';
 import * as disposeMesh from './disposeMesh';
 import * as render from './render';

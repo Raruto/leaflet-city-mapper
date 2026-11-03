@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/removeRasterTile.js"],
+  "sourcesContent": ["import { destroyTexture } from './destroyTexture';\n\nexport function removeRasterTile(backend, tile) {\n  backend._terrainRequest?.abort();\n  const mesh = backend._rasterTiles.get(tile);\n  if (!mesh) return;\n  backend.remove(mesh);\n  destroyTexture(backend, mesh.texture.texture);\n  backend._rasterTiles.delete(tile);\n  tile.style.visibility = tile._terrainVisibility;\n  delete tile._terrainVisibility;\n}\n"],
+  "mappings": "AAAA,OAAS,kBAAAA,MAAsB,mBAExB,SAASC,EAAiBC,EAASC,EAAM,CAC9CD,EAAQ,iBAAiB,MAAM,EAC/B,MAAME,EAAOF,EAAQ,aAAa,IAAIC,CAAI,EACrCC,IACLF,EAAQ,OAAOE,CAAI,EACnBJ,EAAeE,EAASE,EAAK,QAAQ,OAAO,EAC5CF,EAAQ,aAAa,OAAOC,CAAI,EAChCA,EAAK,MAAM,WAAaA,EAAK,mBAC7B,OAAOA,EAAK,mBACd",
+  "names": ["destroyTexture", "removeRasterTile", "backend", "tile", "mesh"]
+}

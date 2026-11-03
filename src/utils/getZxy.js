@@ -1,8 +1,8 @@
-import { decodeDirectory } from './decodeDirectory';
-import { decompress } from './decompress';
-import { tileId } from './tileId';
-import { read } from "./read";
-import { getHeader } from './getHeader';
+import { decodeDirectory } from './decodeDirectory.js';
+import { decompress } from './decompress.js';
+import { tileId } from './tileId.js';
+import { read } from './read.js';
+import { getHeader } from './getHeader.js';
 
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 

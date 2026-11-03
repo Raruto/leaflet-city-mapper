@@ -15,10 +15,25 @@ import { tooltip } from '../utils/tooltip.js';
  * The 'sunlight' layer on the same map drives the time; without one, vehicles run live.
  */
 L.Layer.types.traffic = L.Layer.types['3d'].extend({
-  initialize({ url, vehicle = 'car', side, outline = false, speed: velocity = speed, ...options } = {}) {
-    if (!url) throw new Error('Traffic needs a source url');
-    if (!vehicles[vehicle]) throw new Error(`Unknown vehicle: ${vehicle}`);
-    L.Layer.types['3d'].prototype.initialize.call(this, { tooltipContent: tooltip, nightLight: Boolean(vehicles[vehicle].lights), ...options });
+  initialize({
+    url,
+    vehicle = 'car',
+    side,
+    outline = false,
+    speed: velocity = speed,
+    ...options
+  } = {}) {
+    if (!url) {
+      throw new Error('Traffic needs a source url');
+    }
+    if (!vehicles[vehicle]) {
+      throw new Error(`Unknown vehicle: ${vehicle}`);
+    }
+    L.Layer.types['3d'].prototype.initialize.call(this, {
+      tooltipContent: tooltip,
+      nightLight: Boolean(vehicles[vehicle].lights),
+      ...options
+    });
     installTraffic(this, { url, ...vehicles[vehicle], side: side ?? vehicles[vehicle].side, outline, velocity });
   },
 });

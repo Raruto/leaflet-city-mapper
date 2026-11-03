@@ -1,7 +1,5 @@
 import { bridgeElevation } from '../utils/bridgeElevation.js';
 import { terrainElevation } from '../utils/terrainElevation.js';
-import { terrainGrid } from '../utils/terrainGrid.js';
-import { terrainAtlas } from '../utils/terrainAtlas.js';
 import { triangulate } from '../utils/triangulate.js';
 import './3d.js';
 import './pmtiles.js';
@@ -9,8 +7,10 @@ import { removeProgram } from '../utils/removeProgram.js';
 import { destroyTexture } from '../utils/destroyTexture.js';
 import { disposeMesh } from '../utils/disposeMesh.js';
 import { createMesh } from '../utils/createMesh.js';
-import { createProgram } from '../utils/createProgram.js';
 import { update } from '../utils/update.js';
+import { removeRasterTile } from '../utils/removeRasterTile.js';
+import { elevationWGSL } from '../utils/elevationWGSL.js';
+import { addRasterTile } from '../utils/addRasterTile.js';
 
 /**
  * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
@@ -186,155 +186,9 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
     if (position.length) this._bridgeMesh = createMesh(this, { position, normal, color });
   },
 
-  async addRasterTile(layer, coords, tile) {
-    const [ready, bitmap] = await Promise.all([this._terrainPromise, createImageBitmap(tile)]);
-    if (!ready || !this._map || this._map._terrain3D !== this || layer._terrain3D !== this ||
-      tile.request.signal.aborted || !tile.isConnected || this._rasterTiles.has(tile)) {
-      bitmap.close();
-      return;
-    }
-    // Match DEM pixel spacing, capped at 64 subdivisions per tile.
-    const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - this._terrainZoom)));
-    const map = this._map, crs = map.options.crs;
-    const origin = crs.project(this.location), metres = Math.cos(this.location.lat * Math.PI / 180);
-    // Tile pixels map linearly to projected metres: one scaled unit grid per tile, elevation in the vertex shader.
-    const scale = crs.scale(coords.z), terrainScale = 2 ** (this._terrainZoom - coords.z);
-    const corner = crs.transformation.untransform(new L.Point(coords.x * 256, coords.y * 256), scale);
-    const opposite = crs.transformation.untransform(new L.Point((coords.x + 1) * 256, (coords.y + 1) * 256), scale);
-    const device = this.renderer.device;
-    const texture = {
-      device,
-      texture: device.createTexture({
-        size: [tile.width, tile.height],
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-      }),
-      sampler: device.createSampler({ addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' }),
-      samplerOptions: { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
-      image: tile, format: 'rgba8unorm', srgb: false, flipY: false, uploaded: tile,
-    };
-    device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: texture.texture }, [tile.width, tile.height]);
-    bitmap.close();
-    if (!this._rasterProgram || this._rasterProgram.device !== device) {
-      // DEM atlas over the archive's tile grid; invalid or missing samples become -1e9 (the shader's no-data).
-      // ponytail: one texture, capped by maxTextureDimension2D (32×32 DEM tiles at 8192 px); split it for larger archives.
-      const bounds = this._terrainBounds, columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
-      const { elevations, low, high } = terrainAtlas(this._terrainTiles, bounds);
-      if (this._dem) destroyTexture(this, this._dem.texture);
-      this._dem = {
-        texture: device.createTexture({
-          size: [columns * 256, rows * 256],
-          format: 'r32float',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        }),
-        low: Number.isFinite(low) ? low : this._terrainOriginElevation,
-        high: Number.isFinite(high) ? high : this._terrainOriginElevation,
-      };
-      device.queue.writeTexture({ texture: this._dem.texture }, elevations,
-        { bytesPerRow: columns * 1024 }, [columns * 256, rows * 256]);
-      this._terrainGrids = new Map();
-      this._rasterProgram = createProgram(this, {
-        baseTexture: texture,
-        unlit: true,
-        alphaMode: 'BLEND',
-        terrain: this._dem,
-      });
-    }
-    let attributes = this._terrainGrids.get(divisions);
-    if (!attributes) {
-      attributes = terrainGrid(divisions);
-      for (const [name, attribute] of Object.entries(attributes)) {
-        attribute.size ||= 1;
-        attribute.count = attribute.data.length / attribute.size;
-        attribute.indexFormat = 'uint16';
-        attribute.buffer = device.createBuffer({
-          size: Math.max(4, attribute.data.byteLength),
-          usage: name === 'index'
-            ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-            : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
-      }
-      this._terrainGrids.set(divisions, attributes);
-    }
-    const base = this._terrainOriginElevation;
-    const bottom = Math.min(this._dem.low, base) - base, top = Math.max(this._dem.high, base) - base;
-    const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
-    // ponytail: ray picking sees the flat unit grid; read the DEM back if terrain must be pickable.
-    const geometry = {
-      device,
-      attributes,
-      drawRange: { start: 0, count: attributes.index.count },
-      // Local bounds whose radius, scaled by the largest axis, still covers the displaced tile.
-      bounds: {
-        min: [0, bottom, 0], max: [1, top, 1], center: [0.5, (bottom + top) / 2, 0.5],
-        radius: Math.hypot(sizeX, top - bottom, sizeZ) / 2 / Math.max(sizeX, 1, sizeZ),
-      },
-    };
-    const mesh = {
-      position:    [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
-      rotation:    [0, 0, 0],
-      scale:       [sizeX, 1, sizeZ],
-      worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-      children:    [],
-      visible:     true,
-      device,
-      geometry,
-      program:      this._rasterProgram,
-      texture,
-      // DEM pixel of the tile's corner, DEM pixels per tile, and the elevation at the layer origin.
-      terrain:      [
-        coords.x * 256 * terrainScale - this._terrainBounds.min.x * 256,
-        coords.y * 256 * terrainScale - this._terrainBounds.min.y * 256,
-        256 * terrainScale,
-        base,
-      ],
-      tile,
-      opacity:      layer.options.opacity ?? 1,
-      id:           L.Layer.types['3d']._nextId++,
-      renderOrder: -1,
-    };
-    this.add(mesh);
-    this._rasterTiles.set(tile, mesh);
-    tile._terrainVisibility = tile.style.visibility;
-  },
+  addRasterTileaddRasterTile: addRasterTile,
 
-  removeRasterTile(tile) {
-    tile._terrainRequest?.abort();
-    const mesh = this._rasterTiles.get(tile);
-    if (!mesh) return;
-    this.remove(mesh);
-    destroyTexture(this, mesh.texture.texture);
-    this._rasterTiles.delete(tile);
-    tile.style.visibility = tile._terrainVisibility;
-    delete tile._terrainVisibility;
-  },
+  removeRasterTile: removeRasterTile,
 });
 
-/**
- * WGSL twin of _getElevation for the vertex shader: bilinear DEM pixels, or the first valid
- * neighbour near no-data (stored as -1e9), else `base`. Expects `dem: texture_2d<f32>`.
- */
-L.Layer.types.terrain.elevationWGSL = `
-  fn demSample(pixel: vec2<i32>) -> f32 {
-    if (any(pixel < vec2<i32>(0)) || any(pixel >= vec2<i32>(textureDimensions(dem)))) { return -1e9; }
-    return textureLoad(dem, pixel, 0).r;
-  }
-  fn elevation(pixel: vec2<f32>, base: f32) -> f32 {
-    let p = pixel - vec2<f32>(0.5);
-    let f = fract(p);
-    let i = vec2<i32>(floor(p));
-    let v00 = demSample(i);
-    let v10 = demSample(i + vec2<i32>(1, 0));
-    let v01 = demSample(i + vec2<i32>(0, 1));
-    let v11 = demSample(i + vec2<i32>(1, 1));
-    if (v00 > -1000.0 && v10 > -1000.0 && v01 > -1000.0 && v11 > -1000.0) {
-      return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
-    }
-    if (v00 > -1000.0) { return v00; }
-    if (v10 > -1000.0) { return v10; }
-    if (v01 > -1000.0) { return v01; }
-    if (v11 > -1000.0) { return v11; }
-    return base;
-  }
-`;
+L.Layer.types.terrain.elevationWGSL = elevationWGSL;

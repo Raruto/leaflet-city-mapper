@@ -1,5 +1,5 @@
-import { decodeHeader } from './decodeHeader';
-import { read } from "./read";
+import { decodeHeader } from './decodeHeader.js';
+import { read } from './read.js';
 
 /** Cache header initialization; failures remain visible to all callers. */
 

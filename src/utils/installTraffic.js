@@ -1,7 +1,5 @@
-import * as gpuApi from '../utils/gpu';
 import * as createMesh from './createMesh';
 import * as disposeMesh from './disposeMesh';
-import * as picking from '../utils/picking';
 import * as setHighlight from './setHighlight';
 import * as showFeature from './showFeature';
 import * as render from './render';

@@ -38,13 +38,26 @@ AfterAll(function () {
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
-    const [gpu, lighting, picking, render, sources, emptyNode, setParent, traverse,
+    const [createMesh, createProgram, destroyTexture, disposeMesh, removeProgram,
+      findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
+      renderModule, update, sortMeshes, pump, releaseArea, emptyNode, setParent, traverse,
       updateWorldMatrix, updateCamera, parseColor, triangulate] = await Promise.all([
-      import('/dist/utils/gpu.js'),
-      import('/dist/utils/lighting.js'),
-      import('/dist/utils/picking.js'),
+      import('/dist/utils/createMesh.js'),
+      import('/dist/utils/createProgram.js'),
+      import('/dist/utils/destroyTexture.js'),
+      import('/dist/utils/disposeMesh.js'),
+      import('/dist/utils/removeProgram.js'),
+      import('/dist/utils/findFeature.js'),
+      import('/dist/utils/raycast.js'),
+      import('/dist/utils/onClick.js'),
+      import('/dist/utils/onPointerLeave.js'),
+      import('/dist/utils/setHighlight.js'),
+      import('/dist/utils/showFeature.js'),
       import('/dist/utils/render.js'),
-      import('/dist/utils/sources.js'),
+      import('/dist/utils/update.js'),
+      import('/dist/utils/sortMeshes.js'),
+      import('/dist/utils/pump.js'),
+      import('/dist/utils/releaseArea.js'),
       import('/dist/utils/emptyNode.js'),
       import('/dist/utils/setParent.js'),
       import('/dist/utils/traverse.js'),
@@ -60,8 +73,29 @@ export async function prepare3DChecks(page) {
       updateWorldMatrix: updateWorldMatrix.updateWorldMatrix,
       updateCamera: updateCamera.updateCamera,
     };
+    const gpu = {
+      createMesh: createMesh.createMesh,
+      createProgram: createProgram.createProgram,
+      destroyTexture: destroyTexture.destroyTexture,
+      disposeMesh: disposeMesh.disposeMesh,
+      removeProgram: removeProgram.removeProgram,
+    };
+    const picking = {
+      findFeature: findFeature.findFeature,
+      raycast: raycast.raycast,
+      onClick: onClick.onClick,
+      onPointerLeave: onPointerLeave.onPointerLeave,
+      setHighlight: setHighlight.setHighlight,
+      showFeature: showFeature.showFeature,
+    };
+    const render = {
+      render: renderModule.render,
+      update: update.update,
+      sortMeshes: sortMeshes.sortMeshes,
+    };
+    const sources = { pump: pump.pump, releaseArea: releaseArea.releaseArea };
     window.nativeChecks = {
-      gpu, lighting, picking, render, sources,
+      gpu, picking, render, sources,
       graph,
       geometry: {
         parseColor: parseColor.parseColor,

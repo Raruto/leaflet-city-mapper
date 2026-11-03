@@ -10,7 +10,12 @@ import { installWalk } from '../utils/installWalk.js';
  * Visible meshes of the other 3D layers (buildings, trees, models, streetlights) are solid; terrain and traffic are not.
  */
 L.Layer.types.walk = L.Layer.types['3d'].extend({
-  initialize({ speed = 70, distance = 20, position = 'bottomright', ...options } = {}) {
+  initialize({
+    speed = 70,
+    distance = 20,
+    position = 'bottomright',
+    ...options
+  } = {}) {
     L.Layer.types['3d'].prototype.initialize.call(this, options);
     installWalk(this, { speed, distance, position });
   },
