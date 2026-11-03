@@ -45,14 +45,97 @@ export async function prepare3DChecks(page) {
           worldMatrix: Array.from(new DOMMatrix().toFloat64Array()), children: [], visible: true,
         };
       },
-      mesh(layer, attributes, program = layer._createProgram({ vertexColors: true })) {
-        return {
-          ...nativeChecks.group(),
-          gl: layer.renderer.gl,
-          geometry: layer._createGeometry(layer.renderer.gl, Object.fromEntries(Object.entries(attributes)
-            .map(([name, values]) => [name, { size: 3, data: new Float32Array(values) }]))),
-          program, id: L.Layer.types['3d']._nextId++, renderOrder: 0, extras: {},
+      mesh(layer, attributes, program) {
+        const mesh = layer._createMesh(attributes, program?._layerMaterial);
+        layer.remove(mesh);
+        if (program) {
+          layer._removeProgram(mesh.program);
+          mesh.program = program;
+        }
+        return mesh;
+      },
+      async pixels(layer, x = 0, y = 0, width = layer.renderer.canvas.width, height = layer.renderer.canvas.height) {
+        const { device, context, format, canvas } = layer.renderer;
+        context.configure({
+          device, format, alphaMode: 'premultiplied',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+        layer._shared._render();
+        const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
+        const buffer = device.createBuffer({
+          size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        const encoder = device.createCommandEncoder();
+        encoder.copyTextureToBuffer(
+          { texture: context.getCurrentTexture(), origin: [x, canvas.height - y - height] },
+          { buffer, bytesPerRow }, [width, height],
+        );
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const mapped = new Uint8Array(buffer.getMappedRange()), pixels = new Uint8Array(width * height * 4);
+        for (let row = 0; row < height; row++) {
+          for (let column = 0; column < width; column++) {
+            const source = row * bytesPerRow + column * 4;
+            const target = ((height - row - 1) * width + column) * 4;
+            pixels.set(format.startsWith('bgra')
+              ? [mapped[source + 2], mapped[source + 1], mapped[source], mapped[source + 3]]
+              : mapped.subarray(source, source + 4), target);
+          }
+        }
+        buffer.unmap();
+        buffer.destroy();
+        return pixels;
+      },
+      async terrainHeights(terrain, vertices) {
+        const { device } = terrain.renderer;
+        const module = device.createShaderModule({ code: `
+          @group(0) @binding(0) var dem: texture_2d<f32>;
+          @group(0) @binding(1) var<storage, read> terrains: array<vec4<f32>>;
+          @group(0) @binding(2) var<storage, read> uvs: array<vec2<f32>>;
+          @group(0) @binding(3) var<storage, read_write> heights: array<f32>;
+          ${L.Layer.types.terrain.elevationWGSL}
+          @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+            if (id.x >= arrayLength(&heights)) { return; }
+            let t = terrains[id.x];
+            heights[id.x] = elevation(t.xy + uvs[id.x] * t.z, t.w) - t.w;
+          }
+        ` });
+        const layout = device.createBindGroupLayout({ entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+          { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+          { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ] });
+        const pipeline = device.createComputePipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+          compute: { module, entryPoint: 'main' },
+        });
+        const storage = data => {
+          const buffer = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+          device.queue.writeBuffer(buffer, 0, data);
+          return buffer;
         };
+        const terrains = storage(new Float32Array(vertices.flatMap(({ mesh }) => mesh.terrain)));
+        const uvs = storage(new Float32Array(vertices.flatMap(({ u, v }) => [u, v])));
+        const heights = device.createBuffer({ size: vertices.length * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+        const readback = device.createBuffer({ size: vertices.length * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, device.createBindGroup({ layout, entries: [
+          { binding: 0, resource: terrain._dem.texture.createView() },
+          { binding: 1, resource: { buffer: terrains } },
+          { binding: 2, resource: { buffer: uvs } },
+          { binding: 3, resource: { buffer: heights } },
+        ] }));
+        pass.dispatchWorkgroups(Math.ceil(vertices.length / 64));
+        pass.end();
+        encoder.copyBufferToBuffer(heights, 0, readback, 0, vertices.length * 4);
+        device.queue.submit([encoder.finish()]);
+        await readback.mapAsync(GPUMapMode.READ);
+        const result = new Float32Array(readback.getMappedRange()).slice();
+        for (const buffer of [terrains, uvs, heights, readback]) buffer.destroy();
+        return result;
       },
       ready(layer) {
         return new Promise((resolve, reject) => {

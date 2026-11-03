@@ -53,7 +53,7 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   await this.page.route('**/fixture.pmtiles*', async route => {
     const request = route.request();
     const [start, end] = request.headers().range.match(/\d+/g).map(Number);
-    requests.push({ start, end });
+    requests.push({ start, end, query: new URL(request.url()).search });
     let bytes = archive;
     const url = new URL(request.url());
     if (url.searchParams.has('plain')) bytes = plainArchive;
@@ -119,7 +119,10 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   assert.equal(result.badDirectory, true);
   assert.deepEqual(result.errors, ['Expected a PMTiles v3 archive', 'Unsupported PMTiles compression: 3',
     'Unable to read PMTiles: HTTP 503', 'Truncated PMTiles range', 'PMTiles archive changed; recreate the layer']);
-  assert.equal(requests.filter(request => request.start === 127).length, 5, 'One root request per reader');
+  for (const query of ['', '?changed', '?full', '?plain', '?directory']) {
+    assert.equal(requests.filter(request => request.start === 127 && request.query === query).length, 1,
+      `One cached root request for reader ${query || 'default'}`);
+  }
   const real = await this.page.evaluate(async () => {
     const buildings = new L.Layer({ source: { type: '3d', url: '../examples/data/paris-buildings.pmtiles' } });
     await nativeChecks.ready(buildings);

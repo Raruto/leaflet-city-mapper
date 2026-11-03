@@ -184,7 +184,10 @@ L.Layer.types['3d'] = L.Layer.extend({
           this.group = this.root;
           if (this.url) this.header = await this.getHeader();
         }
-        if (this._map) await this._attach(this._map);
+        if (this._map) {
+          await this._attach(this._map);
+          this._added.resolve();
+        }
         if (this.modelUrl) await this._loadModel();
         if (this._shared) this.update();
         this.fire('ready');
@@ -196,7 +199,6 @@ L.Layer.types['3d'] = L.Layer.extend({
 
   /** Attach interaction immediately; initialization may finish before or after onAdd. */
   onAdd(map) {
-    this._added.resolve();
     if (!this.location) {
       const center = map.getCenter();
       this.location = new L.LatLng(center.lat, center.lng);
@@ -217,7 +219,7 @@ L.Layer.types['3d'] = L.Layer.extend({
       }, this);
     }
     if (this.root) {
-      this._attach(map).catch(error => this.fire('error', { error }));
+      this._attach(map).then(() => this._added.resolve(), error => this.fire('error', { error }));
     }
   },
 

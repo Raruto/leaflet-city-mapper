@@ -169,7 +169,7 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     layer._showFeature(feature, position);
     layer.remove();
     const restoredCursor = container.style.cursor === 'crosshair';
-    for (const attribute of Object.values(mesh.geometry.attributes)) mesh.geometry.gl.deleteBuffer(attribute.buffer);
+    for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
     layer._removeProgram(mesh.program);
     container.style.cursor = '';
     return { created, displayed, clickNotPinned, hidden, leaveCleared, sharedCursor, removed, recreated, restoredCursor };

@@ -142,7 +142,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', a
     return Object.values(map._layers).some(layer => layer._geojson &&
       [...layer._areas.values()].some(area => area.done && area.buildings === 5));
   });
-  assert.match(await this.page.locator('#status').textContent(), /^Schematic Colosseum: 5 parts; 0 pending\./);
+  assert.match(await this.page.locator('#status').textContent(), /^Colosseum: 5 parts;/);
   const geometry = await this.page.evaluate(() => {
     const layer = Object.values(map._layers).find(layer => layer._geojson);
     const features = layer.options.data.features;

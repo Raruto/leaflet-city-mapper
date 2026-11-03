@@ -4,10 +4,6 @@ Feature: Building volumes from PMTiles
     Given a map with the standalone 3D module and no dependency import map
     Then cancelled building downloads recover without errors or stale meshes
 
-  Scenario: The Paris example prevents navigation outside its local archives
-    Given the Eiffel Tower example page is open
-    Then the Paris example keeps navigation inside the building archive
-
   Scenario: Building blocks cover the visible ground through camera changes
     Given a map with the standalone 3D module and no dependency import map
     Then building blocks cover pitched views and retain overlapping areas

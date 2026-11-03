@@ -6,6 +6,8 @@ export async function decompress(data, compression) {
 
 /** Decode the PMTiles v3 header. */
 export function decodeHeader(data) {
+  if (data.byteLength < 127 || new TextDecoder().decode(new Uint8Array(data, 0, 7)) !== 'PMTiles' ||
+    new Uint8Array(data)[7] !== 3) throw new Error('Expected a PMTiles v3 archive');
   const view = new DataView(data);
   const header = {};
   ['rootDirectoryOffset', 'rootDirectoryLength', 'jsonMetadataOffset', 'jsonMetadataLength', 'leafDirectoryOffset', 'leafDirectoryLength', 'tileDataOffset', 'tileDataLength', 'numAddressedTiles', 'numTileEntries', 'numTileContents'].forEach((name, i) => { header[name] = Number(view.getBigUint64(8 + i * 8, true)); });

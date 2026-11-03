@@ -431,53 +431,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
           vertices.push({ mesh, coords, divisions, u: uv.data[i * 2], v: uv.data[i * 2 + 1] });
         }
       }
-      const module = device.createShaderModule({ code: `
-        @group(0) @binding(0) var dem: texture_2d<f32>;
-        @group(0) @binding(1) var<storage, read> terrains: array<vec4<f32>>;
-        @group(0) @binding(2) var<storage, read> uvs: array<vec2<f32>>;
-        @group(0) @binding(3) var<storage, read_write> heights: array<f32>;
-        ${L.Layer.types.terrain.elevationWGSL}
-        @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-          if (id.x >= arrayLength(&heights)) { return; }
-          let t = terrains[id.x];
-          heights[id.x] = elevation(t.xy + uvs[id.x] * t.z, t.w) - t.w;
-        }
-      ` });
-      const layout = device.createBindGroupLayout({ entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ] });
-      const pipeline = device.createComputePipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-        compute: { module, entryPoint: 'main' },
-      });
-      const storage = data => {
-        const buffer = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-        device.queue.writeBuffer(buffer, 0, data);
-        return buffer;
-      };
-      const terrains = storage(new Float32Array(vertices.flatMap(({ mesh }) => mesh.terrain)));
-      const uvs = storage(new Float32Array(vertices.flatMap(({ u, v }) => [u, v])));
-      const heights = device.createBuffer({ size: vertices.length * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-      const readback = device.createBuffer({ size: vertices.length * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-      const encoder = device.createCommandEncoder();
-      const pass = encoder.beginComputePass();
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, device.createBindGroup({ layout, entries: [
-        { binding: 0, resource: terrain._dem.texture.createView() },
-        { binding: 1, resource: { buffer: terrains } },
-        { binding: 2, resource: { buffer: uvs } },
-        { binding: 3, resource: { buffer: heights } },
-      ] }));
-      pass.dispatchWorkgroups(Math.ceil(vertices.length / 64));
-      pass.end();
-      encoder.copyBufferToBuffer(heights, 0, readback, 0, vertices.length * 4);
-      device.queue.submit([encoder.finish()]);
-      await readback.mapAsync(GPUMapMode.READ);
-      const gpuHeights = new Float32Array(readback.getMappedRange()).slice();
-      for (const buffer of [terrains, uvs, heights, readback]) buffer.destroy();
+      const gpuHeights = await nativeChecks.terrainHeights(terrain, vertices);
       // Reference: geographic round trip per vertex, as the grid was built before the linear shortcut.
       let maxError = 0, relief = 0;
       for (const [i, { mesh, coords, divisions, u, v }] of vertices.entries()) {

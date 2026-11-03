@@ -70,6 +70,10 @@ const checks = {
     assert.throws(() => decodeDirectory(new ArrayBuffer(0)), /Truncated PMTiles directory/);
     assert.throws(() => decodeDirectory(Uint8Array.from([...bytes, 0]).buffer), /Trailing PMTiles directory data/);
     const data = new ArrayBuffer(127), view = new DataView(data);
+    new Uint8Array(data).set(new TextEncoder().encode('PMTiles'));
+    view.setUint8(7, 3);
+    assert.throws(() => decodeHeader(new ArrayBuffer(127)), /Expected a PMTiles v3 archive/);
+    assert.throws(() => decodeHeader(new ArrayBuffer(8)), /Expected a PMTiles v3 archive/);
     view.setBigUint64(8, 127n, true);
     view.setUint8(100, 4);
     assert.equal(decodeHeader(data).rootDirectoryOffset, 127);

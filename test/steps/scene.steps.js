@@ -6,6 +6,7 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     const layer = new L.Layer({ source: { type: '3d' } });
     await nativeChecks.ready(layer);
     layer.addTo(test3d.map);
+    await layer._added.promise;
     const scene = nativeChecks.group();
     const mesh = nativeChecks.mesh(layer, {
       position: [0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -52,8 +53,6 @@ Then('layer-owned objects preserve values and visibility without engine classes'
         color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
       }, layer._createProgram({ vertexColors: true }));
       node.program.transparent = properties.program.transparent;
-      node.program.blend = [layer.renderer.gl.SRC_ALPHA, layer.renderer.gl.ONE_MINUS_SRC_ALPHA,
-        layer.renderer.gl.ONE, layer.renderer.gl.ONE_MINUS_SRC_ALPHA];
       // The shared renderer computes depth from geometry centers, not authored node origins.
       node.position[0] = 0; node.position[1] = 0; node.position[2] = properties.id === 3 ? -100 : 0;
       programs.push(node.program);
@@ -65,21 +64,21 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     layer.setParent(hiddenMesh, hidden);
     layer.add(scene);
     const order = [];
-    const use = layer._useProgram;
-    layer._useProgram = function (program) {
-      if (programs.includes(program)) order.push(programs.indexOf(program) + 1);
-      return use.call(this, program);
+    const draw = layer._drawGeometry;
+    layer._drawGeometry = function (mesh, ...args) {
+      if (programs.includes(mesh.program)) order.push(programs.indexOf(mesh.program) + 1);
+      return draw.call(this, mesh, ...args);
     };
     layer._shared._render();
-    layer._useProgram = use;
+    layer._drawGeometry = draw;
     const sorted = order.join() === '2,3,1';
     layer.traverse(scene, node => {
       if (node !== hiddenMesh && node.geometry?.attributes) {
-        for (const attribute of Object.values(node.geometry.attributes)) node.geometry.gl.deleteBuffer(attribute.buffer);
+        for (const attribute of Object.values(node.geometry.attributes)) attribute.buffer.destroy();
         layer._removeProgram(node.program);
       }
     });
-    for (const attribute of Object.values(mesh.geometry.attributes)) mesh.geometry.gl.deleteBuffer(attribute.buffer);
+    for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
     layer._removeProgram(mesh.program);
     layer.remove();
     return { worldCameraRay, singularTransform, sorted, noEngine, independent };
@@ -96,6 +95,7 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
     await Promise.all([beforeReady, afterReady].map(nativeChecks.ready));
     const deferred = afterReady.location == null && !afterReady.renderer;
     afterReady.addTo(map);
+    await afterReady._added.promise;
     const origins = beforeReady.location.equals(initial) && afterReady.location.equals(initial);
     const shared = beforeReady.renderer === afterReady.renderer &&
       Math.hypot(...beforeReady.root.position) === 0 && Math.hypot(...afterReady.root.position) === 0;
@@ -104,6 +104,7 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
     map.setView([48.86, 2.3], 17, { animate: false });
     beforeReady.addTo(map);
     afterReady.addTo(map);
+    await Promise.all([beforeReady._added.promise, afterReady._added.promise]);
     const retained = beforeReady.location.equals(initial) && afterReady.location.equals(initial) &&
       beforeReady.renderer === afterReady.renderer;
     beforeReady.remove();
@@ -151,25 +152,25 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     const size = map.getSize();
     const error = new L.Point((screen[0] + 1) * size.x / 2, (1 - screen[1]) * size.y / 2).distanceTo(expected);
     const renderer = second.renderer;
-    const canvasDefaults = renderer.gl.canvas.parentNode === map.getPane('webglPane') &&
-      map.getPane('webglPane').parentNode === map.getContainer() &&
-      map.getPane('webglPane').style.zIndex === '450' &&
+    const canvasDefaults = renderer.canvas.parentNode === map.getPane('webgpuPane') &&
+      map.getPane('webgpuPane').parentNode === map.getContainer() &&
+      map.getPane('webgpuPane').style.zIndex === '450' &&
       renderer.dpr === Math.min(window.devicePixelRatio, 2);
     let disposals = 0;
-    const contextLoss = renderer.gl.getExtension('WEBGL_lose_context');
-    const loseContext = contextLoss.loseContext;
-    contextLoss.loseContext = function () { disposals++; loseContext.call(this); };
+    const destroy = renderer.device.destroy.bind(renderer.device);
+    renderer.device.destroy = function () { disposals++; destroy(); };
     const sceneOrigin = first.location;
     const matrix = [...first.camera.projectionViewMatrix];
     first.update();
     first.remove();
     await new Promise(requestAnimationFrame);
-    const retained = second.renderer === renderer && renderer.gl.canvas.isConnected && disposals === 0 &&
+    const retained = second.renderer === renderer && renderer.canvas.isConnected && disposals === 0 &&
       second._shared === second && L.Layer.types['3d']._renderers.get(map) === second &&
       second._sceneOrigin === sceneOrigin && !first._frame &&
       second.camera.projectionViewMatrix.every((value, index) => Math.abs(value - matrix[index]) < 1e-10);
     const otherMap = new L.Map('second', { center: second.location, zoom: 17, rotate: true });
     first.addTo(otherMap);
+    await first._added.promise;
     const movedOwner = first._shared === first && first.renderer !== renderer &&
       second._shared === second && second.renderer === renderer;
     otherMap.setBearing(70);
@@ -179,6 +180,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
       second.camera.projectionViewMatrix.some((value, index) => Math.abs(value - matrix[index]) > 1e-6);
     first.remove();
     first.addTo(map);
+    await first._added.promise;
     const rejoined = first.renderer === renderer && first._shared === second &&
       first.root.position.every(value => Math.abs(value) < 1e-8);
     const overlayRegistration = control._layers.filter(entry => entry.layer === first).length === 1 &&
@@ -188,6 +190,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     checkbox().click();
     const checkboxDisabled = !map.hasLayer(first);
     checkbox().click();
+    await first._added.promise;
     const checkboxEnabled = map.hasLayer(first) && first.renderer === renderer;
     const other = await nativeChecks.ready(new Layer3D({
       center: [second.location.lat, second.location.lng],
@@ -195,10 +198,12 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     const isolated = other.renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
     second.remove();
     const transferredAgain = first._shared === first && first.renderer === renderer &&
-      first._sceneOrigin === sceneOrigin && renderer.gl.canvas.isConnected && disposals === 0;
+      first._sceneOrigin === sceneOrigin && renderer.canvas.isConnected && disposals === 0;
     first.remove();
-    const released = disposals === 1 && !renderer.gl.canvas.isConnected && other.renderer.gl.canvas.isConnected;
+    await renderer.device.lost;
+    const released = disposals === 1 && !renderer.canvas.isConnected && other.renderer.canvas.isConnected;
     second.addTo(map);
+    await second._added.promise;
     const restored = second.renderer !== renderer && second.root.children.includes(object);
     map.remove();
     otherMap.remove();

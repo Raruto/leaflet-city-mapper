@@ -35,7 +35,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     });
     const first = new L.Layer({ source: { type: 'pmtiles', url: 'roof-first.pmtiles', archive: archive(false) } });
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'roof-second.pmtiles', archive: archive(true) } });
-    const sample = (offset, height) => {
+    const sample = async (offset, height) => {
       layer._shared._render();
       const crs = map.options.crs;
       const origin = crs.project(layer.location);
@@ -44,13 +44,12 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       const projected = new DOMPoint((point.x - origin.x) * metres, height, -(point.y - origin.y) * metres, 1)
         .matrixTransform(new DOMMatrix(layer.root.worldMatrix))
         .matrixTransform(new DOMMatrix(layer.camera.projectionViewMatrix));
-      const gl = layer.renderer.gl, pixel = new Uint8Array(4);
-      gl.readPixels(Math.floor((projected.x / projected.w + 1) * gl.canvas.width / 2),
-        Math.floor((projected.y / projected.w + 1) * gl.canvas.height / 2),
-        1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-      return [...pixel];
+      const { canvas } = layer.renderer;
+      return [...await nativeChecks.pixels(layer,
+        Math.floor((projected.x / projected.w + 1) * canvas.width / 2),
+        Math.floor((projected.y / projected.w + 1) * canvas.height / 2), 1, 1)];
     };
-    const roof = () => [[-30, 0], [30, 0]].map(offset => sample(offset, 20));
+    const roof = async () => [await sample([-30, 0], 20), await sample([30, 0], 20)];
     const loaded = async raster => {
       await raster.ready;
       const deadline = performance.now() + 5000;
@@ -61,48 +60,48 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     };
     try {
       first.addTo(map);
-      const before = roof();
+      const before = await roof();
       release();
       await loaded(first);
-      const textured = roof();
+      const textured = await roof();
       const texture = layer._shared._roofRaster.texture.texture;
       const signature = layer._shared._roofRaster.signature;
-      roof();
+      await roof();
       const reused = signature === layer._shared._roofRaster.signature && texture === layer._shared._roofRaster.texture.texture;
       const boundaryX = boundary.x / 256;
       const westRed = (boundaryX - 1) % 2 === 0;
       map.setPitch(55); map.setBearing(35);
-      const rotated = roof();
-      const wall = sample([0, 60], 10);
+      const rotated = await roof();
+      const wall = await sample([0, 60], 10);
       layer._setHighlight({ mesh, ...mesh.extras.featureFaces[0] });
-      const highlighted = roof();
+      const highlighted = await roof();
       layer._setHighlight(null);
       map.setPitch(0); map.setBearing(0);
       first.remove();
-      const empty = roof();
+      const empty = await roof();
       second.addTo(map);
       await loaded(second);
-      const switched = roof();
+      const switched = await roof();
       first.addTo(map);
       await loaded(first);
       first.setZIndex(2);
-      const stacked = roof();
+      const stacked = await roof();
       second.setZIndex(3);
-      const reordered = roof();
+      const reordered = await roof();
       first.remove();
       map.setZoom(18, { animate: false });
       await loaded(second);
-      const zoomed = roof();
+      const zoomed = await roof();
       map.panBy([20, 10], { animate: false });
       await loaded(second);
-      const panned = roof();
+      const panned = await roof();
       owner.remove();
-      const transferred = roof();
+      const transferred = await roof();
       const sameTexture = layer._shared === layer && layer._roofRaster.texture.texture === texture;
       second.setOpacity(0);
-      const transparent = roof();
+      const transparent = await roof();
       second.setOpacity(1);
-      const restored = roof();
+      const restored = await roof();
       return { before, textured, westRed, rotated, wall, highlighted, empty, switched, stacked, reordered, zoomed, panned, transferred,
         transparent, restored, reused, sameTexture };
     } finally {
@@ -215,15 +214,19 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         const tileCoords = Object.values(raster._tiles).find(t => t.el === tile).coords;
         const positions = mesh.geometry.attributes.position.data;
         const uv = mesh.geometry.attributes.uv.data;
+        const heights = await nativeChecks.terrainHeights(terrain,
+          Array.from({ length: mesh.geometry.attributes.position.count }, (_, i) =>
+            ({ mesh, u: uv[i * 2], v: uv[i * 2 + 1] })));
         for (let row = 0; row <= 64; row++) {
           for (let column = 0; column <= 64; column++) {
             const i = row * 65 + column;
             const expected = height(new L.Point((tileCoords.x + column / 64) * 256, (tileCoords.y + row / 64) * 256));
-            elevationError = Math.max(elevationError, Math.abs(positions[i * 3 + 1] + terrain.root.position[1] - expected));
+            elevationError = Math.max(elevationError, Math.abs(heights[i] + terrain.root.position[1] - expected));
             uvError = Math.max(uvError, Math.abs(uv[i * 2 + 1] - row / 64));
+            if (positions[i * 3 + 1] !== 0) throw new Error('Terrain unit grids must stay flat on the CPU');
           }
         }
-        deformation = Math.max(deformation, Math.abs(positions[1] - positions[positions.length - 2]));
+        deformation = Math.max(deformation, Math.abs(heights[0] - heights.at(-1)));
       }
       for (const area of buildings._areas.values()) {
         if (!area.mesh) continue;
@@ -246,34 +249,36 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       const roofCenter = [0, 1, 2].map(axis =>
         (roofPositions[axis] + roofPositions[3 + axis] + roofPositions[6 + axis]) / 3);
       const roofWorld = new DOMPoint(...roofCenter, 1).matrixTransform(new DOMMatrix(roofMesh.worldMatrix));
-      const roofUv = roofWorld.matrixTransform(new DOMMatrix(buildings._shared._roofRaster.matrix));
       const roofProjected = roofWorld.matrixTransform(new DOMMatrix(buildings.camera.projectionViewMatrix));
-      const roofGl = buildings.renderer.gl, roofPixel = new Uint8Array(4);
-      roofGl.readPixels(Math.floor((roofProjected.x / roofProjected.w + 1) * roofGl.canvas.width / 2),
-        Math.floor((roofProjected.y / roofProjected.w + 1) * roofGl.canvas.height / 2),
-        1, 1, roofGl.RGBA, roofGl.UNSIGNED_BYTE, roofPixel);
-      const atlas = buildings._shared._roofRaster.texture.image;
-      const roofImagePixel = [...atlas.getContext('2d').getImageData(
-        Math.floor(roofUv.x * atlas.width), Math.floor(roofUv.z * atlas.height), 1, 1).data];
+      const { canvas: output } = buildings.renderer;
+      const roofPixel = await nativeChecks.pixels(buildings,
+        Math.floor((roofProjected.x / roofProjected.w + 1) * output.width / 2),
+        Math.floor((roofProjected.y / roofProjected.w + 1) * output.height / 2), 1, 1);
+      const roofOrigin = map.project(buildings._shared._sceneOrigin, zoom);
+      const pixelsPerMetre = map.options.crs.scale(zoom) /
+        (40075016.68557849 * Math.cos(buildings._shared._sceneOrigin.lat * Math.PI / 180));
+      const roofRow = (roofOrigin.y + roofWorld.z * pixelsPerMetre) % 256;
+      const roofImagePixel = [...ctx.getImageData(128, Math.floor(roofRow), 1, 1).data];
       map.setView(map.unproject(coords.add([0.5, 0.5]).multiplyBy(256), zoom), zoom, { animate: false });
       map.setPitch(0); map.setBearing(0);
       await wait(settled);
       buildings._shared._render();
       const tile = Object.values(raster._tiles).find(t => t.coords.x === coords.x && t.coords.y === coords.y);
       const mesh = terrain._rasterTiles.get(tile.el);
-      const pixels = [16, 48].map(row => {
+      const pixels = [];
+      const heights = await nativeChecks.terrainHeights(terrain,
+        [16, 48].map(row => ({ mesh, u: 0.5, v: row / 64 })));
+      for (const [sample, row] of [16, 48].entries()) {
         const i = (row * 65 + 32) * 3;
         const position = mesh.geometry.attributes.position.data;
-        const projected = new DOMPoint(position[i], position[i + 1], position[i + 2], 1)
+        const projected = new DOMPoint(position[i], heights[sample], position[i + 2], 1)
           .matrixTransform(new DOMMatrix(mesh.worldMatrix))
           .matrixTransform(new DOMMatrix(buildings.camera.projectionViewMatrix));
-        const gl = buildings.renderer.gl;
-        const pixel = new Uint8Array(4);
-        gl.readPixels(Math.floor((projected.x / projected.w + 1) / 2 * gl.canvas.width),
-          Math.floor((projected.y / projected.w + 1) / 2 * gl.canvas.height),
-          1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-        return [...pixel];
-      });
+        const pixel = await nativeChecks.pixels(buildings,
+          Math.floor((projected.x / projected.w + 1) / 2 * output.width),
+          Math.floor((projected.y / projected.w + 1) / 2 * output.height), 1, 1);
+        pixels.push([...pixel]);
+      }
       let cameraError = 0, projectionError = 0;
       for (const pitch of [0, 45, 83, 85]) {
         map.setPitch(pitch);

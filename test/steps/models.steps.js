@@ -49,10 +49,10 @@ Then('configured models preserve external assets and can be detached and reattac
     const model = layer.model;
     let mesh;
     layer.traverse(model, node => { if (node.geometry) mesh = node; });
-    const style = mesh.program._layerMaterial, gl = layer.renderer.gl;
+    const style = mesh.program._layerMaterial, device = layer.renderer.device;
     const attached = model.parent === layer.root && !('ready' in layer);
-    const maps = style.baseTexture.internalFormat === gl.SRGB8_ALPHA8 &&
-      style.metalTexture.internalFormat === gl.RGBA &&
+    const maps = style.baseTexture.format === 'rgba8unorm-srgb' &&
+      style.metalTexture.format === 'rgba8unorm' &&
       style.baseTexture === style.emissiveTexture && style.metalTexture === style.occlusionTexture &&
       style.baseTexture !== style.metalTexture;
     const factors = style.color.join() === '0.6,0.3,0.1' && style.metallic === 0.5 &&
@@ -64,7 +64,7 @@ Then('configured models preserve external assets and can be detached and reattac
       style.metalTexture.uploaded === style.metalTexture.image;
     const program = mesh.program;
     layer.remove(model);
-    const retained = !model.parent && mesh.program === program && gl.isProgram(program.program);
+    const retained = !model.parent && mesh.program === program && program.device === device;
     layer.add(model);
     const reattached = model.parent === layer.root;
     layer.remove();
@@ -163,7 +163,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
       return [point.x / point.w, point.y / point.w, point.z / point.w].join() === '3,2,3';
     })();
     for (const mesh of [first, second]) {
-      for (const attribute of Object.values(mesh.geometry.attributes)) mesh.geometry.gl.deleteBuffer(attribute.buffer);
+      for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
       layer._removeProgram(mesh.program);
     }
     configured.remove();
@@ -205,28 +205,22 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       }
       if (style.alphaMode === 'BLEND' && mesh.program.transparent && !mesh.program.depthWrite) transparentMeshes++;
     });
-    const gl = layer.renderer.gl;
     const drawGeometry = layer._drawGeometry;
-    const pixels = () => {
-      layer._shared._render();
-      const data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
-      gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      return data;
-    };
-    const texturedPixels = pixels();
+    const texturedPixels = await nativeChecks.pixels(layer);
     const textures = new Map();
     layer.traverse(layer.model, mesh => {
       const texture = mesh.program?.uniforms.baseTexture?.value;
       if (!texture || textures.has(texture)) return;
       textures.set(texture, texture.image);
       const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 1;
+      canvas.width = texture.image.width;
+      canvas.height = texture.image.height;
       canvas.getContext('2d').fillStyle = 'white';
-      canvas.getContext('2d').fillRect(0, 0, 1, 1);
+      canvas.getContext('2d').fillRect(0, 0, canvas.width, canvas.height);
       texture.image = canvas;
       texture.needsUpdate = true;
     });
-    const plainPixels = pixels();
+    const plainPixels = await nativeChecks.pixels(layer);
     for (const [texture, image] of textures) { texture.image = image; texture.needsUpdate = true; }
     layer._shared._render();
     let changedPixels = 0;
@@ -242,30 +236,22 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     layer.traverse(layer.model, mesh => {
       if (!mesh.program) return;
       programs.set(mesh, mesh.program);
-      const style = { ...mesh.program._layerMaterial, alphaMode: 'BLEND' };
+      const style = { ...mesh.program._layerMaterial, alphaMode: 'BLEND', doubleSided: true };
       mesh.program = layer._createProgram(style);
-      if (style.baseTexture && gl.SRGB8_ALPHA8 && style.baseTexture.internalFormat !== gl.SRGB8_ALPHA8) {
+      if (style.baseTexture && style.baseTexture.format !== 'rgba8unorm-srgb') {
         linearTextures = false;
       }
     });
-    layer._drawGeometry = function (geometry, program, mode) {
-      if (program.transparent) {
-        if (!passes.has(geometry)) passes.set(geometry, []);
-        passes.get(geometry).push(program.cullFace);
-      }
-      return drawGeometry.call(this, geometry, program, mode);
-    };
-    layer._shared._render();
     const list = [];
-    const useProgram = layer._useProgram;
-    layer._useProgram = function (program) {
-      const mesh = [...programs.keys()].find(mesh => mesh.program === program);
-      if (mesh && !list.includes(mesh)) list.push(mesh);
-      return useProgram.call(this, program);
+    layer._drawGeometry = function (mesh, pass, cullMode, frontFace) {
+      if (mesh.program.transparent) {
+        if (!passes.has(mesh)) passes.set(mesh, []);
+        passes.get(mesh).push(cullMode);
+        if (!list.includes(mesh)) list.push(mesh);
+      }
+      return drawGeometry.call(this, mesh, pass, cullMode, frontFace);
     };
-    passes.clear();
     layer._shared._render();
-    layer._useProgram = useProgram;
     const depths = list.map(mesh => {
       const world = new DOMPoint(...mesh.geometry.bounds.center, 1).matrixTransform(new DOMMatrix(mesh.worldMatrix));
       const point = world.matrixTransform(new DOMMatrix(layer.camera.projectionViewMatrix));
@@ -273,10 +259,9 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     });
     const transparentOrder = depths.length > 1 && depths.every((depth, i) =>
       !i || depths[i - 1] >= depth) && Math.max(...depths) > Math.min(...depths);
-    const doubleSidedPasses = passes.size > 0 && [...passes].every(([geometry, faces]) => {
-      const mesh = [...programs.keys()].find(mesh => mesh.geometry === geometry);
-      return faces.length === 2 && faces[0] === gl.FRONT && faces[1] === gl.BACK &&
-        !mesh.program.depthWrite && mesh.program.cullFace === null;
+    const doubleSidedPasses = passes.size > 0 && [...passes].every(([mesh, faces]) => {
+      return faces.length === 2 && faces[0] === 'front' && faces[1] === 'back' &&
+        !mesh.program.depthWrite && mesh.program.cullMode === 'none';
     });
     layer._drawGeometry = drawGeometry;
     for (const [mesh, program] of programs) {
@@ -285,44 +270,30 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     }
     layer._shared._render();
     const probe = nativeChecks.mesh(layer, {
-      position: [-1, -1, 0.5, 1, -1, 0.5, 0, 1, 0.5, -1, -1, 0, 1, -1, 0, 0, 1, 0],
-      normal: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      position: [-20, 2, -20, 20, 2, -20, 0, 2, 20, -20, 0, -20, 20, 0, -20, 0, 0, 20],
+      normal: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
       color: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-    }, layer._createProgram({ vertexColors: true, alphaMode: 'MASK' }));
-    const probeCamera = structuredClone(layer.camera);
-    probeCamera.position.splice(0, 3, 0, 0, 3);
-    probeCamera.target.splice(0, 3, 0, 0, 0);
-    const sample = () => {
-      layer._updateWorldMatrix(probe);
-      layer._updateCamera(probeCamera);
-      const modelView = new DOMMatrix(probeCamera.viewMatrix).multiply(new DOMMatrix(probe.worldMatrix)).toFloat64Array();
-      const inverse = new DOMMatrix(modelView).inverse().toFloat64Array();
-      Object.assign(probe.program.uniforms, {
-        modelViewMatrix: { value: modelView }, projectionMatrix: { value: probeCamera.projectionMatrix },
-        normalMatrix: { value: [inverse[0], inverse[4], inverse[8], inverse[1], inverse[5], inverse[9],
-          inverse[2], inverse[6], inverse[10]] },
-      });
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.depthMask(true); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      layer._useProgram(probe.program);
-      layer._drawGeometry(probe.geometry, probe.program, gl.TRIANGLES);
-      const pixel = new Uint8Array(4);
-      gl.readPixels(Math.floor(gl.drawingBufferWidth / 2), Math.floor(gl.drawingBufferHeight / 2),
-        1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-      return [...pixel];
-    };
-    const firstPixel = sample();
+    }, layer._createProgram({ vertexColors: true, alphaMode: 'MASK', doubleSided: true }));
+    const pitch = map.getPitch(), bearing = map.getBearing();
+    layer.model.visible = false;
+    map.setPitch(0); map.setBearing(0); map.setView(layer.location, 17, { animate: false });
+    layer.add(probe);
+    const sample = () => nativeChecks.pixels(layer,
+      Math.floor(layer.renderer.canvas.width / 2), Math.floor(layer.renderer.canvas.height / 2), 1, 1);
+    const firstPixel = await sample();
     for (const attribute of Object.values(probe.geometry.attributes)) {
       const first = attribute.data.slice(0, 9);
       attribute.data.copyWithin(0, 9);
       attribute.data.set(first, 9);
-      attribute.needsUpdate = true;
+      layer.renderer.device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
     }
-    const secondPixel = sample();
+    const secondPixel = await sample();
     const depthOrderIndependent = firstPixel.every((value, index) => value === secondPixel[index]) &&
       firstPixel[0] > firstPixel[2] && firstPixel[3] === 255;
-    for (const attribute of Object.values(probe.geometry.attributes)) probe.geometry.gl.deleteBuffer(attribute.buffer);
-    layer._removeProgram(probe.program);
+    layer._disposeMesh(probe);
+    layer.model.visible = true;
+    map.setPitch(pitch); map.setBearing(bearing);
+    layer._shared._render();
     const container = map.getContainer();
     const rect = container.getBoundingClientRect();
     let position;
@@ -362,17 +333,18 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     const tooltipRemoved = !tooltip.isConnected && container.style.cursor !== 'pointer';
     const attributionRemoved = !map.attributionControl.getContainer().textContent.includes('Test model attribution');
     layer.addTo(map);
+    await layer._added.promise;
     const retained = layer.model.parent === layer.root;
     const tooltipRecreated = layer._tooltip !== tooltip && layer._tooltip.hidden;
     layer._shared._render();
     const restoredHit = layer._findFeature(position);
     const restoredGPU = restoredHit?.model === layer.model &&
-      restoredHit.mesh.geometry.gl === layer.renderer.gl &&
-      restoredHit.mesh.program.gl === layer.renderer.gl;
+      restoredHit.mesh.geometry.device === layer.renderer.device &&
+      restoredHit.mesh.program.device === layer.renderer.device;
     let restoredTextures = true;
     layer.traverse(layer.model, mesh => {
       const texture = mesh.program?.uniforms.baseTexture?.value;
-      if (texture && texture.gl !== layer.renderer.gl) restoredTextures = false;
+      if (texture && texture.device !== layer.renderer.device) restoredTextures = false;
     });
     layer.remove();
     return { centered, attached, rotation, scale, attribution, attributionRemoved, retained,
@@ -608,7 +580,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       render.apply(this, args);
       if (!map._animatingZoom) return;
       animatedFrames++;
-      if (this.renderer.gl.canvas.hidden) hiddenFrames++;
+      if (this.renderer.canvas.hidden) hiddenFrames++;
       const level = tower._shared._zoomLevel;
       const probe = document.createElement('span');
       probe.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0';
@@ -652,17 +624,14 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     map.setBearing(30);
     await new Promise(requestAnimationFrame);
     const renderer = tower.renderer;
-    const gl = renderer.gl;
-    tower._shared._render();
-    const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
-    gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const pixels = await nativeChecks.pixels(tower);
     let visiblePixels = 0;
     for (let i = 3; i < pixels.length; i += 4) {
       if (pixels[i]) visiblePixels++;
     }
-    const clickThrough = getComputedStyle(renderer.gl.canvas).pointerEvents === 'none';
+    const clickThrough = getComputedStyle(renderer.canvas).pointerEvents === 'none';
     map.removeLayer(tower);
-    const sharedCanvasRemains = document.querySelector('.leaflet-3d') === eiffel.renderer.gl.canvas;
+    const sharedCanvasRemains = document.querySelector('.leaflet-3d') === eiffel.renderer.canvas;
     map.removeLayer(eiffel);
     const other3d = [];
     map.eachLayer(layer => { if (layer instanceof L.Layer.types['3d']) other3d.push(layer); });
@@ -671,6 +640,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     tower.addTo(map);
     eiffel.addTo(map);
     other3d.forEach(layer => layer.addTo(map));
+    await Promise.all([tower, eiffel, ...other3d].map(layer => layer._added.promise));
     return {
       height, meshes, errors, footprintErrors, tileErrors, zoomErrors, animatedFrames, hiddenFrames,
       visiblePixels, clickThrough, removed, sharedCanvasRemains,

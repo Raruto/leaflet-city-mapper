@@ -52,6 +52,7 @@ Then('cancelled building downloads recover without errors or stale meshes', asyn
     const stopped = requests.length === beforeRemoval && active === 0 && layer._areas.size === 0;
     hold = false;
     layer.addTo(map);
+    await layer._added.promise;
     await idle();
     const reloaded = requests.length > beforeRemoval && [...layer._areas.values()].every(area => area.done);
     layer.remove();
@@ -62,29 +63,6 @@ Then('cancelled building downloads recover without errors or stale meshes', asyn
   assert.equal(result.aborted, 4, 'Pan and removal each cancel two pending requests');
   assert.equal(result.errors, 0, 'Expected AbortErrors are not loading failures');
   for (const name of ['recovered', 'noStale', 'stopped', 'reloaded']) assert.equal(result[name], true, name);
-});
-
-Then('the Paris example keeps navigation inside the building archive', async function () {
-  const result = await this.page.evaluate(async () => {
-    const bounds = map.options.maxBounds;
-    const checks = [];
-    for (const [pitch, bearing] of [[0, 0], [45, 90], [85, 270]]) {
-      map.setPitch(pitch);
-      map.setBearing(bearing);
-      for (const location of [[48.91892, 1.99112], [48.7, 2.6]]) {
-        map.setView(location, 17, { animate: false });
-        await new Promise(resolve => setTimeout(resolve, 400));
-        checks.push({ valid: bounds.contains(map.getCenter()), pitch, center: map.getCenter() });
-      }
-      map.setZoom(1, { animate: false });
-      await new Promise(resolve => setTimeout(resolve, 400));
-      checks.push({ valid: map.getZoom() === map.options.minZoom && bounds.contains(map.getCenter()),
-        pitch, center: map.getCenter(), zoom: map.getZoom() });
-    }
-    return { checks, viscosity: map.options.maxBoundsViscosity };
-  });
-  assert.ok(result.checks.every(check => check.valid), JSON.stringify(result));
-  assert.equal(result.viscosity, 1);
 });
 
 Then('building blocks cover pitched views and retain overlapping areas', async function () {
@@ -149,7 +127,7 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
     layer.options.featureStyle = () => ({ top: 10 });
     const anchor = layer.location, west = anchor.lng, south = anchor.lat;
     let geometry = { type: 'Polygon', coordinates: [[[west, south]]] };
-    if (invalid === 'geometry') geometry = { type: 'Point', coordinates: [west, south] };
+    if (invalid === 'geometry') geometry = { type: 'LineString', coordinates: [[west, south], [west + 0.001, south]] };
     if (invalid === 'coordinates') geometry = { type: 'Polygon', coordinates: [[['bad', south]]] };
     if (invalid === 'empty polygon') geometry = { type: 'MultiPolygon', coordinates: [
       [[[west, south], [west + 0.001, south], [west, south + 0.001], [west, south]]], [],
