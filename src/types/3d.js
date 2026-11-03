@@ -134,6 +134,7 @@ L.Layer.types['3d'] = L.Layer.extend({
   _onTerrainChange() { return sources.onTerrainChange(this); },
   _updateArea() { return sources.updateArea(this); },
   _pump() { return sources.pump(this); },
+  _loadSource(area) { return sources.loadSource(this, area); },
   _releaseArea(area) { return sources.releaseArea(this, area); },
   _updateStatus(enabled) { return sources.updateStatus(this, enabled); },
 
@@ -158,9 +159,9 @@ L.Layer.types['3d'] = L.Layer.extend({
   initialize(options) {
     L.Util.setOptions(this, options);
     // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
-    const model = /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);
+    const model = !this._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);
     this.modelUrl = model ? this.options.url : null;
-    this.url = this.options.url && !model ? new URL(this.options.url, document.baseURI).href : null;
+    this.url = this.options.url && !model && !this._geojson ? new URL(this.options.url, document.baseURI).href : null;
     this._directories = new Map();
     if (this.options.center) {
       this.location = new L.LatLng(this.options.center[0], this.options.center[1]);
@@ -179,9 +180,9 @@ L.Layer.types['3d'] = L.Layer.extend({
           origin:    [0, 0, 0],
           direction: [0, 0, 0]
         };
-        if (this.url) {
+        if (this.url || this._geojson) {
           this.group = this.root;
-          this.header = await this.getHeader();
+          if (this.url) this.header = await this.getHeader();
         }
         if (this._map) await this._attach(this._map);
         if (this.modelUrl) await this._loadModel();
@@ -200,7 +201,7 @@ L.Layer.types['3d'] = L.Layer.extend({
       const center = map.getCenter();
       this.location = new L.LatLng(center.lat, center.lng);
     }
-    if (this.url || this.options.tooltipContent || this.modelUrl) {
+    if (this.url || this._geojson || this.options.tooltipContent || this.modelUrl) {
       this.container = map.getContainer();
       if (this.options.tooltipContent) {
         this._tooltip = L.DomUtil.create('div', 'leaflet-3d-tooltip', this.container);
@@ -248,7 +249,7 @@ L.Layer.types['3d'] = L.Layer.extend({
     this._areas.clear();
     this._tooltip?.remove();
     this._tooltip = null;
-    if (this.url) this._updateStatus(false);
+    if (this.url || this._geojson) this._updateStatus(false);
     const shared = this._shared;
     if (!shared) return;
     this.setParent(this.root, null);

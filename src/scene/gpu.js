@@ -30,11 +30,12 @@ export async function attach(backend, map) {
     const device = await adapter.requestDevice().catch(fail);
     device.addEventListener('uncapturederror', event => {
       const owner = L.Layer.types['3d']._renderers.get(map);
+      if (owner?.renderer?.device !== device) return;
       for (const layer of owner?._layers || []) layer.fire('error', { error: event.error });
     });
     device.lost.then(info => {
       const owner = L.Layer.types['3d']._renderers.get(map);
-      if (!owner) return;
+      if (!owner || owner.renderer?.device !== device) return;
       const error = new Error(`WebGPU device lost: ${info.message || info.reason}`);
       for (const layer of owner._layers) layer.fire('error', { error });
     });
@@ -185,7 +186,7 @@ export async function attach(backend, map) {
     }
   });
   shared.update();
-  if (backend.header) backend._updateArea();
+  if (backend.header || backend._geojson) backend._updateArea();
 }
 
 export function destroyTexture(backend, texture) {

@@ -1,7 +1,7 @@
 import { parseColor, triangulate, isClockWise, treeGeometry, lightGeometry, lampPostGeometry } from '../utils/geometry.js';
 import { emptyNode } from '../utils/scene.js';
 
-/** PMTiles GeoJSON source areas: loading, building and releasing. */
+/** GeoJSON source areas: loading, building and releasing. */
 export function onTerrainChange(backend) {
   if (!backend._map) return;
   for (const area of backend._areas.values()) backend._releaseArea(area);
@@ -39,6 +39,13 @@ export function updateArea(backend) {
   backend._pump();
 }
 
+export async function loadSource(backend, area) {
+  const { z, x, y } = area.coords;
+  const result = await backend.getZxy(z, x, y, area.request.signal);
+  return result ? JSON.parse(new TextDecoder().decode(result.data))
+    : { type: 'FeatureCollection', features: [] };
+}
+
 /** Start at most two load/build tasks; cancelled tasks still free their slot in finally. */
 export function pump(backend) {
   // Meshes need the shared renderer; _attach() re-runs _updateArea() once it exists.
@@ -50,12 +57,10 @@ export function pump(backend) {
     backend._inflight++;
     (async () => {
       try {
-        const coords = area.coords, { z, x, y } = coords;
-        const result = await backend.getZxy(z, x, y, area.request.signal);
+        const coords = area.coords;
+        const data = await backend._loadSource(area);
         if (area.request.signal.aborted) return;
-        const data = result ? JSON.parse(new TextDecoder().decode(result.data))
-          : { type: 'FeatureCollection', features: [] };
-        if (data.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
+        if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
           throw new Error('Invalid GeoJSON response');
         }
         const features = data.features;
@@ -90,16 +95,18 @@ export function pump(backend) {
             if (area.request.signal.aborted) return;
             deadline = performance.now() + 8;
           }
-          const geometry = feature.geometry;
+          const geometry = feature?.geometry;
           const isTree = geometry?.type === 'Point';
           if (backend.options.nightLight && !isTree) throw new Error('Night lights require Point geometry');
           const polygons = geometry?.type === 'Polygon' ? [geometry.coordinates] : geometry?.type === 'MultiPolygon' ? geometry.coordinates : null;
           if (!polygons && !isTree) throw new Error('Unsupported GeoJSON geometry');
           const [lon, lat] = (isTree ? geometry.coordinates : polygons[0]?.[0]?.[0]) ?? [];
           if (!Number.isFinite(lon) || !Number.isFinite(lat)) throw new Error('Invalid GeoJSON coordinates');
-          const anchor = map.project(new L.LatLng(lat, lon), coords.z);
-          // Overlapping archive blocks may contain the same polygon; its first vertex owns it.
-          if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) continue;
+          if (coords) {
+            const anchor = map.project(new L.LatLng(lat, lon), coords.z);
+            // Overlapping archive blocks may contain the same polygon; its first vertex owns it.
+            if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) continue;
+          }
           const style = backend.options.featureStyle(feature);
           if (style === null) {
             skipped++;

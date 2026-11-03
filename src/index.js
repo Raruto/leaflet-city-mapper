@@ -12,6 +12,7 @@
  * - types/: one module per `source.type`, the only files imported by this router:
  *   - 'pmtiles': raster PMTiles basemap (an L.TileLayer), draped on the terrain when present;
  *   - '3d': shared WebGPU scene with a GLB/glTF model, PMTiles GeoJSON features, or empty;
+ *   - 'geojson': inline or URL-backed GeoJSON features rendered by the shared 3D scene;
  *   - 'terrain': Float32 PMTiles DEM that deforms raster tiles, buildings and the camera, plus optional bridge decks;
  *   - 'sunlight': simulation clock control, sun/moon lighting and shadows;
  *   - 'traffic': vehicles moving along GeoJSON lanes (measured flow or timetable);
