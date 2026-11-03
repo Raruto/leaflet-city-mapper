@@ -19,7 +19,17 @@ Then('every local source in the city example is available', async function () {
 });
 
 Given('the city mapper plugin is loaded after leaflet-rotate', async function () {
-  await this.page.goto(`${this.baseUrl}/test/fixtures/plugin.html`);
+  await this.page.goto(this.baseUrl);
+  await this.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
+  const leaflet2 = process.env.LEAFLET_VERSION === '2';
+  await this.page.addScriptTag({
+    url: leaflet2
+      ? 'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js'
+      : 'https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
+  });
+  if (leaflet2) await this.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
+  await this.page.addScriptTag({ url: 'https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js' });
+  await this.page.addScriptTag({ url: `${this.baseUrl}/dist/index.js` });
   await this.page.waitForFunction(() => L.Layer.types);
 });
 
