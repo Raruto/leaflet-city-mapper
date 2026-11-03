@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { Then } from '@cucumber/cucumber';
-import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../../src/utils/geometry.js';
-import { emptyNode, setParent, traverse } from '../../../src/utils/scene.js';
-import { decodeDirectory, decodeHeader, decompress, tileId } from '../../../src/utils/pmtiles.js';
-import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../../src/utils/model.js';
-import { lightGrid, worldLights } from '../../../src/utils/lighting.js';
-import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../../src/utils/terrain.js';
-import { toLanes, tripsAt, routeGeometry } from '../../../src/utils/traffic.js';
-import { collider, horizontalRay } from '../../../src/utils/walk.js';
-import { materialShaders } from '../../../src/utils/shaders.js';
-import { projectCelestialBody } from '../../../src/utils/sun.js';
+import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../src/utils/geometry.js';
+import { emptyNode, setParent, traverse } from '../../src/utils/scene.js';
+import { decodeDirectory, decodeHeader, decompress, tileId } from '../../src/utils/pmtiles.js';
+import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../src/utils/model.js';
+import { lightGrid, worldLights } from '../../src/utils/lighting.js';
+import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../src/utils/terrain.js';
+import { toLanes, tripsAt, routeGeometry } from '../../src/utils/traffic.js';
+import { collider, horizontalRay } from '../../src/utils/walk.js';
+import { materialShaders } from '../../src/utils/shaders.js';
+import { projectCelestialBody } from '../../src/utils/sun.js';
 
 const checks = {
   geometry() {

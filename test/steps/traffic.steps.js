@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Then } from '@cucumber/cucumber';
-import { along, scheduledTrips, speed, vehicleOffsets } from '../../../src/utils/traffic.js';
-import { trafficHour } from '../../../examples/data/paris-traffic.js';
+import { along, scheduledTrips, speed, vehicleOffsets } from '../../src/utils/traffic.js';
+import { trafficHour } from '../../examples/data/paris-traffic.js';
 
 const [cruise] = JSON.parse(readFileSync(new URL('../../../examples/data/seine-cruises.geojson', import.meta.url))).features;
 const cruises = date => scheduledTrips(date, cruise.properties.timetable);

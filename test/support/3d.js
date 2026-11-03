@@ -153,7 +153,7 @@ Given('a map with the standalone 3D module and no dependency import map', async 
 
 const openEiffelExample = async function () {
   await this.page.setViewportSize({ width: 800, height: 600 });
-  await this.page.goto(`${this.baseUrl}/examples/paris.html`, { waitUntil: 'domcontentloaded' });
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.map && typeof window.map.getPitch === 'function');
   await this.page.waitForFunction(() => layers._layers.some(entry => entry.name === 'Shadows'));

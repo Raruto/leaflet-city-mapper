@@ -137,7 +137,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', a
     contentType: 'image/png',
     body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0u8AAAAASUVORK5CYII=', 'base64'),
   }));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-minimal.html`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`);
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => layer._geojson &&
       [...layer._areas.values()].some(area => area.done && area.buildings === 5));

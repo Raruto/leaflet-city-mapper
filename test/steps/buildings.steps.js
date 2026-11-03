@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
-import { prepare3DChecks } from '../../support/3d.js';
+import { prepare3DChecks } from '../support/3d.js';
 
 Then('cancelled building downloads recover without errors or stale meshes', async function () {
   const result = await this.page.evaluate(async () => {
@@ -237,7 +237,7 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
     }
   });
   await this.page.setViewportSize({ width: 800, height: 600 });
-  await this.page.goto(`${this.baseUrl}/examples/paris.html`, { waitUntil: 'domcontentloaded' });
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => layer.ready)));
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>

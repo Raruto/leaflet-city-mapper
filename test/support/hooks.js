@@ -59,6 +59,8 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
     let body = (await response.text())
+      .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/dist\/leaflet-city-mapper\.js/g,
+        `${baseUrl}/dist/leaflet-city-mapper.js`)
       .replace(/\bconst (map|esri|osm|layers|markers|path|circle|polygon|rectangle) =/g, 'const $1 = window.$1 =');
     if (version === '2') {
       body = body
