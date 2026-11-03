@@ -1,0 +1,2 @@
+function e(M,i,c,u,s){const t=Math.PI/180,o=(280.16+360.9856235*M+c)*t-u,a=i*t,h=Math.asin(Math.sin(a)*Math.sin(s)+Math.cos(a)*Math.cos(s)*Math.cos(o)),n=(Math.atan2(Math.sin(o),Math.cos(o)*Math.sin(a)-Math.tan(s)*Math.cos(a))/t+180+360)%360;return{altitude:h/t,azimuth:n,direction:[Math.sin(n*t)*Math.cos(h),Math.sin(h),-Math.cos(n*t)*Math.cos(h)]}}export{e as horizontalPosition};
+//# sourceMappingURL=horizontalPosition.js.map

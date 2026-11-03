@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/tileId.js"],
+  "sourcesContent": ["/** Cumulative Hilbert ID for an archive tile. */\n\nexport function tileId(z, x, y) {\n  if (![z, x, y].every(Number.isInteger) || z < 0 || z > 26 ||\n    x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) throw new Error('Invalid PMTiles tile coordinates');\n  let id = (4 ** z - 1) / 3;\n  const n = 2 ** z;\n  // Same cumulative Hilbert ordering used by build/pmtiles.js.\n  for (let s = n / 2; s >= 1; s /= 2) {\n    const rx = (x & s) ? 1 : 0, ry = (y & s) ? 1 : 0;\n    id += s * s * ((3 * rx) ^ ry);\n    if (!ry) {\n      if (rx) { x = n - 1 - x; y = n - 1 - y; }\n      [x, y] = [y, x];\n    }\n  }\n  return id;\n}\n"],
+  "mappings": "AAEO,SAASA,EAAOC,EAAGC,EAAGC,EAAG,CAC9B,GAAI,CAAC,CAACF,EAAGC,EAAGC,CAAC,EAAE,MAAM,OAAO,SAAS,GAAKF,EAAI,GAAKA,EAAI,IACrDC,EAAI,GAAKC,EAAI,GAAKD,GAAK,GAAKD,GAAKE,GAAK,GAAKF,EAAG,MAAM,IAAI,MAAM,kCAAkC,EAClG,IAAIG,GAAM,GAAKH,EAAI,GAAK,EACxB,MAAM,EAAI,GAAKA,EAEf,QAASI,EAAI,EAAI,EAAGA,GAAK,EAAGA,GAAK,EAAG,CAClC,MAAMC,EAAMJ,EAAIG,EAAK,EAAI,EAAGE,EAAMJ,EAAIE,EAAK,EAAI,EAC/CD,GAAMC,EAAIA,GAAM,EAAIC,EAAMC,GACrBA,IACCD,IAAMJ,EAAI,EAAI,EAAIA,EAAGC,EAAI,EAAI,EAAIA,GACrC,CAACD,EAAGC,CAAC,EAAI,CAACA,EAAGD,CAAC,EAElB,CACA,OAAOE,CACT",
+  "names": ["tileId", "z", "x", "y", "id", "s", "rx", "ry"]
+}

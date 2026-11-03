@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/types.js"],
+  "sourcesContent": ["export const types = {\n  5120: Int8Array,\n  5121: Uint8Array,\n  5122: Int16Array,\n  5123: Uint16Array,\n  5125: Uint32Array,\n  5126: Float32Array,\n};\n"],
+  "mappings": "AAAO,MAAMA,EAAQ,CACnB,KAAM,UACN,KAAM,WACN,KAAM,WACN,KAAM,YACN,KAAM,YACN,KAAM,YACR",
+  "names": ["types"]
+}

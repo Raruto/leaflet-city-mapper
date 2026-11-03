@@ -3,18 +3,38 @@ import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
 import { Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
-import { parseColor, triangulate, computeBounds, setVertexColor, treeGeometry, lightGeometry, lampPostGeometry } from '../../src/utils/geometry.js';
-import { emptyNode, setParent, traverse } from '../../src/utils/scene.js';
-import { decodeDirectory, decodeHeader, decompress, tileId } from '../../src/utils/pmtiles.js';
-import { decodeModel, readAccessor, nodeMatrix, vertexNormals, textureSampler } from '../../src/utils/model.js';
-import { lightGrid } from '../../src/utils/lighting.js';
+import { parseColor } from '../../src/utils/parseColor.js';
+import { triangulate } from '../../src/utils/triangulate.js';
+import { computeBounds } from '../../src/utils/computeBounds.js';
+import { setVertexColor } from '../../src/utils/setVertexColor.js';
+import { treeGeometry } from '../../src/utils/treeGeometry.js';
+import { lightGeometry } from '../../src/utils/lightGeometry.js';
+import { lampPostGeometry } from '../../src/utils/lampPostGeometry.js';
+import { emptyNode } from '../../src/utils/emptyNode.js';
+import { setParent } from '../../src/utils/setParent.js';
+import { traverse } from '../../src/utils/traverse.js';
+import { decodeDirectory } from '../../src/utils/decodeDirectory.js';
+import { decodeHeader } from '../../src/utils/decodeHeader.js';
+import { decompress } from '../../src/utils/decompress.js';
+import { tileId } from '../../src/utils/tileId.js';
+import { decodeModel } from '../../src/utils/decodeModel.js';
+import { readAccessor } from '../../src/utils/readAccessor.js';
+import { nodeMatrix } from '../../src/utils/nodeMatrix.js';
+import { vertexNormals } from '../../src/utils/vertexNormals.js';
+import { textureSampler } from '../../src/utils/textureSampler.js';
+import { lightGrid } from '../../src/utils/lightGrid.js';
 import { worldLights } from '../../src/utils/worldLights.js';
-import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../../src/utils/terrain.js';
-import { toLanes, tripsAt, routeGeometry } from '../../src/utils/traffic.js';
-import { collider } from '../../src/utils/walk.js';
+import { bridgeElevation } from '../../src/utils/bridgeElevation.js';
+import { terrainElevation } from '../../src/utils/terrainElevation.js';
+import { terrainGrid } from '../../src/utils/terrainGrid.js';
+import { terrainAtlas } from '../../src/utils/terrainAtlas.js';
+import { toLanes } from '../../src/utils/toLanes.js';
+import { tripsAt } from '../../src/utils/tripsAt.js';
+import { routeGeometry } from '../../src/utils/routeGeometry.js';
+import { collider } from '../../src/utils/collider.js';
 import { horizontalRay } from '../../src/utils/horizontalRay.js';
-import { materialShaders } from '../../src/utils/shaders.js';
-import { projectCelestialBody } from '../../src/utils/sun.js';
+import { materialShaders } from '../../src/utils/materialShaders.js';
+import { projectCelestialBody } from '../../src/utils/projectCelestialBody.js';
 
 const checks = {
   async 'dev-server'() {
@@ -233,8 +253,13 @@ Then('the standalone 3D {string} utilities preserve their results and errors', a
 
 Then('standalone browser math preserves scene transforms and picking', async function () {
   const result = await this.page.evaluate(async base => {
-    const { emptyNode, setParent, updateWorldMatrix, updateCamera } = await import(`${base}/dist/utils/scene.js`);
-    const { intersectMeshes } = await import(`${base}/dist/utils/picking.js`);
+    const [{ emptyNode }, { setParent }, { updateWorldMatrix }, { updateCamera }, { intersectMeshes }] = await Promise.all([
+      import(`${base}/dist/utils/emptyNode.js`),
+      import(`${base}/dist/utils/setParent.js`),
+      import(`${base}/dist/utils/updateWorldMatrix.js`),
+      import(`${base}/dist/utils/updateCamera.js`),
+      import(`${base}/dist/utils/intersectMeshes.js`),
+    ]);
     const parent = emptyNode(), child = emptyNode();
     parent.position = [10, 20, 30];
     parent.scale = [2, 3, 4];

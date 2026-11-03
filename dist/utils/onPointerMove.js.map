@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/onPointerMove.js"],
+  "sourcesContent": ["import { findFeature } from './findFeature';\nimport { setHighlight } from './setHighlight';\nimport { showFeature } from './showFeature';\n\n/** Hover is transient; featurehover also reports misses with feature:null. */\n\nexport function onPointerMove(backend, event) {\n  backend.hoveredFeature = findFeature(backend, event);\n  setHighlight(backend, backend.hoveredFeature);\n  showFeature(backend, backend.hoveredFeature, event);\n  backend.fire('featurehover', { feature: backend.hoveredFeature, originalEvent: event });\n}\n"],
+  "mappings": "AAAA,OAAS,eAAAA,MAAmB,gBAC5B,OAAS,gBAAAC,MAAoB,iBAC7B,OAAS,eAAAC,MAAmB,gBAIrB,SAASC,EAAcC,EAASC,EAAO,CAC5CD,EAAQ,eAAiBJ,EAAYI,EAASC,CAAK,EACnDJ,EAAaG,EAASA,EAAQ,cAAc,EAC5CF,EAAYE,EAASA,EAAQ,eAAgBC,CAAK,EAClDD,EAAQ,KAAK,eAAgB,CAAE,QAASA,EAAQ,eAAgB,cAAeC,CAAM,CAAC,CACxF",
+  "names": ["findFeature", "setHighlight", "showFeature", "onPointerMove", "backend", "event"]
+}

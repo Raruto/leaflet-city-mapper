@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/setVertexColor.js"],
+  "sourcesContent": ["/**\n * Paints the vertices `[start, end)` of a mesh and marks its color buffer dirty.\n * @param {Object} mesh Layer-created mesh with a color attribute.\n * @param {number} start Inclusive vertex index, not an offset into the RGB array.\n * @param {number} end Exclusive vertex index.\n * @param {Object} color sRGB {r,g,b}, typically from parseColor().\n */\n\nexport function setVertexColor(mesh, start, end, color) {\n  for (let i = start; i < end; i++) {\n    mesh.geometry.attributes.color.data.set([color.r, color.g, color.b], i * 3);\n  }\n  mesh.geometry.attributes.color.needsUpdate = true;\n}\n"],
+  "mappings": "AAQO,SAASA,EAAeC,EAAMC,EAAOC,EAAKC,EAAO,CACtD,QAASC,EAAIH,EAAOG,EAAIF,EAAKE,IAC3BJ,EAAK,SAAS,WAAW,MAAM,KAAK,IAAI,CAACG,EAAM,EAAGA,EAAM,EAAGA,EAAM,CAAC,EAAGC,EAAI,CAAC,EAE5EJ,EAAK,SAAS,WAAW,MAAM,YAAc,EAC/C",
+  "names": ["setVertexColor", "mesh", "start", "end", "color", "i"]
+}

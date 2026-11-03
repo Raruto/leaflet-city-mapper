@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/textureSampler.js"],
+  "sourcesContent": ["/** Translate glTF sampler constants into WebGPU sampler options. */\n\nexport function textureSampler(sampler) {\n  return {\n    addressModeU: sampler.wrapS === 33071 ? 'clamp-to-edge' : sampler.wrapS === 33648 ? 'mirror-repeat' : 'repeat',\n    addressModeV: sampler.wrapT === 33071 ? 'clamp-to-edge' : sampler.wrapT === 33648 ? 'mirror-repeat' : 'repeat',\n    magFilter: sampler.magFilter === 9728 ? 'nearest' : 'linear',\n    minFilter: sampler.minFilter === 9728 || sampler.minFilter === 9984 || sampler.minFilter === 9986 ? 'nearest' : 'linear',\n  };\n}\n"],
+  "mappings": "AAEO,SAASA,EAAeC,EAAS,CACtC,MAAO,CACL,aAAcA,EAAQ,QAAU,MAAQ,gBAAkBA,EAAQ,QAAU,MAAQ,gBAAkB,SACtG,aAAcA,EAAQ,QAAU,MAAQ,gBAAkBA,EAAQ,QAAU,MAAQ,gBAAkB,SACtG,UAAWA,EAAQ,YAAc,KAAO,UAAY,SACpD,UAAWA,EAAQ,YAAc,MAAQA,EAAQ,YAAc,MAAQA,EAAQ,YAAc,KAAO,UAAY,QAClH,CACF",
+  "names": ["textureSampler", "sampler"]
+}

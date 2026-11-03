@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/limbs.js"],
+  "sourcesContent": ["// [part, pivot x, pivot y, swing sign]\n\nexport const limbs = [\n  ['body', 0, 0, 0],\n  ['leg', -0.09, 0.9, 1],\n  ['leg', 0.09, 0.9, -1],\n  ['arm', -0.25, 1.42, -1],\n  ['arm', 0.25, 1.42, 1]\n];\n"],
+  "mappings": "AAEO,MAAMA,EAAQ,CACnB,CAAC,OAAQ,EAAG,EAAG,CAAC,EAChB,CAAC,MAAO,KAAO,GAAK,CAAC,EACrB,CAAC,MAAO,IAAM,GAAK,EAAE,EACrB,CAAC,MAAO,KAAO,KAAM,EAAE,EACvB,CAAC,MAAO,IAAM,KAAM,CAAC,CACvB",
+  "names": ["limbs"]
+}

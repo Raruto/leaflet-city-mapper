@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/destroyTexture.js"],
+  "sourcesContent": ["\nexport function destroyTexture(backend, texture) {\n  backend.renderer.device.queue.onSubmittedWorkDone().then(() => texture.destroy(), error => {\n    backend.fire('error', { error });\n    texture.destroy();\n  });\n}\n"],
+  "mappings": "AACO,SAASA,EAAeC,EAASC,EAAS,CAC/CD,EAAQ,SAAS,OAAO,MAAM,oBAAoB,EAAE,KAAK,IAAMC,EAAQ,QAAQ,EAAGC,GAAS,CACzFF,EAAQ,KAAK,QAAS,CAAE,MAAAE,CAAM,CAAC,EAC/BD,EAAQ,QAAQ,CAClB,CAAC,CACH",
+  "names": ["destroyTexture", "backend", "texture", "error"]
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/getHeader.js"],
+  "sourcesContent": ["import { decodeHeader } from './decodeHeader';\nimport { read } from \"./read\";\n\n/** Cache header initialization; failures remain visible to all callers. */\n\nexport function getHeader(backend) {\n  if (backend.options.archive) return backend.options.archive.getHeader();\n  return backend._header ||= read(backend, 0, 127).then(decodeHeader);\n}\n"],
+  "mappings": "AAAA,OAAS,gBAAAA,MAAoB,iBAC7B,OAAS,QAAAC,MAAY,SAId,SAASC,EAAUC,EAAS,CACjC,OAAIA,EAAQ,QAAQ,QAAgBA,EAAQ,QAAQ,QAAQ,UAAU,EAC/DA,EAAQ,UAAYF,EAAKE,EAAS,EAAG,GAAG,EAAE,KAAKH,CAAY,CACpE",
+  "names": ["decodeHeader", "read", "getHeader", "backend"]
+}

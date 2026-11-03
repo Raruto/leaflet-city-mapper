@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/CELL.js"],
+  "sourcesContent": ["// Walls (non-horizontal triangles) of a mesh in world space, bucketed by 8 m cells; `origin` is the world translation\n// at build time, since layer roots only move vertically with the terrain afterwards.\n\nexport const CELL = 8;\n"],
+  "mappings": "AAGO,MAAMA,EAAO",
+  "names": ["CELL"]
+}

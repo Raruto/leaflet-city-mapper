@@ -1,0 +1,2 @@
+function s(e){const i=[1/0,1/0,1/0],a=[-1/0,-1/0,-1/0],n=e.attributes.position.data;for(let t=0;t<n.length;t++)i[t%3]=Math.min(i[t%3],n[t]),a[t%3]=Math.max(a[t%3],n[t]);const o=i.map((t,h)=>(t+a[h])/2);let f=0;for(let t=0;t<n.length;t+=3)f=Math.max(f,Math.hypot(n[t]-o[0],n[t+1]-o[1],n[t+2]-o[2]));e.bounds={min:i,max:a,center:o,radius:f}}export{s as computeBounds};
+//# sourceMappingURL=computeBounds.js.map

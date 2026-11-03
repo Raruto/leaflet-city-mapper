@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/sizes.js"],
+  "sourcesContent": ["export const sizes = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };\n"],
+  "mappings": "AAAO,MAAMA,EAAQ,CAAE,OAAQ,EAAG,KAAM,EAAG,KAAM,EAAG,KAAM,CAAE",
+  "names": ["sizes"]
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/startZoom.js"],
+  "sourcesContent": ["import { getTileLevel } from \"./getTileLevel\";\n\n/** Preserve the outgoing tile level before Leaflet changes its logical zoom. */\n\nexport function startZoom() {\n  const backend = this;\n  backend._zoomLevel = getTileLevel(backend);\n}\n"],
+  "mappings": "AAAA,OAAS,gBAAAA,MAAoB,iBAItB,SAASC,GAAY,CAC1B,MAAMC,EAAU,KAChBA,EAAQ,WAAaF,EAAaE,CAAO,CAC3C",
+  "names": ["getTileLevel", "startZoom", "backend"]
+}

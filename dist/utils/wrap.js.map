@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/wrap.js"],
+  "sourcesContent": ["export const wrap = angle => Math.atan2(Math.sin(angle), Math.cos(angle));\n"],
+  "mappings": "AAAO,MAAMA,EAAOC,GAAS,KAAK,MAAM,KAAK,IAAIA,CAAK,EAAG,KAAK,IAAIA,CAAK,CAAC",
+  "names": ["wrap", "angle"]
+}

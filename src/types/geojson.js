@@ -1,5 +1,7 @@
 import './3d.js';
-import { onTerrainChange, releaseArea, updateArea } from '../scene/sources.js';
+import { onTerrainChange } from "../utils/onTerrainChange.js";
+import { updateArea } from "../utils/updateArea.js";
+import { releaseArea } from "../utils/releaseArea.js";
 
 /** One GeoJSON batch, independent of the viewport, using the existing extrusion pipeline. */
 L.Layer.types.geojson = L.Layer.types['3d'].extend({

@@ -1,0 +1,2 @@
+import{parseColor as w}from"./parseColor.js";function b(i,u,f){if(!Number.isFinite(u.lightRadius)||u.lightRadius<=0)throw new Error("Invalid light radius");const l=w(u.color),s=(o,n,r,p,t,m)=>{f(o,t,n,t,r,t,...m,l),f(o,t,r,t,p,t,...m,l)},c=.65,d=(o,n,r)=>({x:i.x+(r===2?0:o*c),y:i.y+(r===1?0:r===2?o*c:n*c),ground:i.ground+(r===0?0:n*c),uv:[o,n]});for(let o=0;o<3;o++)s(d(-1,-1,o),d(1,-1,o),d(1,1,o),d(-1,1,o),u.top,o===0?[0,1,0]:o===1?[0,0,1]:[1,0,0])}export{b as lightGeometry};
+//# sourceMappingURL=lightGeometry.js.map

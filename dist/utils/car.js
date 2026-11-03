@@ -1,0 +1,2 @@
+import{paints as o,mirror as r,tyre as a,box as t,glass as e,headlight as l,taillight as s}from"./paints.js";const h=n=>{const i=o[n%o.length];return[...r(.7,.92,-1.68,-1.02,0,.64,a),...r(.7,.92,1.02,1.68,0,.64,a),[[[-.9,-1.95],[-.72,-2.25],[.72,-2.25],[.9,-1.95],[.9,2.05],[.76,2.25],[-.76,2.25],[-.9,2.05]],.28,.82,i],[t(-.84,.84,-.75,1.6),.82,1.38,e,t(-.7,.7,-.05,1.3)],[t(-.71,.71,-.06,1.31),1.38,1.46,i],...r(.38,.8,-2.3,-2.16,.56,.76,l),[t(-.78,.78,2.16,2.3),.6,.76,s]]};export{h as car};
+//# sourceMappingURL=car.js.map

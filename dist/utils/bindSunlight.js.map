@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/bindSunlight.js"],
+  "sourcesContent": ["\nexport function bindSunlight(backend) {\n  const sun = backend.renderer.sunlight;\n  sun.bindGroup = backend.renderer.device.createBindGroup({\n    layout: sun.layout, entries: [\n      { binding: 0, resource: { buffer: sun.buffer } },\n      { binding: 1, resource: sun.texture.createView() },\n      { binding: 2, resource: sun.sampler },\n      { binding: 3, resource: { buffer: sun.lights } },\n    ]\n  });\n}\n"],
+  "mappings": "AACO,SAASA,EAAaC,EAAS,CACpC,MAAMC,EAAMD,EAAQ,SAAS,SAC7BC,EAAI,UAAYD,EAAQ,SAAS,OAAO,gBAAgB,CACtD,OAAQC,EAAI,OAAQ,QAAS,CAC3B,CAAE,QAAS,EAAG,SAAU,CAAE,OAAQA,EAAI,MAAO,CAAE,EAC/C,CAAE,QAAS,EAAG,SAAUA,EAAI,QAAQ,WAAW,CAAE,EACjD,CAAE,QAAS,EAAG,SAAUA,EAAI,OAAQ,EACpC,CAAE,QAAS,EAAG,SAAU,CAAE,OAAQA,EAAI,MAAO,CAAE,CACjD,CACF,CAAC,CACH",
+  "names": ["bindSunlight", "backend", "sun"]
+}

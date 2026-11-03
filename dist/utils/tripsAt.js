@@ -1,0 +1,2 @@
+import{vehicleOffsets as u}from"./vehicleOffsets.js";import{scheduledTrips as g}from"./scheduledTrips.js";const n=(s,i,t)=>i.flatMap((r,o)=>{const{timetable:p,flow:d=0}=r.properties;if(!r.length)return[];if(p)return g(s,p).map(e=>({id:`${o}-${e.id}`,lane:r,distance:e.progress*r.length,speed:r.length/(p.duration*60),properties:{...r.properties,departure:e.departure}}));const f=s/1e3*t;return(r.offsets||=u(r.length,d,t)).map((e,h)=>({id:`${o}-${h}`,lane:r,distance:(e+f)%r.length,speed:t,properties:r.properties}))});export{n as tripsAt};
+//# sourceMappingURL=tripsAt.js.map

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/speed.js"],
+  "sourcesContent": ["// Pure helpers of the 'traffic' type: lane interpolation and vehicle scheduling.\n/** Default urban speed (m/s) used to turn a lane's hourly `flow` into vehicles on the road. */\nexport const speed = 8;\n"],
+  "mappings": "AAEO,MAAMA,EAAQ",
+  "names": ["speed"]
+}

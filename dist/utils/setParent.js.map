@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/setParent.js"],
+  "sourcesContent": ["/** Reparent/detach scene data without drawing or disposing GPU resources. */\n\nexport function setParent(node, parent) {\n  if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1);\n  node.parent = parent;\n  if (parent) parent.children.push(node);\n}\n"],
+  "mappings": "AAEO,SAASA,EAAUC,EAAMC,EAAQ,CAClCD,EAAK,QAAQA,EAAK,OAAO,SAAS,OAAOA,EAAK,OAAO,SAAS,QAAQA,CAAI,EAAG,CAAC,EAClFA,EAAK,OAASC,EACVA,GAAQA,EAAO,SAAS,KAAKD,CAAI,CACvC",
+  "names": ["setParent", "node", "parent"]
+}

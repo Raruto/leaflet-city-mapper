@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/decompress.js"],
+  "sourcesContent": ["export async function decompress(data, compression) {\n  if (compression === 1) return data;\n  if (compression !== 2) throw new Error(`Unsupported PMTiles compression: ${compression}`);\n  return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();\n}\n"],
+  "mappings": "AAAA,eAAsBA,EAAWC,EAAMC,EAAa,CAClD,GAAIA,IAAgB,EAAG,OAAOD,EAC9B,GAAIC,IAAgB,EAAG,MAAM,IAAI,MAAM,oCAAoCA,CAAW,EAAE,EACxF,OAAO,IAAI,SAAS,IAAI,KAAK,CAACD,CAAI,CAAC,EAAE,OAAO,EAAE,YAAY,IAAI,oBAAoB,MAAM,CAAC,CAAC,EAAE,YAAY,CAC1G",
+  "names": ["decompress", "data", "compression"]
+}

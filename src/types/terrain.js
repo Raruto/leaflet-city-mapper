@@ -1,9 +1,13 @@
-import { bridgeElevation, terrainElevation, terrainGrid, terrainAtlas } from '../utils/terrain.js';
-import { triangulate } from '../utils/geometry.js';
+import { bridgeElevation } from '../utils/bridgeElevation.js';
+import { terrainElevation } from '../utils/terrainElevation.js';
+import { terrainGrid } from '../utils/terrainGrid.js';
+import { terrainAtlas } from '../utils/terrainAtlas.js';
+import { triangulate } from '../utils/triangulate.js';
 import './3d.js';
 import './pmtiles.js';
-import * as gpu from '../scene/gpu.js';
-import * as render from '../scene/render.js';
+import * as gpu from '../utils/gpu.js';
+import * as render from '../utils/render.js';
+import * as update from "../utils/update.js";
 
 /**
  * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
@@ -100,7 +104,7 @@ L.Layer.types.terrain = L.Layer.types['3d'].extend({
       for (const layer of Object.values(map._layers)) layer._setTerrainHeight?.();
       if (bridges) this._addBridges(bridges);
       map.fire('terrainchange');
-      render.update(this);
+      update.update(this);
       this.fire('terrainready');
       return true;
     } catch (error) {

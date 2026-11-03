@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/moves.js"],
+  "sourcesContent": ["// W/S (\u2191/\u2193) run forward/back along the heading, A/D (\u2190/\u2192) turn: [forward, turn].\nexport const moves = {\n  KeyW: [1, 0],\n  ArrowUp: [1, 0],\n  KeyS: [-1, 0],\n  ArrowDown: [-1, 0],\n  KeyD: [0, 1],\n  ArrowRight: [0, 1],\n  KeyA: [0, -1],\n  ArrowLeft: [0, -1]\n};\n"],
+  "mappings": "AACO,MAAMA,EAAQ,CACnB,KAAM,CAAC,EAAG,CAAC,EACX,QAAS,CAAC,EAAG,CAAC,EACd,KAAM,CAAC,GAAI,CAAC,EACZ,UAAW,CAAC,GAAI,CAAC,EACjB,KAAM,CAAC,EAAG,CAAC,EACX,WAAY,CAAC,EAAG,CAAC,EACjB,KAAM,CAAC,EAAG,EAAE,EACZ,UAAW,CAAC,EAAG,EAAE,CACnB",
+  "names": ["moves"]
+}

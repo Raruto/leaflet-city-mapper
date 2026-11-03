@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/sortMeshes.js"],
+  "sourcesContent": ["\nexport function sortMeshes(meshes) {\n  return meshes.sort((a, b) => Number(a.program.transparent) - Number(b.program.transparent) ||\n    (a.program.transparent\n      ? (a.renderOrder || 0) - (b.renderOrder || 0) ||\n      b._sortDepth - a._sortDepth || a.id - b.id\n      : a.id - b.id)\n  );\n}\n"],
+  "mappings": "AACO,SAASA,EAAWC,EAAQ,CACjC,OAAOA,EAAO,KAAK,CAACC,EAAGC,IAAM,OAAOD,EAAE,QAAQ,WAAW,EAAI,OAAOC,EAAE,QAAQ,WAAW,GACtFD,EAAE,QAAQ,eACNA,EAAE,aAAe,IAAMC,EAAE,aAAe,IAC3CA,EAAE,WAAaD,EAAE,aAAcA,EAAE,GAAKC,EAAE,EAE5C,CACF",
+  "names": ["sortMeshes", "meshes", "a", "b"]
+}

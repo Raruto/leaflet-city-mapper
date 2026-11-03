@@ -75,13 +75,23 @@
  * @property {string} [error] Failed load/build message; reported through error and progress.
  */
 
-import * as gpu from '../scene/gpu.js';
-import * as model from '../scene/model.js';
-import * as picking from '../scene/picking.js';
-import * as pmtiles from '../scene/pmtiles.js';
-import * as render from '../scene/render.js';
-import * as graph from '../utils/scene.js';
-import * as sources from '../scene/sources.js';
+import * as attach from '../utils/attach.js';
+import * as destroyTexture from '../utils/destroyTexture.js';
+import * as loadModel from '../utils/loadModel.js';
+import * as onPointerMove from '../utils/onPointerMove.js';
+import * as onClick from '../utils/onClick.js';
+import * as onPointerLeave from '../utils/onPointerLeave.js';
+import * as getHeader from '../utils/getHeader.js';
+import * as update from '../utils/update.js';
+import * as onMapChange from '../utils/onMapChange.js';
+import * as onZoomAnim from '../utils/onZoomAnim.js';
+import * as startZoom from '../utils/startZoom.js';
+import * as endZoom from '../utils/endZoom.js';
+import { emptyNode } from '../utils/emptyNode.js';
+import { setParent } from '../utils/setParent.js';
+import * as onTerrainChange from '../utils/onTerrainChange.js';
+import * as updateArea from '../utils/updateArea.js';
+import * as releaseArea from '../utils/releaseArea.js';
 
 L.Layer.types['3d'] = L.Layer.extend({
   statics: {
@@ -121,21 +131,21 @@ L.Layer.types['3d'] = L.Layer.extend({
     // Defer initialization so callers can subscribe to ready/error after construction.
     queueMicrotask(async () => {
       try {
-        this.root = graph.emptyNode();
+        this.root = emptyNode();
         this.raycaster = {
           origin:    [0, 0, 0],
           direction: [0, 0, 0]
         };
         if (this.url || this._geojson) {
           this.group = this.root;
-          if (this.url) this.header = await pmtiles.getHeader(this);
+          if (this.url) this.header = await getHeader.getHeader(this);
         }
         if (this._map) {
-          await gpu.attach(this, this._map);
+          await attach.attach(this, this._map);
           this._added.resolve();
         }
-        if (this.modelUrl) await model.loadModel(this);
-        if (this._shared) render.update(this);
+        if (this.modelUrl) await loadModel.loadModel(this);
+        if (this._shared) update.update(this);
         this.fire('ready');
       } catch (error) {
         this.fire('error', { error });
@@ -152,9 +162,9 @@ L.Layer.types['3d'] = L.Layer.extend({
     if (this.url || this._geojson || this.options.tooltipContent || this.modelUrl) {
       this.container = map.getContainer();
       this._pointerEvents ||= {
-        mousemove: event => picking.onPointerMove(this, event),
-        click: event => picking.onClick(this, event),
-        mouseleave: () => picking.onPointerLeave(this),
+        mousemove: event => onPointerMove.onPointerMove(this, event),
+        click: event => onClick.onClick(this, event),
+        mouseleave: () => onPointerLeave.onPointerLeave(this),
       };
       if (this.options.tooltipContent) {
         this._tooltip = L.DomUtil.create('div', 'leaflet-3d-tooltip', this.container);
@@ -166,19 +176,19 @@ L.Layer.types['3d'] = L.Layer.extend({
       L.DomEvent.on(this.container, this._pointerEvents);
     }
     if (this.root) {
-      gpu.attach(this, map).then(() => this._added.resolve(), error => this.fire('error', { error }));
+      attach.attach(this, map).then(() => this._added.resolve(), error => this.fire('error', { error }));
     }
   },
 
   /** Reconcile source coverage when the visible ground footprint changes. */
   getEvents() {
     return this.url ? {
-      moveend:       () => sources.updateArea(this),
-      zoomend:       () => sources.updateArea(this),
-      rotate:        () => sources.updateArea(this),
-      pitch:         () => sources.updateArea(this),
-      resize:        () => sources.updateArea(this),
-      terrainchange: () => sources.onTerrainChange(this),
+      moveend:       () => updateArea.updateArea(this),
+      zoomend:       () => updateArea.updateArea(this),
+      rotate:        () => updateArea.updateArea(this),
+      pitch:         () => updateArea.updateArea(this),
+      resize:        () => updateArea.updateArea(this),
+      terrainchange: () => onTerrainChange.onTerrainChange(this),
     } : {};
   },
 
@@ -186,24 +196,24 @@ L.Layer.types['3d'] = L.Layer.extend({
   onRemove(map) {
     this._added = Promise.withResolvers();
     if (this.container) {
-      picking.onPointerLeave(this);
+      onPointerLeave.onPointerLeave(this);
       L.DomEvent.off(this.container, this._pointerEvents);
       this.container = null;
     }
-    for (const area of this._areas.values()) sources.releaseArea(this, area);
+    for (const area of this._areas.values()) releaseArea.releaseArea(this, area);
     this._areas.clear();
     this._tooltip?.remove();
     this._tooltip = null;
-    if (this.url || this._geojson) sources.updateStatus(this, false);
+    if (this.url || this._geojson) releaseArea.updateStatus(this, false);
     const shared = this._shared;
     if (!shared) return;
-    graph.setParent(this.root, null);
+    setParent(this.root, null);
     shared._layers.delete(this);
     if (shared === this) {
-      map.off('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, this);
-      map.off('zoomstart', render.startZoom, this);
-      map.off('zoomanim', render.onZoomAnim, this);
-      map.off('zoomend', render.endZoom, this);
+      map.off('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, this);
+      map.off('zoomstart', startZoom.startZoom, this);
+      map.off('zoomanim', onZoomAnim.onZoomAnim, this);
+      map.off('zoomend', endZoom.endZoom, this);
       cancelAnimationFrame(this._frame);
       this._frame = null;
       this._queued = false;
@@ -216,15 +226,15 @@ L.Layer.types['3d'] = L.Layer.extend({
         }
         for (const layer of next._layers) layer._shared = next;
         L.Layer.types['3d']._renderers.set(map, next);
-        map.on('move zoom rotate pitch resize viewreset layeradd layerremove', render.onMapChange, next);
-        map.on('zoomstart', render.startZoom, next);
-        map.on('zoomanim', render.onZoomAnim, next);
-        map.on('zoomend', render.endZoom, next);
-        render.update(next);
+        map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, next);
+        map.on('zoomstart', startZoom.startZoom, next);
+        map.on('zoomanim', onZoomAnim.onZoomAnim, next);
+        map.on('zoomend', endZoom.endZoom, next);
+        update.update(next);
       } else {
-        if (this._roofRaster) gpu.destroyTexture(this, this._roofRaster.texture.texture);
+        if (this._roofRaster) destroyTexture.destroyTexture(this, this._roofRaster.texture.texture);
         this._roofRaster = null;
-        for (const source of this._roofTiles?.values() || []) gpu.destroyTexture(this, source.texture);
+        for (const source of this._roofTiles?.values() || []) destroyTexture.destroyTexture(this, source.texture);
         this._roofTiles = null;
         for (const animation of this._zoomTransitions?.keys() || []) animation.play();
         this._zoomTransitions = null;
@@ -248,7 +258,7 @@ L.Layer.types['3d'] = L.Layer.extend({
         L.Layer.types['3d']._renderers.delete(map);
         for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete this[key];
       }
-    } else render.update(shared);
+    } else update.update(shared);
     this._shared = null;
     this.renderer = this.scene = this.camera = null;
   },
@@ -260,8 +270,8 @@ L.Layer.types['3d'] = L.Layer.extend({
    * @returns {L.Layer} This layer.
    */
   add(object) {
-    graph.setParent(object, this.root);
-    return render.update(this);
+    setParent(object, this.root);
+    return update.update(this);
   },
 
   _setTerrainHeight() {
@@ -278,8 +288,8 @@ L.Layer.types['3d'] = L.Layer.extend({
    */
   remove(object) {
     if (object === undefined) return L.Layer.prototype.remove.call(this);
-    graph.setParent(object, null);
-    return render.update(this);
+    setParent(object, null);
+    return update.update(this);
   },
 });
 

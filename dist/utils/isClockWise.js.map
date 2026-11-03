@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/isClockWise.js"],
+  "sourcesContent": ["/**\n * @returns {boolean} Whether the `{x, y}` points are in clockwise order.\n */\n\nexport function isClockWise(points) {\n  let area = 0;\n  for (let i = 0; i < points.length; i++) {\n    const a = points[i], b = points[(i + 1) % points.length];\n    area += a.x * b.y - b.x * a.y;\n  }\n  return area < 0;\n}\n"],
+  "mappings": "AAIO,SAASA,EAAYC,EAAQ,CAClC,IAAIC,EAAO,EACX,QAASC,EAAI,EAAGA,EAAIF,EAAO,OAAQE,IAAK,CACtC,MAAMC,EAAIH,EAAOE,CAAC,EAAGE,EAAIJ,GAAQE,EAAI,GAAKF,EAAO,MAAM,EACvDC,GAAQE,EAAE,EAAIC,EAAE,EAAIA,EAAE,EAAID,EAAE,CAC9B,CACA,OAAOF,EAAO,CAChB",
+  "names": ["isClockWise", "points", "area", "i", "a", "b"]
+}

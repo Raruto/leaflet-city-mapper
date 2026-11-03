@@ -1,7 +1,9 @@
 import './3d.js';
-import { read, getHeader, getZxy } from '../scene/pmtiles.js';
-import { decompress } from '../utils/pmtiles.js';
-import { update as updateScene } from '../scene/render.js';
+import { read } from '../scene/read.js';
+import { getHeader } from '../scene/getHeader.js';
+import { getZxy } from '../scene/getZxy.js';
+import { decompress } from '../utils/decompress.js';
+import { update as updateScene } from "../scene/update.js";
 
 /** A raster TileLayer backed by the shared PMTiles reader. */
 L.Layer.types.pmtiles = L.TileLayer.extend({

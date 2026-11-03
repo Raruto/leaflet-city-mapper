@@ -38,22 +38,37 @@ AfterAll(function () {
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
-    const [gpu, lighting, picking, render, sources, graph, geometry] = await Promise.all([
-      import('/dist/scene/gpu.js'),
-      import('/dist/scene/lighting.js'),
-      import('/dist/scene/picking.js'),
-      import('/dist/scene/render.js'),
-      import('/dist/scene/sources.js'),
-      import('/dist/utils/scene.js'),
-      import('/dist/utils/geometry.js'),
+    const [gpu, lighting, picking, render, sources, emptyNode, setParent, traverse,
+      updateWorldMatrix, updateCamera, parseColor, triangulate] = await Promise.all([
+      import('/dist/utils/gpu.js'),
+      import('/dist/utils/lighting.js'),
+      import('/dist/utils/picking.js'),
+      import('/dist/utils/render.js'),
+      import('/dist/utils/sources.js'),
+      import('/dist/utils/emptyNode.js'),
+      import('/dist/utils/setParent.js'),
+      import('/dist/utils/traverse.js'),
+      import('/dist/utils/updateWorldMatrix.js'),
+      import('/dist/utils/updateCamera.js'),
+      import('/dist/utils/parseColor.js'),
+      import('/dist/utils/triangulate.js'),
     ]);
+    const graph = {
+      emptyNode: emptyNode.emptyNode,
+      setParent: setParent.setParent,
+      traverse: traverse.traverse,
+      updateWorldMatrix: updateWorldMatrix.updateWorldMatrix,
+      updateCamera: updateCamera.updateCamera,
+    };
     window.nativeChecks = {
-      gpu, lighting, picking, render, sources, graph, geometry,
+      gpu, lighting, picking, render, sources,
+      graph,
+      geometry: {
+        parseColor: parseColor.parseColor,
+        triangulate: triangulate.triangulate,
+      },
       group() {
-        return {
-          position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1],
-          worldMatrix: Array.from(new DOMMatrix().toFloat64Array()), children: [], visible: true,
-        };
+        return graph.emptyNode();
       },
       mesh(layer, attributes, program) {
         const mesh = gpu.createMesh(layer, attributes, program?._layerMaterial);

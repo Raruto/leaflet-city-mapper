@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/utils/skin.js"],
+  "sourcesContent": ["// Pedestrian, about 1.77 m tall, prisms as in utils/vehicles.js (forward -z). Limbs hang from their pivot at y = 0.\nexport const skin = [0.85, 0.64, 0.5], shirt = [0.75, 0.2, 0.15], trousers = [0.16, 0.2, 0.32], dark = [0.08, 0.07, 0.06];\n"],
+  "mappings": "AACO,MAAMA,EAAO,CAAC,IAAM,IAAM,EAAG,EAAGC,EAAQ,CAAC,IAAM,GAAK,GAAI,EAAGC,EAAW,CAAC,IAAM,GAAK,GAAI,EAAGC,EAAO,CAAC,IAAM,IAAM,GAAI",
+  "names": ["skin", "shirt", "trousers", "dark"]
+}
