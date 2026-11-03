@@ -116,13 +116,10 @@ function getLayer3DModules() {
  * @property {number} [skipped] Features skipped by style.
  * @property {string} [error] Failed load/build message.
  *
+ * @param {L.Layer} backend
  * @param {Layer3DOptions} [options] World origin comes from center or the first map centre.
- * Public state: `location` is fixed after first addition; `root` is this layer's
- * transform; `group` aliases root only for sources; `model` is the configured
- * model wrapper. `_shared` references the rendering owner (a '3d' layer);
- * `scene`, `camera` and `renderer` alias its resources while attached.
  */
-L.Layer.initialize3DLayer = function (backend, options = {}) {
+function initialize3DLayer(backend, options = {}) {
   L.Util.setOptions(backend, options);
   // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
   const isModel = !backend._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(backend.options.url);
@@ -157,12 +154,15 @@ L.Layer.initialize3DLayer = function (backend, options = {}) {
       backend.fire('error', { error });
     }
   });
-};
+}
 
+/**
+ * @param {Layer3DOptions} [options] pane and attribution remain standard L.Layer options.
+ */
 L.Layer.types['3d'] = L.Layer.extend({
   statics: { _renderers: new WeakMap() },
   options: { ariaLabel: '3D scene' },
-  initialize(options = {}) { return L.Layer.initialize3DLayer(this, options); },
+  initialize(options = {}) { return initialize3DLayer(this, options); },
   onAdd(map) {
     if (loadedLayer3DModules) return loadedLayer3DModules.onAdd3DLayer(this, map);
     getLayer3DModules().then(({ onAdd3DLayer }) => {

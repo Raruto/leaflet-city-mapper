@@ -2,7 +2,6 @@ import * as createMeshApi from './createMesh.js';
 import * as disposeMesh from './disposeMesh.js';
 import * as setHighlight from './setHighlight.js';
 import * as showFeature from './showFeature.js';
-import * as render from './render.js';
 import { update as updateScene } from './update.js';
 import { along } from './along.js';
 import { build } from './build.js';
