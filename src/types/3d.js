@@ -92,11 +92,11 @@ import { setParent } from '../utils/setParent.js';
 import * as onTerrainChange from '../utils/onTerrainChange.js';
 import * as updateArea from '../utils/updateArea.js';
 import * as releaseArea from '../utils/releaseArea.js';
+import { renderers } from "../utils/renderers.js";
 
 L.Layer.types['3d'] = L.Layer.extend({
   statics: {
-    /** Rendering owner per map; entries are removed on the last layer removal. */
-    _renderers: new WeakMap(),
+    _renderers: renderers,
   },
 
   options: {
