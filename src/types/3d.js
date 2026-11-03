@@ -33,6 +33,7 @@
  * @typedef {Object} Layer3DOptions The `source` object; `pane`/`attribution` stay standard L.Layer options.
  * @property {string} [type] 'pmtiles' (raster tiles), '3d' (WebGPU scene) or 'terrain'; see L.Layer.types.
  * @property {number[]} [center] Local origin [lat,lng]; defaults to the first map center.
+ * @property {number} [terrainOffset=0] Vertical offset in metres when terrain is enabled.
  * @property {number[]} [rotation] Model Euler rotation [x,y,z] in radians, YXZ order.
  * @property {number[]} [scale] Model scale [x,y,z]; independent of geographic scaling.
  * @property {string} [url] GLB/glTF model URL (loaded before ready), or PMTiles URL containing
@@ -239,22 +240,18 @@ L.Layer.types['3d'] = L.Layer.extend({
         for (const animation of this._zoomTransitions?.keys() || []) animation.play();
         this._zoomTransitions = null;
         this.renderer.canvas.remove();
-        const renderer = this.renderer;
-        const resources = [
-          renderer.depthTexture,
-          renderer.roofFallbackTexture.texture,
-          renderer.uniformBuffer,
-          renderer.sunlight?.texture,
-          renderer.sunlight?.buffer,
-          renderer.sunlight?.lights
-        ].filter(Boolean);
-        renderer.device.queue.onSubmittedWorkDone().then(() => {
-          for (const resource of resources) resource.destroy();
-          renderer.device.destroy();
-        }, error => {
-          this.fire('error', { error });
-          renderer.device.destroy();
-        });
+        this.renderer.device.queue.onSubmittedWorkDone()
+          .then(() => {
+            this.renderer.depthTexture?.destroy();
+            this.renderer.roofFallbackTexture?.texture?.destroy(),
+            this.renderer.uniformBuffer?.destroy(),
+            this.renderer.sunlight?.texture?.destroy(),
+            this.renderer.sunlight?.buffer?.destroy(),
+            this.renderer.sunlight?.lights?.destroy()
+          }, error => {
+            this.fire('error', { error });
+            this.renderer.device.destroy();
+          });
         L.Layer.types['3d']._renderers.delete(map);
         for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete this[key];
       }

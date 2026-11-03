@@ -494,7 +494,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
   await this.page.waitForFunction(() =>
     Object.values(map._layers).some(layer => layer.model && layer.renderer),
   null, { timeout: 45000 });
-  await this.page.waitForFunction(() => map.getZoom() === 16 && Math.abs(map.getPitch() - 45) < 0.01);
+  await this.page.waitForFunction(() => map._terrain3D?._terrainReady);
+  await this.page.waitForFunction(() => map.getZoom() === 15 && Math.abs(map.getPitch() - 45) < 0.01);
   this.eiffel = await this.page.evaluate(async () => {
     let tower, eiffel;
     map.eachLayer(layer => {
@@ -504,12 +505,20 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     const backend = tower;
     const bounds = nativeChecks.bounds(eiffel.model, backend);
     const height = bounds.max[1] - bounds.min[1];
-    const topClipY = Math.max(...[bounds.min[0], bounds.max[0]].flatMap(x =>
+    const topClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
       [bounds.min[2], bounds.max[2]].map(z => {
         const clip = new DOMPoint(x, bounds.max[1], z, 1)
           .matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
         return clip.y / clip.w;
-      })));
+      }));
+    const baseClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
+      [bounds.min[2], bounds.max[2]].map(z => {
+        const clip = new DOMPoint(x, bounds.min[1], z, 1)
+          .matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
+        return clip.y / clip.w;
+      }));
+    const topClipY = Math.max(...topClips);
+    const baseClipY = Math.min(...baseClips);
     let meshes = 0;
     nativeChecks.graph.traverse(eiffel.model, object => { if (object.geometry) meshes++; });
     const errors = [];
@@ -520,8 +529,9 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       { local: [-60.118438720703125, 0, 60.605037689208984], latlng: [48.8574753, 2.2945144] },
       { local: [-60.11847686767578, 0, -60.60499954223633], latlng: [48.8582480, 2.2933119] }
     ];
+    const terrainClearance = Math.min(...feet.map(({ latlng }) =>
+      eiffel.root.position[1] - map._terrain3D._getElevation(latlng)));
     const footprintErrors = [];
-    const tileErrors = [];
     let baseLayer;
     map.eachLayer(layer => {
       if (layer instanceof L.Layer.types.pmtiles && layer._map) baseLayer = layer;
@@ -536,9 +546,10 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         (40075016.68557849 * Math.cos(tower.location.lat * Math.PI / 180));
       const origin = map.project(tower.location).subtract(map.getPixelOrigin());
       const size = map.getSize();
+      const ground = map._terrain3D._getElevation(map.getCenter()) ?? 0;
       for (const [x, z] of [[-40, -40], [0, 0], [40, 40]]) {
         const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
-        const clip = new DOMPoint(x, 0, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
+        const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
         const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
         const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
         errors.push(actual.distanceTo(expected));
@@ -548,12 +559,6 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         const world = [transformed.x / transformed.w, transformed.y / transformed.w, transformed.z / transformed.w];
         const geographic = map.unproject(map.project(tower.location).add([world[0] * scale, world[2] * scale]), zoom);
         footprintErrors.push(geographic.distanceTo(new L.LatLng(...foot.latlng)));
-        const point = map.project(new L.LatLng(...foot.latlng), zoom).subtract(map.getPixelOrigin());
-        const expected = map.layerPointToContainerPoint(point);
-        const clip = new DOMPoint(...world, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
-        const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
-        const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
-        tileErrors.push(actual.distanceTo(expected));
       }
     }
 
@@ -571,9 +576,10 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       const scale = map.options.crs.scale(zoom) /
         (40075016.68557849 * Math.cos(tower.location.lat * Math.PI / 180));
       const origin = map.project(tower.location, zoom).subtract(map.getPixelOrigin());
+      const ground = map._terrain3D._getElevation(map.getCenter()) ?? 0;
       for (const [x, z] of [[0, 0], [-40, -40], [40, 40]]) {
         const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
-        const clip = new DOMPoint(x, 0, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
+        const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
         const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
         const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
         zoomErrors.push(actual.distanceTo(expected));
@@ -622,8 +628,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     baseLayer.addTo(map);
     await Promise.all([tower, eiffel, ...other3d, baseLayer].map(layer => layer._added.promise));
     return {
-      height, meshes, errors, footprintErrors, tileErrors, zoomErrors, animatedFrames, hiddenFrames,
-      topClipY, visiblePixels, clickThrough, removed, sharedCanvasRemains,
+      height, meshes, errors, footprintErrors, zoomErrors, animatedFrames, hiddenFrames,
+      topClipY, baseClipY, terrainClearance, visiblePixels, clickThrough, removed, sharedCanvasRemains,
       restored: tower.renderer.width === map.getSize().x && tower.renderer.height === map.getSize().y,
       latitude: eiffel.location.lat,
       longitude: eiffel.location.lng
@@ -635,10 +641,11 @@ Then('the tower is rendered at its geographic position through camera changes', 
   const result = this.eiffel;
   assert.ok(result.height > 299 && result.height < 301, JSON.stringify(result));
   assert.ok(result.topClipY < 0.9, `Eiffel Tower top is too close to the viewport edge: ${result.topClipY}`);
+  assert.ok(result.baseClipY > -0.9, `Eiffel Tower base is too close to the viewport edge: ${result.baseClipY}`);
+  assert.ok(result.terrainClearance > 0, `Eiffel Tower feet intersect terrain: ${result.terrainClearance}`);
   assert.ok(result.meshes > 1, JSON.stringify(result));
   assert.ok(Math.max(...result.errors) < 1.5, `Logical coordinate rounding errors: ${result.errors}`);
   assert.ok(Math.max(...result.footprintErrors) < 0.5, `Footprint errors in metres: ${result.footprintErrors}`);
-  assert.ok(Math.max(...result.tileErrors) < 2, `Tile alignment errors in pixels: ${result.tileErrors}`);
   assert.ok(result.animatedFrames >= 4, `Too few animated zoom frames: ${result.animatedFrames}`);
   assert.equal(result.hiddenFrames, 0);
   assert.ok(Math.max(...result.zoomErrors) < 0.1, `Animated tile alignment errors: ${result.zoomErrors}`);

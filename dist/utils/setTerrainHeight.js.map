@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/setTerrainHeight.js"],
-  "sourcesContent": ["export function setTerrainHeight(layer) {\r\n  if (!layer.root || !layer.location) return;\r\n  layer._terrainBaseY ??= layer.root.position[1];\r\n  layer.root.position[1] = layer._terrainBaseY + (layer._map?._terrain3D?._getElevation(layer.location) ?? 0);\r\n}\r\n"],
-  "mappings": "AAAO,SAASA,EAAiBC,EAAO,CAClC,CAACA,EAAM,MAAQ,CAACA,EAAM,WAC1BA,EAAM,gBAAkBA,EAAM,KAAK,SAAS,CAAC,EAC7CA,EAAM,KAAK,SAAS,CAAC,EAAIA,EAAM,eAAiBA,EAAM,MAAM,YAAY,cAAcA,EAAM,QAAQ,GAAK,GAC3G",
-  "names": ["setTerrainHeight", "layer"]
+  "sourcesContent": ["export function setTerrainHeight(layer) {\r\n  if (!layer.root || !layer.location) return;\r\n  layer._terrainBaseY ??= layer.root.position[1];\r\n  const terrain = layer._map?._terrain3D;\r\n  const elevation = terrain?._getElevation(layer.location);\r\n  layer.root.position[1] = layer._terrainBaseY + (elevation ?? 0) +\r\n    (terrain && elevation !== null ? layer.options.terrainOffset ?? 0 : 0);\r\n}\r\n"],
+  "mappings": "AAAO,SAASA,EAAiBC,EAAO,CACtC,GAAI,CAACA,EAAM,MAAQ,CAACA,EAAM,SAAU,OACpCA,EAAM,gBAAkBA,EAAM,KAAK,SAAS,CAAC,EAC7C,MAAMC,EAAUD,EAAM,MAAM,WACtBE,EAAYD,GAAS,cAAcD,EAAM,QAAQ,EACvDA,EAAM,KAAK,SAAS,CAAC,EAAIA,EAAM,eAAiBE,GAAa,IAC1DD,GAAWC,IAAc,KAAOF,EAAM,QAAQ,eAAiB,EAAI,EACxE",
+  "names": ["setTerrainHeight", "layer", "terrain", "elevation"]
 }

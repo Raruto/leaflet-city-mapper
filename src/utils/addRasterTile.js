@@ -55,7 +55,6 @@ export async function addRasterTile(backend, layer, coords, tile) {
     backend._rasterProgram = createProgram(backend, {
       baseTexture: texture,
       unlit: true,
-      alphaMode: 'BLEND',
       terrain: backend._dem,
     });
   }

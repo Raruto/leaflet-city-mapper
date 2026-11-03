@@ -118,7 +118,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const nightCount = boatCount();
     const route = layer.root.children[0];
     const routeAtNight = route.geometry.drawRange.count > 100 && route.visible && route.extras.featureFaces.length === 0 &&
-      route.program.depthTest && route.program.depthWrite === false;
+      route.program.depthTest && route.program.depthWrite && !route.program.transparent;
     select('2026-11-02', 555); // 09:15 UTC = first winter departure 10:15 Paris.
     const firstPosition = await firstBoat();
     select('2026-11-02', 565);

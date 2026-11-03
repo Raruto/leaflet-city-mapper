@@ -23,7 +23,7 @@
 		<script>
 			const map = new L.Map('map', {
 				center: [48.8582601, 2.29449985],
-				zoom: 16,
+				zoom: 15,
 				minZoom: 14,
 				preferCanvas: true,
 				rotate: true,
@@ -145,6 +145,7 @@
 						rotation: [0, 45.81 * Math.PI / 180, 0],
 						scale: [1.0257, 1, 1.0167],
 						nightSparkle: true,
+						terrainOffset: 1,
 					},
 					attribution: '<a href="https://3dmr.eu/model/4">CC0 model: n42k / Blend Swap</a>',
 				}).addTo(map),
