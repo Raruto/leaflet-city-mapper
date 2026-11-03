@@ -1,6 +1,6 @@
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
- * load their type module on first use. Subclasses are unchanged.
+ * load their specialized type module on first use. Subclasses are unchanged.
  */
 
 /**
@@ -9,14 +9,14 @@
  * layer into it; types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
- * - types/: one module per `source.type`, imported on demand by this router:
+ * - types/: specialized modules for non-base `source.type`s, imported on demand:
  *   - 'pmtiles': raster PMTiles basemap rendered in the shared WebGPU canvas;
- *   - '3d': shared WebGPU scene with a GLB/glTF model, PMTiles GeoJSON features, or empty;
  *   - 'geojson': inline or URL-backed GeoJSON features rendered by the shared 3D scene;
  *   - 'terrain': Float32 PMTiles DEM that deforms raster tiles, buildings and the camera, plus optional bridge decks;
  *   - 'sunlight': simulation clock control, sun/moon lighting and shadows;
  *   - 'traffic': vehicles moving along GeoJSON lanes (measured flow or timetable);
  *   - 'walk': third-person pedestrian moved with the keyboard, the camera following behind.
+ * - The base '3d' type and its Leaflet lifecycle are defined below.
  * - scene/: named operations for GPU resources, model/archive loading, lighting, sources, picking
  *   and rendering. They receive the layer explicitly; the 3D Leaflet lifecycle is defined here.
  * - utils/: computations and scene-data helpers, independent of Leaflet layers and GPU devices.
@@ -40,7 +40,7 @@ const Pending = L.Layer.extend({
 // One chain for every pending layer: they become real layers in creation order, whatever the import timing.
 let loading = Promise.resolve();
 
-// Shared registry: type modules (src/types) register here.
+// The base type is registered below; specialized modules extend this registry.
 L.Layer.types = {};
 
 let layer3DModules, loadedLayer3DModules;
@@ -53,16 +53,14 @@ function getLayer3DModules() {
     import('./utils/onAdd3DLayer.js'),
     import('./utils/onRemove3DLayer.js'),
     import('./utils/onTerrainChange.js'),
-    import('./utils/renderers.js'),
     import('./utils/update.js'),
     import('./utils/updateArea.js'),
-  ]).then(([attach, emptyNode, getHeader, loadModel, onAdd, onRemove, onTerrainChange, renderers, update, updateArea]) =>
+  ]).then(([attach, emptyNode, getHeader, loadModel, onAdd, onRemove, onTerrainChange, update, updateArea]) =>
     loadedLayer3DModules = {
     attach, emptyNode: emptyNode.emptyNode, getHeader, loadModel,
     onAdd3DLayer: onAdd.onAdd3DLayer,
     onRemove3DLayer: onRemove.onRemove3DLayer,
     onTerrainChange: onTerrainChange.onTerrainChange,
-    renderers: renderers.renderers,
     update, updateArea,
   });
 }

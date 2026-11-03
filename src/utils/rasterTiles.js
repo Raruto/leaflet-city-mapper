@@ -35,8 +35,9 @@ export function updateRasterTiles(backend) {
       wanted.set(`${zoom}/${x}/${y}`, { z: zoom, x, y });
     }
   }
+  backend._wantedRasterTiles = new Set(wanted.keys());
   for (const [key, tile] of backend._rasterTiles) {
-    if (!wanted.has(key)) releaseRasterTile(backend, tile);
+    if (!wanted.has(key) && !tile.done) releaseRasterTile(backend, tile);
   }
   for (const [key, coords] of [...wanted].sort((a, b) =>
     Math.hypot(a[1].x - center.x, a[1].y - center.y) - Math.hypot(b[1].x - center.x, b[1].y - center.y))) {
@@ -45,6 +46,7 @@ export function updateRasterTiles(backend) {
     backend._rasterTiles.set(key, tile);
     loadRasterTile(backend, tile);
   }
+  pruneRasterTiles(backend);
 }
 
 export function releaseRasterTiles(backend) {
@@ -136,6 +138,7 @@ function loadRasterTile(backend, tile) {
   }).finally(() => {
     backend._loadingTiles--;
     if (backend._map) {
+      pruneRasterTiles(backend);
       if (!backend._loadingTiles) backend.fire('load');
       update(backend);
     }
@@ -214,4 +217,15 @@ function releaseRasterTile(backend, tile) {
   tile.image?.close();
   backend.fire('tileunload', { tile, coords: tile.coords });
   update(backend);
+}
+
+function pruneRasterTiles(backend) {
+  const wanted = backend._wantedRasterTiles;
+  if ([...wanted].some(key => {
+    const tile = backend._rasterTiles.get(key);
+    return !tile || (!tile.done && !tile.error);
+  })) return;
+  for (const [key, tile] of backend._rasterTiles) {
+    if (!wanted.has(key)) releaseRasterTile(backend, tile);
+  }
 }

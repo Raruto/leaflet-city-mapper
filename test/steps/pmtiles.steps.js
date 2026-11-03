@@ -143,7 +143,7 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   assert.equal(real.width, 256);
 });
 
-Then('PMTiles layers own archive initialization and native zoom selection', async function () {
+Then('PMTiles layers own archive initialization and native zoom selection', { timeout: 30000 }, async function () {
     const result = await this.page.evaluate(async () => {
       const map = test3d.map;
       let resolveHeader;
@@ -170,6 +170,32 @@ Then('PMTiles layers own archive initialization and native zoom selection', asyn
       const tileZoom = layer._tileZoom;
       const initialized = layer.renderer.canvas.isConnected &&
         [...layer._rasterTiles.values()].every(tile => tile.mesh.parent === layer.root);
+      const waitForZoom = async zoom => {
+        const deadline = performance.now() + 5000;
+        while (layer._tileZoom !== zoom ||
+          ![...layer._rasterTiles.values()].some(tile => tile.coords.z === zoom) ||
+          [...layer._rasterTiles.values()].some(tile => tile.coords.z === zoom && !tile.done && !tile.error)) {
+          if (performance.now() > deadline) throw new Error(`PMTiles zoom ${zoom} tiles did not settle`);
+          await new Promise(requestAnimationFrame);
+        }
+      };
+      map.setZoom(8, { animate: false });
+      await waitForZoom(8);
+      const outgoing = [...layer._rasterTiles.keys()];
+      const pendingTiles = [];
+      layer.options.archive.getZxy = z => z === 9
+        ? new Promise(resolve => pendingTiles.push(resolve))
+        : Promise.resolve({ data: image });
+      map.setZoom(9, { animate: false });
+      const pendingDeadline = performance.now() + 5000;
+      while (!pendingTiles.length) {
+        if (performance.now() > pendingDeadline) throw new Error('PMTiles zoom did not request new tiles');
+        await new Promise(requestAnimationFrame);
+      }
+      const retained = outgoing.every(key => layer._rasterTiles.has(key));
+      for (const resolve of pendingTiles) resolve({ data: image });
+      await waitForZoom(9);
+      const oldTilesRemoved = ![...layer._rasterTiles.keys()].some(key => key.startsWith('8/'));
       layer.remove();
       const override = await new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
         archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }) }, maxNativeZoom: 10 } }).ready;
@@ -202,6 +228,7 @@ Then('PMTiles layers own archive initialization and native zoom selection', asyn
       cancelled.remove();
       await new Promise(resolve => setTimeout(resolve, 0));
       return { delayed, nativeZoom, tileZoom, initialized, override: override.options.maxNativeZoom,
+        retained, oldTilesRemoved,
         failed: error?.message === 'Missing archive' && emitted === error,
         noFallback: failed.options.maxNativeZoom === undefined,
         tileBase: Object.getPrototypeOf(L.Layer.types.pmtiles.prototype) === L.Layer.prototype &&
@@ -215,6 +242,7 @@ Then('PMTiles layers own archive initialization and native zoom selection', asyn
     });
     assert.deepEqual(result, {
       delayed: true, nativeZoom: 12, tileZoom: result.tileZoom, initialized: true, override: 10,
+      retained: true, oldTilesRemoved: true,
       failed: true, noFallback: true,
       tileBase: true, directCanvas: true, missingRaster: true, cancelled: true,
     });
