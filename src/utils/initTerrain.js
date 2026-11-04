@@ -1,4 +1,3 @@
-import { elevationWGSL } from './elevationWGSL.js';
 import { onTerrainRemove } from './onTerrainRemove.js';
 import { onTerrainAdd } from './onTerrainAdd.js';
 
@@ -10,7 +9,7 @@ export function initTerrain(layer, options) {
   const terrainSource = options.url;
   const layerOptions = { ...options };
   delete layerOptions.url;
-  L.Layer.types['3d'](layer, layerOptions);
+  layer._init3D(layerOptions);
   layer.terrainSource = terrainSource;
   layer._terrainTiles = new Map();
   layer._rasterTiles = new Map();
@@ -18,5 +17,3 @@ export function initTerrain(layer, options) {
   layer.onAdd = map => onTerrainAdd(layer, map);
   layer.onRemove = map => onTerrainRemove(layer, map);
 }
-
-initTerrain.elevationWGSL = elevationWGSL;

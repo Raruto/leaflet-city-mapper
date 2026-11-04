@@ -151,13 +151,14 @@ export async function prepare3DChecks(page) {
         return pixels;
       },
       async terrainHeights(terrain, vertices) {
+        const { elevationWGSL } = await import('/dist/utils/elevationWGSL.js');
         const { device } = terrain.renderer;
         const module = device.createShaderModule({ code: `
           @group(0) @binding(0) var dem: texture_2d<f32>;
           @group(0) @binding(1) var<storage, read> terrains: array<vec4<f32>>;
           @group(0) @binding(2) var<storage, read> uvs: array<vec2<f32>>;
           @group(0) @binding(3) var<storage, read_write> heights: array<f32>;
-          ${L.Layer.types.terrain.elevationWGSL}
+          ${elevationWGSL}
           @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             if (id.x >= arrayLength(&heights)) { return; }
             let t = terrains[id.x];
@@ -303,7 +304,7 @@ Given('a map with the standalone 3D module and no dependency import map', async 
   assert.deepEqual(this.threeRequests, []);
   assert.deepEqual(this.oglRequests, []);
   assert.equal(await this.page.evaluate(() => [...document.scripts].every(script => !script.type)), true);
-  assert.equal(await this.page.evaluate(() => L.Layer.types['3d'].SceneRenderer), undefined);
+  assert.equal(await this.page.evaluate(() => L.Layer.SceneRenderer), undefined);
 });
 
 const openEiffelExample = async function () {
@@ -331,7 +332,7 @@ const openEiffelExample = async function () {
       viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
       preferCanvas: map.options.preferCanvas,
       classicScriptsOnly: [...document.scripts].every(script => !script.type),
-      globalLibraries: typeof L.Layer.types['3d'] === 'function' && typeof L.Layer.types.pmtiles === 'function',
+      globalLibraries: typeof L.Layer.prototype._init3D === 'function' && typeof L.Layer.prototype._initRaster === 'function',
       vectorLayers: Object.values(map._layers).filter(layer => layer instanceof L.Path).length,
       backgrounds: [...document.querySelectorAll('.leaflet-control-layers-base label')].map(label => label.textContent.trim()),
       activeBackgrounds: layers._layers.filter(entry => !entry.overlay && map.hasLayer(entry.layer)).map(entry => entry.name),

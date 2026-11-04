@@ -16,7 +16,7 @@ export function initWalk(layer, {
   position = 'bottomright',
   ...options
 } = {}) {
-  L.Layer.types['3d'](layer, options);
+  layer._init3D(options);
   const keys = new Set();
   const control = new L.Control({ position });
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');

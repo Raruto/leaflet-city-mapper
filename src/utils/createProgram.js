@@ -1,11 +1,12 @@
 import { materialShaders } from './materialShaders.js';
+import { elevationWGSL } from './elevationWGSL.js';
 
 
 export function createProgram(backend, material = {}) {
   const shaders = materialShaders(
     material,
     !!backend.options.nightSparkle,
-    material.terrain ? L.Layer.types.terrain.elevationWGSL : ''
+    material.terrain ? elevationWGSL : ''
   );
   const vertex = backend.renderer.device.createShaderModule({ code: shaders.vertex });
   const fragment = backend.renderer.device.createShaderModule({ code: shaders.fragment });

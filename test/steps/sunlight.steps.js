@@ -4,7 +4,7 @@ import { Then } from '@cucumber/cucumber';
 Then('sky and terrain change from day to night and celestial bodies follow the camera', { timeout: 90000 }, async function () {
   await this.page.waitForFunction(() => sunlightOverlay.control && map._sunlight);
   const result = await this.page.evaluate(async () => {
-    const owner = L.Layer.types['3d']._renderers.get(map), { device } = owner.renderer;
+    const owner = L.Layer._renderers.get(map), { device } = owner.renderer;
     const input = sunlightOverlay.control.getContainer().querySelector('input[type=range]');
     const date = sunlightOverlay.control.getContainer().querySelector('input[type=date]');
     date.value = '2026-06-21';
@@ -139,11 +139,11 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     input.value = '720'; input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await this.page.waitForFunction(() => {
-    const renderer = L.Layer.types['3d']._renderers.get(map).renderer;
+    const renderer = L.Layer._renderers.get(map).renderer;
     return map._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
   });
   const result = await this.page.evaluate(async () => {
-    const owner = L.Layer.types['3d']._renderers.get(map), renderer = owner.renderer;
+    const owner = L.Layer._renderers.get(map), renderer = owner.renderer;
     nativeChecks.render.render(owner);
     await renderer.device.queue.onSubmittedWorkDone();
     const { device, sunlight } = renderer;
@@ -197,7 +197,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
   });
   await this.page.waitForFunction(() => map._sunlight.altitude < 0);
   assert.equal(await this.page.evaluate(() => {
-    const owner = L.Layer.types['3d']._renderers.get(map);
+    const owner = L.Layer._renderers.get(map);
     nativeChecks.render.render(owner);
     return owner.renderer.uniformData[51];
   }), 0);

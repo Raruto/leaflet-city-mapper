@@ -7,6 +7,10 @@ Feature: Separate plugin integration
     Given the city mapper plugin is loaded after leaflet-rotate
     Then each source loads only its requested initializer
 
+  Scenario: Invalid source types report errors without blocking subsequent layers
+    Given the city mapper plugin is loaded after leaflet-rotate
+    Then an unknown source rejects readiness and subsequent sources still initialize
+
   @offline
   Scenario: The city example references existing local assets
     Given the city mapper plugin is loaded after leaflet-rotate

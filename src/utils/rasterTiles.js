@@ -182,7 +182,7 @@ function createRasterMesh(backend, tile) {
     worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     children: [], visible: true, device, geometry: backend._rasterGeometry,
     program: backend._rasterProgram, texture,
-    opacity: backend.options.opacity, id: L.Layer.types['3d']._nextId++,
+    opacity: backend.options.opacity, id: L.Layer._nextId++,
     renderOrder: backend.options.zIndex || 0, tile,
   };
   if (!backend._terrain3D) setParent(tile.mesh, backend.root);

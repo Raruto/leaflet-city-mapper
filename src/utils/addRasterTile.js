@@ -109,7 +109,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
     ],
     tile,
     opacity: layer.options.opacity ?? 1,
-    id: L.Layer.types['3d']._nextId++,
+    id: L.Layer._nextId++,
     renderOrder: layer.options.zIndex || 0,
   };
   setParent(mesh, backend.root);

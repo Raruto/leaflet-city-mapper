@@ -41,7 +41,7 @@ export function onRemove3DLayer(backend, map) {
         delete backend[key];
       }
       for (const layer of next._layers) layer._shared = next;
-      L.Layer.types['3d']._renderers.set(map, next);
+      L.Layer._renderers.set(map, next);
       map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, next);
       map.on('zoomstart', startZoom.startZoom, next);
       map.on('zoomanim', onZoomAnim.onZoomAnim, next);
@@ -69,7 +69,7 @@ export function onRemove3DLayer(backend, map) {
           backend.fire('error', { error });
           renderer.device.destroy();
         });
-      L.Layer.types['3d']._renderers.delete(map);
+      L.Layer._renderers.delete(map);
       for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete backend[key];
     }
   } else update.update(shared);

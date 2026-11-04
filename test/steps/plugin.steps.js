@@ -34,7 +34,7 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
   if (leaflet2) await this.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
   await this.page.addScriptTag({ url: 'https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js' });
   await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
-  await this.page.waitForFunction(() => L.Layer.types);
+  await this.page.waitForFunction(() => L.Layer.prototype._init3D);
 });
 
 Then('each source loads only its requested initializer', async function () {
@@ -63,7 +63,8 @@ Then('each source loads only its requested initializer', async function () {
 
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {
   const result = await this.page.evaluate(async () => {
-    const lazy = Object.keys(L.Layer.types).join() === '3d';
+    const lazy = !Object.hasOwn(L.Layer, 'types') &&
+      typeof L.Layer.prototype._init3D === 'function' && L.Layer._renderers instanceof WeakMap;
     const archive = { getHeader: async () => ({ maxZoom: 19 }) };
     const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
@@ -83,6 +84,7 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
         L.Util.setOptions(this, options);
       },
     });
+
     const custom = new Custom({ source: { type: 'application-specific' } });
     const marker = new L.Marker([55, 10]);
     return {
@@ -113,4 +115,18 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     header: 19, custom: true, initializations: 1, marker: true, pitch: true,
     warm: true, plain: true, configured: true, inherited: true,
   });
+});
+
+Then('an unknown source rejects readiness and subsequent sources still initialize', async function () {
+  const result = await this.page.evaluate(async () => {
+    const invalid = new L.Layer({ source: { type: 'unknown' } });
+    const valid = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+      archive: { getHeader: async () => ({ maxZoom: 19 }) } } });
+    let emitted;
+    invalid.on('error', ({ error }) => { emitted = error; });
+    const error = await invalid.ready.then(() => null, error => error);
+    await valid.ready;
+    return { error: error?.message, emitted: emitted === error, header: valid.header.maxZoom };
+  });
+  assert.deepEqual(result, { error: 'Unknown layer type: unknown', emitted: true, header: 19 });
 });

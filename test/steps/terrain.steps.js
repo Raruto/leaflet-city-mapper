@@ -153,10 +153,10 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 256, 128);
     ctx.fillStyle = '#0000ff'; ctx.fillRect(0, 128, 256, 128);
     const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
-    const initialize = L.Layer.types.pmtiles;
+    const initialize = L.Layer.prototype._initRaster;
     let release;
     let pending = new Promise(resolve => { release = resolve; });
-    L.Layer.types.pmtiles = (layer, options) => {
+    L.Layer.prototype._initRaster = function (options) {
       if (options.url.endsWith('fixture-terrain.pmtiles')) options = { ...options, archive: {
         getHeader: async () => header,
         getZxy: async (z, x, y, signal) => {
@@ -171,7 +171,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
           return { data: values.buffer };
         },
       } };
-      return initialize(layer, options);
+      return initialize.call(this, options);
     };
     const wait = async condition => {
       const deadline = performance.now() + 12000;
@@ -328,7 +328,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     } finally {
       release();
       raster.remove(); terrain.remove(); buildings.remove(); model.remove();
-      L.Layer.types.pmtiles = initialize;
+      L.Layer.prototype._initRaster = initialize;
     }
   }, order);
   for (const name of ['initiallyFlat', 'hidden', 'restored', 'cancelled', 'reattached']) assert.equal(result[name], true, name);

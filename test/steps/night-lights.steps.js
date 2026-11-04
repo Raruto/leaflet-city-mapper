@@ -57,7 +57,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
   }, null, { timeout: 60000 });
   await loaded();
   await this.page.waitForFunction(() => {
-    const owner = L.Layer.types['3d']._renderers.get(map);
+    const owner = L.Layer._renderers.get(map);
     return owner?._roofRaster && map._terrain3D?._rasterTiles.size > 0 &&
       !Object.values(map._layers).some(layer => layer.isLoading?.()) &&
       [...owner._layers].every(layer => !layer._3d || !layer.url || (layer._inflight === 0 &&
@@ -65,7 +65,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
   }, null, { timeout: 60000 });
   const result = await this.page.evaluate(async () => {
     const { style: lampStyle, tooltip: lampTooltip } = streetlights.options;
-    const layer = streetlights, owner = L.Layer.types['3d']._renderers.get(map);
+    const layer = streetlights, owner = L.Layer._renderers.get(map);
     const { device, context, canvas, format } = owner.renderer;
     const gpuErrors = [];
     device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));

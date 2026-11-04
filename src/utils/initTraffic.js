@@ -25,7 +25,7 @@ import {
 export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
   side ??= defaultSide;
-  L.Layer.types['3d'](layer, {
+  layer._init3D({
     tooltip,
     nightLight: Boolean(lights),
     ...options,

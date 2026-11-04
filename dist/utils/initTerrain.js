@@ -1,2 +1,2 @@
-import{elevationWGSL as t}from"./elevationWGSL.js";import{onTerrainRemove as a}from"./onTerrainRemove.js";import{onTerrainAdd as m}from"./onTerrainAdd.js";function d(e,n){const i=n.url,o={...n};delete o.url,L.Layer.types["3d"](e,o),e.terrainSource=i,e._terrainTiles=new Map,e._rasterTiles=new Map,e._terrainReady=!1,e.onAdd=r=>m(e,r),e.onRemove=r=>a(e,r)}d.elevationWGSL=t;export{d as initTerrain};
+import{onTerrainRemove as t}from"./onTerrainRemove.js";import{onTerrainAdd as d}from"./onTerrainAdd.js";function a(n,e){const o=e.url,i={...e};delete i.url,n._init3D(i),n.terrainSource=o,n._terrainTiles=new Map,n._rasterTiles=new Map,n._terrainReady=!1,n.onAdd=r=>d(n,r),n.onRemove=r=>t(n,r)}export{a as initTerrain};
 //# sourceMappingURL=initTerrain.js.map

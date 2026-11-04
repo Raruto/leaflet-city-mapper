@@ -186,7 +186,7 @@ export function pump(backend) {
               vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
               ...(backend.options.nightLight ? { nightLight: true, alphaMode: 'BLEND', doubleSided: true } : {})
             }),
-            id: L.Layer.types['3d']._nextId++,
+            id: L.Layer._nextId++,
             renderOrder: 0,
             extras: { featureFaces, lights },
           },

@@ -36,7 +36,7 @@ export function onAddSun(layer, map) {
       }
     };
     const render = () => {
-      const renderer = L.Layer.types['3d']?._renderers.get(map);
+      const renderer = L.Layer._renderers.get(map);
       if (renderer) updateScene(renderer);
     };
     const update = () => {

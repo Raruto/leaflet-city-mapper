@@ -21,7 +21,7 @@ export function createMesh(backend, data, material = {}, usage = 0) {
     device,
     geometry: { device, attributes, drawRange: { start: 0, count: attributes.position.count } },
     program: createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
-    id: L.Layer.types['3d']._nextId++, renderOrder: 0, extras: {},
+    id: L.Layer._nextId++, renderOrder: 0, extras: {},
   };
   setParent(mesh, backend.root);
   update(backend);

@@ -167,7 +167,7 @@ export async function loadModel(backend) {
             device,
             geometry,
             program,
-            id: L.Layer.types['3d']._nextId++,
+            id: L.Layer._nextId++,
             renderOrder: 0
           };
           mesh.name = description.meshes[spec.mesh].name; mesh.extras = spec.extras || {};

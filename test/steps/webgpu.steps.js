@@ -114,7 +114,7 @@ Then('WebGPU matrices match DOMMatrix and frame resources are reused', function 
 
 // Settled scene: terrain meshes exist, the roof atlas was built and no raster layer is still loading.
 const waitForWebGPUScene = page => page.waitForFunction(() => {
-  const owner = L.Layer.types['3d']._renderers.get(map);
+  const owner = L.Layer._renderers.get(map);
   return owner?.renderer?.device && owner._roofRaster && map._terrain3D?._rasterTiles.size > 0 &&
     !Object.values(map._layers).some(layer => layer.isLoading?.());
 }, null, { timeout: 50000 });
@@ -126,7 +126,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuPacing = await this.page.evaluate(async () => {
-      const owner = L.Layer.types['3d']._renderers.get(map);
+      const owner = L.Layer._renderers.get(map);
       const { device } = owner.renderer;
       const frame = () => new Promise(requestAnimationFrame);
       const gpuErrors = [];
@@ -262,7 +262,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuAtlas = await this.page.evaluate(async () => {
-      const owner = L.Layer.types['3d']._renderers.get(map);
+      const owner = L.Layer._renderers.get(map);
       const terrain = map._terrain3D;
       const { device } = owner.renderer;
       const gpuErrors = [];
@@ -392,7 +392,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuTerrain = await this.page.evaluate(async () => {
-      const owner = L.Layer.types['3d']._renderers.get(map);
+      const owner = L.Layer._renderers.get(map);
       const terrain = map._terrain3D;
       const { device } = owner.renderer;
       const crs = map.options.crs;
