@@ -144,6 +144,16 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
   const result = await this.page.evaluate(async () => {
     const layer = nativeLayers.Rectangle;
     map.setBearing(30); map.setPitch(35);
+    const owner = L.Layer._renderers.get(map);
+    nativeChecks.render.render(owner);
+    const crs = map.options.crs, latlng = nativeLayers.CircleMarker.getLatLng(),
+      origin = crs.project(owner._sceneOrigin), point = crs.project(latlng),
+      metres = Math.cos(owner._sceneOrigin.lat * Math.PI / 180);
+    const clip = new DOMPoint((point.x - origin.x) * metres, 0, -(point.y - origin.y) * metres, 1)
+      .matrixTransform(new DOMMatrix(owner.camera.projectionViewMatrix));
+    const projected = new L.Point((clip.x / clip.w + 1) * map.getSize().x / 2,
+      (1 - clip.y / clip.w) * map.getSize().y / 2);
+    const cameraAligned = projected.distanceTo(map.latLngToContainerPoint(latlng)) < 1;
     layer.openPopup();
     await new Promise(requestAnimationFrame);
     const popup = layer.getPopup().getElement();
@@ -176,10 +186,11 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
     canvas.style.pointerEvents = canvasPointer;
     sky.style.pointerEvents = skyPointer;
     map.setBearing(0); map.setPitch(0);
-    return { visible, tipVisible, below, aboveSky, unclipped,
+    return { visible, tipVisible, below, aboveSky, unclipped, cameraAligned,
       untransformed: canvas.parentNode.parentNode === map.getContainer() };
   });
-  assert.deepEqual(result, { visible: true, tipVisible: true, below: true, aboveSky: true, unclipped: true, untransformed: true });
+  assert.deepEqual(result, { visible: true, tipVisible: true, below: true, aboveSky: true, unclipped: true,
+    cameraAligned: true, untransformed: true });
 });
 
 Then('native layer changes, interactions and removal preserve Leaflet behavior', { timeout: 30000 }, async function () {

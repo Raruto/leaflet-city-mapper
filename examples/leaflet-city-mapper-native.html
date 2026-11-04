@@ -6,36 +6,18 @@
   <title>Leaflet City Mapper - Native layers on WebGPU</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"></script>
-  <script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js"></script>
   <script src="https://unpkg.com/leaflet-city-mapper@0.0.1/dist/leaflet-city-mapper.js"></script>
   <style>
     html, body, #map { height: 100%; margin: 0; }
-    #help { position: absolute; bottom: 25px; left: 10px; z-index: 1000; max-width: 310px;
-      padding: 10px; background: white; color: #222; font: 14px sans-serif; }
-    #status { display: block; margin-top: 6px; }
   </style>
 </head>
 <body>
   <div id="map" aria-label="Gallery of native Leaflet layers rendered with WebGPU"></div>
-  <div id="help">
-    Native constructors, direct GPU geometry and textures: no duplicate SVG/Canvas path renderer.
-    Toggle layers, click shapes and drag the marker. Popups, tooltips and HTML markers stay above the canvas.
-    <label>Pitch <input id="pitch" type="range" min="0" max="60" value="0"></label>
-    <label>Bearing <input id="bearing" type="range" min="0" max="360" value="0"></label>
-    <output id="status" aria-live="polite">Loading WebGPU...</output>
-  </div>
   <script>
     const map = new L.Map('map', {
       center: [48.8583, 2.2945], zoom: 15, rotate: true,
       preferCanvas: new URLSearchParams(location.search).has('canvas'),
     });
-    const status = document.getElementById('status');
-    let failed = false;
-    const report = event => {
-      failed = true;
-      status.textContent = (event.error || event).message;
-    };
-    map.on('layeradd', ({ layer }) => layer.on('error', report));
     const image = (color, text) => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 128;
@@ -119,14 +101,7 @@
     const htmlMarker = new L.Marker([48.8583, 2.310], {
       icon: new L.DivIcon({ html: '<strong>HTML</strong>', className: 'leaflet-div-icon', iconSize: [50, 24] }),
     }).bindPopup('DivIcon: kept in the DOM').addTo(map);
-    new L.Control.Layers({}, { ...nativeLayers, 'DivIcon (DOM)': htmlMarker }).addTo(map);
-    document.getElementById('pitch').oninput = event => map.setPitch(Number(event.target.value));
-    document.getElementById('bearing').oninput = event => map.setBearing(Number(event.target.value));
-    Promise.all(Object.values(map._layers).filter(layer => layer._nativeGPU).map(layer => layer.ready))
-      .then(() => {
-        if (!failed) status.textContent = 'WebGPU ready. All native layer types are listed in the control.';
-      })
-      .catch(report);
+    new L.Control.Layers({}, { ...nativeLayers, 'DivIcon (DOM)': htmlMarker }, { collapsed: false }).addTo(map);
   </script>
 </body>
 </html>

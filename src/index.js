@@ -1,3 +1,5 @@
+import './utils/mapCamera.js';
+
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
  * load their specialized utilities on first use. Native map layers also join the WebGPU scene.

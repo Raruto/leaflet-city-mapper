@@ -212,6 +212,10 @@ export async function nativeLayer(state) {
         const left = center.x - (anchor.x ?? anchor[0]), top = center.y - (anchor.y ?? anchor[1]);
         const corners = [[left, top], [left + width, top],
           [left, top + height], [left + width, top + height]].map(([x, y]) => {
+          if (key === 'icon') {
+            const offset = source._cameraIconPoint(x - center.x, y - center.y);
+            x = center.x + offset.x; y = center.y + offset.y;
+          }
           const p = new DOMPoint(x / size.x * 2 - 1,
             1 - y / size.y * 2, clip.z / clip.w, 1).matrixTransform(inverse);
           const result = new DOMPoint(p.x / p.w, p.y / p.w, p.z / p.w, 1).matrixTransform(toLocal);

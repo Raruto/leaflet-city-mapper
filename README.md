@@ -17,13 +17,12 @@ _For a working example see one of the following demos:_
 
 ## How to use
 
-Load leaflet and leaflet-rotate first, then this plugin:
+Load Leaflet (the only runtime dependency), then this plugin:
 
 
 ```html
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate.js"></script>
 <script src="https://unpkg.com/leaflet-city-mapper@0.0.1/dist/leaflet-city-mapper.js"></script>
 ```
 And then set an approriate `source` param to layer constructor:
@@ -47,6 +46,16 @@ const buildings = new L.Layer({
 Vector and raster layers are initialized in [`src/index.js`](./src/index.js); their rendering utilities are loaded only when needed. Terrain, sunlight, traffic and walk initializers are also loaded lazily from [`src/utils`](./src/utils).
 
 Initialization and shared renderer state live directly on `L.Layer`, without a type registry. Supported `source.type` values are `3d`, `geojson`, `pmtiles`, `terrain`, `sunlight`, `traffic` and `walk`; unknown types emit an `error` event and reject `layer.ready`. Leaflet subclasses keep their own initialization.
+
+### Camera and accessible navigation
+
+Rotation and pitch are handled by the WebGPU camera, not CSS transforms of the map panes. Use `bearing` and `pitch` map options, `getBearing()` / `setBearing(degrees, options)`, `getPitch()` / `setPitch(degrees, options)`, `resetNorth()` and `resetNorthPitch()`. Pitch is clamped to 0–85 degrees; animated setters accept `{ animate: true, duration: 0.3 }` and respect reduced-motion preferences. Camera changes emit `rotate` / `pitch`; bounds and pointer coordinates follow the same projection as the GPU. `pitchMaxDistance` (default 3 viewport heights) limits ground loading near the horizon.
+
+The lazily loaded camera controls are ready at `map.cameraReady`. `rotateControl` preserves the compact two-tone compass: the arrow follows bearing and tilts with pitch; click resets both angles, horizontal drag rotates (0.8°/px) and vertical drag tilts (0.5°/px). The focusable button also supports Enter/Space, arrow-key bearing/pitch adjustment and Home to reset. Set `rotateControl: false` to omit it, or pass `position`, `closeOnZeroBearing` (default true) and `visualizePitch` (default true). With `visualizePitch: false`, the control changes/resets bearing only. With `closeOnZeroBearing: false`, it stays visible at north; a focused control is never auto-hidden. It is also available as `new L.Control.Rotate(options)` after camera readiness.
+
+`shiftKeyRotate` enables Shift + wheel; `pitchDrag` enables Ctrl + left-drag or right-drag. Optional `touchRotate` / `touchPitch` handlers add two-finger twist / vertical pitch while preserving pinch zoom and pan. Each handler supports `enable()` / `disable()`. Native Leaflet zoom controls, keyboard navigation, marker focus, dragging, popups and tooltips remain available. On supported devices, the optional `compassBearing` handler follows device orientation; enable it from a user gesture for permission prompts. Permission failures emit `error`. Removing a map releases gesture listeners and camera animations.
+
+Marker options `rotation` (radians), `rotateWithView`, `keepUpright` and `scale`, plus `marker.setRotation(radians)`, apply to GPU icons and their accessible DOM targets.
 
 ### Native Leaflet layers
 

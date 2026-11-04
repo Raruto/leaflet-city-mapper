@@ -18,7 +18,7 @@ Then('every local source in the city example is available', async function () {
   }
 });
 
-Given('the city mapper plugin is loaded after leaflet-rotate', async function () {
+Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }, async function () {
   this.sourceRequests = [];
   this.page.on('request', request => {
     if (/\/dist\/(?:utils|types)\//.test(request.url())) this.sourceRequests.push(request.url());
@@ -32,7 +32,6 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
       : 'https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
   });
   if (leaflet2) await this.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
-  await this.page.addScriptTag({ url: 'https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js' });
   await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
   await this.page.waitForFunction(() => L.Layer.prototype._init3D);
 });
