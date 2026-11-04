@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Vehicles moving along GeoJSON lanes; a compute pass places them on the GPU every frame.
  * Source options:
  * - `url`: GeoJSON (Multi)LineStrings, or a JS module whose default export `(time, layer, signal)` returns them (time-dependent data);
@@ -8,22 +8,19 @@
  * in metres, `name`/`description` for the default tooltip. The status line (vehicle count, then the FeatureCollection `note`) sits under the layer's entry in the layers control.
  * The 'sunlight' layer on the same map drives the time; without one, vehicles run live.
  */
-import * as createMeshApi from '../utils/createMesh.js';
-import * as disposeMesh from '../utils/disposeMesh.js';
-import * as setHighlight from '../utils/setHighlight.js';
-import * as showFeature from '../utils/showFeature.js';
-import { update as updateScene } from '../utils/update.js';
-import { along } from '../utils/along.js';
 import { build } from '../utils/build.js';
-import { computeBounds } from '../utils/computeBounds.js';
-import { routeGeometry } from '../utils/routeGeometry.js';
-import { toLanes } from '../utils/toLanes.js';
-import { tripsAt } from '../utils/tripsAt.js';
-import { underEntry } from '../utils/underEntry.js';
 import { tooltip } from '../utils/tooltip.js';
 import { speed } from '../utils/speed.js';
 import { vehicles } from '../utils/vehicles.js';
-import { getElevation } from '../utils/getElevation.js';
+import {
+  addTraffic,
+  placeTraffic,
+  removeTraffic,
+  readyTraffic,
+  tickTraffic,
+  updateTraffic,
+  updateTrafficTerrain,
+} from '../utils/traffic.js';
 
 L.Layer.types.traffic = function (layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
@@ -33,100 +30,17 @@ L.Layer.types.traffic = function (layer, { url, vehicle = 'car', side, outline, 
     nightLight: Boolean(lights),
     ...options,
   });
-  // The 'sunlight' layer on the same map drives the simulation time; without one, vehicles run live.
-  const now = () => {
-    let control = { live: true };
-    layer._map?.eachLayer(other => { if (other.control?.time) control = other.control; });
-    return { live: control.live, time: control.live ? new Date() : control.time };
-  };
   const status = L.DomUtil.create('small', 'traffic-status');
   status.style.cssText = 'display:block;max-width:200px;margin:0 0 4px 20px;color:#555;';
   const template = build(model(0)), stride = template.position.length, vertices = stride / 3;
-  let ready = false, frame, request, lanes = [], tripsKey, mesh, route, litAt = -Infinity;
-  // Vehicles move on the GPU: `trips` are rebased at most once per second, a compute pass places them every frame.
-  let trips = [], rebasedAt = 0, nextCheck = -Infinity, elapsed = 0, gpu = null, lanesDirty = true, stale = false;
   const params = new ArrayBuffer(16), paramFloats = new Float32Array(params), paramInts = new Uint32Array(params);
-
-  const createMesh = (data, featureFaces, material, usage = 0) => {
-    const result = createMeshApi.createMesh(layer, data, material, usage);
-    result.extras.featureFaces = featureFaces;
-    return result;
-  };
-  const dispose = object => {
-    if (!object) return;
-    if (layer.highlightedFeature?.mesh === object) {
-      setHighlight.setHighlight(layer, null);
-      layer.hoveredFeature = null;
-      showFeature.showFeature(layer, null);
-    };
-    disposeMesh.disposeMesh(layer, object);
-  };
-  const fail = error => {
-    status.textContent = `Error: ${error.message}`;
-    status.setAttribute('role', 'alert');
-    console.error('Traffic layer', error);
-  };
-
-  const ground = () => {
-    const terrain = layer._map._terrain3D?._terrainReady && layer._map._terrain3D, base = layer.root.position[1];
-    for (const lane of lanes) lane.points.forEach((point, i) => {
-      const elevation = terrain && (lane.elevation ?? getElevation(terrain, lane.latlngs[i]));
-      point[2] = Number.isFinite(elevation) && Number.isFinite(base) ? elevation - base : 0;
-    });
-    lanesDirty = true;
-    nextCheck = -Infinity;
-  };
-  const prepare = () => {
-    const crs = layer._map.options.crs, origin = crs.project(layer.location);
-    const metres = Math.cos(layer.location.lat * Math.PI / 180);
-    for (const lane of lanes) {
-      lane.points = lane.latlngs.map(([lat, lng]) => {
-        const point = crs.project(new L.LatLng(lat, lng));
-        return [(point.x - origin.x) * metres, -(point.y - origin.y) * metres, 0];
-      });
-      lane.lengths = [0];
-      for (let i = 1; i < lane.points.length; i++) {
-        lane.lengths.push(lane.lengths[i - 1] + Math.hypot(lane.points[i][0] - lane.points[i - 1][0], lane.points[i][1] - lane.points[i - 1][1]));
-      }
-      lane.length = lane.lengths.at(-1);
-    }
-    ground();
-    dispose(route); route = null;
-    tripsKey = null;
-  };
-
-  // Dashed lane outline, just above the lanes.
-  const drawRoute = () => {
-    route = createMesh(routeGeometry(lanes), [], { emissive: [0.03, 0.25, 0.3] });
-  };
-  // One batched mesh, `vertices` per vehicle; the compute pass writes its position/normal buffers (STORAGE).
-  const rebuild = () => {
-    dispose(mesh); mesh = null;
-    if (!trips.length) return;
-    const color = trips.flatMap((trip, i) => build(model(i)).color), count = color.length / 3;
-    mesh = createMesh({ position: color.map(() => 0), normal: color.map(() => 0), color },
-      trips.map((trip, i) => ({
-        id: trip.id, properties: trip.properties, faceStart: i * vertices / 3, faceEnd: (i + 1) * vertices / 3,
-        vertexStart: i * vertices, vertexEnd: (i + 1) * vertices
-      })), {}, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-    mesh.geometry.drawRange.count = count;
-    bounds();
-  };
-  // Vehicles never leave their lanes: cull and pick against the lanes' extent.
-  const bounds = () => {
-    const extent = { attributes: { position: { data: lanes.flatMap(lane => lane.points.flatMap(([x, z, y]) => [x - 20, y, z - 20, x + 20, y + 5, z + 20])) } } };
-    computeBounds(extent);
-    mesh.geometry.bounds = extent.bounds;
-  };
-
-  const destroyGpu = () => {
-    for (const buffer of [gpu?.params, gpu?.template, gpu?.points, gpu?.vehicles]) buffer?.destroy();
-    gpu = null;
-  };
-  const storage = (device, data) => {
-    const buffer = device.createBuffer({ size: Math.max(16, data.byteLength), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    device.queue.writeBuffer(buffer, 0, data);
-    return buffer;
+  const state = {
+    layer, url, model, lights, side, outline, velocity, status, template, stride, vertices,
+    params, paramFloats, paramInts,
+    ready: false, frame: undefined, request: undefined, lanes: [], tripsKey: undefined,
+    mesh: undefined, route: undefined, litAt: -Infinity,
+    trips: [], rebasedAt: 0, nextCheck: -Infinity, elapsed: 0, gpu: null,
+    lanesDirty: true, stale: false, loaded: undefined, file: undefined,
   };
   // Lane points are [x, z, ground, cumulative length]. Mirrors along() and place().
   const shader = `
@@ -168,187 +82,12 @@ L.Layer.types.traffic = function (layer, { url, vehicle = 'car', side, outline, 
       normal[o + 1u] = model[n + 1u];
       normal[o + 2u] = model[n] * dx - model[n + 2u] * dz;
     }`;
-  // Upload lanes and the rebased trips; the CPU copy is refreshed only for picking (place()).
-  const rebase = () => {
-    const { device } = layer.renderer;
-    if (gpu?.device !== device) {
-      destroyGpu();
-      gpu = {
-        device,
-        pipeline: device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code: shader }), entryPoint: 'main' } }),
-        params: device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-        template: storage(device, new Float32Array([...template.position, ...template.normal])),
-      };
-      lanesDirty = true;
-    }
-    if (lanesDirty) {
-      const data = new Float32Array(lanes.reduce((count, lane) => count + lane.points.length, 0) * 4);
-      let offset = 0;
-      for (const lane of lanes) {
-        lane.start = offset / 4;
-        lane.points.forEach((point, i) => { data.set([point[0], point[1], point[2], lane.lengths[i]], offset); offset += 4; });
-      }
-      gpu.points?.destroy();
-      gpu.points = storage(device, data);
-      lanesDirty = false;
-    }
-    const data = new Float32Array(trips.length * 4), index = new Uint32Array(data.buffer);
-    trips.forEach((trip, i) => {
-      index[i * 4] = trip.lane.start;
-      index[i * 4 + 1] = trip.lane.points.length;
-      data[i * 4 + 2] = trip.distance;
-      data[i * 4 + 3] = trip.speed;
-      mesh.extras.featureFaces[i].properties = trip.properties;
-    });
-    if (gpu.vehicles?.size >= data.byteLength) device.queue.writeBuffer(gpu.vehicles, 0, data);
-    else {
-      gpu.vehicles?.destroy();
-      gpu.vehicles = storage(device, data);
-    }
-    const { position, normal } = mesh.geometry.attributes;
-    gpu.bindGroup = device.createBindGroup({
-      layout: gpu.pipeline.getBindGroupLayout(0),
-      entries: [gpu.params, gpu.template, gpu.points, gpu.vehicles, position.buffer, normal.buffer]
-        .map((buffer, binding) => ({ binding, resource: { buffer } })),
-    });
-  };
-  const move = seconds => {
-    const { device } = gpu;
-    paramFloats[0] = elapsed = seconds;
-    paramFloats[1] = side;
-    paramInts[2] = vertices;
-    paramInts[3] = trips.length * vertices;
-    device.queue.writeBuffer(gpu.params, 0, params);
-    const encoder = device.createCommandEncoder(), pass = encoder.beginComputePass();
-    pass.setPipeline(gpu.pipeline);
-    pass.setBindGroup(0, gpu.bindGroup);
-    pass.dispatchWorkgroups(Math.ceil(paramInts[3] / 64));
-    pass.end();
-    device.queue.submit([encoder.finish()]);
-    stale = true;
-  };
-  // CPU twin of the compute pass: the centre of `trip` and its heading.
-  const locate = trip => {
-    const { points, lengths, length } = trip.lane;
-    let distance = trip.distance + elapsed * trip.speed;
-    distance -= length * Math.floor(distance / length);
-    const { x, y, z, dx, dz } = along(points, lengths, distance);
-    return { x: x - dz * side, y, z: z + dx * side, dx, dz };
-  };
-  // Run lazily before picking.
-  const place = () => {
-    if (!mesh || !stale) return;
-    stale = false;
-    const { position, normal } = mesh.geometry.attributes;
-    trips.forEach((trip, i) => {
-      const { x: cx, y, z: cz, dx, dz } = locate(trip);
-      for (let k = 0, o = i * stride; k < stride; k += 3, o += 3) {
-        const lx = template.position[k], lz = template.position[k + 2], nx = template.normal[k], nz = template.normal[k + 2];
-        position.data[o] = cx - lx * dz - lz * dx;
-        position.data[o + 1] = y + template.position[k + 1];
-        position.data[o + 2] = cz + lx * dx - lz * dz;
-        normal.data[o] = -nx * dz - nz * dx;
-        normal.data[o + 1] = template.normal[k + 1];
-        normal.data[o + 2] = nx * dx - nz * dz;
-      }
-    });
-  };
-  layer._beforeRaycast = place;
-
-  const tick = () => {
-    frame = undefined;
-    if (!ready || !layer._map) return;
-    // Re-adding after the last GPU owner was removed can attach asynchronously.
-    if (!layer.renderer) { frame = requestAnimationFrame(tick); return; }
-    // A renderer change re-creates vertex buffers without STORAGE: rebuild the mesh.
-    if (mesh && !(mesh.geometry.attributes.position.buffer.usage & GPUBufferUsage.STORAGE)) { tripsKey = null; nextCheck = -Infinity; }
-    const { live, time } = now(), ms = time?.getTime(), valid = Number.isFinite(ms);
-    let changed = false;
-    // Trips only change at timetable/hour boundaries: re-check once per second while live.
-    if (!live || !valid || !(ms >= rebasedAt && ms < nextCheck)) {
-      let text;
-      try {
-        trips = valid ? tripsAt(time, lanes, velocity) : [];
-        text = !valid ? 'Select a valid simulation date' : !loaded ? 'Loading…' :
-          `${trips.length} vehicle${trips.length === 1 ? '' : 's'}${loaded.note ? ` · ${loaded.note}` : ''}`;
-      } catch (error) { return fail(error); }
-      rebasedAt = ms;
-      nextCheck = ms + 1000;
-      const key = trips.map(trip => trip.id).join();
-      changed = key !== tripsKey || (outline && !route && lanes.length);
-      if (outline && !route && lanes.length) drawRoute();
-      if (key !== tripsKey) { rebuild(); tripsKey = key; }
-      if (mesh) rebase();
-      if (status.textContent !== text) status.textContent = text;
-      status.removeAttribute('role');
-    }
-    if (mesh) move((ms - rebasedAt) / 1000);
-    // ponytail: night point lights follow the vehicles at 10 Hz via the shared CPU light grid (~5 ms with thousands of lamps);
-    // bin the lights in a compute pass if it shows up in profiles.
-    if (mesh && lights && (!live || !(performance.now() - litAt < 100))) {
-      litAt = performance.now();
-      mesh.extras.lights = trips.flatMap(trip => {
-        const { x, y, z, dx, dz } = locate(trip);
-        return lights.map(({ position: [lx, ly, lz], ...light }) => ({ ...light, position: [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz] }));
-      });
-    }
-    if (mesh || changed) updateScene(layer);
-    if (live && valid) frame = requestAnimationFrame(tick);
-  };
-  let loaded, file;
-  // A JS module serves time-dependent lanes; anything else is a static GeoJSON file, fetched once.
-  const fetchLanes = async (time, signal) => {
-    const href = new URL(url, document.baseURI).href;
-    if (/\.m?js(?:[?#]|$)/i.test(url)) return (await import(href)).default(time, layer, signal);
-    if (!file) {
-      const response = await fetch(href, { signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      file = await response.json();
-    }
-    return file;
-  };
-  const load = () => {
-    const { time } = now();
-    if (!Number.isFinite(time?.getTime())) return;
-    request?.abort();
-    const { signal } = request = new AbortController();
-    fetchLanes(time, signal).then(data => {
-      if (signal.aborted || !layer._map || data === loaded) return;
-      loaded = data;
-      lanes = toLanes(data);
-      prepare();
-      if (!frame) tick();
-    }, error => { if (error.name !== 'AbortError') fail(error); });
-  };
-  // 'layerremove' fires once the clock layer has really left the map.
-  const update = event => {
-    if (event?.layer === layer) return;
-    cancelAnimationFrame(frame);
-    load();
-    tick();
-  };
-  const terrain = () => {
-    if (!lanes.length) return;
-    ground();
-    dispose(route); route = null;
-    if (mesh) bounds();
-    if (!frame) tick();
-  };
-  const start = () => {
-    layer._map.off('simulationtimechange layerremove', update).on('simulationtimechange layerremove', update);
-    layer._map.off('terrainchange', terrain).on('terrainchange', terrain);
-    underEntry(layer, status);
-    update();
-  };
-  layer.on('ready', () => { ready = true; if (layer._map) start(); });
-  layer.on('add', () => { if (ready) start(); });
-  layer.on('remove', () => {
-    request?.abort();
-    cancelAnimationFrame(frame); frame = undefined;
-    layer._map.off('simulationtimechange layerremove', update).off('terrainchange', terrain);
-    dispose(mesh); dispose(route); mesh = route = null;
-    delete layer._beforeRaycast;
-    destroyGpu();
-    lanes = []; trips = []; tripsKey = loaded = null;
-  });
+  state.shader = shader;
+  state.tick = tickTraffic.bind(null, state);
+  state.update = updateTraffic.bind(null, state);
+  state.terrain = updateTrafficTerrain.bind(null, state);
+  layer._beforeRaycast = placeTraffic.bind(null, state);
+  layer.on('ready', readyTraffic.bind(null, state));
+  layer.on('add', addTraffic.bind(null, state));
+  layer.on('remove', removeTraffic.bind(null, state));
 }
