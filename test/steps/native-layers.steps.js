@@ -125,8 +125,20 @@ Then('native rendering avoids DOM geometry reads and pan-time path rebuilds', as
         mesh.geometry.attributes.position.buffer === buffer &&
         data.every((value, i) => value === mesh.geometry.attributes.position.data[i]));
       const compactCircle = nativeLayers.CircleMarker._nativeGPU.meshes.get('stroke').geometry.attributes.position.count < 200;
+      const tiles = nativeLayers.TileLayer, tileMeshes = [...tiles._nativeGPU.meshes.values()];
+      const tileBuffers = new Set(tileMeshes.map(mesh => mesh.geometry.attributes.position.buffer));
+      let tileUploads = 0;
+      owner.renderer.device.queue.writeBuffer = function (buffer, ...args) {
+        if (tileBuffers.has(buffer)) tileUploads++;
+        return write.call(this, buffer, ...args);
+      };
+      tiles.setOpacity(0.7);
+      tiles.fire('tileload');
+      nativeChecks.render.render(owner);
+      const sharedTileProgram = new Set(tileMeshes.map(mesh => mesh.program)).size === 1;
+      tiles.setOpacity(1);
       return { layouts, uploads, createdBuffers, retained, compactCircle, marker: backend.root.children.length > 0,
-        errors: nativeErrors };
+        sharedTileProgram, tileUploads, errors: nativeErrors };
     } finally {
       window.getComputedStyle = getStyle;
       owner.renderer.device.queue.writeBuffer = write;
@@ -137,7 +149,8 @@ Then('native rendering avoids DOM geometry reads and pan-time path rebuilds', as
       });
     }
   });
-  assert.deepEqual(result, { layouts: 0, uploads: 0, createdBuffers: 0, retained: true, compactCircle: true, marker: true, errors: [] });
+  assert.deepEqual(result, { layouts: 0, uploads: 0, createdBuffers: 0, retained: true, compactCircle: true,
+    marker: true, sharedTileProgram: true, tileUploads: 0, errors: [] });
 });
 
 Then('native popups and tooltips remain above the GPU canvas', async function () {
@@ -311,5 +324,114 @@ Then('HTML grid tiles report an error instead of silently disappearing', async f
       layer.remove();
     }
   });
+
   assert.equal(message, 'WebGPU native raster layers require image or canvas tiles');
+});
+
+Then('native pointer events respect bubbling and propagation cancellation', async function () {
+  const point = await this.page.evaluate(() => {
+    const layer = nativeLayers.CircleMarker;
+    layer.unbindPopup().unbindTooltip();
+    map.setView(layer.getLatLng(), 15, { animate: false });
+    nativeChecks.render.render(L.Layer._renderers.get(map));
+    const p = map.latLngToContainerPoint(layer.getLatLng()), rect = map.getContainer().getBoundingClientRect();
+    window.eventCounts = { map: 0, layer: 0, down: 0, up: 0 };
+    map.on('click', () => eventCounts.map++);
+    layer.on('click', () => eventCounts.layer++);
+    layer.on(L.version.startsWith('2') ? 'pointerdown' : 'mousedown', () => eventCounts.down++);
+    layer.on(L.version.startsWith('2') ? 'pointerup' : 'mouseup', () => eventCounts.up++);
+    layer.options[L.version.startsWith('2') ? 'bubblingPointerEvents' : 'bubblingMouseEvents'] = false;
+    return { x: rect.left + p.x, y: rect.top + p.y };
+  });
+  await this.page.mouse.click(point.x, point.y);
+  assert.deepEqual(await this.page.evaluate(() => eventCounts), { map: 0, layer: 1, down: 1, up: 1 });
+  await this.page.evaluate(() => {
+    nativeLayers.CircleMarker.options[L.version.startsWith('2') ? 'bubblingPointerEvents' : 'bubblingMouseEvents'] = true;
+  });
+  await this.page.mouse.click(point.x, point.y);
+  assert.deepEqual(await this.page.evaluate(() => eventCounts), { map: 1, layer: 2, down: 2, up: 2 });
+  await this.page.evaluate(() => nativeLayers.CircleMarker.on('click', event => L.DomEvent.stopPropagation(event)));
+  await this.page.mouse.click(point.x, point.y);
+  assert.deepEqual(await this.page.evaluate(() => eventCounts), { map: 1, layer: 3, down: 3, up: 3 });
+});
+
+Then('native zoom animation interpolates the GPU camera and accessible marker targets', { timeout: 30000 }, async function () {
+  await this.page.evaluate(() => {
+    const owner = L.Layer._renderers.get(map), marker = nativeLayers.Marker;
+    map.setView(marker.getLatLng(), 15, { animate: false });
+    map._setPitchAndBearing(50, 35);
+    nativeChecks.render.render(owner);
+  });
+  await this.page.waitForFunction(() => Object.values(nativeLayers).filter(layer => layer instanceof L.GridLayer)
+    .every(layer => !layer.isLoading() && Object.values(layer._tiles).every(tile => !tile.current || tile.active)));
+  const result = await this.page.evaluate(async () => {
+    const owner = L.Layer._renderers.get(map), marker = nativeLayers.Marker;
+    const distance = () => Math.hypot(...owner.camera.position.map((value, i) => value - owner.camera.target[i]));
+    const start = distance(), samples = [];
+    map.setZoomAround(new L.Point(500, 300), 16, { animate: true });
+    for (let i = 0; i < 24; i++) {
+      await new Promise(requestAnimationFrame);
+      const dom = L.DomUtil.getPosition(marker._icon).add(map._getMapPanePos());
+      const crs = map.options.crs, location = crs.project(marker.getLatLng()), origin = crs.project(owner._sceneOrigin);
+      const metres = Math.cos(owner._sceneOrigin.lat * Math.PI / 180), size = map.getSize();
+      const clip = new DOMPoint((location.x - origin.x) * metres, 0, -(location.y - origin.y) * metres, 1)
+        .matrixTransform(new DOMMatrix(owner.camera.projectionViewMatrix));
+      const gpu = new L.Point((clip.x / clip.w + 1) * size.x / 2, (1 - clip.y / clip.w) * size.y / 2);
+      samples.push({ distance: distance(), error: dom.distanceTo(gpu) });
+    }
+    const intermediate = samples.filter(sample => sample.distance < start * 0.99 && sample.distance > start * 0.51);
+    const cleaned = !map._cameraView && !map.getContainer().classList.contains('leaflet-camera-zoom');
+    return { intermediate: intermediate.length, error: Math.max(...samples.map(sample => sample.error)),
+      finalScale: start / distance(), cleaned };
+  });
+  assert.ok(result.intermediate >= 2, `Intermediate camera frames: ${JSON.stringify(result)}`);
+  assert.ok(result.error < 2, `Animated DOM/GPU anchor drift: ${result.error}px`);
+  assert.ok(Math.abs(result.finalScale - 2) < 0.001, `Final zoom scale: ${result.finalScale}`);
+  assert.equal(result.cleaned, true);
+});
+
+Then('native icon transitions, hover stacking and closest path points remain available', async function () {
+  const result = await this.page.evaluate(async () => {
+    const marker = new L.Marker(map.getCenter(), {
+      icon: new L.DivIcon({ html: 'HTML' }), riseOnHover: true,
+    }).addTo(map);
+    const icon = nativeLayers.Marker.getIcon();
+    marker.setIcon(icon);
+    await marker.ready;
+    await marker._icon.decode();
+    const owner = L.Layer._renderers.get(map);
+    nativeChecks.render.render(owner);
+    const gpu = marker._nativeGPU.meshes.get('icon');
+    const adapted = Boolean(gpu) && marker._icon.classList.contains('leaflet-webgpu-target');
+    const order = gpu.renderOrder;
+    marker.fire(L.version.startsWith('2') ? 'pointerover' : 'mouseover');
+    nativeChecks.render.render(owner);
+    const raised = gpu.renderOrder > order;
+    marker.setIcon(new L.DivIcon({ html: 'HTML again' }));
+    nativeChecks.render.render(owner);
+    const html = marker._nativeGPU.meshes.size === 0 && !marker._icon.classList.contains('leaflet-webgpu-target');
+    marker.setIcon(icon);
+    await marker._icon.decode();
+    nativeChecks.render.render(owner);
+    const restored = marker._nativeGPU.meshes.has('icon');
+    const path = nativeLayers.Polyline;
+    const closest = path.closestLayerPoint(map.latLngToLayerPoint(path.getLatLngs()[0]));
+    const closestPoint = closest && closest.distance < 1;
+    const shadowMarker = nativeLayers['Marker (default icon)'];
+    shadowMarker.options.keepUpright = true;
+    shadowMarker.options.scale = 2;
+    shadowMarker.setRotation(Math.PI);
+    const upright = shadowMarker._cameraIconPoint(1, 0).x > 0;
+    const shadowScaled = shadowMarker._shadow.style.transform.includes('scale(2)');
+    const grid = nativeLayers.GridLayer;
+    nativeLayers.TileLayer.setZIndex(20);
+    grid.bringToFront();
+    const front = grid.options.zIndex > 20;
+    grid.bringToBack();
+    const back = grid.options.zIndex < nativeLayers.TileLayer.options.zIndex &&
+      grid.options.zIndex < nativeLayers['TileLayer.WMS'].options.zIndex;
+    return { adapted, raised, html, restored, closestPoint, upright, shadowScaled, front, back };
+  });
+  assert.deepEqual(result, { adapted: true, raised: true, html: true, restored: true,
+    closestPoint: true, upright: true, shadowScaled: true, front: true, back: true });
 });

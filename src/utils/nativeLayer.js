@@ -14,7 +14,7 @@ export async function nativeLayer(state) {
   const images = new Set();
   map._nativeGPUOrder ||= 0;
   map._nativeGPUBack ||= 0;
-  let dirty = true, viewDirty = true, failed = false, order = ++map._nativeGPUOrder;
+  let dirty = true, viewDirty = true, failed = false, order = ++map._nativeGPUOrder, rasterProgram;
   const marker = source instanceof L.Marker;
   const paneOrder = Number(getComputedStyle(source.getPane()).zIndex) || 0;
   const current = () => source._nativeGPU === state && map.hasLayer(source);
@@ -53,8 +53,13 @@ export async function nativeLayer(state) {
     const own = Object.getOwnPropertyDescriptor(source, name), original = source[name];
     methods.set(name, own);
     source[name] = function (...args) {
-      if (name === 'setIcon') args[0].options.crossOrigin ||= true;
       const result = original.apply(this, args);
+      if ((name === 'bringToFront' || name === 'bringToBack') && this instanceof L.GridLayer) {
+        const indices = Object.values(map._layers).filter(layer => layer !== this &&
+          layer instanceof L.GridLayer && layer.getPane() === this.getPane()).map(layer => layer.options.zIndex || 0);
+        const edge = name === 'bringToFront' ? Math.max(...indices) + 1 : Math.min(...indices) - 1;
+        if (Number.isFinite(edge)) this.setZIndex(edge);
+      }
       if (name === 'bringToFront') order = ++map._nativeGPUOrder;
       if (name === 'bringToBack') order = --map._nativeGPUBack;
       refresh();
@@ -101,6 +106,15 @@ export async function nativeLayer(state) {
     return [(p.x - origin.x) * metres, 0, -(p.y - origin.y) * metres];
   };
   const pixel = p => local(map.unproject(p));
+  const styleMesh = (mesh, color, opacity) => {
+    mesh.program.uniforms.baseColor.value = color;
+    mesh.program.uniforms.opacity.value = opacity;
+    if (source instanceof L.GridLayer) mesh.opacity = opacity;
+    const zIndex = marker ? source._zIndex + (source._cameraZIndexOffset || 0) : source.options.zIndex;
+    mesh.renderOrder = paneOrder * 1e6 + (zIndex || 0) * 1000 + order;
+    mesh._nativeSource = source;
+    mesh._nativeUsed = true;
+  };
   const put = (key, position, color, opacity, texture, uv) => {
     if (!position.length) return;
     let mesh = meshes.get(key);
@@ -114,21 +128,19 @@ export async function nativeLayer(state) {
       mesh = createMesh(backend, data, {
         vertexColors: false, color, opacity, unlit: true, alphaMode: 'BLEND',
         ...(texture ? { baseTexture: texture } : {}),
-      });
+      }, 0, source instanceof L.GridLayer ? rasterProgram : undefined);
+      if (source instanceof L.GridLayer) {
+        rasterProgram ||= mesh.program;
+        mesh.texture = texture;
+      }
       meshes.set(key, mesh);
     } else {
       const attribute = mesh.geometry.attributes.position;
       attribute.data.set(position);
       attribute.needsUpdate = true;
       mesh.geometry.bounds = null;
-      mesh.program.uniforms.baseColor.value = color;
-      mesh.program.uniforms.opacity.value = opacity;
     }
-    const zIndex = marker ? map.latLngToLayerPoint(source.getLatLng()).y +
-      (source.options.zIndexOffset || 0) : source.options.zIndex;
-    mesh.renderOrder = paneOrder * 1e6 + (zIndex || 0) * 1000 + order;
-    mesh._nativeSource = source;
-    mesh._nativeUsed = true;
+    styleMesh(mesh, color, opacity);
     return mesh;
   };
   const textureFor = (key, image) => {
@@ -156,17 +168,38 @@ export async function nativeLayer(state) {
         }),
         sampler: device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
       };
-      // Upload here so CORS/security failures reject ready or emit error on the owning native layer.
-      try {
-        device.queue.copyExternalImageToTexture({ source: image }, { texture: texture.texture }, [width, height]);
-      } catch (error) {
-        texture.texture.destroy();
-        throw error;
-      }
-      texture.uploaded = image;
       textures.set(key, texture);
+      if (image instanceof HTMLCanvasElement) {
+        texture.pending = true;
+        // Snapshot asynchronously: copying a GPU-backed 2D canvas directly forces a blocking readback in Chromium.
+        createImageBitmap(image).then(bitmap => {
+          try {
+            if (!current() || textures.get(key) !== texture) return;
+            device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: texture.texture }, [width, height]);
+            texture.uploaded = image;
+            texture.pending = false;
+            refresh();
+          } finally {
+            bitmap.close();
+          }
+        }).catch(error => {
+          failed = true;
+          source.fire('error', { error });
+        });
+      } else {
+        // CORS/security failures reject ready or emit error on the owning native layer.
+        try {
+          device.queue.copyExternalImageToTexture({ source: image }, { texture: texture.texture }, [width, height]);
+        } catch (error) {
+          texture.texture.destroy();
+          textures.delete(key);
+          throw error;
+        }
+        texture.uploaded = image;
+      }
     }
-    return texture;
+    texture.used = true;
+    return texture.uploaded === image ? texture : undefined;
   };
   const quad = (key, image, corners, opacity) => {
     const texture = textureFor(key, image);
@@ -184,11 +217,21 @@ export async function nativeLayer(state) {
     dirty = false;
     viewDirty = false;
     for (const mesh of meshes.values()) mesh._nativeUsed = false;
+    for (const texture of textures.values()) texture.used = false;
     if (source instanceof L.GridLayer) {
       for (const [key, tile] of Object.entries(source._tiles || {})) {
         if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) continue;
-        const [nw, se] = source._tileCoordsToNwSe(tile.coords);
-        quad(key, tile.el, boundsQuad(new L.LatLngBounds(nw, se)), source.options.opacity ?? 1);
+        const opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
+        const retained = textures.get(key);
+        let mesh = meshes.get(key);
+        if (mesh && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
+          retained.used = true;
+          styleMesh(mesh, [1, 1, 1], opacity);
+        } else {
+          const [nw, se] = source._tileCoordsToNwSe(tile.coords);
+          mesh = quad(key, tile.el, boundsQuad(new L.LatLngBounds(nw, se)), opacity);
+        }
+        if (mesh) mesh.renderOrder += tile.coords.z / 100;
       }
     } else if (source instanceof L.ImageOverlay) {
       if (source._image?.complete && source._image.naturalWidth) {
@@ -212,10 +255,8 @@ export async function nativeLayer(state) {
         const left = center.x - (anchor.x ?? anchor[0]), top = center.y - (anchor.y ?? anchor[1]);
         const corners = [[left, top], [left + width, top],
           [left, top + height], [left + width, top + height]].map(([x, y]) => {
-          if (key === 'icon') {
-            const offset = source._cameraIconPoint(x - center.x, y - center.y);
-            x = center.x + offset.x; y = center.y + offset.y;
-          }
+          const offset = source._cameraIconPoint(x - center.x, y - center.y);
+          x = center.x + offset.x; y = center.y + offset.y;
           const p = new DOMPoint(x / size.x * 2 - 1,
             1 - y / size.y * 2, clip.z / clip.w, 1).matrixTransform(inverse);
           const result = new DOMPoint(p.x / p.w, p.y / p.w, p.z / p.w, 1).matrixTransform(toLocal);
@@ -241,6 +282,11 @@ export async function nativeLayer(state) {
       meshes.delete(key);
       const texture = textures.get(key);
       if (texture) destroyTexture(backend, texture.texture);
+      textures.delete(key);
+    }
+    for (const [key, texture] of textures) {
+      if (texture.used) continue;
+      destroyTexture(backend, texture.texture);
       textures.delete(key);
     }
   };

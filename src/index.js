@@ -101,13 +101,17 @@ L.Layer.include({
     }
     layerProto._layerAdd.call(this, event);
     if (!native || !event.target.hasLayer(this)) return;
+    this._initNativeGPU(event.target);
+  },
+  _initNativeGPU(map) {
+    if (this._nativeGPU) return;
     if (!document.getElementById('leaflet-webgpu-targets')) {
       const style = document.createElement('style');
       style.id = 'leaflet-webgpu-targets';
       style.textContent = '.leaflet-webgpu-target{opacity:0!important}';
       document.head.append(style);
     }
-    const state = this._nativeGPU = { source: this, map: event.target, hidden: new Set() };
+    const state = this._nativeGPU = { source: this, map, hidden: new Set() };
     state.hide = () => {
       const htmlIcon = this instanceof L.Marker && this.options.icon instanceof L.DivIcon;
       for (const element of [htmlIcon ? null : this._icon, htmlIcon ? null : this._shadow]) {
@@ -335,6 +339,14 @@ L.Layer.addInitHook(function () {
       _bringToFront: () => this._nativeGPU?.reorder?.(true),
       _bringToBack: () => this._nativeGPU?.reorder?.(false),
     };
+    if (this instanceof L.Polyline) {
+      const closest = this.closestLayerPoint;
+      this.closestLayerPoint = function (point) {
+        this._project();
+        this._parts = this._rings;
+        return closest.call(this, point);
+      };
+    }
     if (this instanceof L.Circle) {
       const getBounds = this.getBounds;
       this.getBounds = function () {
@@ -347,6 +359,25 @@ L.Layer.addInitHook(function () {
     this._initContainer = function () {
       initialize.call(this);
       this._container.remove();
+    };
+    this._updateOpacity = function () {
+      if (!this._map) return;
+      const now = Date.now();
+      let fading = false, prune = false;
+      for (const tile of Object.values(this._tiles || {})) {
+        if (!tile.current || !tile.loaded) continue;
+        tile._gpuOpacity = this._map._fadeAnimated ? Math.min(1, (now - tile.loaded) / 200) : 1;
+        if (tile._gpuOpacity < 1) fading = true;
+        else if (!tile.active) {
+          this._onOpaqueTile(tile);
+          tile.active = true;
+          prune = true;
+        }
+      }
+      if (prune && !this._noPrune) this._pruneTiles();
+      this._nativeGPU?.refresh?.();
+      cancelAnimationFrame(this._fadeFrame);
+      if (fading) this._fadeFrame = requestAnimationFrame(() => this._updateOpacity());
     };
   } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
     this.onAdd = function () {

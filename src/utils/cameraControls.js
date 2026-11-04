@@ -2,22 +2,25 @@ function editable(target) {
   return target.closest?.('input,textarea,select,[contenteditable="true"]');
 }
 
-function dragCamera(map, element, accept, sensitivity = [0.5, 0.25]) {
+function dragCamera(map, element, accept, sensitivity = [0.8, 0.5], orbit = false) {
   let drag, moved = false;
-  const end = () => {
+  const end = event => {
     if (!drag) return;
-    if (element.hasPointerCapture?.(drag.id)) element.releasePointerCapture(drag.id);
-    if (drag.dragging) map.dragging.enable();
+    if (event?.pointerId !== undefined && event.pointerId !== drag.id) return;
+    const finished = drag;
     drag = null;
-    element.style.cursor = 'grab';
+    if (element.hasPointerCapture?.(finished.id)) element.releasePointerCapture(finished.id);
+    if (finished.dragging && map.getContainer()._leaflet_id) map.dragging.enable();
+    element.style.cursor = finished.cursor;
   };
   const down = event => {
     if (drag || !accept(event) || editable(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
     moved = false;
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY,
-      pitch: map.getPitch(), bearing: map.getBearing(), dragging: map.dragging?.enabled() };
+    const rect = map.getContainer().getBoundingClientRect();
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, cursor: element.style.cursor,
+      cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, dragging: map.dragging?.enabled() };
     map.dragging?.disable();
     element.focus?.({ preventScroll: true });
     element.setPointerCapture(event.pointerId);
@@ -30,15 +33,28 @@ function dragCamera(map, element, accept, sensitivity = [0.5, 0.25]) {
     map._stopPitchBearingAnimation();
     moved = true;
     event.preventDefault();
-    map._setPitchAndBearing(drag.pitch - y * sensitivity[1], drag.bearing + x * sensitivity[0]);
+    let bearing = x * sensitivity[0];
+    if (orbit) {
+      if (Math.abs(drag.cy - drag.y) > 100) {
+        const angle = Math.atan2(event.clientY - drag.cy, event.clientX - drag.cx) -
+          Math.atan2(event.clientY - drag.cy, drag.x - drag.cx);
+        bearing = Math.atan2(Math.sin(angle), Math.cos(angle)) * 180 / Math.PI;
+      } else bearing *= event.clientY < drag.cy ? 1 : -1;
+    }
+    map._setPitchAndBearing(map.getPitch() - y * sensitivity[1], map.getBearing() + bearing);
+    drag.x = event.clientX; drag.y = event.clientY;
   };
   const click = event => { if (moved) { event.preventDefault(); event.stopPropagation(); moved = false; } };
+  const context = event => {
+    if (drag || moved) { event.preventDefault(); event.stopPropagation(); }
+  };
   element.addEventListener('pointerdown', down, true);
   element.addEventListener('pointermove', move);
   element.addEventListener('pointerup', end);
   element.addEventListener('pointercancel', end);
   element.addEventListener('lostpointercapture', end);
   element.addEventListener('click', click, true);
+  element.addEventListener('contextmenu', context);
   window.addEventListener('blur', end);
   return () => {
     end();
@@ -48,6 +64,7 @@ function dragCamera(map, element, accept, sensitivity = [0.5, 0.25]) {
     element.removeEventListener('pointercancel', end);
     element.removeEventListener('lostpointercapture', end);
     element.removeEventListener('click', click, true);
+    element.removeEventListener('contextmenu', context);
     window.removeEventListener('blur', end);
   };
 }
@@ -123,21 +140,19 @@ const PitchDrag = L.Handler.extend({
   addHooks() {
     this._end = dragCamera(this._map, this._map.getContainer(), event =>
       !event.target.closest('.leaflet-control,.leaflet-marker-icon,.leaflet-popup') &&
-      (event.button === 2 || event.button === 0 && event.ctrlKey));
-    this._context = event => { event.preventDefault(); };
-    this._map.getContainer().addEventListener('contextmenu', this._context);
+      (event.button === 2 || event.button === 0 && event.ctrlKey), [0.8, 0.5], true);
   },
   removeHooks() {
     this._end();
-    this._map.getContainer().removeEventListener('contextmenu', this._context);
   },
 });
 const Compass = L.Handler.extend({
   addHooks() {
     const generation = this._generation = (this._generation || 0) + 1;
     this._orientation = event => {
-      if (Number.isFinite(event.webkitCompassHeading)) this._map.setBearing(-event.webkitCompassHeading);
-      else if (event.absolute && Number.isFinite(event.alpha)) this._map.setBearing(event.alpha);
+      const bearing = Number.isFinite(event.webkitCompassHeading) ? -event.webkitCompassHeading : event.alpha;
+      const orientation = event.absolute ? 0 : (screen.orientation?.angle ?? window.orientation ?? 0);
+      if (Number.isFinite(bearing)) this._map.setBearing(bearing - orientation);
     };
     const permission = window.DeviceOrientationEvent?.requestPermission;
     Promise.resolve(permission ? permission.call(window.DeviceOrientationEvent) : 'granted').then(result => {
@@ -157,10 +172,19 @@ const Compass = L.Handler.extend({
   },
 });
 
+const ContainerResize = L.Handler.extend({
+  addHooks() {
+    this._observer = new ResizeObserver(() => this._map.invalidateSize());
+    this._observer.observe(this._map.getContainer());
+  },
+  removeHooks() { this._observer.disconnect(); },
+});
+
 export function cameraControls(map) {
   map.addHandler('shiftKeyRotate', ShiftRotate);
   map.addHandler('pitchDrag', PitchDrag);
   map.addHandler('compassBearing', Compass);
+  map.addHandler('trackContainerMutation', ContainerResize);
   // Two optional touch modes share one pinch/pan recognizer with Leaflet's zoom setting.
   const TouchMode = L.Handler.extend({
     addHooks() { map.fire('cameratouchchange'); },
@@ -195,19 +219,26 @@ export function cameraControls(map) {
     const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * 180 / Math.PI;
     map._setPitchAndBearing(map.touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch,
       map.touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
+    const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    if (distance < 1) return;
     const zoom = touch.zooming ? Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(),
-      touch.zoom + Math.log2(Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) / touch.distance))) : touch.zoom;
+      touch.zoom + Math.log2(distance / touch.distance))) : touch.zoom;
     map.setView(map.getCenter(), zoom, { animate: false });
-    const projected = map.project(touch.anchor).subtract(map.project(map.containerPointToLatLng(middle)));
-    map.setView(map.unproject(map.project(map.getCenter()).add(projected)), map.getZoom(), { animate: false });
+    if (map.options.touchZoom !== 'center') {
+      const projected = map.project(touch.anchor).subtract(map.project(map.containerPointToLatLng(middle)));
+      map.setView(map.unproject(map.project(map.getCenter()).add(projected)), map.getZoom(), { animate: false });
+    }
     event.preventDefault(); event.stopImmediatePropagation();
   };
-  const end = () => {
+  const end = event => {
     if (!touch) return;
-    if (touch.dragging) map.dragging.enable();
+    if (event?.touches?.length >= 2) return;
+    if (touch.dragging && container._leaflet_id) map.dragging.enable();
     const snap = touch.snap;
     map.options.zoomSnap = snap;
-    if (touch.zooming && snap) map.setZoom(Math.round(map.getZoom() / snap) * snap, { animate: false });
+    if (touch.zooming && snap && container._leaflet_id) {
+      map.setZoom(Math.round(map.getZoom() / snap) * snap, { animate: false });
+    }
     touch = null;
   };
   const change = () => {
@@ -217,7 +248,7 @@ export function cameraControls(map) {
       map.touchZoom?.disable();
     } else if (!active && nativeZoom !== undefined) {
       end();
-      if (nativeZoom) map.touchZoom.enable();
+      if (nativeZoom && container._leaflet_id) map.touchZoom.enable();
       nativeZoom = undefined;
     }
   };

@@ -10,5 +10,4 @@ export function disposeMesh(backend, mesh) {
   for (const attribute of Object.values(mesh.geometry.attributes)) {
     attribute.buffer.destroy();
   }
-  mesh.program.pipelineCache.clear();
 }

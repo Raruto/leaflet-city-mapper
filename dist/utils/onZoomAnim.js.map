@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/onZoomAnim.js"],
-  "sourcesContent": ["import { update } from \"./update.js\";\n\n\nexport function onZoomAnim() {\n  update(this);\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAGhB,SAASC,GAAa,CAC3BD,EAAO,IAAI,CACb",
-  "names": ["update", "onZoomAnim"]
+  "sourcesContent": ["import { render } from \"./render.js\";\n\n\nexport function onZoomAnim(event) {\n  const map = this._map;\n  if (event && !this._zoomView) {\n    this._zoomView = { from: map.getCenter(), zoom: map.getZoom(), to: event.center,\n      targetZoom: event.zoom, start: performance.now() };\n    map.getContainer().classList.add('leaflet-camera-zoom');\n  }\n  queueMicrotask(() => {\n    if (this._shared === this && this.renderer) render(this);\n  });\n}\n"],
+  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAGhB,SAASC,EAAWC,EAAO,CAChC,MAAMC,EAAM,KAAK,KACbD,GAAS,CAAC,KAAK,YACjB,KAAK,UAAY,CAAE,KAAMC,EAAI,UAAU,EAAG,KAAMA,EAAI,QAAQ,EAAG,GAAID,EAAM,OACvE,WAAYA,EAAM,KAAM,MAAO,YAAY,IAAI,CAAE,EACnDC,EAAI,aAAa,EAAE,UAAU,IAAI,qBAAqB,GAExD,eAAe,IAAM,CACf,KAAK,UAAY,MAAQ,KAAK,UAAUH,EAAO,IAAI,CACzD,CAAC,CACH",
+  "names": ["render", "onZoomAnim", "event", "map"]
 }

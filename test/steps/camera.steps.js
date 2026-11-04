@@ -16,6 +16,51 @@ async function createMap(page, options = {}) {
   }, options);
 }
 
+Then('pitched zoom, panning and marker focus preserve their screen anchors', { timeout: 30000 }, async function () {
+  await createMap(this.page, { pitch: 60, bearing: 35 });
+  const result = await this.page.evaluate(() => {
+    const map = cameraMap, screen = new L.Point(420, 290);
+    const anchor = map.containerPointToLatLng(screen);
+    map.setZoomAround(screen, 17, { animate: false });
+    const zoomError = map.latLngToContainerPoint(anchor).distanceTo(screen);
+    const old = map.getCenter(), half = map.getSize().divideBy(2), offset = new L.Point(30, 40);
+    map.panBy(offset, { animate: false });
+    const panError = map.latLngToContainerPoint(old).distanceTo(half.subtract(offset));
+    const outside = map.containerPointToLatLng(new L.Point(710, 300));
+    const marker = new L.Marker(outside, { icon: new L.DivIcon({ html: 'Focus me' }) }).addTo(map);
+    marker._icon.focus();
+    map.panInside(marker.getLatLng(), { padding: [30, 30], animate: false });
+    const focused = map.latLngToContainerPoint(marker.getLatLng());
+    const focusInside = focused.x >= 28 && focused.x <= 572 && focused.y >= 28 && focused.y <= 372;
+    const bounds = new L.LatLngBounds([48.84, 2.27], [48.88, 2.32]);
+    let fitError = 0;
+    for (const [pitch, bearing] of [[0, 45], [60, 35], [80, 270]]) {
+      map._setPitchAndBearing(pitch, bearing);
+      map.fitBounds(bounds, { paddingTopLeft: [40, 30], paddingBottomRight: [20, 50], animate: false });
+      for (const corner of [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]) {
+        const p = map.latLngToContainerPoint(corner);
+        fitError = Math.max(fitError, 40 - p.x, p.x - 580, 30 - p.y, p.y - 350);
+      }
+    }
+    map.setMaxBounds(bounds);
+    map.setView(bounds.getNorthEast(), 17, { animate: false });
+    map._setPitchAndBearing(65, 75);
+    map.panInsideBounds(bounds, { animate: false });
+    const visible = map.getBounds();
+    const min = map.project(bounds.getNorthWest()), max = map.project(bounds.getSouthEast());
+    const nw = map.project(visible.getNorthWest()), se = map.project(visible.getSouthEast());
+    const boundsError = Math.max(0, min.x - nw.x, min.y - nw.y, se.x - max.x, se.y - max.y);
+    map.remove();
+    return { zoomError, panError, focusInside, boundsError, fitError };
+  });
+  assert.ok(result.zoomError < 2, `Zoom anchor drift: ${result.zoomError}px`);
+  assert.ok(result.panError < 2, `Screen pan drift: ${result.panError}px`);
+  assert.equal(result.focusInside, true, 'Focused marker stays in the padded viewport');
+  assert.ok(result.fitError < 2, `fitBounds padding overflow: ${result.fitError}px`);
+  // Leaflet ignores one-pixel bounds corrections and rounds pan offsets.
+  assert.ok(result.boundsError < 2, `Maximum bounds overflow: ${result.boundsError}px`);
+});
+
 Then('camera coordinates round-trip and native overlays remain aligned', { timeout: 30000 }, async function () {
   await createMap(this.page);
   const result = await this.page.evaluate(() => {
@@ -143,7 +188,7 @@ Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { time
     map.panBy([30, 0], { animate: false });
     const panned = !map.getCenter().equals(start);
     map.remove();
-    return { mouse: before.bearing === 35 && before.pitch === 10, touched, restored, zoomRestored, panned };
+    return { mouse: Math.abs(before.bearing - 53) < 0.01 && before.pitch === 20, touched, restored, zoomRestored, panned };
   });
   assert.deepEqual(result, { mouse: true, touched: true, restored: true, zoomRestored: true, panned: true });
 });
@@ -182,4 +227,51 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
   await this.page.getByRole('button', { name: 'Reset bearing to north', exact: true }).click();
   assert.deepEqual(await this.page.evaluate(() => [cameraMap.getBearing(), cameraMap.getPitch()]), [0, 30]);
   await this.page.evaluate(() => cameraMap.remove());
+});
+
+Then('compass permissions, landscape headings and camera cleanup are preserved', { timeout: 30000 }, async function () {
+  await createMap(this.page, { trackContainerMutation: true, touchRotate: true, touchPitch: true });
+  const result = await this.page.evaluate(async () => {
+    const map = cameraMap, element = map.getContainer(), deviceEvent = window.DeviceOrientationEvent;
+    const orientation = Object.getOwnPropertyDescriptor(screen.orientation, 'angle');
+    let relative, webkit, denied;
+    try {
+      Object.defineProperty(screen.orientation, 'angle', { configurable: true, value: 90 });
+      window.DeviceOrientationEvent = { requestPermission: async () => 'granted' };
+      map.compassBearing.enable();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const send = values => {
+        const event = new Event('deviceorientation');
+        for (const [key, value] of Object.entries(values)) Object.defineProperty(event, key, { value });
+        window.dispatchEvent(event);
+      };
+      send({ alpha: 120, absolute: false });
+      relative = map.getBearing();
+      send({ webkitCompassHeading: 15, absolute: false });
+      webkit = map.getBearing();
+      map.compassBearing.disable();
+      window.DeviceOrientationEvent.requestPermission = async () => 'denied';
+      const error = new Promise(resolve => map.once('error', event => resolve(event.error.message)));
+      map.compassBearing.enable();
+      denied = (await error).includes('denied') && !map.compassBearing.enabled();
+    } finally {
+      window.DeviceOrientationEvent = deviceEvent;
+      if (orientation) Object.defineProperty(screen.orientation, 'angle', orientation);
+      else delete screen.orientation.angle;
+    }
+    element.style.width = '660px';
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    const resized = map.getSize().x === 660;
+    const rect = element.getBoundingClientRect(), event = new Event('touchstart', { cancelable: true });
+    Object.defineProperty(event, 'touches', { value: [
+      { clientX: rect.left + 250, clientY: rect.top + 200 },
+      { clientX: rect.left + 350, clientY: rect.top + 200 },
+    ] });
+    element.dispatchEvent(event);
+    map.remove();
+    const cleaned = !map.dragging.enabled() && !map.touchZoom.enabled() && map.options.zoomSnap === 1;
+    return { relative, webkit, denied, resized, cleaned };
+  });
+  assert.deepEqual(result, { relative: 30, webkit: 255, denied: true, resized: true, cleaned: true });
 });

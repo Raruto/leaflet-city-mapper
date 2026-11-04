@@ -1,2 +1,2 @@
-import{update as i}from"./update.js";function s(){const o=this;for(const n of o._zoomTransitions?.keys()||[])n.finish();o._zoomTransitions=null,o._zoomLevel=null,i(o)}export{s as endZoom};
+import{update as a}from"./update.js";function m(){const o=this;for(const e of o._zoomTransitions?.keys()||[])e.finish();o._zoomTransitions=null,o._zoomView=null,delete o._map._cameraView,o._map.getContainer().classList.remove("leaflet-camera-zoom"),o._map._updateCameraOverlays(),o._zoomLevel=null,a(o)}export{m as endZoom};
 //# sourceMappingURL=endZoom.js.map

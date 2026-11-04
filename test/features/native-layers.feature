@@ -15,3 +15,15 @@ Feature: Native Leaflet layers rendered automatically with WebGPU
   Scenario: Non-raster GridLayer tiles report an explicit error
     Given the native WebGPU gallery uses the "SVG" renderer preference
     Then HTML grid tiles report an error instead of silently disappearing
+
+  Scenario: GPU paths retain Leaflet event propagation
+    Given the native WebGPU gallery uses the "SVG" renderer preference
+    Then native pointer events respect bubbling and propagation cancellation
+
+  Scenario: Animated zoom remains smooth and aligned
+    Given the native WebGPU gallery uses the "SVG" renderer preference
+    Then native zoom animation interpolates the GPU camera and accessible marker targets
+
+  Scenario: Native mutations preserve Leaflet utility methods and stacking
+    Given the native WebGPU gallery uses the "SVG" renderer preference
+    Then native icon transitions, hover stacking and closest path points remain available

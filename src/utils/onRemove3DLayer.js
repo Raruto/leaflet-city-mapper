@@ -36,7 +36,7 @@ export function onRemove3DLayer(backend, map) {
     if (backend._layers.size) {
       // Keep the original scene origin and GPU resources when ownership changes.
       const next = backend._layers.values().next().value;
-      for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_zoomTransitions', '_cursor', '_roofRaster', '_roofTiles']) {
+      for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_zoomTransitions', '_zoomView', '_cursor', '_roofRaster', '_roofTiles']) {
         next[key] = backend[key];
         delete backend[key];
       }
@@ -54,6 +54,9 @@ export function onRemove3DLayer(backend, map) {
       backend._roofTiles = null;
       for (const animation of backend._zoomTransitions?.keys() || []) animation.play();
       backend._zoomTransitions = null;
+      backend._zoomView = null;
+      delete map._cameraView;
+      map.getContainer().classList.remove('leaflet-camera-zoom');
       const renderer = backend.renderer;
       renderer.canvas.remove();
       renderer.device.queue.onSubmittedWorkDone()

@@ -6,9 +6,10 @@ import { update } from './update.js';
 /**
  * Add a non-indexed, vertex-coloured mesh from flat vec3 arrays `{ position, normal, color }` in layer-local metres.
  * `usage` adds GPUBufferUsage flags to the vertex buffers (e.g. STORAGE for compute passes).
+ * A supplied `program` shares compiled shaders and pipelines across compatible meshes.
  */
 
-export function createMesh(backend, data, material = {}, usage = 0) {
+export function createMesh(backend, data, material = {}, usage = 0, program) {
   const { device } = backend.renderer, attributes = {};
   for (const [name, values] of Object.entries(data)) {
     const array = new Float32Array(values);
@@ -21,7 +22,7 @@ export function createMesh(backend, data, material = {}, usage = 0) {
     ...emptyNode(),
     device,
     geometry: { device, attributes, drawRange: { start: 0, count: attributes.position.count } },
-    program: createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
+    program: program || createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
     id: L.Layer._nextId++, renderOrder: 0, extras: {},
   };
   setParent(mesh, backend.root);

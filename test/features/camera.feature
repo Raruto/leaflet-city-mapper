@@ -11,3 +11,11 @@ Feature: Standalone WebGPU camera with Leaflet as its only dependency
   Scenario: The compact compass retains its appearance and drag behavior
     Given the city mapper plugin is loaded after Leaflet alone
     Then the compass retains its drag sensitivity and bearing-only option
+
+  Scenario: Navigation keeps screen anchors and the visible ground inside maximum bounds
+    Given the city mapper plugin is loaded after Leaflet alone
+    Then pitched zoom, panning and marker focus preserve their screen anchors
+
+  Scenario: Device orientation, container resizing and gesture cleanup remain supported
+    Given the city mapper plugin is loaded after Leaflet alone
+    Then compass permissions, landscape headings and camera cleanup are preserved

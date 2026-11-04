@@ -8,14 +8,31 @@ export function nativeEvents(state) {
   let context = maps.get(map);
   if (!context) {
     context = { states: new Set(), hovered: null };
-    const handle = event => {
+    const pointer = L.version.startsWith('2');
+    const move = pointer ? 'pointermove' : 'mousemove', out = pointer ? 'pointerout' : 'mouseout';
+    const over = pointer ? 'pointerover' : 'mouseover';
+    const descriptor = Object.getOwnPropertyDescriptor(map, '_fireDOMEvent');
+    const fireDOMEvent = map._fireDOMEvent;
+    const handle = function (event, type = event.type, targets) {
       const owner = L.Layer._renderers.get(map);
-      if (!owner?.renderer || !event.originalEvent) return;
-      const target = event.originalEvent.target;
+      if (!owner?.renderer || targets || !['click', 'preclick', 'dblclick', 'contextmenu',
+        'mousedown', 'mouseup', 'mousemove', 'mouseover', 'mouseout',
+        'pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout'].includes(type)) {
+        return fireDOMEvent.call(this, event, type, targets);
+      }
+      const target = event.target;
       const dom = target instanceof Element &&
         target.closest('.leaflet-marker-icon,.leaflet-popup,.leaflet-tooltip,.leaflet-control');
+      if (dom && context.hovered && (type === move || type === out)) {
+        fireDOMEvent.call(map, event, out, [context.hovered]);
+        context.hovered = null;
+        map.getContainer().style.cursor = '';
+      }
+      if (dom || type === move && (map.dragging?.moving() || map._animatingZoom)) {
+        return fireDOMEvent.call(this, event, type, targets);
+      }
       const meshes = [];
-      if (!dom && event.type !== 'mouseout') {
+      if (type !== out) {
         for (const candidate of context.states) {
           const { source } = candidate;
           if (source instanceof L.Marker || source.options.interactive === false ||
@@ -23,26 +40,28 @@ export function nativeEvents(state) {
           meshes.push(...candidate.meshes.values());
         }
       }
-      const hits = meshes.length ? raycast(owner, event.originalEvent, meshes, false) : [];
+      const hits = meshes.length ? raycast(owner, event, meshes, false) : [];
       hits.sort((a, b) => b.object.renderOrder - a.object.renderOrder || a.distance - b.distance);
-      const source = hits[0]?.object._nativeSource || null;
-      const data = {
-        originalEvent: event.originalEvent, latlng: event.latlng,
-        layerPoint: event.layerPoint, containerPoint: event.containerPoint,
-      };
-      if (event.type === 'mousemove' || event.type === 'mouseout') {
+      let source = hits[0]?.object._nativeSource || null;
+      if ((type === 'click' || type === 'preclick') && source && map._draggableMoved(source)) source = null;
+      if (type === move || type === out) {
         if (context.hovered !== source) {
-          context.hovered?.fire('mouseout', data, true);
+          if (context.hovered) fireDOMEvent.call(map, event, out, [context.hovered]);
           context.hovered = source;
-          source?.fire('mouseover', data, true);
+          if (source) fireDOMEvent.call(map, event, over, [source]);
           map.getContainer().style.cursor = source ? 'pointer' : '';
         }
       }
-      if (event.type !== 'mouseout') source?.fire(event.type, data, true);
+      return fireDOMEvent.call(this, event, type, source ? [source] : undefined);
     };
     context.handle = handle;
+    context.restore = () => {
+      if (map._fireDOMEvent !== handle) return;
+      if (descriptor) Object.defineProperty(map, '_fireDOMEvent', descriptor);
+      else delete map._fireDOMEvent;
+    };
     maps.set(map, context);
-    map.on('click dblclick contextmenu mousemove mouseout', handle);
+    map._fireDOMEvent = handle;
   }
   context.states.add(state);
   return () => {
@@ -52,7 +71,7 @@ export function nativeEvents(state) {
       map.getContainer().style.cursor = '';
     }
     if (context.states.size) return;
-    map.off('click dblclick contextmenu mousemove mouseout', context.handle);
+    context.restore();
     maps.delete(map);
   };
 }

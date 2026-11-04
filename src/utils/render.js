@@ -41,6 +41,16 @@ export function render(backend) {
     for (const [animation, { start, time }] of backend._zoomTransitions) {
       animation.currentTime = Math.min(animation.effect.getComputedTiming().endTime, time + now - start);
     }
+    if (backend._zoomView) {
+      const view = backend._zoomView;
+      const proxy = [...backend._zoomTransitions.keys()].find(animation => animation.effect.target === map._proxy);
+      const progress = proxy?.effect.getComputedTiming().progress ?? Math.min(1, (now - view.start) / 250);
+      const targetScale = map.getZoomScale(view.targetZoom, view.zoom), scale = 1 + (targetScale - 1) * progress;
+      const from = map.project(view.from, view.zoom), to = map.project(view.to, view.zoom);
+      map._cameraView = { zoom: map.getScaleZoom(scale, view.zoom),
+        center: map.unproject(from.add(to.subtract(from).multiplyBy(targetScale * progress / scale)), view.zoom) };
+      map._updateCameraOverlays();
+    }
   }
   if (!backend._size || !backend._size.equals(size)) {
     backend.renderer.width = size.x;
@@ -58,15 +68,15 @@ export function render(backend) {
     backend._size = size;
   }
 
-  // Match the map's CSS camera: a perspective distance of 1.5 viewport heights.
-  let pixelsPerMeter = map.options.crs.scale(map.getZoom()) / (40075016.68557849 * Math.cos(backend._sceneOrigin.lat * Math.PI / 180));
-  let origin = map.project(backend._sceneOrigin).subtract(map.getPixelOrigin());
+  // Match the map's perspective, including the intermediate view of an animated zoom.
+  const zoom = map._cameraView?.zoom ?? map.getZoom(), center = map._cameraView?.center ?? map.getCenter();
+  const pixelsPerMeter = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(backend._sceneOrigin.lat * Math.PI / 180));
+  const offset = map.project(center, zoom).subtract(map.project(backend._sceneOrigin, zoom));
   const distance = size.y * 1.5 / pixelsPerMeter;
-  const center = map.containerPointToLayerPoint(size.divideBy(2));
   const target = [
-    (center.x - origin.x) / pixelsPerMeter,
-    (map._terrain3D ? getElevation(map._terrain3D, map.getCenter()): undefined) ?? 0,
-    (center.y - origin.y) / pixelsPerMeter
+    offset.x / pixelsPerMeter,
+    (map._terrain3D ? getElevation(map._terrain3D, center): undefined) ?? 0,
+    offset.y / pixelsPerMeter
   ];
   const pitch = map.getPitch() * Math.PI / 180;
   const bearing = map.getBearing() * Math.PI / 180;
@@ -387,7 +397,7 @@ export function render(backend) {
     }
     const frontFace = determinant < 0 ? 'cw' : 'ccw';
     const program = mesh.program;
-    if (program.transparent && program._layerMaterial.doubleSided) {
+    if (program.transparent && program._layerMaterial.doubleSided && !mesh._nativeSource) {
       drawGeometry(backend, mesh, pass, 'front', frontFace);
       drawGeometry(backend, mesh, pass, 'back', frontFace);
     } else {

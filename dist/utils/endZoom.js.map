@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/endZoom.js"],
-  "sourcesContent": ["import { update } from \"./update.js\";\n\n/** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */\n\nexport function endZoom() {\n  const backend = this;\n  for (const animation of backend._zoomTransitions?.keys() || []) animation.finish();\n  backend._zoomTransitions = null;\n  backend._zoomLevel = null;\n  update(backend);\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAIhB,SAASC,GAAU,CACxB,MAAMC,EAAU,KAChB,UAAWC,KAAaD,EAAQ,kBAAkB,KAAK,GAAK,CAAC,EAAGC,EAAU,OAAO,EACjFD,EAAQ,iBAAmB,KAC3BA,EAAQ,WAAa,KACrBF,EAAOE,CAAO,CAChB",
+  "sourcesContent": ["import { update } from \"./update.js\";\n\n/** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */\n\nexport function endZoom() {\n  const backend = this;\n  for (const animation of backend._zoomTransitions?.keys() || []) animation.finish();\n  backend._zoomTransitions = null;\n  backend._zoomView = null;\n  delete backend._map._cameraView;\n  backend._map.getContainer().classList.remove('leaflet-camera-zoom');\n  backend._map._updateCameraOverlays();\n  backend._zoomLevel = null;\n  update(backend);\n}\n"],
+  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAIhB,SAASC,GAAU,CACxB,MAAMC,EAAU,KAChB,UAAWC,KAAaD,EAAQ,kBAAkB,KAAK,GAAK,CAAC,EAAGC,EAAU,OAAO,EACjFD,EAAQ,iBAAmB,KAC3BA,EAAQ,UAAY,KACpB,OAAOA,EAAQ,KAAK,YACpBA,EAAQ,KAAK,aAAa,EAAE,UAAU,OAAO,qBAAqB,EAClEA,EAAQ,KAAK,sBAAsB,EACnCA,EAAQ,WAAa,KACrBF,EAAOE,CAAO,CAChB",
   "names": ["update", "endZoom", "backend", "animation"]
 }
