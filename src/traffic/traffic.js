@@ -35,6 +35,7 @@ export function disposeTrafficObject(state, object) {
 }
 
 export function failTraffic(state, error) {
+  state.error = error;
   state.status.textContent = `Error: ${error.message}`;
   state.status.setAttribute('role', 'alert');
   console.error('Traffic layer', error);
@@ -169,7 +170,7 @@ export function moveTraffic(state, seconds) {
   const encoder = device.createCommandEncoder(), pass = encoder.beginComputePass();
   pass.setPipeline(state.gpu.pipeline);
   pass.setBindGroup(0, state.gpu.bindGroup);
-  pass.dispatchWorkgroups(Math.ceil(state.paramInts[3] / 64));
+  pass.dispatchWorkgroups(state.trips.length);
   pass.end();
   device.queue.submit([encoder.finish()]);
   state.stale = true;
@@ -225,8 +226,10 @@ export function tickTraffic(state) {
     if (state.outline && !state.route && state.lanes.length) drawTrafficRoute(state);
     if (key !== state.tripsKey) { rebuildTrafficMesh(state); state.tripsKey = key; }
     if (state.mesh) rebaseTraffic(state);
-    if (state.status.textContent !== text) state.status.textContent = text;
-    state.status.removeAttribute('role');
+    if (!state.error) {
+      if (state.status.textContent !== text) state.status.textContent = text;
+      state.status.removeAttribute('role');
+    }
   }
   if (state.mesh) moveTraffic(state, (ms - state.rebasedAt) / 1000);
   if (state.mesh && state.lights && (!live || !(performance.now() - state.litAt < 100))) {
@@ -252,15 +255,21 @@ export async function fetchTrafficLanes(state, time, signal) {
 }
 
 export function loadedTrafficLanes(state, signal, data) {
-  if (signal.aborted || !state.layer._map || data === state.loaded) return;
+  if (signal.aborted || !state.layer._map) return;
+  state.error = null;
+  if (data === state.loaded) {
+    state.nextCheck = -Infinity;
+    if (!state.frame) state.tick();
+    return;
+  }
   state.loaded = data;
   state.lanes = toLanes(data);
   prepareTraffic(state);
   if (!state.frame) state.tick();
 }
 
-export function failedTrafficLoad(state, error) {
-  if (error.name !== 'AbortError') failTraffic(state, error);
+export function failedTrafficLoad(state, signal, error) {
+  if (!signal.aborted && error.name !== 'AbortError') failTraffic(state, error);
 }
 
 export function loadTraffic(state) {
@@ -270,12 +279,12 @@ export function loadTraffic(state) {
   const { signal } = state.request = new AbortController();
   fetchTrafficLanes(state, time, signal).then(
     loadedTrafficLanes.bind(null, state, signal),
-    failedTrafficLoad.bind(null, state),
+    failedTrafficLoad.bind(null, state, signal),
   );
 }
 
 export function updateTraffic(state, event) {
-  if (event?.layer === state.layer) return;
+  if (event?.layer && !event.layer.control?.time) return;
   cancelAnimationFrame(state.frame);
   loadTraffic(state);
   state.tick();

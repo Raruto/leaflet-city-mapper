@@ -2,7 +2,7 @@
  * Vehicles moving along GeoJSON lanes; a compute pass places them on the GPU every frame.
  * Source options:
  * - `url`: GeoJSON (Multi)LineStrings, or a JS module whose default export `(time, layer, signal)` returns them (time-dependent data);
- * - `vehicle`: 'car' (default), 'boat', 'bus', 'tram' or 'metro'; `side`: offset right of the lane centreline in metres (vehicle default);
+ * - `vehicle`: 'car' (default), 'boat', 'bus', 'tram', 'metro', 'bicycle' or 'pedestrian'; `side`: offset right of the lane centreline in metres (vehicle default);
  * - `speed`: m/s of `flow` lanes; `outline`: draw the lanes.
  * Lane properties: `flow` (vehicles/h) or `timetable` (see scheduledTrips.js), optional fixed `elevation`
  * in metres, `name`/`description` for the default tooltip. The status line (vehicle count, then the FeatureCollection `note`) sits under the layer's entry in the layers control.
@@ -13,6 +13,7 @@ import { init3D } from '../scene/init3D.js';
 import { tooltip } from './tooltip.js';
 import { speed } from './speed.js';
 import { vehicles } from './vehicles.js';
+import { trafficShader } from './trafficShader.js';
 import {
   addTraffic,
   placeTraffic,
@@ -44,51 +45,7 @@ export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed:
     lanesDirty: true, stale: false, loaded: undefined, file: undefined,
   };
   // Lane points are [x, z, ground, cumulative length]. Mirrors along() and place().
-  const shader = `
-    struct Params { seconds: f32, side: f32, vertices: u32, total: u32 }
-    struct Vehicle { start: u32, count: u32, base: f32, speed: f32 }
-    @group(0) @binding(0) var<uniform> params: Params;
-    @group(0) @binding(1) var<storage, read> model: array<f32>;
-    @group(0) @binding(2) var<storage, read> points: array<vec4f>;
-    @group(0) @binding(3) var<storage, read> vehicles: array<Vehicle>;
-    @group(0) @binding(4) var<storage, read_write> position: array<f32>;
-    @group(0) @binding(5) var<storage, read_write> normal: array<f32>;
-    @compute @workgroup_size(64)
-    fn main(@builtin(global_invocation_id) id: vec3u) {
-      let v = id.x;
-      if (v >= params.total) { return; }
-      let vehicle = vehicles[v / params.vertices];
-      let last = vehicle.start + vehicle.count - 1u;
-      let length = points[last].w;
-      var s = vehicle.base + params.seconds * vehicle.speed;
-      s -= length * floor(s / length);
-      var i = vehicle.start + 1u;
-      var end = last;
-      while (i < end) {
-        let middle = i + (end - i) / 2u;
-        if (points[middle].w < s) { i = middle + 1u; }
-        else { end = middle; }
-      }
-      let a = points[i - 1u];
-      let b = points[i];
-      let d = select(b.w - a.w, 1.0, b.w == a.w);
-      let t = (s - a.w) / d;
-      let dx = (b.x - a.x) / d;
-      let dz = (b.y - a.y) / d;
-      let cx = a.x + (b.x - a.x) * t - dz * params.side;
-      let cz = a.y + (b.y - a.y) * t + dx * params.side;
-      let y = a.z + (b.z - a.z) * t;
-      let k = (v % params.vertices) * 3u;
-      let n = params.vertices * 3u + k;
-      let o = v * 3u;
-      position[o] = cx - model[k] * dz - model[k + 2u] * dx;
-      position[o + 1u] = y + model[k + 1u];
-      position[o + 2u] = cz + model[k] * dx - model[k + 2u] * dz;
-      normal[o] = -model[n] * dz - model[n + 2u] * dx;
-      normal[o + 1u] = model[n + 1u];
-      normal[o + 2u] = model[n] * dx - model[n + 2u] * dz;
-    }`;
-  state.shader = shader;
+  state.shader = trafficShader;
   state.tick = tickTraffic.bind(null, state);
   state.update = updateTraffic.bind(null, state);
   state.terrain = updateTrafficTerrain.bind(null, state);

@@ -4,9 +4,9 @@ import { initNativeGPU } from './scene/initNativeGPU.js';
 import { initRaster } from './pmtiles/initRaster.js';
 import { setGeoJSONData } from './scene/setGeoJSONData.js';
 import { initTerrain } from './terrain/initTerrain.js';
-import { initSunlight } from './sunlight/initSunlight.js';
+import './sunlight/initSunlight.js';
 import { initTraffic } from './traffic/initTraffic.js';
-import { initWalk } from './walk/initWalk.js';
+import './walk/initWalk.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -40,7 +40,7 @@ let loading = Promise.resolve();
  * Layers on one map share a canvas, scene and camera; each has its own root transform.
  *
  * @typedef {Object} Layer3DOptions Layer options; pane and attribution remain standard L.Layer options.
- * @property {string} [type] '3d', 'geojson', 'pmtiles', 'terrain', 'sunlight', 'traffic' or 'walk'.
+ * @property {string} [type] '3d', 'geojson', 'pmtiles', 'terrain' or 'traffic'.
  * @property {number[]} [center] Local origin [lat,lng]; defaults to the first map center.
  * @property {number} [terrainOffset=0] Vertical offset in metres when terrain is enabled.
  * @property {boolean} [terrainConform=false] Fit lower model geometry to local terrain elevation.
@@ -144,12 +144,8 @@ L.Layer.include({
           return initRaster;
         case 'terrain':
           return initTerrain;
-        case 'sunlight':
-          return initSunlight;
         case 'traffic':
           return initTraffic;
-        case 'walk':
-          return initWalk;
         default:
           throw new Error(`Unknown layer type: ${type}`);
       }

@@ -9,7 +9,7 @@ Then('every local source in the city example is available', async function () {
   await response.dispose();
   const sources = [...html.matchAll(/\b(?:url|bridges):\s*'([^']+)'/g)]
     .map(([, source]) => new URL(source, url));
-  assert.equal(sources.length, 13);
+  assert.equal(sources.length, 15);
   for (const source of sources) {
     assert.equal(source.origin, new URL(url).origin);
     const asset = await this.context.request.get(source.href, { headers: { Range: 'bytes=0-0' } });
@@ -40,7 +40,7 @@ Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }
 
 Then('each source initializes from the single bundle', async function () {
   assert.deepEqual(this.sourceRequests, ['/dist/leaflet-city-mapper.js']);
-  const specialized = ['terrain', 'sunlight', 'traffic', 'walk'];
+  const specialized = ['terrain', 'traffic'];
   for (const [index, type] of ['pmtiles', 'geojson', ...specialized].entries()) {
     await this.page.evaluate(async type => {
       const layer = new L.Layer({ source: {

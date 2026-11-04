@@ -97,7 +97,12 @@ export function render(backend) {
   // Refresh the camera view, projection and combined projection-view matrices.
   updateCamera(camera);
   updateWorldMatrix(backend.scene);
-  for (const layer of backend._layers) layer._beforeRender?.();
+  let sceneChanged = false;
+  for (const layer of backend._layers) {
+    if (!layer._beforeRender) continue;
+    layer._beforeRender();
+    sceneChanged = true;
+  }
   const sunlight = map._sunlight;
   const lightPoint = new DOMPoint(...(sunlight?.direction || [-300, 500, 300]), 0).matrixTransform(new DOMMatrix(camera.viewMatrix));
   const lightLength = Math.hypot(lightPoint.x, lightPoint.y, lightPoint.z) || 1;
@@ -122,7 +127,7 @@ export function render(backend) {
     Math.hypot(frustum[4][0], frustum[4][1], frustum[4][2]),
     Math.hypot(frustum[5][0], frustum[5][1], frustum[5][2]),
   ];
-  updateWorldMatrix(backend.scene);
+  if (sceneChanged) updateWorldMatrix(backend.scene);
   traverse(backend.scene, mesh => {
     if (!mesh.visible) return true;
     if (mesh.geometry) {
@@ -213,7 +218,7 @@ export function render(backend) {
       const device = renderer.device;
       if (!renderer.roofBlit) {
         const module = device.createShaderModule({
-          code: `
+          code: /* wgsl */ `
           @group(0) @binding(0) var source: texture_2d<f32>;
           @group(0) @binding(1) var sourceSampler: sampler;
           @group(0) @binding(2) var<uniform> opacity: f32;

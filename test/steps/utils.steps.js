@@ -23,6 +23,7 @@ import { nodeMatrix } from '../../src/model/nodeMatrix.js';
 import { vertexNormals } from '../../src/geometry/vertexNormals.js';
 import { textureSampler } from '../../src/model/textureSampler.js';
 import { lightGrid } from '../../src/rendering/lightGrid.js';
+import { cacheLightGrid, updatePointLights } from '../../src/rendering/updatePointLights.js';
 import { worldLights } from '../../src/rendering/worldLights.js';
 import { bridgeElevation } from '../../src/geometry/bridgeElevation.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
@@ -206,6 +207,53 @@ const checks = {
     assert.deepEqual([...data.slice(data[8] * 4, data[8] * 4 + 8)], [...values]);
     assert.throws(() => lightGrid([values], 32), /GPU storage limit/);
     assert.deepEqual([...lightGrid([], 32).data], Array(8).fill(0));
+    const lamp = { visible: true, worldMatrix: [...matrix], children: [],
+      extras: { lights: [{ position: [1, 2, 3], radius: 4, color: [1, 0.5, 0], flux: 4 * Math.PI }] } };
+    const cached = cacheLightGrid([lamp], undefined, 1024);
+    assert.deepEqual(cached.data, data);
+    assert.equal(cacheLightGrid([lamp], cached, 1024), cached);
+    lamp.worldMatrix[12]++;
+    const moved = cacheLightGrid([lamp], cached, 1024);
+    assert.notEqual(moved, cached);
+    lamp.extras.lights = [...lamp.extras.lights];
+    assert.notEqual(cacheLightGrid([lamp], moved, 1024), moved);
+    assert.equal(cacheLightGrid([], moved, 1024).count, 0);
+
+    const headlight = { ...lamp, worldMatrix: [...matrix],
+      extras: { lights: [...lamp.extras.lights], dynamicLights: true } };
+    const root = { visible: true, children: [lamp, headlight] };
+    const buffer = { size: 8192, writes: [] };
+    const sun = { lights: buffer };
+    const backend = { _layers: [{ options: { nightLight: true }, root }],
+      renderer: { sunlight: sun, device: { limits: { maxStorageBufferBindingSize: 8192 },
+        queue: { writeBuffer: recordLightUpload } } } };
+    updatePointLights(backend);
+    assert.equal(sun.lightCount, 2);
+    assert.equal(buffer.writes.length, 2);
+    const fixedGrid = sun.staticLightGrid;
+    assert.equal(buffer.writes[0].data[6] * 16, buffer.writes[1].offset);
+    buffer.writes.length = 0;
+    updatePointLights(backend);
+    assert.equal(buffer.writes.length, 0, 'Unchanged lights need no GPU upload');
+    headlight.extras.lights = [...headlight.extras.lights];
+    updatePointLights(backend);
+    assert.equal(sun.staticLightGrid, fixedGrid, 'Moving headlights must not rebuild streetlights');
+    assert.equal(buffer.writes.length, 1);
+    assert.equal(buffer.writes[0].offset, fixedGrid.data.byteLength);
+    headlight.visible = false;
+    updatePointLights(backend);
+    assert.equal(sun.lightCount, 1);
+    assert.equal(sun.dynamicLightGrid.count, 0);
+    lamp.visible = false;
+    updatePointLights(backend);
+    assert.equal(sun.lightCount, 0);
+    assert.equal(sun.staticLightGrid.data[6], 2, 'An empty static grid still links to moving lights');
+    lamp.visible = headlight.visible = true;
+    updatePointLights(backend);
+    assert.equal(sun.lightCount, 2, 'Re-enabled layers restore both grids');
+    backend.renderer.device.limits.maxStorageBufferBindingSize = sun.staticLightGrid.data.byteLength;
+    headlight.extras.lights = [...headlight.extras.lights];
+    assert.throws(() => updatePointLights(backend), /GPU storage limit/);
   },
 
   terrain() {
@@ -282,6 +330,10 @@ const checks = {
     assert.equal(projectCelestialBody([0, 0, 1], size, Math.PI / 2, 0), null);
   },
 };
+
+function recordLightUpload(buffer, offset, data) {
+  buffer.writes.push({ offset, data: data.slice() });
+}
 
 Then('the standalone 3D {string} utilities preserve their results and errors', async function (domain) {
   await checks[domain]();

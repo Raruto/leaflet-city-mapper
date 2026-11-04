@@ -1,25 +1,45 @@
 import { init3D } from '../scene/init3D.js';
 import {
-  controlOnAdd, onBlur, onKey, onLayerAdd, onLayerRemove, onPointer, onReady, onTerrain, start, step, stop, toggle
+  onBlur, onKey, onPointer, onTerrain, start, step, stop, toggle
 } from './walk.js';
 
 /**
  * Third-person walk mode, toggled by a map button (and Esc): a pedestrian at the map centre runs with W/S (or ↑/↓) and
  * turns with A/D (or ←/→); the camera swings back behind it while it moves. Dragging the map only turns the camera
  * (bearing, pitch); the wheel changes the camera distance.
- * The walker follows the terrain, bridges included, and `layer.walker` exposes `{ latlng, heading, phase }`.
- * Source options: `speed` (m/s, default 6), `distance` (camera distance in metres, default 20), `position` (button corner, default 'topleft').
+ * The walker follows the terrain, bridges included, and `control.walker` exposes `{ latlng, heading, phase }`.
+ * Options: `speed` (m/s, default 70), `distance` (camera distance in metres, default 20), `position` (button corner, default 'bottomright').
  * Visible meshes of the other 3D layers (buildings, trees, models, streetlights) are solid; terrain and traffic are not.
  */
-export function initWalk(layer, {
+L.Control.Walk = L.Control.extend({
+  options: { position: 'bottomright', speed: 70, distance: 20 },
+
+  initialize(options) {
+    L.Util.setOptions(this, options);
+    initWalk(this, this.options);
+  },
+
+  onAdd(map) {
+    this._walk.layer.addTo(map);
+    return this._walk.container;
+  },
+
+  onRemove() {
+    this._walk.stop();
+    this._walk.layer.remove();
+  },
+});
+
+function initWalk(control, {
   speed = 70,
   distance = 20,
   position = 'bottomright',
   ...options
 } = {}) {
+  const layer = new L.Layer();
+  layer._type = 'walk';
   init3D(layer, options);
   const keys = new Set();
-  const control = new L.Control({ position });
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
   container.style.cssText = 'display:flex;align-items:center;background:#fff;';
   const button = L.DomUtil.create('button', '', container);
@@ -49,8 +69,7 @@ export function initWalk(layer, {
     swing: 0,
     saved: null,
     drag: null,
-    ready: false,
-    state: layer.walker = { latlng: null, heading: 0, phase: 0 }
+    state: control.walker = layer.walker = { latlng: null, heading: 0, phase: 0 }
   }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);
@@ -60,14 +79,6 @@ export function initWalk(layer, {
   context.start = start.bind(context);
   context.stop = stop.bind(context);
   context.toggle = toggle.bind(context);
-  context.controlOnAdd = controlOnAdd.bind(context);
-  context.onReady = onReady.bind(context);
-  context.onLayerAdd = onLayerAdd.bind(context);
-  context.onLayerRemove = onLayerRemove.bind(context);
-
-  control.onAdd = context.controlOnAdd;
+  control._walk = context;
   L.DomEvent.on(button, 'click', context.toggle);
-  layer.on('ready', context.onReady);
-  layer.on('add', context.onLayerAdd);
-  layer.on('remove', context.onLayerRemove);
 };

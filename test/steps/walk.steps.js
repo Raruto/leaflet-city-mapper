@@ -1,6 +1,50 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
+Then('Time and Walk controls clean up and can be added again', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    const time = new L.Control.Time({ position: 'topleft' }).addTo(map);
+    const standalone = time instanceof L.Control && time.getPosition() === 'topleft' &&
+      time.getContainer().parentNode === map._controlCorners.topleft && !!map._sunlight;
+    time.getContainer().querySelector('input[type=date]').value = '2026-06-21';
+    const slider = time.getContainer().querySelector('input[type=range]');
+    slider.value = '720';
+    slider.dispatchEvent(new Event('input'));
+    const selected = time.time.getTime();
+    time.remove();
+    const timeRemoved = !map._sunlight && !time.getContainer().isConnected;
+    time.layer.addTo(map);
+    const layers = new L.Control.Layers({}, { Shadows: time.layer }).addTo(map);
+    await new Promise(resolve => queueMicrotask(resolve));
+    const nested = layers.getContainer().contains(time.getContainer()) &&
+      !time.getContainer().classList.contains('leaflet-control') && time.time.getTime() === selected;
+    time.remove();
+    const adapterRemoved = !map.hasLayer(time.layer) && !map._sunlight;
+    time.addTo(map);
+    const restoredStandalone = time.getContainer().parentNode === map._controlCorners.topleft;
+    time.remove();
+    layers.remove();
+
+    const control = new L.Control.Walk({ speed: 6 }).addTo(map);
+    await nativeChecks.ready(control._walk.layer);
+    const before = { zoom: map.getZoom(), pitch: map.getPitch(), dragging: map.dragging.enabled() };
+    control.getContainer().querySelector('button').click();
+    const walking = control instanceof L.Control && !!control.walker.latlng && !map.dragging.enabled();
+    control.remove();
+    const walkRemoved = !map.hasLayer(control._walk.layer) && !control.getContainer().isConnected &&
+      map.getZoom() === before.zoom && map.getPitch() === before.pitch &&
+      map.dragging.enabled() === before.dragging && !control._walk.meshes;
+    control.addTo(map);
+    await control._walk.layer._added.promise;
+    control.getContainer().querySelector('button').click();
+    const restarted = control.getContainer().querySelector('button').getAttribute('aria-pressed') === 'true';
+    control.remove();
+    return { standalone, timeRemoved, nested, adapterRemoved, restoredStandalone, walking, walkRemoved, restarted };
+  });
+  for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
+});
+
 Then('keyboard walking moves toward a wall, stops at it and can move away', { timeout: 30000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
@@ -14,8 +58,8 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
       normal: Array(6).fill([0, 0, 1]).flat(),
       color: Array(18).fill(0.5),
     });
-    const walk = new L.Layer({ source: { type: 'walk', speed: 6 } }).addTo(map);
-    await nativeChecks.ready(walk);
+    const control = window.walkControl = new L.Control.Walk({ speed: 6 }).addTo(map);
+    await nativeChecks.ready(control._walk.layer);
   });
   const button = this.page.getByRole('button', { name: 'Walk', exact: true });
   await button.click();

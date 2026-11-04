@@ -167,21 +167,3 @@ export function stop() {
 export function toggle() {
   if (this.saved) stop.call(this); else start.call(this);
 }
-
-export function controlOnAdd() {
-  return this.container;
-}
-
-export function onReady() {
-  this.ready = true;
-  if (this.layer._map) this.control.addTo(this.layer._map);
-}
-
-export function onLayerAdd() {
-  if (this.ready) this.control.addTo(this.layer._map);
-}
-
-export function onLayerRemove() {
-  stop.call(this);
-  this.control.remove();
-}

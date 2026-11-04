@@ -275,7 +275,7 @@ Then('only the {string} background is active and the 3D scene is unchanged', asy
       .map(entry => entry.layer);
     const tower = overlays.find(layer => layer.model);
     return {
-      enabled: overlays.length === 6 && overlays.every(layer => map.hasLayer(layer)),
+      enabled: overlays.length === 5 && overlays.every(layer => map.hasLayer(layer)),
       shared: overlays.every(layer => layer.renderer === before.renderer),
       canvas: document.querySelectorAll('.leaflet-3d').length === 1 &&
         before.canvas.isConnected && tower.renderer.canvas === before.canvas,
@@ -305,7 +305,6 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => entry.layer.model).layer;
     // The Walk button is not managed by the overlays control under test.
-    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
     walk.remove();
     window.exampleOverlayBefore = { tower, model: tower.model, canvas: tower.renderer.canvas, walk };
   });
@@ -363,7 +362,7 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await this.page.evaluate(async () => {
     const { walk } = window.exampleOverlayBefore;
     walk.addTo(map);
-    await walk._added.promise;
+    await walk._walk.layer._added.promise;
   });
 });
 

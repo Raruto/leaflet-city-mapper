@@ -1,18 +1,19 @@
 // Builds the offline PMTiles archives used by examples/leaflet-city-mapper.html.
-// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,metro,bus-tram,orthophotos,plan-ign,terrain] [--jobs=3]
+// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,metro,bus-tram,bicycle,pedestrian,orthophotos,plan-ign,terrain] [--jobs=3]
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { gzipSync, inflateSync } from 'node:zlib';
+import { mobilityLanes } from '../examples/data/mobilityLanes.js';
 
 const { values: args } = parseArgs({
   options: {
     bbox: { type: 'string', default: '2.26,48.835,2.38,48.885' },
     minzoom: { type: 'string', default: '11' },
     maxzoom: { type: 'string', default: '17' },
-    only: { type: 'string', default: 'buildings,trees,streetlights,metro,bus-tram,orthophotos,plan-ign,terrain' },
+    only: { type: 'string', default: 'buildings,trees,streetlights,metro,bus-tram,bicycle,pedestrian,orthophotos,plan-ign,terrain' },
     jobs: { type: 'string', default: '3' },
   },
 });
@@ -35,6 +36,36 @@ const transitZoom = 10;
 const terrainSourceTiles = new Map();
 let treeTiles;
 let lightTiles;
+let mobilityData;
+
+function mobilityArchive(mode) {
+  const archive = {
+    tileType: 0,
+    tileCompression: 2,
+    bbox: buildingsBbox,
+    minZoom: transitZoom,
+    maxZoom: transitZoom,
+    concurrency: 1,
+    attribution: 'Ville de Paris / OpenStreetMap contributors — ODbL',
+    metadata: {
+      format: 'geojson',
+      source: 'https://opendata.paris.fr/explore/dataset/amenagements-cyclables/',
+      license: 'ODbL-1.0',
+    },
+    async tile() {
+      const url = new URL('https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/amenagements-cyclables/exports/geojson');
+      url.searchParams.set('select', 'osm_id,nom,amenagement,geo_shape,source,date_export');
+      mobilityData ||= download(url);
+      const data = mobilityLanes(JSON.parse(await mobilityData), mode, buildingsBbox);
+      if (!data.features.length) throw new Error(`No ${mode} paths in archive bounds`);
+      data.retrievedAt = new Date().toISOString();
+      archive.metadata.retrievedAt = data.retrievedAt;
+      archive.metadata.records = data.features.length;
+      return gzipSync(JSON.stringify(data));
+    },
+  };
+  return archive;
+}
 
 function transitArchive(types) {
   return {
@@ -173,6 +204,8 @@ const archives = {
   },
   metro: transitArchive(['Subway']),
   'bus-tram': transitArchive(['Bus', 'Tram']),
+  bicycle: mobilityArchive('bicycle'),
+  pedestrian: mobilityArchive('pedestrian'),
 };
 
 function indexPointTiles(data, z, [west, south, east, north], idProperty = 'idbase', label = 'tree') {

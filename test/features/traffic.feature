@@ -1,5 +1,28 @@
 Feature: Traffic lanes, flows and timetables
 
+  @unit
+  Scenario: Traffic is fetched over HTTP per map, with honest count provenance
+    Then HTTP traffic loaders refresh per map and distinguish measured from assumed flows
+    And cycling counts are only assigned to nearby paths and preserve zero or missing coverage
+
+  @coverage @traffic-compute
+  Scenario: Shared GPU vehicle poses preserve every vertex and normal
+    Given a leaflet map
+    Then all traffic models match CPU poses on GPU workgroup boundaries
+
+  @unit
+  Scenario: Open-data cycling and pedestrian paths produce bounded, distinct simulations
+    Then mobility snapshots preserve provenance and contain moving bicycles and pedestrians
+
+  @unit
+  Scenario: Mobility conversion excludes roads for pedestrians and obsolete route records
+    Then mobility paths are clipped, deduplicated and validated without inventing pedestrian roads
+
+  @coverage @mobility
+  Scenario: One traffic toggle controls all six HTTP-driven modes
+    Given the cycling and pedestrian example layers are open
+    Then bicycles and pedestrians move with the clock and can be disabled and restored
+
   @coverage
   Scenario: Tourist boats follow the simulation clock and seasonal Paris timetable
     Given the Eiffel Tower example page is open with its offline archives
@@ -24,6 +47,10 @@ Feature: Traffic lanes, flows and timetables
   Scenario: Vehicles interpolate position, ground height and heading along a lane
     Then along a lane 50 m from the start is at x 50, height 15, z 0 heading east
     And along a flat lane 125 m from the start is at x 100, height 0, z 25 heading north
+
+  @unit
+  Scenario: Long routes use logarithmic lookup without changing segment boundaries
+    Then long traffic routes preserve interpolation at endpoints and repeated coordinates
 
   @unit
   Scenario Outline: Unpublished Paris counting hours fall back to the same weekday and hour

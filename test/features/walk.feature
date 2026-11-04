@@ -1,5 +1,9 @@
 @coverage
 Feature: Third-person walk mode
+  Scenario: Time and Walk controls support standalone use, removal and reuse
+    Given a leaflet map
+    Then Time and Walk controls clean up and can be added again
+
   Scenario: Keyboard movement checks scene obstacles without breaking the walk loop
     Given a leaflet map
     Then keyboard walking moves toward a wall, stops at it and can move away

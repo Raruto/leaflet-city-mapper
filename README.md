@@ -47,6 +47,21 @@ The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dis
 
 Raster imagery blends coarse-to-fine on the terrain, retaining depth occlusion for 3D objects.
 
+### Time and walk controls
+
+```js
+const time = new L.Control.Time({ position: 'bottomright' });
+new L.Control.Layers({}, { Shadows: time.layer.addTo(map) }).addTo(map);
+const walk = new L.Control.Walk({ speed: 6, distance: 20 }).addTo(map);
+```
+
+Time stays under **Shadows** in the layers control; its checkbox enables/disables
+the clock, sky and shadows together. Use `time.addTo(map)` instead for a standalone
+control. `time.time` and `time.live` expose the selected UTC time and live mode.
+Walk exposes `walk.walker` (`latlng`, `heading`, `phase`); W/S move, A/D turn,
+drag looks around and Esc exits. Both controls support `remove()` and re-adding.
+These replace the former `sunlight` and `walk` layer source types.
+
 ### Update demo data
 
 The Paris example makes extensive use of [PMTiles](./build/pmtiles.js) to ensure offline access / long-term availability of the map. To update them:
@@ -54,7 +69,6 @@ The Paris example makes extensive use of [PMTiles](./build/pmtiles.js) to ensure
 ```shell
 npm run pmtiles
 node build/pmtiles.js --only=trees
-node build/pmtiles.js --only=metro,bus-tram
 node build/pmtiles.js --jobs=6
 
 ```

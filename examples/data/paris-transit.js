@@ -3,6 +3,9 @@
  * Not GTFS schedules, service availability, stop dwell times or live vehicle locations.
  * Subway trains are intentionally displayed on the surface.
  */
+import { clipLine, samePoint } from '../../src/geometry/clipLine.js';
+import { boundsQuery, trafficBounds } from './paris-api.js';
+
 const modes = {
   bus: { archive: 'bus-tram', type: 'Bus', speed: 5, flow: 12 },
   tram: { archive: 'bus-tram', type: 'Tram', speed: 7, flow: 15 },
@@ -14,49 +17,6 @@ export function transitSettings(mode) {
   const settings = modes[mode];
   if (!settings) throw new Error(`Unknown transit mode: ${mode}`);
   return settings;
-}
-
-// Clip each segment, rather than filtering vertices and connecting disconnected pieces.
-function clipSegment(a, b, bounds) {
-  const [west, south, east, north] = bounds;
-  const dx = b[0] - a[0], dy = b[1] - a[1];
-  const p = [-dx, dx, -dy, dy], q = [a[0] - west, east - a[0], a[1] - south, north - a[1]];
-  let start = 0, end = 1;
-  for (let i = 0; i < 4; i++) {
-    if (p[i] === 0) {
-      if (q[i] < 0) return null;
-    } else {
-      const t = q[i] / p[i];
-      if (p[i] < 0) start = Math.max(start, t);
-      else end = Math.min(end, t);
-      if (start > end) return null;
-    }
-  }
-  if (start === end || dx === 0 && dy === 0) return null;
-  return [[a[0] + start * dx, a[1] + start * dy], [a[0] + end * dx, a[1] + end * dy]];
-}
-
-function samePoint(a, b) {
-  return Math.abs(a[0] - b[0]) < 1e-10 && Math.abs(a[1] - b[1]) < 1e-10;
-}
-
-function clipLine(line, bounds) {
-  const pieces = [];
-  let current;
-  for (let i = 1; i < line.length; i++) {
-    if (samePoint(line[i - 1], line[i])) continue;
-    const segment = clipSegment(line[i - 1], line[i], bounds);
-    if (!segment) {
-      current = null;
-      continue;
-    }
-    if (current && samePoint(current.at(-1), segment[0])) current.push(segment[1]);
-    else {
-      current = segment;
-      pieces.push(current);
-    }
-  }
-  return pieces;
 }
 
 function joinLines(lines) {
@@ -114,8 +74,7 @@ export function transitLanes(data, mode, bounds) {
             flow: settings.flow,
             name: `${settings.type} ${p.route_short_name}`,
             description: `${p.route_long_name || ''}\nIDFM open-data route. Simulated positions, not live.\n` +
-              `Assumed ${settings.speed * 3.6} km/h and ${settings.flow} vehicles/hour per route segment.` +
-              (mode === 'metro' ? '\nSubway shown on the surface for visibility.' : ''),
+              `Assumed ${settings.speed * 3.6} km/h and ${settings.flow} vehicles/hour per route segment.`,
           },
         });
       }
@@ -123,8 +82,7 @@ export function transitLanes(data, mode, bounds) {
   }
   return {
     type: 'FeatureCollection',
-    note: 'simulated on IDFM routes; assumed speed/headway, no live positions' +
-      (mode === 'metro' ? '; subway shown on surface' : ''),
+    note: 'simulated on IDFM routes; assumed speed/headway, no live positions',
     features,
   };
 }
@@ -136,17 +94,16 @@ function invalidCoordinate(point) {
 export default async function parisTransit(time, layer, signal) {
   signal.throwIfAborted();
   if (cache.has(layer)) return cache.get(layer);
-  const mode = layer.options.transitMode, settings = transitSettings(mode);
-  const url = new URL(`paris-${settings.archive}.pmtiles`, import.meta.url).href;
-  const archive = new L.Layer({ source: { type: 'pmtiles', url } });
-  await archive.ready;
-  signal.throwIfAborted();
-  const h = archive.header;
-  const point = layer._map.project([h.centerLat, h.centerLon], h.maxZoom).divideBy(256).floor();
-  const tile = await archive.getZxy(h.maxZoom, point.x, point.y, signal);
-  if (!tile) throw new Error(`Missing ${mode} transit archive tile`);
-  const data = transitLanes(JSON.parse(new TextDecoder().decode(tile.data)), mode,
-    [h.minLon, h.minLat, h.maxLon, h.maxLat]);
+  const mode = layer.options.transitMode, settings = transitSettings(mode), bounds = trafficBounds(layer);
+  const url = new URL('https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-des-lignes-de-transport-en-commun-idfm/exports/geojson');
+  url.search = new URLSearchParams({
+    select: 'route_id,route_short_name,route_long_name,route_type,route_color,shape',
+    where: `${boundsQuery('shape', bounds)} AND route_type = '${settings.type}'`,
+  });
+  const response = await fetch(url, { signal, cache: 'no-store' });
+  if (!response.ok) throw new Error(`IDFM ${mode}: HTTP ${response.status}`);
+  const data = transitLanes(await response.json(), mode, bounds);
+  data.note = `${mode}: no live counts; simulated flow on IDFM routes`;
   signal.throwIfAborted();
   cache.set(layer, data);
   return data;

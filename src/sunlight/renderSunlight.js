@@ -96,7 +96,7 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
       layout: sun.depthLayout, entries: [{ binding: 0, resource: { buffer: sun.buffer } }],
     });
     const shader = device.createShaderModule({
-      code: `
+      code: /* wgsl */ `
       struct Mesh { world: mat4x4<f32>, padding: array<vec4<f32>, 4>, highlight: vec4<f32> };
       @group(0) @binding(0) var<uniform> mesh: Mesh;
       @group(1) @binding(0) var<uniform> matrix: mat4x4<f32>;
