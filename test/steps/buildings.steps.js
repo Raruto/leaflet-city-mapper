@@ -156,8 +156,8 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
 Then('building style for {int} storeys, {int} floors and ground {int} is {string}',
   async function (storeys, floors, ground, expected) {
     const result = await this.page.evaluate(({ storeys, floors, ground }) => {
-      const layer = layers._layers.find(entry => entry.layer instanceof L.Layer.types['3d'] &&
-        !(entry.layer instanceof L.Layer.types.terrain) && entry.layer.url).layer;
+      const layer = layers._layers.find(entry => entry.layer._3d &&
+        !(entry.layer._type === 'terrain') && entry.layer.url).layer;
       const feature = { properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } };
       const style = layer.options.style(feature);
       return style === null ? null : {
@@ -220,10 +220,10 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
   await prepare3DChecks(this.page);
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => layer.ready)));
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
-    !(layer instanceof L.Layer.types['3d']) || (layer.root && (!layer.modelUrl || layer.model) &&
+    !(layer._3d) || (layer.root && (!layer.modelUrl || layer.model) &&
       (!layer.url || layer.header))));
   await this.page.evaluate(() => Promise.all(layers._layers
-    .filter(({ layer }) => !(layer instanceof L.Layer.types['3d'])).map(({ layer }) => layer.ready)));
+    .filter(({ layer }) => !(layer._3d)).map(({ layer }) => layer.ready)));
   await this.page.waitForFunction(() => {
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
     const error = buildings && [...buildings._areas.values()].find(area => area.error);
@@ -266,10 +266,10 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
       min: Math.min(...heights),
       max: Math.max(...heights),
       sharedScene: buildings.root.parent === buildings.scene &&
-        Object.values(map._layers).filter(layer => layer instanceof L.Layer.types['3d'])
+        Object.values(map._layers).filter(layer => layer._3d)
           .every(layer => layer.renderer === buildings.renderer),
-      true3DLayer: buildings instanceof L.Layer.types['3d'] && !(buildings instanceof L.GridLayer),
-      noSubclass: buildings.constructor === L.Layer.types['3d'],
+      true3DLayer: buildings._3d && !(buildings instanceof L.GridLayer),
+      noSubclass: buildings.constructor === L.Layer && Object.getPrototypeOf(buildings) === L.Layer.prototype,
       meshes: buildings.group.children.length,
       skipped: [...buildings._areas.values()].reduce((sum, area) => sum + (area.skipped || 0), 0)
     };
@@ -389,8 +389,8 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
 
 When('I move and toggle the Paris building volumes', { timeout: 60000 }, async function () {
   const status = text => this.page.waitForFunction(text => {
-    const buildings = layers._layers.find(entry => entry.layer instanceof L.Layer.types['3d'] &&
-      !(entry.layer instanceof L.Layer.types.terrain) && entry.layer.url).layer;
+    const buildings = layers._layers.find(entry => entry.layer._3d &&
+      !(entry.layer._type === 'terrain') && entry.layer.url).layer;
     if (buildings._inflight || !buildings._areas.size) return false;
     const areas = [...buildings._areas.values()];
     if (text === 'Unable to load') return areas.some(area => area.error);

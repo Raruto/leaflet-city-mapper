@@ -5,8 +5,8 @@
 
 /**
  * Router for `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`.
- * It imports the type module on demand and turns the
- * layer into it; types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
+ * It imports the type module on demand and initializes the existing instance;
+ * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
  * - types/: specialized modules for non-base `source.type`s, imported on demand:
@@ -31,17 +31,9 @@ const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(
 const scriptUrl = ((document.currentScript && document.currentScript.src) ||
   (import.meta && import.meta.url) || document.baseURI).split('/').slice(0, -1).join('/') + '/';
 
-// Stand-in while the type module loads: remembers the map, renders nothing.
-const Pending = L.Layer.extend({
-  onAdd() {},
-  onRemove() {},
-});
-
 // One chain for every pending layer: they become real layers in creation order, whatever the import timing.
 let loading = Promise.resolve();
-
-// The base type is registered below; specialized modules extend this registry.
-L.Layer.types = {};
+let sceneModules, sceneLoading;
 
 /**
  * The '3d' layer type: native WebGPU scene synchronized with the map camera.
@@ -96,78 +88,77 @@ L.Layer.types = {};
  * @param {Layer3DOptions} [options] World origin comes from center or the first map centre.
  */
 
-/**
- * @param {Layer3DOptions} [options] pane and attribution remain standard L.Layer options.
- */
-L.Layer.types['3d'] = L.Layer.extend({
-  statics: { _renderers: new WeakMap() },
-  options: { ariaLabel: '3D scene' },
-  initialize(options = {}) {
-    L.Util.setOptions(this, options);
-    // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
-    const isModel = !this._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(this.options.url);
-    this.modelUrl = isModel ? this.options.url : null;
-    this.url = this.options.url && !isModel && !this._geojson ? new URL(this.options.url, document.baseURI).href : null;
-    this._directories = new Map();
-    if (this.options.center) {
-      this.location = new L.LatLng(this.options.center[0], this.options.center[1]);
-    }
-    /** @type {Map<string, SourceArea>} Keys are archive x/y, not screen tiles. */
-    this._areas = new Map();
-    this._inflight = 0;
-    this._added = Promise.withResolvers();
-    queueMicrotask(async () => {
-      try {
-        this.root = (await import('./utils/emptyNode.js')).emptyNode();
-        this.raycaster = { origin: [0, 0, 0], direction: [0, 0, 0] };
-        if (this.url || this._geojson) {
-          this.group = this.root;
-          if (this.url) this.header = await (await import('./utils/getHeader.js')).getHeader(this);
-        }
-        if (this._map) {
-          await (await import('./utils/attach.js')).attach(this, this._map);
-          this._added.resolve();
-        }
-        if (this.modelUrl) await (await import('./utils/loadModel.js')).loadModel(this);
-        if (this._shared) await (await import('./utils/update.js')).update(this);
-        this.fire('ready');
-      } catch (error) {
-        this.fire('error', { error });
-      }
-    });
-  },
-  onAdd(map) {
-    if (this._map !== map) {
-      return;
-    }
-    import('./utils/onAdd3DLayer.js').then(({ onAdd3DLayer }) => { onAdd3DLayer(this, map); });
-  },
-  onRemove(map) {
-    import('./utils/onRemove3DLayer.js').then(({ onRemove3DLayer }) => onRemove3DLayer(this, map));
-  },
-});
-L.Layer.types['3d']._nextId = 0;
-
-// Core L.Layer has no initialize and init hooks get no arguments: keep the options for the hook.
-L.Layer.include({
-  getEvents() {
-    if (!this._areas) return {};
+L.Layer.types = {};
+L.Layer.types['3d'] = function (layer, options = {}) {
+  const ready = sceneLoading ||= Promise.all([
+    import('./utils/onAdd3DLayer.js'),
+    import('./utils/onRemove3DLayer.js'),
+    import('./utils/updateArea.js'),
+    import('./utils/onTerrainChange.js'),
+  ]).then(([add, remove, update, terrain]) => sceneModules = { ...add, ...remove, ...update, ...terrain });
+  layer._3d = true;
+  L.Util.setOptions(layer, { ariaLabel: '3D scene', ...options });
+  layer.onAdd = map => {
+    if (sceneModules) return sceneModules.onAdd3DLayer(layer, map);
+    ready.then(({ onAdd3DLayer }) => {
+      if (layer._map === map) onAdd3DLayer(layer, map);
+    }).catch(error => layer.fire('error', { error }));
+  };
+  layer.onRemove = map => {
+    if (sceneModules) return sceneModules.onRemove3DLayer(layer, map);
+    ready.then(({ onRemove3DLayer }) => onRemove3DLayer(layer, map))
+      .catch(error => layer.fire('error', { error }));
+  };
+  layer.getEvents = () => {
     const events = {};
-    if (this.url) {
-      const updateArea = () => import('./utils/updateArea.js').then(({ updateArea }) => updateArea(this));
-      Object.assign(events, {
-        moveend: updateArea,
-        zoomend: updateArea,
-        rotate: updateArea,
-        pitch: updateArea,
-        resize: updateArea,
-      });
+    if (layer.url) {
+      events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = () =>
+        sceneModules ? sceneModules.updateArea(layer) : ready.then(({ updateArea }) => updateArea(layer));
     }
-    if (this._geojson || this.url) {
-      events.terrainchange = () => import('./utils/onTerrainChange.js').then(({ onTerrainChange }) => onTerrainChange(this));
+    if (layer._geojson || layer.url) {
+      events.terrainchange = () => sceneModules
+        ? sceneModules.onTerrainChange(layer)
+        : ready.then(({ onTerrainChange }) => onTerrainChange(layer));
     }
     return events;
-  },
+  };
+  // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
+  const isModel = !layer._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
+  layer.modelUrl = isModel ? layer.options.url : null;
+  layer.url = layer.options.url && !isModel && !layer._geojson ? new URL(layer.options.url, document.baseURI).href : null;
+  layer._directories = new Map();
+  if (layer.options.center) {
+    layer.location = new L.LatLng(layer.options.center[0], layer.options.center[1]);
+  }
+  /** @type {Map<string, SourceArea>} Keys are archive x/y, not screen tiles. */
+  layer._areas = new Map();
+  layer._inflight = 0;
+  layer._added = Promise.withResolvers();
+  queueMicrotask(async () => {
+    try {
+      await ready;
+      layer.root = (await import('./utils/emptyNode.js')).emptyNode();
+      layer.raycaster = { origin: [0, 0, 0], direction: [0, 0, 0] };
+      if (layer.url || layer._geojson) {
+        layer.group = layer.root;
+        if (layer.url) layer.header = await (await import('./utils/getHeader.js')).getHeader(layer);
+      }
+      if (layer._map) {
+        await (await import('./utils/attach.js')).attach(layer, layer._map);
+        layer._added.resolve();
+      }
+      if (layer.modelUrl) await (await import('./utils/loadModel.js')).loadModel(layer);
+      if (layer._shared) (await import('./utils/update.js')).update(layer);
+      layer.fire('ready');
+    } catch (error) {
+      layer.fire('error', { error });
+    }
+  });
+};
+L.Layer.types['3d']._renderers = new WeakMap();
+L.Layer.types['3d']._nextId = 0;
+
+L.Layer.include({
   initialize(options = {}) {
     if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options.source) {
       if (layerProto.initialize) return layerProto.initialize.apply(this, arguments);
@@ -185,28 +176,29 @@ L.Layer.include({
     // A stand-in created by the entry point before this module loaded may already be on a map.
     const map = this._map;
     map?.removeLayer(this);
-    delete this.onAdd;
-    delete this.onRemove;
+    L.Util.setOptions(this, core);
     if (L.Layer.types[type]) {
-      Object.setPrototypeOf(this, L.Layer.types[type].prototype);
-      this.options = Object.create(L.Layer.types[type].prototype.options);
-      L.Layer.types[type].prototype.initialize.call(this, settings);
+      this._type = type;
+      L.Layer.types[type](this, settings);
       map?.addLayer(this);
       return;
     }
-    Object.setPrototypeOf(this, Pending.prototype);
-    L.Util.setOptions(this, core);
+    this.onAdd = () => {};
+    this.onRemove = () => {};
     map?.addLayer(this);
     // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
     loading = loading.catch(() => {}).then(() => import(new URL(`./types/${type}.js`, scriptUrl).href));
     const pending = this.ready = loading.then(() => {
       const map = this._map;
       map?.removeLayer(this);
-      Object.setPrototypeOf(this, L.Layer.types[type].prototype);
-      this.options = Object.create(L.Layer.types[type].prototype.options);
-      L.Layer.types[type].prototype.initialize.call(this, settings);
+      delete this.onAdd;
+      delete this.onRemove;
+      if (typeof L.Layer.types[type] !== 'function') throw new Error(`Unknown layer type: ${type}`);
+      this._type = type;
+      L.Layer.types[type](this, settings);
       map?.addLayer(this);
       return this.ready === pending ? this : this.ready;
     });
+    pending.catch(error => this.fire('error', { error }));
   },
 });

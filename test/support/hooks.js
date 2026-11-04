@@ -77,10 +77,9 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `const prototype = L.Layer.types?.['3d']?.prototype;
-    if (prototype && !prototype._testArchive) {
-      const initialize = prototype.initialize;
-      prototype.initialize = function (options = {}) {
+  const pmtilesMock = `const initialize = L.Layer.types?.['3d'];
+    if (initialize && !initialize._testArchive) {
+      L.Layer.types['3d'] = Object.assign(function (layer, options = {}) {
         if (options.url && !/\\.(glb|gltf)(?:[?#]|$)/i.test(options.url) && !options.archive) {
           const url = new URL(options.url, document.baseURI).href;
           options = { ...options, archive: {
@@ -94,9 +93,8 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
             },
           } };
         }
-        return initialize.call(this, options);
-      };
-      prototype._testArchive = true;
+        return initialize(layer, options);
+      }, initialize, { _testArchive: true });
     }`;
   const mockPMTiles = async route => {
     const response = await route.fetch();

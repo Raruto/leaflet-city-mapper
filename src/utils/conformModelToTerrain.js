@@ -1,4 +1,5 @@
 import { computeBounds } from './computeBounds.js';
+import { getElevation } from './getElevation.js';
 import { update } from './update.js';
 import { updateWorldMatrix } from './updateWorldMatrix.js';
 import { vertexNormals } from './vertexNormals.js';
@@ -52,7 +53,7 @@ export function conformModelToTerrain(layer, terrain) {
       const worldZ = world[2] * x + world[6] * y + world[10] * z + world[14];
       const point = crs.transformation.transform(new L.Point(
         origin.x + worldX / metres, origin.y - worldZ / metres), pixelScale);
-      const elevation = terrain._getElevation(point);
+      const elevation = getElevation(terrain, point);
       if (!Number.isFinite(elevation)) continue;
       const offset = (elevation - worldY) * weight;
       attribute.data[i] += inverse[4] * offset;

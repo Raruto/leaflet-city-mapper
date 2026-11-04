@@ -35,7 +35,10 @@ export function onAddSun(layer, map) {
         disc.style.left = `${left}px`; disc.style.top = `${top}px`;
       }
     };
-    const render = () => updateScene(L.Layer.types['3d']?._renderers.get(map));
+    const render = () => {
+      const renderer = L.Layer.types['3d']?._renderers.get(map);
+      if (renderer) updateScene(renderer);
+    };
     const update = () => {
       try {
         if (control.live) control.time = new Date();

@@ -20,17 +20,17 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   const button = this.page.getByRole('button', { name: 'Walk', exact: true });
   await button.click();
   await this.page.waitForFunction(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(test3d.map._layers).find(layer => layer._type === 'walk');
     return walk.root.children.length === 5;
   });
   const start = await this.page.evaluate(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(test3d.map._layers).find(layer => layer._type === 'walk');
     return { lat: walk.walker.latlng.lat, phase: walk.walker.phase };
   });
   await this.page.keyboard.down('KeyW');
   try {
     await this.page.waitForFunction(lat => {
-      const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
+      const walk = Object.values(test3d.map._layers).find(layer => layer._type === 'walk');
       return (walk.walker.latlng.lat - lat) * 111320 > 0.5;
     }, start.lat);
     await this.page.waitForTimeout(1200);
@@ -38,7 +38,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
     await this.page.keyboard.up('KeyW');
   }
   const stopped = await this.page.evaluate(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(test3d.map._layers).find(layer => layer._type === 'walk');
     return { lat: walk.walker.latlng.lat, phase: walk.walker.phase,
       centerError: test3d.map.latLngToContainerPoint(walk.walker.latlng).distanceTo(test3d.map.getSize().divideBy(2)) };
   });
@@ -50,7 +50,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   await this.page.keyboard.down('KeyS');
   try {
     await this.page.waitForFunction(lat => {
-      const walk = Object.values(test3d.map._layers).find(layer => layer instanceof L.Layer.types.walk);
+      const walk = Object.values(test3d.map._layers).find(layer => layer._type === 'walk');
       return (lat - walk.walker.latlng.lat) * 111320 > 0.5;
     }, stopped.lat);
   } finally {
@@ -72,15 +72,15 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await button.click();
   assert.equal(await button.getAttribute('aria-pressed'), 'true');
   await this.page.waitForFunction(() => {
-    const walk = Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
     return walk.walker.latlng && walk.root.children.length === 5;
   });
   const state = () => this.page.evaluate(() => {
-    const walk = Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk), [body] = walk.root.children;
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk'), [body] = walk.root.children;
     return {
       ...walk.walker.latlng, heading: walk.walker.heading, bearing: map.getBearing(), pitch: map.getPitch(),
       dragging: map.dragging.enabled(), center: map.getCenter(),
-      feet: body.position[1] + walk.root.position[1], deck: map._terrain3D._getElevation(walk.walker.latlng),
+      feet: body.position[1] + walk.root.position[1], deck: nativeChecks.getElevation(map._terrain3D, walk.walker.latlng),
     };
   });
   const start = await state();
@@ -121,7 +121,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
 
   // Champ de Mars side street: running south ends against a building facade (after sliding along it).
   await this.page.evaluate(() => {
-    const walk = Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
     walk.walker.latlng = new L.LatLng(48.8560, 2.2950);
     walk.walker.heading = Math.PI;
   });
@@ -141,7 +141,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await this.page.keyboard.press('Escape');
   const after = await this.page.evaluate(() => ({
     dragging: map.dragging.enabled(), zoom: map.getZoom(), pitch: map.getPitch(),
-    meshes: Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk).root.children.length,
+    meshes: Object.values(map._layers).find(layer => layer._type === 'walk').root.children.length,
   }));
   assert.deepEqual(after, { dragging: true, zoom: before.zoom, pitch: before.pitch, meshes: 0 });
   assert.equal(await button.getAttribute('aria-pressed'), 'false');

@@ -10,7 +10,7 @@ import { updateWorldMatrix } from './updateWorldMatrix.js';
 // ponytail: traffic vehicles and boats move on the GPU and are not obstacles.
 
 export function hit(layer, x, y, z, dx, dz, reach) {
-  const types = L.Layer.types, skip = other => other === layer || ['terrain', 'traffic'].some(name => types[name] && other instanceof types[name]);
+  const skip = other => other === layer || ['terrain', 'traffic'].includes(other._type);
   updateWorldMatrix(layer.scene);
   let best = reach, found = null;
   for (const other of layer._shared._layers) {

@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/types/sunlight.js"],
-  "sourcesContent": ["import { onAddSun } from '../utils/onAddSun.js';\nimport { onRemoveSun } from '../utils/onRemoveSun.js';\n\n// Sun/moon clock control and sky colours; the control is created on first add (`layer.control`).\nL.Layer.types.sunlight = L.Layer.extend({\n  onAdd(map) { return onAddSun(this, map); },\n  onRemove() { return onRemoveSun(this); },\n});"],
-  "mappings": "AAAA,OAAS,YAAAA,MAAgB,uBACzB,OAAS,eAAAC,MAAmB,0BAG5B,EAAE,MAAM,MAAM,SAAW,EAAE,MAAM,OAAO,CACtC,MAAMC,EAAK,CAAE,OAAOF,EAAS,KAAME,CAAG,CAAG,EACzC,UAAW,CAAE,OAAOD,EAAY,IAAI,CAAG,CACzC,CAAC",
-  "names": ["onAddSun", "onRemoveSun", "map"]
+  "sourcesContent": ["import { onAddSun } from '../utils/onAddSun.js';\nimport { onRemoveSun } from '../utils/onRemoveSun.js';\n\n// Sun/moon clock control and sky colours; the control is created on first add (`layer.control`).\nL.Layer.types.sunlight = (layer, options) => {\n  L.Util.setOptions(layer, options);\n  layer.onAdd = map => onAddSun(layer, map);\n  layer.onRemove = () => onRemoveSun(layer);\n};"],
+  "mappings": "AAAA,OAAS,YAAAA,MAAgB,uBACzB,OAAS,eAAAC,MAAmB,0BAG5B,EAAE,MAAM,MAAM,SAAW,CAACC,EAAOC,IAAY,CAC3C,EAAE,KAAK,WAAWD,EAAOC,CAAO,EAChCD,EAAM,MAAQE,GAAOJ,EAASE,EAAOE,CAAG,EACxCF,EAAM,SAAW,IAAMD,EAAYC,CAAK,CAC1C",
+  "names": ["onAddSun", "onRemoveSun", "layer", "options", "map"]
 }

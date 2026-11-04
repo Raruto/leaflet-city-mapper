@@ -1,2 +1,2 @@
-import{setGeoJSONData as t}from"../utils/setGeoJSONData.js";L.Layer.types.geojson=L.Layer.types["3d"].extend({_geojson:!0,setData(e){return t(this,e)}});
+import{setGeoJSONData as s}from"../utils/setGeoJSONData.js";L.Layer.types.geojson=(t,e)=>{t._geojson=!0,t.setData=o=>s(t,o),L.Layer.types["3d"](t,e)};
 //# sourceMappingURL=geojson.js.map

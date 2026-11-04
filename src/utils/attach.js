@@ -3,7 +3,6 @@ import { setParent } from './setParent.js';
 import { traverse } from './traverse.js';
 import { createProgram } from './createProgram.js';
 import { endZoom } from './endZoom.js';
-import { initSunlight } from './initSunlight.js';
 import { onMapChange } from './onMapChange.js';
 import { onZoomAnim } from './onZoomAnim.js';
 import { render } from './render.js';
@@ -11,6 +10,7 @@ import { startZoom } from './startZoom.js';
 import { update } from './update.js';
 import { updateArea } from './updateArea.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
+import { resizeSunlight } from './resizeSunlight.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
 /**
@@ -93,7 +93,22 @@ export async function attach(backend, map) {
       canvas,
       dpr: Math.min(window.devicePixelRatio, 2)
     };
-    initSunlight(backend);
+    const layout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      ]
+    });
+    const buffer = backend.renderer.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const sampler = backend.renderer.device.createSampler({ compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
+    const lights = backend.renderer.device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    backend.renderer.sunlight = { layout, buffer, sampler, lights, size: 0 };
+    const values = new Float32Array(20);
+    values.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    backend.renderer.device.queue.writeBuffer(buffer, 0, values);
+    resizeSunlight(backend, 1);
     const emptyImage = document.createElement('canvas');
     emptyImage.width = 1;
     emptyImage.height = 1;
@@ -215,5 +230,5 @@ export async function attach(backend, map) {
     }
   });
   update(shared);
-  if ((backend.header && !(backend instanceof L.Layer.types.pmtiles)) || backend._geojson) updateArea(backend);
+  if ((backend.header && backend._type !== 'pmtiles') || backend._geojson) updateArea(backend);
 }

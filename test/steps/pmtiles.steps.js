@@ -231,8 +231,8 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         retained, oldTilesRemoved,
         failed: error?.message === 'Missing archive' && emitted === error,
         noFallback: failed.options.maxNativeZoom === undefined,
-        tileBase: Object.getPrototypeOf(L.Layer.types.pmtiles.prototype) === L.Layer.prototype &&
-          layer instanceof L.Layer.types.pmtiles && !(layer instanceof L.TileLayer) &&
+        tileBase: Object.getPrototypeOf(layer) === L.Layer.prototype &&
+          layer._type === 'pmtiles' && !(layer instanceof L.TileLayer) &&
           !(layer instanceof L.GridLayer),
         directCanvas: !('_container' in layer) && !('createTile' in layer),
         missingRaster: tileError.error.message ===

@@ -4,36 +4,37 @@ import { disposeMesh } from './disposeMesh.js';
 import { setRasterTerrain } from './rasterTiles.js';
 import { removeRasterTile } from './removeRasterTile.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
+import { onRemove3DLayer } from './onRemove3DLayer.js';
 
-export function onTerrainRemove(backend, map) {
-  backend._terrainController?.abort();
-  backend._terrainLoading = false;
-  backend._terrainReady = false;
+export function onTerrainRemove(layer, map) {
+  layer._terrainController?.abort();
+  layer._terrainLoading = false;
+  layer._terrainReady = false;
   map.eachLayer(layer => {
-    if (layer instanceof L.Layer.types.pmtiles) setRasterTerrain(layer, null);
+    if (layer._type === 'pmtiles') setRasterTerrain(layer, null);
   });
-  for (const tile of backend._rasterTiles.keys()) removeRasterTile(backend, tile);
-  if (map._terrain3D === backend) delete map._terrain3D;
-  for (const layer of Object.values(map._layers)) {
-    conformModelToTerrain(layer, null);
-    setTerrainHeight(layer);
+  for (const tile of layer._rasterTiles.keys()) removeRasterTile(layer, tile);
+  if (map._terrain3D === layer) delete map._terrain3D;
+  for (const l of Object.values(map._layers)) {
+    conformModelToTerrain(l, null);
+    setTerrainHeight(l);
   }
   map.fire('terrainchange');
-  backend._terrainTiles.clear();
-  backend._terrainOriginElevation = 0;
-  backend._terrainPromise = null;
-  if (backend._rasterProgram) {
-    backend._rasterProgram.pipelineCache.clear();
+  layer._terrainTiles.clear();
+  layer._terrainOriginElevation = 0;
+  layer._terrainPromise = null;
+  if (layer._rasterProgram) {
+    layer._rasterProgram.pipelineCache.clear();
   }
-  backend._rasterProgram = null;
-  if (backend._dem) destroyTexture(backend, backend._dem.texture);
-  backend._dem = null;
-  for (const grid of backend._terrainGrids?.values() || []) {
-    for (const attribute of Object.values(grid)) destroyTexture(backend, attribute.buffer);
+  layer._rasterProgram = null;
+  if (layer._dem) destroyTexture(layer, layer._dem.texture);
+  layer._dem = null;
+  for (const grid of layer._terrainGrids?.values() || []) {
+    for (const attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
-  backend._terrainGrids = null;
-  backend._bridges = null;
-  disposeMesh(backend, backend._bridgeMesh);
-  backend._bridgeMesh = null;
-  L.Layer.types['3d'].prototype.onRemove.call(backend, map);
+  layer._terrainGrids = null;
+  layer._bridges = null;
+  disposeMesh(layer, layer._bridgeMesh);
+  layer._bridgeMesh = null;
+  onRemove3DLayer(layer, map);
 }

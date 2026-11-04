@@ -10,6 +10,7 @@ import { updateStatus } from "./releaseArea.js";
 import { loadSource } from './loadSource.js';
 import { setParent } from './setParent.js';
 import { update } from './update.js';
+import { getElevation } from "./getElevation.js";
 
 /** Start at most two load/build tasks; cancelled tasks still free their slot in finally. */
 
@@ -90,7 +91,7 @@ export function pump(backend) {
           const vertexStart = positions.length / 3;
           if (isTree) {
             const point = crs.project(new L.LatLng(lat, lon));
-            const elevation = map._terrain3D?._getElevation([lat, lon]);
+            const elevation = map._terrain3D ? getElevation(map._terrain3D, [lat, lon]) : undefined;
             const projected = {
               x: (point.x - origin.x) * metres, y: (point.y - origin.y) * metres,
               ground: Number.isFinite(elevation) && Number.isFinite(backend.root.position[1])
@@ -118,7 +119,7 @@ export function pump(backend) {
               return ring.slice(0, -1).map(([lng, lat]) => {
                 if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw new Error('Invalid GeoJSON coordinates');
                 const point = crs.project(new L.LatLng(lat, lng));
-                const elevation = backend._map._terrain3D?._getElevation([lat, lng]);
+                const elevation = backend._map._terrain3D ? getElevation(backend._map._terrain3D, [lat, lng]) : undefined;
                 return {
                   x: (point.x - origin.x) * metres,
                   y: (point.y - origin.y) * metres,

@@ -282,7 +282,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       }
       const atlas = owner._roofRaster.texture;
       const tiles = Object.values(map._layers)
-        .filter(layer => layer instanceof L.Layer.types.pmtiles && layer._rasterTiles && layer.options.opacity > 0)
+        .filter(layer => layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0)
         .flatMap(layer => [...layer._rasterTiles.values()]
           .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
           .map(tile => ({ tile, layer })));

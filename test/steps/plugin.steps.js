@@ -35,11 +35,12 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
 
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {
   const result = await this.page.evaluate(async () => {
-    const lazy = Object.keys(L.Layer.types).length === 0;
+    const lazy = Object.keys(L.Layer.types).join() === '3d';
     const archive = { getHeader: async () => ({ maxZoom: 19 }) };
     const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
     const pending = first.ready instanceof Promise && second.ready instanceof Promise;
+    const firstPrototype = Object.getPrototypeOf(first);
     await Promise.all([first.ready, second.ready]);
     const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles', archive } });
     await warm.ready;
@@ -58,9 +59,13 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     const marker = new L.Marker([55, 10]);
     return {
       lazy, pending,
-      routed: first instanceof L.Layer.types.pmtiles && first instanceof L.Layer &&
+      routed: first._type === 'pmtiles' && first instanceof L.Layer &&
         !(first instanceof L.TileLayer) && !(first instanceof L.GridLayer) &&
-        second instanceof L.Layer.types.pmtiles,
+        second._type === 'pmtiles',
+      samePrototype: firstPrototype === L.Layer.prototype && Object.getPrototypeOf(first) === firstPrototype &&
+        first.constructor === L.Layer && warm.constructor === L.Layer,
+      ownMethods: Object.hasOwn(first, 'onAdd') && Object.hasOwn(first, 'getHeader') &&
+        first.getHeader !== second.getHeader && first.options !== second.options,
       settings: first.options.maxZoom,
       sourceRemoved: first.options.source === undefined,
       header: first.header.maxZoom,
@@ -68,7 +73,7 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
       initializations,
       marker: marker instanceof L.Marker && marker.getLatLng().equals([55, 10]),
       pitch: typeof L.Map.prototype.getPitch === 'function',
-      warm: warm instanceof L.Layer.types.pmtiles && warm.header.maxZoom === 19,
+      warm: warm._type === 'pmtiles' && warm.header.maxZoom === 19,
       plain: plain instanceof L.Layer && !plain.ready,
       configured: configured.options.attribution === 'Plain layer',
       inherited: inherited instanceof Inherited &&
@@ -76,7 +81,7 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     };
   });
   assert.deepEqual(result, {
-    lazy: true, pending: true, routed: true, settings: 24, sourceRemoved: true,
+    lazy: true, pending: true, routed: true, samePrototype: true, ownMethods: true, settings: 24, sourceRemoved: true,
     header: 19, custom: true, initializations: 1, marker: true, pitch: true,
     warm: true, plain: true, configured: true, inherited: true,
   });

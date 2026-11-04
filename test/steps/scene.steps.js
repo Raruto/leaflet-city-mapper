@@ -37,11 +37,11 @@ Then('layer-owned objects preserve values and visibility without engine classes'
       Object.getPrototypeOf(mesh.worldMatrix) === Array.prototype &&
       objects.every(object => Object.getPrototypeOf(object) === Object.prototype &&
         Object.values(object).every(value => typeof value !== 'function')) &&
-      !Object.keys(L.Layer.types['3d'].prototype).some(name => /Methods|Prototype/.test(name));
-    const prototype = L.Layer.types['3d'].prototype;
+      !Object.keys(layer).some(name => /Methods|Prototype/.test(name));
+    const prototype = Object.getPrototypeOf(layer);
     const noLayerHelpers = ['add', 'remove', '_setTerrainHeight', '_lampPostGeometry', '_lightGeometry']
-      .every(name => !Object.prototype.hasOwnProperty.call(prototype, name)) &&
-      prototype.remove === L.Layer.prototype.remove;
+      .every(name => !Object.hasOwn(layer, name)) &&
+      prototype === L.Layer.prototype && layer.remove === L.Layer.prototype.remove;
     const independent = scene.position !== layer.root.position &&
       scene.children !== layer.root.children && scene.worldMatrix !== layer.root.worldMatrix;
     const nodes = [
@@ -121,15 +121,15 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
 
 When('I add and remove independent 3D layers', { timeout: 60000 }, async function () {
   this.shared3d = await this.page.evaluate(async () => {
-    const { Layer3D, map } = test3d;
+    const { map } = test3d;
     const control = new L.Control.Layers().addTo(map);
-    const pending = new Layer3D({ center: [map.getCenter().lat, map.getCenter().lng] }).addTo(map);
+    const pending = new L.Layer({ source: { type: '3d', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
     pending.remove();
     await nativeChecks.ready(pending);
     const pendingRemoved = !document.querySelector('.leaflet-3d');
-    const first = new Layer3D({ center: [48.8582601, 2.29449985] }).addTo(map);
+    const first = new L.Layer({ source: { type: '3d', center: [48.8582601, 2.29449985] } }).addTo(map);
     control.addOverlay(first, 'First 3D layer');
-    const second = new Layer3D({ center: [48.8602, 2.298] }).addTo(map);
+    const second = new L.Layer({ source: { type: '3d', center: [48.8602, 2.298] } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
     const backend = first;
     const object = nativeChecks.group();
@@ -193,9 +193,9 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     checkbox().click();
     await first._added.promise;
     const checkboxEnabled = map.hasLayer(first) && first.renderer === renderer;
-    const other = await nativeChecks.ready(new Layer3D({
-      center: [second.location.lat, second.location.lng],
-    }).addTo(otherMap));
+    const other = await nativeChecks.ready(new L.Layer({ source: {
+      type: '3d', center: [second.location.lat, second.location.lng],
+    } }).addTo(otherMap));
     const isolated = other.renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
     second.remove();
     const transferredAgain = first._shared === first && first.renderer === renderer &&
@@ -231,7 +231,7 @@ Then('an unavailable WebGPU adapter emits an error without leaving a canvas', as
       value: { requestAdapter: async () => null },
     });
     try {
-      const layer = new test3d.Layer3D().addTo(test3d.map);
+      const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
       let emitted;
       layer.on('error', event => { emitted = event.error; });
       const error = await nativeChecks.ready(layer).then(() => null, error => error);
@@ -250,8 +250,8 @@ Then('an unavailable WebGPU adapter emits an error without leaving a canvas', as
 
 When('I select the {string} background in the 3D example', async function (background) {
   await this.page.evaluate(() => {
-    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer instanceof L.Layer.types['3d'] &&
-      !(entry.layer instanceof L.Layer.types.terrain))
+    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer._3d &&
+      !(entry.layer._type === 'terrain'))
       .map(entry => entry.layer);
     window.exampleSceneBefore = {
       overlays, renderer: overlays[0].renderer, canvas: overlays[0].renderer.canvas,
@@ -269,8 +269,8 @@ Then('only the {string} background is active and the 3D scene is unchanged', asy
   }, background);
   const result = await this.page.evaluate(() => {
     const before = window.exampleSceneBefore;
-    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer instanceof L.Layer.types['3d'] &&
-      !(entry.layer instanceof L.Layer.types.terrain))
+    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer._3d &&
+      !(entry.layer._type === 'terrain'))
       .map(entry => entry.layer);
     const tower = overlays.find(layer => layer.model);
     return {
@@ -301,15 +301,15 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => entry.layer.model).layer;
     // The Walk button is not managed by the overlays control under test.
-    const walk = Object.values(map._layers).find(layer => layer instanceof L.Layer.types.walk);
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
     walk.remove();
     window.exampleOverlayBefore = { tower, model: tower.model, canvas: tower.renderer.canvas, walk };
   });
   await towerControl.uncheck();
   const towerDisabled = await this.page.evaluate(() => {
     const before = window.exampleOverlayBefore;
-    const buildings = layers._layers.find(entry => entry.layer instanceof L.Layer.types['3d'] &&
-      !(entry.layer instanceof L.Layer.types.terrain) && entry.layer.url).layer;
+    const buildings = layers._layers.find(entry => entry.layer._3d &&
+      !(entry.layer._type === 'terrain') && entry.layer.url).layer;
     return !map.hasLayer(before.tower) && map.hasLayer(buildings) &&
       before.canvas.isConnected && buildings.renderer.canvas === before.canvas &&
       !map.attributionControl.getContainer().textContent.includes('CC0 model:') &&
@@ -344,11 +344,11 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await lightsControl.check();
   await boatsControl.check();
   await trafficControl.check();
-  await this.page.waitForFunction(() => layers._layers.filter(entry => entry.overlay && entry.layer instanceof L.Layer.types['3d'])
+  await this.page.waitForFunction(() => layers._layers.filter(entry => entry.overlay && entry.layer._3d)
     .every(({ layer }) => layer.root && layer.renderer));
   const bothRestored = await this.page.evaluate(() => {
-    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer instanceof L.Layer.types['3d'] &&
-      !(entry.layer instanceof L.Layer.types.terrain))
+    const overlays = layers._layers.filter(entry => entry.overlay && entry.layer._3d &&
+      !(entry.layer._type === 'terrain'))
       .map(entry => entry.layer);
     return overlays.every(layer => map.hasLayer(layer)) &&
       overlays.every(layer => layer.renderer === overlays[0].renderer) &&

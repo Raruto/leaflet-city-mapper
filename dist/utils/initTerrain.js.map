@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/initTerrain.js"],
-  "sourcesContent": ["export function initTerrain(backend, options = {}) {\n  const terrainSource = options.url;\n  const layerOptions = { ...options };\n  delete layerOptions.url;\n  L.Layer.types['3d'].prototype.initialize.call(backend, layerOptions);\n  backend.terrainSource = terrainSource;\n  backend._terrainTiles = new Map();\n  backend._rasterTiles = new Map();\n  backend._terrainReady = false;\n}\n"],
-  "mappings": "AAAO,SAASA,EAAYC,EAASC,EAAU,CAAC,EAAG,CACjD,MAAMC,EAAgBD,EAAQ,IACxBE,EAAe,CAAE,GAAGF,CAAQ,EAClC,OAAOE,EAAa,IACpB,EAAE,MAAM,MAAM,IAAI,EAAE,UAAU,WAAW,KAAKH,EAASG,CAAY,EACnEH,EAAQ,cAAgBE,EACxBF,EAAQ,cAAgB,IAAI,IAC5BA,EAAQ,aAAe,IAAI,IAC3BA,EAAQ,cAAgB,EAC1B",
-  "names": ["initTerrain", "backend", "options", "terrainSource", "layerOptions"]
-}

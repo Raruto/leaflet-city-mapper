@@ -548,7 +548,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         const z = world[2] * positions[i] + world[6] * positions[i + 1] + world[10] * positions[i + 2] + world[14];
         const point = crs.transformation.transform(
           new L.Point(sceneOrigin.x + x / metres, sceneOrigin.y - z / metres), pixelScale);
-        const elevation = terrain._getElevation(point);
+        const elevation = nativeChecks.getElevation(terrain, point);
         if (Number.isFinite(elevation)) terrainConformanceErrors.push(Math.abs(y - elevation));
       }
     });
@@ -557,7 +557,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     let maskDepthWrite = eiffel.options.alphaMode === 'MASK' && eiffel.options.terrainConform;
     let baseLayer;
     map.eachLayer(layer => {
-      if (layer instanceof L.Layer.types.pmtiles && layer._map) baseLayer = layer;
+      if (layer._type === 'pmtiles' && layer._map) baseLayer = layer;
     });
     for (const [zoom, pitch, bearing] of [[17, 0, 0], [17, 45, 30], [18, 60, 135], [16, 80, 270]]) {
       map.setView(tower.location, zoom, { animate: false });
@@ -569,7 +569,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
         (40075016.68557849 * Math.cos(tower.location.lat * Math.PI / 180));
       const origin = map.project(tower.location).subtract(map.getPixelOrigin());
       const size = map.getSize();
-      const ground = map._terrain3D._getElevation(map.getCenter()) ?? 0;
+      const ground = nativeChecks.getElevation(map._terrain3D, map.getCenter()) ?? 0;
       for (const [x, z] of [[-40, -40], [0, 0], [40, 40]]) {
         const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
         const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
@@ -604,7 +604,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       const scale = map.options.crs.scale(zoom) /
         (40075016.68557849 * Math.cos(tower.location.lat * Math.PI / 180));
       const origin = map.project(tower.location, zoom).subtract(map.getPixelOrigin());
-      const ground = map._terrain3D._getElevation(map.getCenter()) ?? 0;
+      const ground = nativeChecks.getElevation(map._terrain3D, map.getCenter()) ?? 0;
       for (const [x, z] of [[0, 0], [-40, -40], [40, 40]]) {
         const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
         const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(tower.camera.projectionViewMatrix));
@@ -646,7 +646,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     const sharedCanvasRemains = document.querySelector('.leaflet-3d') === eiffel.renderer.canvas;
     map.removeLayer(eiffel);
     const other3d = [];
-    map.eachLayer(layer => { if (layer instanceof L.Layer.types['3d']) other3d.push(layer); });
+    map.eachLayer(layer => { if (layer._3d) other3d.push(layer); });
     other3d.forEach(layer => layer.remove());
     baseLayer.remove();
     const removed = !document.querySelector('.leaflet-3d');

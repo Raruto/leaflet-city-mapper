@@ -58,7 +58,13 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
       return nativeChecks.loadBlock(layer, block, features);
     };
     const previousTerrain = map._terrain3D;
-    map._terrain3D = { _getElevation: () => 50 };
+    const terrainTiles = new Map();
+    for (let x = tile.x - 1; x <= tile.x + 1; x++) {
+      for (let y = tile.y - 1; y <= tile.y + 1; y++) {
+        terrainTiles.set(`${x}/${y}`, new Float32Array(256 * 256).fill(50));
+      }
+    }
+    map._terrain3D = { _map: map, _terrainReady: true, _terrainZoom: zoom, _terrainTiles: terrainTiles };
     const errors = [];
     layer.on('error', ({ error }) => errors.push(error.message));
     try {

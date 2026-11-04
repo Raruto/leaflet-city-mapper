@@ -9,6 +9,7 @@ import { renderSunlight } from './renderSunlight.js';
 import { sortMeshes } from "./sortMeshes.js";
 import { update } from "./update.js";
 import { getRasterTileSize } from "./rasterTiles.js";
+import { getElevation } from "./getElevation.js";
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
@@ -64,7 +65,7 @@ export function render(backend) {
   const center = map.containerPointToLayerPoint(size.divideBy(2));
   const target = [
     (center.x - origin.x) / pixelsPerMeter,
-    map._terrain3D?._getElevation(map.getCenter()) ?? 0,
+    (map._terrain3D ? getElevation(map._terrain3D, map.getCenter()): undefined) ?? 0,
     (center.y - origin.y) / pixelsPerMeter
   ];
   const pitch = map.getPitch() * Math.PI / 180;
@@ -146,7 +147,7 @@ export function render(backend) {
   });
   const renderer = backend.renderer;
   if ([...backend._layers].some(layer => layer.options.roofTexture)) {
-    const rasters = Object.values(map._layers).filter(layer => layer instanceof L.Layer.types.pmtiles && layer._rasterTiles && layer.options.opacity > 0);
+    const rasters = Object.values(map._layers).filter(layer => layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0);
     const tiles = rasters.flatMap(layer => [...layer._rasterTiles.values()]
       .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
       .map(tile => ({ tile, layer })));
@@ -323,7 +324,7 @@ export function render(backend) {
   const shadowMeshes = [];
   if (sunlight?.altitude >= 3) {
     for (const layer of backend._layers) {
-      if (layer instanceof L.Layer.types.terrain) continue;
+      if (layer._type === 'terrain') continue;
       traverse(layer.root, mesh => {
         if (!mesh.visible) return true;
         if (mesh.geometry && !mesh.tile && !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);

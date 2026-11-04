@@ -48,7 +48,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     map.setPitch(60);
     const retained = layer._areas.get('geojson') === area;
     const previousArea = area;
-    const terrainUpdated = await new Promise(resolve => {
+    const terrainUpdate = new Promise(resolve => {
       const progress = () => {
         const refreshed = layer._areas.get('geojson');
         if (refreshed !== previousArea && refreshed?.mesh) {
@@ -59,6 +59,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
       layer.on('progress', progress);
     });
     map.fire('terrainchange');
+    const terrainUpdated = await terrainUpdate;
     area = layer._areas.get('geojson');
     done = completed();
     layer.setData({ type: 'FeatureCollection', features: [] });

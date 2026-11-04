@@ -41,7 +41,7 @@ export async function prepare3DChecks(page) {
     const [createMesh, createProgram, destroyTexture, disposeMesh,
       findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
       renderModule, update, sortMeshes, pump, releaseArea, emptyNode, setParent, traverse,
-      updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry] = await Promise.all([
+      updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry, getElevation] = await Promise.all([
       import('/dist/utils/createMesh.js'),
       import('/dist/utils/createProgram.js'),
       import('/dist/utils/destroyTexture.js'),
@@ -66,6 +66,7 @@ export async function prepare3DChecks(page) {
       import('/dist/utils/triangulate.js'),
       import('/dist/utils/lampPostGeometry.js'),
       import('/dist/utils/lightGeometry.js'),
+      import('/dist/utils/getElevation.js'),
     ]);
     const graph = {
       emptyNode: emptyNode.emptyNode,
@@ -97,6 +98,7 @@ export async function prepare3DChecks(page) {
     window.nativeChecks = {
       gpu, picking, render, sources,
       graph,
+      getElevation: getElevation.getElevation,
       geometry: {
         parseColor: parseColor.parseColor,
         triangulate: triangulate.triangulate,
@@ -286,7 +288,7 @@ Given('a map with the standalone 3D module and no dependency import map', async 
       <script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js"></script>
       <script src="../dist/leaflet-city-mapper.js"></script>
       <script>
-        import('../dist/types/terrain.js').then(() => window.test3d = { Layer3D: L.Layer.types['3d'], map: new L.Map('first', {
+        import('../dist/types/terrain.js').then(() => window.test3d = { map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30
         }) });
       </script>`,
@@ -314,10 +316,10 @@ const openEiffelExample = async function () {
   });
   await this.page.waitForFunction(() => sunlightOverlay.control);
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
-    !(layer instanceof L.Layer.types['3d']) || (layer.root && (!layer.modelUrl || layer.model) &&
+    !(layer._3d) || (layer.root && (!layer.modelUrl || layer.model) &&
       (!layer.url || layer.header))));
   await this.page.evaluate(() => Promise.all(layers._layers
-    .filter(({ layer }) => !(layer instanceof L.Layer.types['3d'])).map(({ layer }) => layer.ready)));
+    .filter(({ layer }) => !(layer._3d)).map(({ layer }) => layer.ready)));
   const layout = await this.page.evaluate(() => {
     const rect = map.getContainer().getBoundingClientRect();
     return {

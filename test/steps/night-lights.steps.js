@@ -145,7 +145,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     for (const program of programs) program.nightSparkle = true;
     const towerPixels = brighter(lit, darkTower);
     // Hide terrain and the luminous sprite triangles: only nearby 3D surfaces can brighten.
-    const terrain = [...owner._layers].find(layer => layer instanceof L.Layer.types.terrain);
+    const terrain = [...owner._layers].find(layer => layer._type === 'terrain');
     terrain.root.visible = false;
     const ranges = layer.root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
     for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;

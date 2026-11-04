@@ -54,18 +54,20 @@ export function onRemove3DLayer(backend, map) {
       backend._roofTiles = null;
       for (const animation of backend._zoomTransitions?.keys() || []) animation.play();
       backend._zoomTransitions = null;
-      backend.renderer.canvas.remove();
-      backend.renderer.device.queue.onSubmittedWorkDone()
+      const renderer = backend.renderer;
+      renderer.canvas.remove();
+      renderer.device.queue.onSubmittedWorkDone()
         .then(() => {
-          backend.renderer.depthTexture?.destroy();
-          backend.renderer.roofFallbackTexture?.texture?.destroy(),
-            backend.renderer.uniformBuffer?.destroy(),
-            backend.renderer.sunlight?.texture?.destroy(),
-            backend.renderer.sunlight?.buffer?.destroy(),
-            backend.renderer.sunlight?.lights?.destroy();
+          renderer.depthTexture?.destroy();
+          renderer.roofFallbackTexture?.texture?.destroy();
+          renderer.uniformBuffer?.destroy();
+          renderer.sunlight?.texture?.destroy();
+          renderer.sunlight?.buffer?.destroy();
+          renderer.sunlight?.lights?.destroy();
+          renderer.device.destroy();
         }, error => {
           backend.fire('error', { error });
-          backend.renderer.device.destroy();
+          renderer.device.destroy();
         });
       L.Layer.types['3d']._renderers.delete(map);
       for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete backend[key];

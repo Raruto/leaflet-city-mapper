@@ -1,5 +1,7 @@
+import { addRasterTile } from './addRasterTile.js';
 import { createProgram } from './createProgram.js';
 import { destroyTexture } from './destroyTexture.js';
+import { removeRasterTile } from './removeRasterTile.js';
 import { setParent } from './setParent.js';
 import { update } from './update.js';
 
@@ -64,7 +66,7 @@ export function releaseRasterTiles(backend) {
 export function setRasterTerrain(backend, terrain) {
   if (backend._terrain3D === terrain) return;
   for (const tile of backend._rasterTiles.values()) {
-    backend._terrain3D?.removeRasterTile(tile);
+    if(backend._terrain3D) removeRasterTile(backend._terrain3D, tile);
     if (tile.mesh) setParent(tile.mesh, terrain ? null : backend.root);
   }
   backend._terrain3D = terrain || null;
@@ -78,7 +80,7 @@ export function setRasterTerrain(backend, terrain) {
 export function registerTerrainTile(backend, coords, tile) {
   if (backend._terrain3D && tile.done && !tile.request.signal.aborted &&
     backend._rasterTiles.get(`${coords.z}/${coords.x}/${coords.y}`) === tile) {
-    backend._terrain3D.addRasterTile(backend, coords, tile)
+    addRasterTile(backend._terrain3D, backend, coords, tile)
       .catch(error => backend.fire('tileerror', { tile, coords, error }));
   }
 }
@@ -211,7 +213,7 @@ function releaseRasterTile(backend, tile) {
   if (backend._rasterTiles.get(key) !== tile) return;
   backend._rasterTiles.delete(key);
   tile.request.abort();
-  backend._terrain3D?.removeRasterTile(tile);
+  if(backend._terrain3D) removeRasterTile(backend._terrain3D, tile);
   if (tile.mesh) setParent(tile.mesh, null);
   if (tile.texture) destroyTexture(backend, tile.texture.texture);
   tile.image?.close();

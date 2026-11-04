@@ -153,24 +153,25 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 256, 128);
     ctx.fillStyle = '#0000ff'; ctx.fillRect(0, 128, 256, 128);
     const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
-    const getHeader = L.Layer.types.pmtiles.prototype.getHeader;
-    const getZxy = L.Layer.types.pmtiles.prototype.getZxy;
+    const initialize = L.Layer.types.pmtiles;
     let release;
     let pending = new Promise(resolve => { release = resolve; });
-    L.Layer.types.pmtiles.prototype.getHeader = function () {
-      return this.url.endsWith('/fixture-terrain.pmtiles') ? Promise.resolve(header) : getHeader.call(this);
-    };
-    L.Layer.types.pmtiles.prototype.getZxy = async function (z, x, y, signal) {
-      if (!this.url.endsWith('/fixture-terrain.pmtiles')) return getZxy.call(this, z, x, y, signal);
-      await pending;
-      signal.throwIfAborted();
-      const values = new Float32Array(256 * 256);
-      for (let row = 0; row < 256; row++) {
-        for (let column = 0; column < 256; column++) {
-          values[row * 256 + column] = height(new L.Point(x * 256 + column + 0.5, y * 256 + row + 0.5));
-        }
-      }
-      return { data: values.buffer };
+    L.Layer.types.pmtiles = (layer, options) => {
+      if (options.url.endsWith('fixture-terrain.pmtiles')) options = { ...options, archive: {
+        getHeader: async () => header,
+        getZxy: async (z, x, y, signal) => {
+          await pending;
+          signal.throwIfAborted();
+          const values = new Float32Array(256 * 256);
+          for (let row = 0; row < 256; row++) {
+            for (let column = 0; column < 256; column++) {
+              values[row * 256 + column] = height(new L.Point(x * 256 + column + 0.5, y * 256 + row + 0.5));
+            }
+          }
+          return { data: values.buffer };
+        },
+      } };
+      return initialize(layer, options);
     };
     const wait = async condition => {
       const deadline = performance.now() + 12000;
@@ -209,7 +210,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       const initiallyFlat = [...raster._rasterTiles.values()].every(tile => tile.image);
       terrain._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
       nativeChecks.render.render(buildings._shared);
-      const partialElevation = terrain._getElevation(map.getCenter());
+      const partialElevation = nativeChecks.getElevation(terrain, map.getCenter());
       const partialCameraY = buildings.camera.target[1];
       terrain._terrainTiles.delete(`${coords.x}/${coords.y}`);
       release();
@@ -327,8 +328,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     } finally {
       release();
       raster.remove(); terrain.remove(); buildings.remove(); model.remove();
-      L.Layer.types.pmtiles.prototype.getHeader = getHeader;
-      L.Layer.types.pmtiles.prototype.getZxy = getZxy;
+      L.Layer.types.pmtiles = initialize;
     }
   }, order);
   for (const name of ['initiallyFlat', 'hidden', 'restored', 'cancelled', 'reattached']) assert.equal(result[name], true, name);
