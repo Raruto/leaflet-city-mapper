@@ -178,7 +178,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         nativeChecks.graph.traverse(owner.scene, mesh => {
           if (!mesh.geometry) return;
           if (mesh.uniformBuffer) ownBuffers++;
-          if (!mesh._visibleInFrame) return;
+          if (!mesh.visible || !mesh._visibleInFrame || mesh._appearance === 0) return;
           drawn++;
           if (mesh.boundBuffer === owner.renderer.uniformBuffer) sharedBindings++;
         });
@@ -355,8 +355,8 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
         uploads,
         tiles: tiles.length,
         terrainTiles: terrainTiles.length,
-        duplicatedTerrainTiles: terrainTiles.filter(({ tile }) => owner._roofTiles.has(tile)).length,
-        roofTiles: owner._roofTiles.size,
+        duplicatedTerrainTiles: terrainTiles.filter(({ tile }) => terrain._rasterTiles.get(tile).texture !== tile.texture).length,
+        roofTiles: tiles.length,
         contrast: best.contrast,
         colorError: Math.max(...actual.flatMap((quadrant, i) => quadrant.map((value, c) => Math.abs(value - best.expected[i][c])))),
         alpha,

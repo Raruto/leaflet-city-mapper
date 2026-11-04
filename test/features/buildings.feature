@@ -1,15 +1,19 @@
-@3d-layer
+@coverage
 Feature: Building volumes from PMTiles
+  Scenario: Nearby source blocks share priority across layers
+    Given a leaflet map
+    Then source layers share load slots and start nearby blocks before distant ones
+
   Scenario: Cancelled building downloads release their slots and reload on return
-    Given a map with the standalone 3D module and no dependency import map
+    Given a leaflet map
     Then cancelled building downloads recover without errors or stale meshes
 
   Scenario: Building blocks cover the visible ground through camera changes
-    Given a map with the standalone 3D module and no dependency import map
+    Given a leaflet map
     Then building blocks cover pitched views and retain overlapping areas
 
   Scenario Outline: Invalid source blocks report errors without partial meshes
-    Given a map with the standalone 3D module and no dependency import map
+    Given a leaflet map
     Then a source block with "<invalid>" reports "<message>" without attaching a mesh
 
     Examples:
@@ -20,14 +24,12 @@ Feature: Building volumes from PMTiles
       | empty polygon      | Empty GeoJSON polygon       |
       | short ring         | Invalid GeoJSON polygon ring |
 
-  @paris-buildings
   Scenario: Building volumes render with holes, storey heights, and interaction
     Given the Paris buildings example is open with sample volumes
     Then the building volumes preserve courtyards and elevated floors
     When I move and toggle the Paris building volumes
     Then 3D coverage follows the viewport, releases distant volumes, and recovers from failures
 
-  @eiffel @3d-example
   Scenario Outline: The example filters invalid building volumes and estimates valid heights
     Given the Eiffel Tower example page is open
     Then building style for <storeys> storeys, <floors> floors and ground <ground> is "<result>"

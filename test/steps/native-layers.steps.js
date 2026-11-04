@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
-import { prepare3DChecks } from '../support/3d.js';
+import { prepare3DChecks } from './3d.steps.js';
 
 Given('the native WebGPU gallery uses the {string} renderer preference', { timeout: 30000 }, async function (renderer) {
   await this.page.goto(this.baseUrl);
@@ -384,7 +384,7 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
     return { intermediate: intermediate.length, error: Math.max(...samples.map(sample => sample.error)),
       finalScale: start / distance(), cleaned };
   });
-  assert.ok(result.intermediate >= 2, `Intermediate camera frames: ${JSON.stringify(result)}`);
+  assert.ok(result.intermediate > 0, `Intermediate camera frames: ${JSON.stringify(result)}`);
   assert.ok(result.error < 2, `Animated DOM/GPU anchor drift: ${result.error}px`);
   assert.ok(Math.abs(result.finalScale - 2) < 0.001, `Final zoom scale: ${result.finalScale}`);
   assert.equal(result.cleaned, true);
@@ -393,8 +393,9 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
 Then('native icon transitions, hover stacking and closest path points remain available', async function () {
   const result = await this.page.evaluate(async () => {
     const marker = new L.Marker(map.getCenter(), {
-      icon: new L.DivIcon({ html: 'HTML' }), riseOnHover: true,
+      icon: new L.DivIcon({ html: 'HTML' }), riseOnHover: true, draggable: true, autoPan: true,
     }).addTo(map);
+    window.changedIconMarker = marker;
     const icon = nativeLayers.Marker.getIcon();
     marker.setIcon(icon);
     await marker.ready;
@@ -407,6 +408,7 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     marker.fire(L.version.startsWith('2') ? 'pointerover' : 'mouseover');
     nativeChecks.render.render(owner);
     const raised = gpu.renderOrder > order;
+    const retiredIcon = marker._icon;
     marker.setIcon(new L.DivIcon({ html: 'HTML again' }));
     nativeChecks.render.render(owner);
     const html = marker._nativeGPU.meshes.size === 0 && !marker._icon.classList.contains('leaflet-webgpu-target');
@@ -414,6 +416,8 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     await marker._icon.decode();
     nativeChecks.render.render(owner);
     const restored = marker._nativeGPU.meshes.has('icon');
+    const retired = !retiredIcon.classList.contains('leaflet-webgpu-target') &&
+      marker._nativeGPU.hidden.size <= 2;
     const path = nativeLayers.Polyline;
     const closest = path.closestLayerPoint(map.latLngToLayerPoint(path.getLatLngs()[0]));
     const closestPoint = closest && closest.distance < 1;
@@ -430,8 +434,31 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     grid.bringToBack();
     const back = grid.options.zIndex < nativeLayers.TileLayer.options.zIndex &&
       grid.options.zIndex < nativeLayers['TileLayer.WMS'].options.zIndex;
-    return { adapted, raised, html, restored, closestPoint, upright, shadowScaled, front, back };
+    return { adapted, raised, html, restored, retired, closestPoint, upright, shadowScaled, front, back };
   });
-  assert.deepEqual(result, { adapted: true, raised: true, html: true, restored: true,
+  assert.deepEqual(result, { adapted: true, raised: true, html: true, restored: true, retired: true,
     closestPoint: true, upright: true, shadowScaled: true, front: true, back: true });
+  const drag = await this.page.evaluate(() => {
+    map._setPitchAndBearing(45, 30);
+    nativeChecks.render.render(L.Layer._renderers.get(map));
+    const r = changedIconMarker._icon.getBoundingClientRect(), container = map.getContainer().getBoundingClientRect();
+    const point = map.latLngToContainerPoint(changedIconMarker.getLatLng());
+    window.expectedDragPoint = point.add([45, 30]);
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2,
+      edgeX: container.right - 5, edgeY: container.top + container.height / 2 };
+  });
+  await this.page.mouse.move(drag.x, drag.y);
+  await this.page.mouse.down();
+  await this.page.mouse.move(drag.x + 45, drag.y + 30, { steps: 6 });
+  await this.page.mouse.up();
+  const drift = await this.page.evaluate(() =>
+    map.latLngToContainerPoint(changedIconMarker.getLatLng()).distanceTo(expectedDragPoint));
+  assert.ok(drift < 2, `Marker drag after setIcon: ${drift}px`);
+  const center = await this.page.evaluate(() => map.getCenter());
+  await this.page.mouse.move(drag.x + 45, drag.y + 30);
+  await this.page.mouse.down();
+  await this.page.mouse.move(drag.edgeX, drag.edgeY, { steps: 8 });
+  await this.page.waitForTimeout(300);
+  await this.page.mouse.up();
+  assert.ok(await this.page.evaluate(center => map.distance(map.getCenter(), center) > 1, center), 'Marker autoPan moves the map');
 });

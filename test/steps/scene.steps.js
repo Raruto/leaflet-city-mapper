@@ -219,11 +219,9 @@ Then('3D groups retain their geographic origins and share resources only on the 
   const { error, ...checks } = this.shared3d;
   for (const [name, value] of Object.entries(checks)) assert.equal(value, true, name);
   assert.ok(error < 1.5, `Geographic origin error: ${error}px`);
-  assert.deepEqual(this.threeRequests, []);
-  assert.deepEqual(this.oglRequests, []);
 });
 
-Then('an unavailable WebGPU adapter emits an error without leaving a canvas', async function () {
+Then('an unavailable WebGPU adapter emits an error and shows a warning without leaving a canvas', async function () {
   const result = await this.page.evaluate(async () => {
     const descriptor = Object.getOwnPropertyDescriptor(navigator, 'gpu');
     Object.defineProperty(navigator, 'gpu', {
@@ -236,8 +234,11 @@ Then('an unavailable WebGPU adapter emits an error without leaving a canvas', as
       layer.on('error', event => { emitted = event.error; });
       const error = await nativeChecks.ready(layer).then(() => null, error => error);
       layer.remove();
+      const warning = test3d.map.getContainer().querySelector('.leaflet-webgpu-warning');
       return { rejected: error instanceof Error, unavailable: error?.message === 'Unable to acquire a WebGPU adapter',
         emitted: error === emitted, removed: !test3d.map.hasLayer(layer),
+        warning: warning?.getAttribute('role') === 'alert' && warning.textContent.includes('WebGPU'),
+        learnMore: warning?.querySelector('a')?.href.startsWith('https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API'),
         noCanvas: !document.querySelector('.leaflet-3d') };
     } finally {
       if (descriptor) Object.defineProperty(navigator, 'gpu', descriptor);

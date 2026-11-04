@@ -21,19 +21,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
   const corner = crs.transformation.untransform(new L.Point(coords.x * 256, coords.y * 256), scale);
   const opposite = crs.transformation.untransform(new L.Point((coords.x + 1) * 256, (coords.y + 1) * 256), scale);
   const device = backend.renderer.device;
-  const texture = {
-    device,
-    texture: device.createTexture({
-      size: [tile.image.width, tile.image.height],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    }),
-    sampler: device.createSampler({ addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' }),
-    samplerOptions: { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
-    image: tile.image, format: 'rgba8unorm', srgb: false, flipY: false, uploaded: tile.image,
-  };
-  device.queue.copyExternalImageToTexture({ source: tile.image }, { texture: texture.texture },
-    [tile.image.width, tile.image.height]);
+  const texture = tile.texture;
   if (!backend._rasterProgram || backend._rasterProgram.device !== device) {
     // DEM atlas over the archive's tile grid; invalid or missing samples become -1e9 (the shader's no-data).
     // ponytail: one texture, capped by maxTextureDimension2D (32×32 DEM tiles at 8192 px); split it for larger archives.
@@ -56,6 +44,8 @@ export async function addRasterTile(backend, layer, coords, tile) {
       baseTexture: texture,
       unlit: true,
       terrain: backend._dem,
+      alphaMode: 'BLEND',
+      depthWrite: true,
     });
   }
   let attributes = backend._terrainGrids.get(divisions);
@@ -111,7 +101,11 @@ export async function addRasterTile(backend, layer, coords, tile) {
     opacity: layer.options.opacity ?? 1,
     id: L.Layer._nextId++,
     renderOrder: layer.options.zIndex || 0,
+    fadeDuration: 250,
+    fadeStart: tile.loadedAt,
+    ground: true,
   };
+  tile.mesh.visible = false;
   setParent(mesh, backend.root);
   update(backend);
   backend._rasterTiles.set(tile, mesh);

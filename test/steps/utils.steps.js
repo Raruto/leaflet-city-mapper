@@ -34,9 +34,37 @@ import { routeGeometry } from '../../src/utils/routeGeometry.js';
 import { collider } from '../../src/utils/collider.js';
 import { horizontalRay } from '../../src/utils/horizontalRay.js';
 import { materialShaders } from '../../src/utils/materialShaders.js';
+import { sortMeshes } from '../../src/utils/sortMeshes.js';
 import { projectCelestialBody } from '../../src/utils/projectCelestialBody.js';
+import { roofCoverage } from '../../src/utils/roofCoverage.js';
 
 const checks = {
+  'roof-coverage'() {
+    const backend = {
+      _sceneOrigin: { x: 0, y: 0, lat: 0 },
+      _map: { project: point => Array.isArray(point) ? { x: point[1], y: point[0] } : point,
+        options: { crs: { scale: () => 40075016.68557849 } } },
+    };
+    const mesh = { geometry: { bounds: { min: [50, 0, 50], max: [300, 20, 300] } },
+      worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
+    const layer = { _tileZoom: 1, header: {}, _rasterTiles: new Map() };
+    assert.equal(roofCoverage(mesh, backend, [layer]), false);
+    for (const [x, y] of [[0, 0], [1, 0], [0, 1]]) {
+      layer._rasterTiles.set(`${x}/${y}`, { coords: { x, y, z: 1 }, done: true });
+    }
+    assert.equal(roofCoverage(mesh, backend, [layer]), false);
+    layer._rasterTiles.set('1/1', { coords: { x: 1, y: 1, z: 1 }, done: true });
+    assert.equal(roofCoverage(mesh, backend, [layer]), true);
+    layer._rasterTiles = new Map([['parent', { coords: { x: 0, y: 0, z: 0 }, done: true }]]);
+    assert.equal(roofCoverage(mesh, backend, [layer]), true);
+    layer._rasterTiles.clear();
+    layer.header = { minLon: 400, maxLon: 500, maxLat: 400, minLat: 500 };
+    assert.equal(roofCoverage(mesh, backend, [layer]), true);
+    layer.header = { minLon: 0, maxLon: 100, maxLat: 0, minLat: 100 };
+    layer._rasterTiles.set('error', { coords: { x: 0, y: 0, z: 1 }, error: 'Reported tile error' });
+    assert.equal(roofCoverage(mesh, backend, [layer]), true);
+  },
+
   async 'dev-server'() {
     for (const watch of [false, true]) {
       const server = await startServer(0, { watch });
@@ -238,6 +266,14 @@ const checks = {
     assert.match(textured.vertex, /fn elevation\(\)/);
     assert.match(textured.fragment, /input.localPosition/);
     assert.equal(textured.hasTerrain, true);
+    assert.match(plain.fragment, /appearance\(input.position.xy\)/);
+    const mesh = (id, depth, transparent = false) => ({ id, _sortDepth: depth, program: { transparent } });
+    const far = mesh(1, 0.9), near = mesh(2, 0.1);
+    const glassNear = mesh(3, 0.2, true), glassFar = mesh(4, 0.8, true);
+    const ground = { ...mesh(5, 1, true), ground: true, tile: { coords: { z: 17 } } };
+    const preview = { ...mesh(6, 1, true), ground: true, tile: { coords: { z: 15 } } };
+    assert.deepEqual(sortMeshes([far, glassNear, ground, near, glassFar, preview]).map(mesh => mesh.id),
+      [6, 5, 2, 1, 4, 3]);
   },
 
   sky() {

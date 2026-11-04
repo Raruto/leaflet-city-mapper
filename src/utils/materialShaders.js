@@ -118,6 +118,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
     @group(1) @binding(3) var<storage, read> lightGrid: array<vec4<f32>>;
     ${baseBinding}${metalBinding}${emissiveBinding}${occlusionBinding}${roofBinding}
     struct FragmentInput {
+      @builtin(position) position: vec4<f32>,
       @location(0) color: vec3<f32>,
       @location(1) normal: vec3<f32>,
       @location(2) viewPosition: vec3<f32>,
@@ -161,12 +162,18 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       }
       return light * frame.skyDirection.w;
     }
+    fn appearance(position: vec2<f32>) {
+      // Screen-door dissolve keeps opaque depth writes and avoids sorting whole buildings as glass.
+      let noise = fract(52.9829189 * fract(dot(floor(position), vec2<f32>(0.06711056, 0.00583715))));
+      if (u.highlight.w < 1.0 && noise >= u.highlight.w) { discard; }
+    }
     @fragment fn fragmentMain(input: FragmentInput, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
       ${material.nightLight ? `
         if (input.uv.x <= 2.0) {
         let radial = max(0.0, 1.0 - dot(input.uv, input.uv));
         let alpha = radial * radial * frame.skyDirection.w * 0.65;
         if (alpha < 0.005) { discard; }
+        appearance(input.position.xy);
         return vec4<f32>(input.color, alpha);
         }
       ` : ''}
@@ -227,6 +234,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
         (diffuse + specular) * nl * toLinear(vec3<f32>(1.0, 0.937, 0.835)) * 3.0 + glow;
       ${material.vertexColors ? 'color = base * (ambient + toLinear(vec3<f32>(1.0, 0.937, 0.835)) * (3.0 / PI) * nl) + glow;' : ''}
       color = (color - glow) * frame.atmosphereTint.rgb + base * artificial * (1.0 - metal * 0.5) + glow;
+      appearance(input.position.xy);
       return vec4<f32>(toSRGB(color), ${material.alphaMode === 'BLEND' ? 'alpha' : '1.0'});
       `}
     }

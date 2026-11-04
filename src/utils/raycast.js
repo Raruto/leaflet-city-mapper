@@ -51,9 +51,10 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   const meshes = [];
   for (const object of objects) {
     if (recursive) traverse(object, mesh => {
-      if (mesh.geometry && mesh.visible) meshes.push(mesh);
+      if (!mesh.visible) return true;
+      if (mesh.geometry && mesh._appearance !== 0) meshes.push(mesh);
     });
-    else if (object.geometry && object.visible) meshes.push(object);
+    else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
   }
   return intersectMeshes(backend.raycaster, meshes, backend.renderer.uniformData?.[55]);
 }

@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/removeRasterTile.js"],
-  "sourcesContent": ["import { destroyTexture } from './destroyTexture.js';\nimport { setParent } from './setParent.js';\nimport { update } from './update.js';\n\nexport function removeRasterTile(layer, tile) {\n  layer._terrainRequest?.abort();\n  const mesh = layer._rasterTiles.get(tile);\n  if (!mesh) return;\n  setParent(mesh, null);\n  update(layer);\n  destroyTexture(layer, mesh.texture.texture);\n  layer._rasterTiles.delete(tile);\n}\n"],
-  "mappings": "AAAA,OAAS,kBAAAA,MAAsB,sBAC/B,OAAS,aAAAC,MAAiB,iBAC1B,OAAS,UAAAC,MAAc,cAEhB,SAASC,EAAiBC,EAAOC,EAAM,CAC5CD,EAAM,iBAAiB,MAAM,EAC7B,MAAME,EAAOF,EAAM,aAAa,IAAIC,CAAI,EACnCC,IACLL,EAAUK,EAAM,IAAI,EACpBJ,EAAOE,CAAK,EACZJ,EAAeI,EAAOE,EAAK,QAAQ,OAAO,EAC1CF,EAAM,aAAa,OAAOC,CAAI,EAChC",
+  "sourcesContent": ["import { destroyTexture } from './destroyTexture.js';\nimport { setParent } from './setParent.js';\nimport { update } from './update.js';\n\nexport function removeRasterTile(layer, tile) {\n  layer._terrainRequest?.abort();\n  const mesh = layer._rasterTiles.get(tile);\n  if (!mesh) return;\n  setParent(mesh, null);\n  update(layer);\n  if (mesh.texture !== tile.texture) destroyTexture(layer, mesh.texture.texture);\n  layer._rasterTiles.delete(tile);\n}\n"],
+  "mappings": "AAAA,OAAS,kBAAAA,MAAsB,sBAC/B,OAAS,aAAAC,MAAiB,iBAC1B,OAAS,UAAAC,MAAc,cAEhB,SAASC,EAAiBC,EAAOC,EAAM,CAC5CD,EAAM,iBAAiB,MAAM,EAC7B,MAAME,EAAOF,EAAM,aAAa,IAAIC,CAAI,EACnCC,IACLL,EAAUK,EAAM,IAAI,EACpBJ,EAAOE,CAAK,EACRE,EAAK,UAAYD,EAAK,SAASL,EAAeI,EAAOE,EAAK,QAAQ,OAAO,EAC7EF,EAAM,aAAa,OAAOC,CAAI,EAChC",
   "names": ["destroyTexture", "setParent", "update", "removeRasterTile", "layer", "tile", "mesh"]
 }

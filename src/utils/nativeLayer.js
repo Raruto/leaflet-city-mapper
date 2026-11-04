@@ -23,7 +23,14 @@ export async function nativeLayer(state) {
     viewDirty = true;
     failed = false;
     state.hide();
-    for (const image of [source._icon, source._shadow, source._image]) {
+    const activeImages = [source._icon, source._shadow, source._image];
+    for (const image of images) {
+      if (activeImages.includes(image)) continue;
+      image.removeEventListener('load', refresh);
+      image.removeEventListener('error', imageError);
+      images.delete(image);
+    }
+    for (const image of activeImages) {
       if (!(image instanceof HTMLImageElement) || images.has(image)) continue;
       images.add(image);
       image.addEventListener('load', refresh);

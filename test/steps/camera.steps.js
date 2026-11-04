@@ -42,6 +42,14 @@ Then('pitched zoom, panning and marker focus preserve their screen anchors', { t
         fitError = Math.max(fitError, 40 - p.x, p.x - 580, 30 - p.y, p.y - 350);
       }
     }
+    map._setPitchAndBearing(45, 35);
+    const padding = new L.Point(120, 80), minPadding = padding.divideBy(2), maxPadding = map.getSize().subtract(minPadding);
+    const footprint = new L.Bounds([
+      minPadding, new L.Point(maxPadding.x, minPadding.y), new L.Point(minPadding.x, maxPadding.y), maxPadding,
+    ].map(point => map.containerPointToLayerPoint(point))).getSize();
+    const extent = map.project(bounds.getSouthEast()).subtract(map.project(bounds.getNorthWest()));
+    const insideZoom = Math.ceil(map.getScaleZoom(Math.max(footprint.x / extent.x, footprint.y / extent.y)));
+    const paddedInside = map.getBoundsZoom(bounds, true, padding) === insideZoom;
     map.setMaxBounds(bounds);
     map.setView(bounds.getNorthEast(), 17, { animate: false });
     map._setPitchAndBearing(65, 75);
@@ -51,11 +59,12 @@ Then('pitched zoom, panning and marker focus preserve their screen anchors', { t
     const nw = map.project(visible.getNorthWest()), se = map.project(visible.getSouthEast());
     const boundsError = Math.max(0, min.x - nw.x, min.y - nw.y, se.x - max.x, se.y - max.y);
     map.remove();
-    return { zoomError, panError, focusInside, boundsError, fitError };
+    return { zoomError, panError, focusInside, boundsError, fitError, paddedInside };
   });
   assert.ok(result.zoomError < 2, `Zoom anchor drift: ${result.zoomError}px`);
   assert.ok(result.panError < 2, `Screen pan drift: ${result.panError}px`);
   assert.equal(result.focusInside, true, 'Focused marker stays in the padded viewport');
+  assert.equal(result.paddedInside, true, 'Inside bounds zoom accounts for padding');
   assert.ok(result.fitError < 2, `fitBounds padding overflow: ${result.fitError}px`);
   // Leaflet ignores one-pixel bounds corrections and rounds pan offsets.
   assert.ok(result.boundsError < 2, `Maximum bounds overflow: ${result.boundsError}px`);
@@ -234,7 +243,7 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
   const result = await this.page.evaluate(async () => {
     const map = cameraMap, element = map.getContainer(), deviceEvent = window.DeviceOrientationEvent;
     const orientation = Object.getOwnPropertyDescriptor(screen.orientation, 'angle');
-    let relative, webkit, denied;
+    let relative, webkit, denied, failed;
     try {
       Object.defineProperty(screen.orientation, 'angle', { configurable: true, value: 90 });
       window.DeviceOrientationEvent = { requestPermission: async () => 'granted' };
@@ -254,6 +263,10 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
       const error = new Promise(resolve => map.once('error', event => resolve(event.error.message)));
       map.compassBearing.enable();
       denied = (await error).includes('denied') && !map.compassBearing.enabled();
+      window.DeviceOrientationEvent.requestPermission = () => { throw new Error('Permission unavailable'); };
+      const thrown = new Promise(resolve => map.once('error', event => resolve(event.error.message)));
+      map.compassBearing.enable();
+      failed = (await thrown).includes('unavailable') && !map.compassBearing.enabled();
     } finally {
       window.DeviceOrientationEvent = deviceEvent;
       if (orientation) Object.defineProperty(screen.orientation, 'angle', orientation);
@@ -271,7 +284,17 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
     element.dispatchEvent(event);
     map.remove();
     const cleaned = !map.dragging.enabled() && !map.touchZoom.enabled() && map.options.zoomSnap === 1;
-    return { relative, webkit, denied, resized, cleaned };
+    return { relative, webkit, denied, failed, resized, cleaned };
   });
-  assert.deepEqual(result, { relative: 30, webkit: 255, denied: true, resized: true, cleaned: true });
+  assert.deepEqual(result, { relative: 30, webkit: 255, denied: true, failed: true, resized: true, cleaned: true });
+  await createMap(this.page, { rotate: false, trackContainerMutation: true });
+  const resizeOnly = await this.page.evaluate(async () => {
+    cameraMap.getContainer().style.width = '680px';
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    const resized = cameraMap.getSize().x === 680 && !cameraMap.rotateControl;
+    cameraMap.remove();
+    return resized;
+  });
+  assert.equal(resizeOnly, true, 'Container resizing remains available without rotation');
 });

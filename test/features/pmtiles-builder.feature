@@ -5,7 +5,15 @@ Feature: Offline PMTiles archive builder
     Given two trees on either side of a zoom 16 tile boundary
     When the trees are indexed into zoom 16 tiles
     Then each tree is in exactly one tile with its id and properties
-    And indexing fails for invalid GeoJSON, invalid coordinates and points outside the archive
+    And indexing fails for invalid GeoJSON and invalid coordinates
+    And points outside the archive are excluded while boundary points are kept
+
+  Scenario: Every archive follows the buildings extent
+    Then all archives and building queries use the same default or custom bbox
+
+  Scenario: Archives run in parallel with a bounded job count
+    Then archive builds respect the job limit and reject invalid selections before starting
+    And a failed archive stops new jobs and waits for running builds
 
   Scenario: Streetlight tiles keep colocated lamps and their photometric records
     Given two streetlights at the same position

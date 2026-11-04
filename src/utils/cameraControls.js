@@ -155,7 +155,7 @@ const Compass = L.Handler.extend({
       if (Number.isFinite(bearing)) this._map.setBearing(bearing - orientation);
     };
     const permission = window.DeviceOrientationEvent?.requestPermission;
-    Promise.resolve(permission ? permission.call(window.DeviceOrientationEvent) : 'granted').then(result => {
+    new Promise(resolve => resolve(permission ? permission.call(window.DeviceOrientationEvent) : 'granted')).then(result => {
       if (!this.enabled() || this._generation !== generation) return;
       if (!window.DeviceOrientationEvent || result !== 'granted') throw new Error('Device compass permission unavailable or denied');
       window.addEventListener('deviceorientation', this._orientation);
@@ -181,10 +181,11 @@ const ContainerResize = L.Handler.extend({
 });
 
 export function cameraControls(map) {
+  map.addHandler('trackContainerMutation', ContainerResize);
+  if (!map.options.rotate) return;
   map.addHandler('shiftKeyRotate', ShiftRotate);
   map.addHandler('pitchDrag', PitchDrag);
   map.addHandler('compassBearing', Compass);
-  map.addHandler('trackContainerMutation', ContainerResize);
   // Two optional touch modes share one pinch/pan recognizer with Leaflet's zoom setting.
   const TouchMode = L.Handler.extend({
     addHooks() { map.fire('cameratouchchange'); },

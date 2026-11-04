@@ -1,8 +1,55 @@
 import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
-import { prepare3DChecks } from '../support/3d.js';
+import { prepare3DChecks } from './3d.steps.js';
 
-Then('cancelled building downloads recover without errors or stale meshes', async function () {
+Then('source layers share load slots and start nearby blocks before distant ones', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    map.setPitch(80);
+    const layers = Array.from({ length: 3 }, () => new L.Layer({ source: { type: '3d' } }).addTo(map));
+    const ground = new L.Layer({ source: { type: 'pmtiles', url: 'priority-ground.pmtiles', archive: {
+      getHeader: async () => ({ minZoom: 16, maxZoom: 16, minLat: -80, maxLat: -79, minLon: -170, maxLon: -169 }),
+      getZxy: async () => { throw new Error('Out-of-view ground should not be requested'); },
+    } } }).addTo(map);
+    await Promise.all(layers.map(layer => nativeChecks.ready(layer)));
+    await ground.ready;
+    await ground._added.promise;
+    const zoom = 16, center = map.project(map.getCenter(), zoom).divideBy(256).floor();
+    const started = [], releases = [];
+    let active = 0, maximum = 0;
+    for (const [index, layer] of layers.entries()) {
+      layer.url = `priority-${index}.pmtiles`;
+      layer.options.archive = { getZxy: async (z, x, y) => {
+        started.push(x - center.x);
+        active++;
+        maximum = Math.max(maximum, active);
+        await new Promise(resolve => releases.push(resolve));
+        active--;
+        return { data: new TextEncoder().encode('{"type":"FeatureCollection","features":[]}') };
+      } };
+      for (const offset of [100, 50, 0, 1]) {
+        layer._areas.set(`${offset}`, { coords: { z: zoom, x: center.x + offset, y: center.y },
+          request: new AbortController() });
+      }
+    }
+    nativeChecks.sources.pump(layers[0]);
+    while (started.length < 4) await new Promise(requestAnimationFrame);
+    const near = started.every(offset => offset < 2);
+    // Cancel a layer while its slots are occupied; the remaining queue must still advance.
+    layers[0].remove();
+    while (layers.some(layer => layer._inflight)) {
+      for (const release of releases.splice(0)) release();
+      await new Promise(requestAnimationFrame);
+    }
+    const recovered = layers.slice(1).every(layer => [...layer._areas.values()].every(area => area.done));
+    for (const layer of layers.slice(1)) layer.remove();
+    ground.remove();
+    return { near, bounded: maximum === 4, recovered };
+  });
+  assert.deepEqual(result, { near: true, bounded: true, recovered: true });
+});
+
+Then('cancelled building downloads recover without errors or stale meshes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const layer = new L.Layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
@@ -37,6 +84,7 @@ Then('cancelled building downloads recover without errors or stale meshes', asyn
     };
     const home = map.getCenter();
     map.setView([48.85657, 2.39], 17, { animate: false });
+    while (active < 2) await new Promise(requestAnimationFrame);
     const pending = [...layer._areas.values()].filter(area => area.started && !area.done);
     const started = active;
     hold = false;
@@ -46,6 +94,7 @@ Then('cancelled building downloads recover without errors or stale meshes', asyn
     const noStale = pending.every(area => area.request.signal.aborted && !area.mesh && !area.done);
     hold = true;
     map.setView([48.85657, 2.39], 17, { animate: false });
+    while (active < 2) await new Promise(requestAnimationFrame);
     const beforeRemoval = requests.length;
     layer.remove();
     await idle();
@@ -134,6 +183,7 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
     ] };
     const data = invalid === 'collection' ? { type: 'Feature', properties: {} }
       : { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry }] };
+    layer.url = 'invalid-fixture.pmtiles';
     layer.options.archive ||= {};
     layer.options.archive.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(data)) });
     const point = test3d.map.project(anchor, 16).divideBy(256).floor();
@@ -218,6 +268,10 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
   await this.page.setViewportSize({ width: 800, height: 600 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
+  await this.page.evaluate(() => {
+    const terrain = layers._layers.find(entry => entry.layer._type === 'terrain').layer;
+    terrain.remove();
+  });
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => layer.ready)));
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
     !(layer._3d) || (layer.root && (!layer.modelUrl || layer.model) &&

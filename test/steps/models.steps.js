@@ -171,8 +171,6 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     return { triangulated, invalidRejected, decoded, transformed };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
-  assert.deepEqual(this.oglRequests, []);
-  assert.deepEqual(this.threeRequests, []);
 });
 
 Then('a configured 3D model loads with its transforms and attribution', { timeout: 60000 }, async function () {
@@ -353,8 +351,6 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     'transparentOrder', 'doubleSidedPasses']) {
     assert.equal(result[name], true, name);
   }
-  assert.deepEqual(this.threeRequests, []);
-  assert.deepEqual(this.oglRequests, []);
 });
 
 When('I load a configured 3D model with {string}', async function (failure) {

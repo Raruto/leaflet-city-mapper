@@ -44,7 +44,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   data[base + 19] = 1;
   data[base + 20] = uniforms.metallic.value;
   data[base + 21] = uniforms.roughness.value;
-  data[base + 22] = uniforms.opacity.value;
+  data[base + 22] = uniforms.opacity.value * (mesh.ground ? mesh._appearance ?? 1 : 1);
   data[base + 23] = uniforms.alphaCutoff.value;
   data.set(uniforms.emissive.value, base + 24);
   data[base + 27] = uniforms.occlusionStrength.value;
@@ -55,7 +55,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   data[base + 32] = mesh.highlight?.[0] ?? 0;
   data[base + 33] = mesh.highlight?.[1] ?? 0;
   data[base + 34] = program.nightSparkle ? data[55] : 0;
-  data[base + 35] = 0;
+  data[base + 35] = mesh.ground ? 1 : mesh._appearance ?? 1;
 
   const textures = mesh._textures ||= [];
   textures.length = 0;

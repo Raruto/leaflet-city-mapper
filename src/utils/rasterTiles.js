@@ -38,17 +38,40 @@ export function updateRasterTiles(backend) {
     }
   }
   backend._wantedRasterTiles = new Set(wanted.keys());
-  for (const [key, tile] of backend._rasterTiles) {
-    if (!wanted.has(key) && !tile.done) releaseRasterTile(backend, tile);
+  const coverage = new Map();
+  const parentZoom = Math.max(backend.header.minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
+  if (parentZoom < zoom) {
+    for (const [key, coords] of wanted) {
+      if (backend._rasterTiles.get(key)?.done) continue;
+      const parent = { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
+      coverage.set(`${parent.z}/${parent.x}/${parent.y}`, parent);
+    }
   }
-  for (const [key, coords] of [...wanted].sort((a, b) =>
-    Math.hypot(a[1].x - center.x, a[1].y - center.y) - Math.hypot(b[1].x - center.x, b[1].y - center.y))) {
+  const required = new Map([...coverage, ...wanted]);
+  for (const [key, tile] of backend._rasterTiles) {
+    if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
+  }
+  for (const [key, coords] of required) {
     if (backend._rasterTiles.has(key)) continue;
     const tile = { coords, request: new AbortController(), done: false };
     backend._rasterTiles.set(key, tile);
+  }
+  pumpRasterTiles(backend);
+  pruneRasterTiles(backend);
+}
+
+function pumpRasterTiles(backend) {
+  const map = backend._map;
+  if (!map) return;
+  const center = map.project(map.getCenter(), 0).divideBy(TILE_SIZE);
+  const pending = [...backend._rasterTiles.values()].filter(tile => !tile.started && !tile.request.signal.aborted);
+  const distance = ({ coords }) => Math.hypot((coords.x + 0.5) / 2 ** coords.z - center.x,
+    (coords.y + 0.5) / 2 ** coords.z - center.y);
+  pending.sort((a, b) => a.coords.z - b.coords.z || distance(a) - distance(b));
+  for (const tile of pending) {
+    if (backend._loadingTiles >= 4) break;
     loadRasterTile(backend, tile);
   }
-  pruneRasterTiles(backend);
 }
 
 export function releaseRasterTiles(backend) {
@@ -67,7 +90,10 @@ export function setRasterTerrain(backend, terrain) {
   if (backend._terrain3D === terrain) return;
   for (const tile of backend._rasterTiles.values()) {
     if(backend._terrain3D) removeRasterTile(backend._terrain3D, tile);
-    if (tile.mesh) setParent(tile.mesh, terrain ? null : backend.root);
+    if (tile.mesh) {
+      tile.mesh.visible = true;
+      setParent(tile.mesh, backend.root);
+    }
   }
   backend._terrain3D = terrain || null;
   if (terrain) {
@@ -108,11 +134,12 @@ export function getRasterTileSize() {
 }
 
 function loadRasterTile(backend, tile) {
+  tile.started = true;
   const first = backend._loadingTiles === 0;
   backend._loadingTiles++;
   backend.fire('tileloadstart', { tile, coords: tile.coords });
   if (first) backend.fire('loading');
-  Promise.resolve(backend.ready).then(() => backend.options.archive.getZxy(
+  return Promise.resolve(backend.ready).then(() => backend.options.archive.getZxy(
     tile.coords.z, tile.coords.x, tile.coords.y, tile.request.signal
   )).then(async result => {
     if (tile.request.signal.aborted) return;
@@ -128,18 +155,22 @@ function loadRasterTile(backend, tile) {
       return;
     }
     createRasterMesh(backend, tile);
+    tile.loadedAt = performance.now();
     tile.done = true;
+    backend._rasterVersion = (backend._rasterVersion || 0) + 1;
     registerTerrainTile(backend, tile.coords, tile);
     backend.fire('tileload', { tile, coords: tile.coords });
     update(backend);
   }).catch(error => {
     if (tile.request.signal.aborted) return;
     tile.error = error.message;
+    backend._rasterVersion = (backend._rasterVersion || 0) + 1;
     backend.fire('tileerror', { tile, coords: tile.coords, error });
     backend.fire('error', { error, coords: tile.coords });
   }).finally(() => {
     backend._loadingTiles--;
     if (backend._map) {
+      pumpRasterTiles(backend);
       pruneRasterTiles(backend);
       if (!backend._loadingTiles) backend.fire('load');
       update(backend);
@@ -156,7 +187,8 @@ function createRasterMesh(backend, tile) {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     }),
-    sampler: device.createSampler({ addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' }),
+    sampler: device.createSampler({ addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
+      magFilter: 'linear', minFilter: 'linear' }),
     image: tile.image, format: 'rgba8unorm', srgb: false, uploaded: null,
   };
   if (!backend._rasterProgram) {
@@ -183,9 +215,9 @@ function createRasterMesh(backend, tile) {
     children: [], visible: true, device, geometry: backend._rasterGeometry,
     program: backend._rasterProgram, texture,
     opacity: backend.options.opacity, id: L.Layer._nextId++,
-    renderOrder: backend.options.zIndex || 0, tile,
+    renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
   };
-  if (!backend._terrain3D) setParent(tile.mesh, backend.root);
+  setParent(tile.mesh, backend.root);
 }
 
 function createGeometry(device) {
@@ -212,6 +244,7 @@ function releaseRasterTile(backend, tile) {
   const key = `${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`;
   if (backend._rasterTiles.get(key) !== tile) return;
   backend._rasterTiles.delete(key);
+  backend._rasterVersion = (backend._rasterVersion || 0) + 1;
   tile.request.abort();
   if(backend._terrain3D) removeRasterTile(backend._terrain3D, tile);
   if (tile.mesh) setParent(tile.mesh, null);
@@ -221,13 +254,32 @@ function releaseRasterTile(backend, tile) {
   update(backend);
 }
 
-function pruneRasterTiles(backend) {
+export function pruneRasterTiles(backend) {
   const wanted = backend._wantedRasterTiles;
-  if ([...wanted].some(key => {
+  const now = performance.now();
+  if (backend._pruneVersion === backend._rasterVersion && backend._pruneWanted === wanted &&
+    now < backend._pruneAfter) return Number.isFinite(backend._pruneAfter);
+  backend._pruneVersion = backend._rasterVersion;
+  backend._pruneWanted = wanted;
+  backend._pruneAfter = Infinity;
+  const pending = [...wanted].filter(key => {
     const tile = backend._rasterTiles.get(key);
-    return !tile || (!tile.done && !tile.error);
-  })) return;
+    if (tile?.done && now - tile.loadedAt < 250) {
+      backend._pruneAfter = Math.min(backend._pruneAfter, tile.loadedAt + 250);
+    }
+    return !tile?.done || now - tile.loadedAt < 250;
+  }).map(key => {
+    const [z, x, y] = key.split('/').map(Number);
+    return { z, x, y };
+  });
   for (const [key, tile] of backend._rasterTiles) {
-    if (!wanted.has(key)) releaseRasterTile(backend, tile);
+    if (wanted.has(key)) continue;
+    const overlaps = pending.some(coords => {
+      const zoom = Math.min(coords.z, tile.coords.z);
+      return Math.floor(coords.x / 2 ** (coords.z - zoom)) === Math.floor(tile.coords.x / 2 ** (tile.coords.z - zoom)) &&
+        Math.floor(coords.y / 2 ** (coords.z - zoom)) === Math.floor(tile.coords.y / 2 ** (tile.coords.z - zoom));
+    });
+    if (!overlaps) releaseRasterTile(backend, tile);
   }
+  return Number.isFinite(backend._pruneAfter);
 }

@@ -11,7 +11,6 @@ Feature: Separate plugin integration
     Given the city mapper plugin is loaded after Leaflet alone
     Then an unknown source rejects readiness and subsequent sources still initialize
 
-  @offline
   Scenario: The city example references existing local assets
     Given the city mapper plugin is loaded after Leaflet alone
     Then every local source in the city example is available

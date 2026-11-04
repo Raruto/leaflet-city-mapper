@@ -1,5 +1,5 @@
 // Builds the offline PMTiles archives used by examples/leaflet-city-mapper.html.
-// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,orthophotos,plan-ign,terrain]
+// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,orthophotos,plan-ign,terrain] [--jobs=3]
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
@@ -9,19 +9,24 @@ import { gzipSync, inflateSync } from 'node:zlib';
 
 const { values: args } = parseArgs({
   options: {
-    bbox: { type: 'string', default: '2.26,48.83,2.35,48.89' },
+    bbox: { type: 'string', default: '2.26,48.835,2.38,48.885' },
     minzoom: { type: 'string', default: '11' },
     maxzoom: { type: 'string', default: '17' },
     only: { type: 'string', default: 'buildings,trees,streetlights,orthophotos,plan-ign,terrain' },
+    jobs: { type: 'string', default: '3' },
   },
 });
-const rasterBbox = args.bbox.split(',').map(Number);
+const buildingsBbox = args.bbox.split(',').map(value => value.trim() ? Number(value) : NaN);
 const minZoom = Number(args.minzoom);
 const maxZoom = Number(args.maxzoom);
-if (rasterBbox.length !== 4 || rasterBbox.some(Number.isNaN) || !(minZoom >= 0 && minZoom <= maxZoom && maxZoom <= 19)) {
+const jobs = Number(args.jobs);
+if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('Invalid --jobs: expected a positive integer');
+if (buildingsBbox.length !== 4 || !buildingsBbox.every(Number.isFinite) ||
+  !(buildingsBbox[0] >= -180 && buildingsBbox[0] < buildingsBbox[2] && buildingsBbox[2] <= 180 &&
+    buildingsBbox[1] >= -85.0511287798066 && buildingsBbox[1] < buildingsBbox[3] && buildingsBbox[3] <= 85.0511287798066) ||
+  !Number.isInteger(minZoom) || !Number.isInteger(maxZoom) || !(minZoom >= 0 && minZoom <= maxZoom && maxZoom <= 19)) {
   throw new Error('Invalid --bbox, --minzoom, or --maxzoom');
 }
-const parisBbox = [2.2424, 48.8162, 2.416, 48.9022];
 const outDir = new URL('../examples/data/', import.meta.url);
 const ignUrl = (layer, format) => (z, x, y) => `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer}&STYLE=normal&FORMAT=${format}&TILEMATRIXSET=PM_0_19&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}`;
 const ignAttribution = 'IGN — Licence Ouverte Etalab 2.0';
@@ -34,7 +39,7 @@ const archives = {
   streetlights: {
     tileType: 0,
     tileCompression: 2,
-    bbox: [2.20, 48.74, 2.48, 48.92],
+    bbox: buildingsBbox,
     minZoom: 16,
     maxZoom: 16,
     concurrency: 2,
@@ -60,7 +65,7 @@ const archives = {
   trees: {
     tileType: 0,
     tileCompression: 2,
-    bbox: [2.20, 48.74, 2.48, 48.92],
+    bbox: buildingsBbox,
     minZoom: 16,
     maxZoom: 16,
     concurrency: 2,
@@ -80,7 +85,7 @@ const archives = {
   buildings: {
     tileType: 0, // GeoJSON FeatureCollection per zoom 16 tile, same payload as the online API
     tileCompression: 2,
-    bbox: parisBbox,
+    bbox: buildingsBbox,
     minZoom: 16,
     maxZoom: 16,
     concurrency: 2,
@@ -102,7 +107,7 @@ const archives = {
   orthophotos: {
     tileType: 3,
     tileCompression: 1,
-    bbox: rasterBbox,
+    bbox: buildingsBbox,
     minZoom,
     maxZoom,
     concurrency: 4,
@@ -112,7 +117,7 @@ const archives = {
   'plan-ign': {
     tileType: 2,
     tileCompression: 1,
-    bbox: rasterBbox,
+    bbox: buildingsBbox,
     minZoom,
     maxZoom,
     concurrency: 4,
@@ -122,7 +127,7 @@ const archives = {
   terrain: {
     tileType: 0,
     tileCompression: 2,
-    bbox: parisBbox,
+    bbox: buildingsBbox,
     minZoom: terrainZoom,
     maxZoom: terrainZoom,
     concurrency: 2,
@@ -140,9 +145,7 @@ function indexPointTiles(data, z, [west, south, east, north], idProperty = 'idba
     if (feature.geometry?.type !== 'Point' || !Number.isFinite(lng) || !Number.isFinite(lat)) {
       throw new Error(`Invalid ${label} coordinates`);
     }
-    if (lng < west || lng > east || lat < south || lat > north) {
-      throw new Error(`${label} outside archive bounds; update archive bbox`);
-    }
+    if (lng < west || lng > east || lat < south || lat > north) continue;
     feature.id = feature.properties[idProperty];
     const key = `${lngToX(lng, z)}/${latToY(lat, z)}`;
     if (!tiles.has(key)) tiles.set(key, []);
@@ -160,15 +163,15 @@ function latToY(lat, z) {
   return Math.min(2 ** z - 1, Math.floor((1 - Math.asinh(Math.tan(rad)) / Math.PI) / 2 * 2 ** z));
 }
 
-// Same clipping as the example: tile bounds clamped to the Paris dataset extent.
+// Building queries are limited to the shared archive bbox.
 function tileBounds(z, x, y) {
   const lng = x => x / 2 ** z * 360 - 180;
   const lat = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
   return [
-    Math.max(lng(x), parisBbox[0]),
-    Math.max(lat(y + 1), parisBbox[1]),
-    Math.min(lng(x + 1), parisBbox[2]),
-    Math.min(lat(y), parisBbox[3]),
+    Math.max(lng(x), buildingsBbox[0]),
+    Math.max(lat(y + 1), buildingsBbox[1]),
+    Math.min(lng(x + 1), buildingsBbox[2]),
+    Math.min(lat(y), buildingsBbox[3]),
   ];
 }
 
@@ -444,8 +447,25 @@ async function build(name, archive) {
   console.log(`${name}: wrote ${entries.length} tiles to ${fileURLToPath(file)}`);
 }
 
-await mkdir(outDir, { recursive: true });
-for (const name of args.only.split(',')) {
-  if (!archives[name]) throw new Error(`Unknown archive "${name}"`);
-  await build(name, archives[name]);
+async function buildArchives(names) {
+  names = [...new Set(names)];
+  for (const name of names) {
+    if (!Object.hasOwn(archives, name)) throw new Error(`Unknown archive "${name}"`);
+  }
+  let next = 0;
+  const errors = [];
+  await Promise.all(Array.from({ length: Math.min(jobs, names.length) }, async () => {
+    while (next < names.length && !errors.length) {
+      const name = names[next++];
+      try {
+        await build(name, archives[name]);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }));
+  if (errors.length) throw new AggregateError(errors, 'Archive build failed; no further archives started');
 }
+
+await mkdir(outDir, { recursive: true });
+await buildArchives(args.only.split(','));

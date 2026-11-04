@@ -1,4 +1,4 @@
-@3d-layer
+@coverage
 Feature: Standalone GeoJSON sources
   Scenario Outline: GeoJSON uses the shared extrusion pipeline
     Given the city mapper plugin is loaded after Leaflet alone

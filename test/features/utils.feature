@@ -16,8 +16,9 @@ Feature: Standalone 3D utilities
       | shaders  |
       | sky      |
       | dev-server |
+      | roof-coverage |
 
-  @3d-layer
+  @coverage
   Scenario: Browser math utilities preserve transforms, camera projection and ray intersections
-    Given a map with the standalone 3D module and no dependency import map
+    Given a leaflet map
     Then standalone browser math preserves scene transforms and picking

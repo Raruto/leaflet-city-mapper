@@ -12,18 +12,34 @@ import { setParent } from './setParent.js';
 import { update } from './update.js';
 import { getElevation } from "./getElevation.js";
 
-/** Start at most two load/build tasks; cancelled tasks still free their slot in finally. */
+/** Share four load/build slots across source layers, nearest ground blocks first. */
 
-export function pump(backend) {
+export function pump(backend, map = backend._map) {
   // Meshes need the shared renderer; _attach() re-runs _updateArea() once it exists.
-  if (!backend._map || !backend._shared) return;
-  for (const area of backend._areas.values()) {
-    if (backend._inflight >= 2) break;
-    if (area.started) continue;
+  const shared = map && L.Layer._renderers.get(map);
+  if (!shared) return;
+  const layers = [...shared._layers].filter(layer =>
+    Number.isFinite(layer._inflight) && layer._areas && (layer.url || layer._geojson));
+  const pending = layers.flatMap(layer => [...layer._areas.values()]
+    .filter(area => !area.started && !area.request.signal.aborted)
+    .map(area => {
+      const center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
+      return { layer, area, distance: center
+        ? Math.hypot(area.coords.x + 0.5 - center.x, area.coords.y + 0.5 - center.y) / 2 ** area.coords.z : 0 };
+    })).sort((a, b) => a.distance - b.distance);
+  let inflight = layers.reduce((sum, layer) => sum + layer._inflight, 0);
+  for (const { layer: backend, area } of pending) {
+    if (inflight >= 4) break;
+    if (backend._inflight >= 2) continue;
     area.started = true;
     backend._inflight++;
+    inflight++;
     (async () => {
       try {
+        // Let ground requests start first, and avoid rebuilding flat geometry when the DEM arrives.
+        await new Promise(requestAnimationFrame);
+        await map._terrain3D?._terrainPromise;
+        if (area.request.signal.aborted) return;
         const coords = area.coords;
         const data = await loadSource(backend, area);
         if (area.request.signal.aborted) return;
@@ -37,7 +53,6 @@ export function pump(backend) {
         const positions = [], normals = [], colors = [], uvs = [], featureFaces = [], lights = [];
         const supports = new Set();
         let skipped = 0;
-        const map = backend._map;
         const crs = map.options.crs;
         const origin = crs.project(backend.location);
         const metres = Math.cos(backend.location.lat * Math.PI / 180);
@@ -57,13 +72,13 @@ export function pump(backend) {
           colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
           if (backend.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
         };
-        let deadline = performance.now() + 8;
+        let deadline = performance.now() + 4;
         for (const feature of features) {
           if (area.request.signal.aborted) return;
           if (performance.now() >= deadline) {
             await new Promise(requestAnimationFrame);
             if (area.request.signal.aborted) return;
-            deadline = performance.now() + 8;
+            deadline = performance.now() + 4;
           }
           const geometry = feature?.geometry;
           const isTree = geometry?.type === 'Point';
@@ -188,6 +203,7 @@ export function pump(backend) {
             }),
             id: L.Layer._nextId++,
             renderOrder: 0,
+            fadeDuration: 250,
             extras: { featureFaces, lights },
           },
           buildings: featureFaces.length,
@@ -203,8 +219,8 @@ export function pump(backend) {
       }
     })().finally(() => {
       backend._inflight--;
-      pump(backend);
+      pump(backend, map);
     });
   }
-  updateStatus(backend);
+  for (const layer of layers) updateStatus(layer);
 }

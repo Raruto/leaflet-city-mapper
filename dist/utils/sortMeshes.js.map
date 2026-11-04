@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/sortMeshes.js"],
-  "sourcesContent": ["\nexport function sortMeshes(meshes) {\n  return meshes.sort((a, b) => Number(a.program.transparent) - Number(b.program.transparent) ||\n    (a.program.transparent\n      ? (a.renderOrder || 0) - (b.renderOrder || 0) ||\n      b._sortDepth - a._sortDepth || a.id - b.id\n      : a.id - b.id)\n  );\n}\n"],
-  "mappings": "AACO,SAASA,EAAWC,EAAQ,CACjC,OAAOA,EAAO,KAAK,CAACC,EAAGC,IAAM,OAAOD,EAAE,QAAQ,WAAW,EAAI,OAAOC,EAAE,QAAQ,WAAW,GACtFD,EAAE,QAAQ,eACNA,EAAE,aAAe,IAAMC,EAAE,aAAe,IAC3CA,EAAE,WAAaD,EAAE,aAAcA,EAAE,GAAKC,EAAE,EAE5C,CACF",
+  "sourcesContent": ["\nexport function sortMeshes(meshes) {\n  return meshes.sort((a, b) => Number(Boolean(b.ground)) - Number(Boolean(a.ground)) ||\n    (a.ground && b.ground ? (a.renderOrder || 0) - (b.renderOrder || 0) ||\n      a.tile.coords.z - b.tile.coords.z : 0) ||\n    Number(a.program.transparent) - Number(b.program.transparent) ||\n    (a.program.transparent\n      ? (a.renderOrder || 0) - (b.renderOrder || 0) ||\n      b._sortDepth - a._sortDepth || a.id - b.id\n      : (a._sortDepth ?? 0) - (b._sortDepth ?? 0) || a.id - b.id)\n  );\n}\n"],
+  "mappings": "AACO,SAASA,EAAWC,EAAQ,CACjC,OAAOA,EAAO,KAAK,CAACC,EAAGC,IAAM,CAAO,EAAQA,EAAE,OAAW,CAAO,EAAQD,EAAE,SACvEA,EAAE,QAAUC,EAAE,QAAUD,EAAE,aAAe,IAAMC,EAAE,aAAe,IAC/DD,EAAE,KAAK,OAAO,EAAIC,EAAE,KAAK,OAAO,EAAI,IACtC,OAAOD,EAAE,QAAQ,WAAW,EAAI,OAAOC,EAAE,QAAQ,WAAW,IAC3DD,EAAE,QAAQ,aACNA,EAAE,aAAe,IAAMC,EAAE,aAAe,IAC3CA,EAAE,WAAaD,EAAE,YAAcA,EAAE,GAAKC,EAAE,IACrCD,EAAE,YAAc,IAAMC,EAAE,YAAc,IAAMD,EAAE,GAAKC,EAAE,GAC5D,CACF",
   "names": ["sortMeshes", "meshes", "a", "b"]
 }

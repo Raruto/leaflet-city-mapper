@@ -68,7 +68,7 @@ export function createProgram(backend, material = {}) {
     pipelineCache: new Map(),
     cullMode: material.doubleSided ? 'none' : 'back',
     transparent: material.alphaMode === 'BLEND',
-    depthWrite: material.alphaMode !== 'BLEND',
+    depthWrite: material.depthWrite ?? material.alphaMode !== 'BLEND',
     depthTest: material.depthTest !== false,
     terrain: material.terrain,
     nightLight: Boolean(material.nightLight),

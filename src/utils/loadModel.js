@@ -47,6 +47,7 @@ export async function loadModel(backend) {
     // Preserve straight alpha and raw samples; GPU sRGB formats do color decoding.
     return createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
   }));
+  await backend._map?._terrain3D?._terrainPromise;
   const textures = new Map();
   const textureFor = (reference, color = false) => {
     if (!reference) return null;
@@ -167,6 +168,7 @@ export async function loadModel(backend) {
             device,
             geometry,
             program,
+            fadeDuration: 250,
             id: L.Layer._nextId++,
             renderOrder: 0
           };

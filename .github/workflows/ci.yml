@@ -19,4 +19,4 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: sudo apt-get install -y mesa-vulkan-drivers
-      - run: npm run build && node build/test.js
+      - run: npm test

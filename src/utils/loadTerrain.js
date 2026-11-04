@@ -27,6 +27,9 @@ export async function loadTerrain(backend) {
     for (let x = northwest.x; x <= southeast.x; x++) {
       for (let y = northwest.y; y <= southeast.y; y++) tiles.push({ z: backend._terrainZoom, x, y });
     }
+    const center = map.project(map.getCenter(), backend._terrainZoom).divideBy(256);
+    tiles.sort((a, b) => Math.hypot(a.x + 0.5 - center.x, a.y + 0.5 - center.y) -
+      Math.hypot(b.x + 0.5 - center.x, b.y + 0.5 - center.y));
     let next = 0;
     await Promise.all(Array.from({ length: Math.min(4, tiles.length) }, async () => {
       while (next < tiles.length) {

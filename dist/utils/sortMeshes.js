@@ -1,2 +1,2 @@
-function n(t){return t.sort((r,e)=>Number(r.program.transparent)-Number(e.program.transparent)||r.program.transparent&&((r.renderOrder||0)-(e.renderOrder||0)||e._sortDepth-r._sortDepth)||r.id-e.id)}export{n as sortMeshes};
+function t(o){return o.sort((r,e)=>+!!e.ground-+!!r.ground||(r.ground&&e.ground?(r.renderOrder||0)-(e.renderOrder||0)||r.tile.coords.z-e.tile.coords.z:0)||Number(r.program.transparent)-Number(e.program.transparent)||(r.program.transparent?(r.renderOrder||0)-(e.renderOrder||0)||e._sortDepth-r._sortDepth||r.id-e.id:(r._sortDepth??0)-(e._sortDepth??0)||r.id-e.id))}export{t as sortMeshes};
 //# sourceMappingURL=sortMeshes.js.map

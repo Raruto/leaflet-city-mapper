@@ -1,6 +1,50 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
+Then('shadow maps are reused until geometry, appearance or sunlight changes', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map, layer = new L.Layer({ source: { type: '3d' } }).addTo(map);
+    await nativeChecks.ready(layer);
+    const mesh = nativeChecks.gpu.createMesh(layer, { position: [-20,0,-20,20,0,-20,0,20,20],
+      normal: [0,1,0,0,1,0,0,1,0], color: [1,0,0,1,0,0,1,0,0] });
+    const begin = GPUCommandEncoder.prototype.beginRenderPass;
+    let passes = 0;
+    GPUCommandEncoder.prototype.beginRenderPass = function (descriptor) {
+      if (!descriptor.colorAttachments.length) passes++;
+      return begin.call(this, descriptor);
+    };
+    map._sunlight = { altitude: 45, direction: [0.2,0.8,0.4] };
+    const render = () => { const before = passes; nativeChecks.render.render(layer._shared); return passes - before; };
+    try {
+      const first = render();
+      map._cameraBearing = 25;
+      const pan = render();
+      mesh.position[0] += 1;
+      const moved = render();
+      mesh.geometry.attributes.position.data[1] += 1;
+      mesh.geometry.attributes.position.needsUpdate = true;
+      const geometry = render();
+      const stable = render();
+      mesh._appearance = 0.5;
+      const fading = render();
+      map._sunlight.direction[0] += 0.1;
+      const sun = render();
+      nativeChecks.graph.setParent(mesh, null);
+      render();
+      const disabled = !layer.renderer.sunlight.enabled;
+      nativeChecks.graph.setParent(mesh, layer.root);
+      const restored = render();
+      return {first,pan,moved,geometry,stable,fading,sun,disabled,restored};
+    } finally {
+      GPUCommandEncoder.prototype.beginRenderPass = begin;
+      delete map._sunlight;
+      nativeChecks.gpu.disposeMesh(layer, mesh);
+      layer.remove();
+    }
+  });
+  assert.deepEqual(result, {first:1,pan:0,moved:1,geometry:1,stable:0,fading:1,sun:1,disabled:true,restored:1});
+});
+
 Then('sky and terrain change from day to night and celestial bodies follow the camera', { timeout: 90000 }, async function () {
   await this.page.waitForFunction(() => sunlightOverlay.control && map._sunlight);
   const result = await this.page.evaluate(async () => {

@@ -1,4 +1,4 @@
-@3d-layer
+@coverage
 Feature: Native Leaflet layers rendered automatically with WebGPU
   Scenario Outline: Native raster, vector and marker layers share the GPU scene
     Given the native WebGPU gallery uses the "<renderer>" renderer preference

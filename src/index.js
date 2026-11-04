@@ -114,7 +114,13 @@ L.Layer.include({
     const state = this._nativeGPU = { source: this, map, hidden: new Set() };
     state.hide = () => {
       const htmlIcon = this instanceof L.Marker && this.options.icon instanceof L.DivIcon;
-      for (const element of [htmlIcon ? null : this._icon, htmlIcon ? null : this._shadow]) {
+      const targets = [htmlIcon ? null : this._icon, htmlIcon ? null : this._shadow];
+      for (const element of state.hidden) {
+        if (targets.includes(element)) continue;
+        element.classList.remove('leaflet-webgpu-target');
+        state.hidden.delete(element);
+      }
+      for (const element of targets) {
         if (!element || state.hidden.has(element)) continue;
         element.classList.add('leaflet-webgpu-target');
         state.hidden.add(element);

@@ -1,6 +1,5 @@
-@3d-layer @night-lights
+@coverage
 Feature: Indicative Paris night lighting
-  @offline
   Scenario: Real lamp inventory lights the ground at night and the Eiffel Tower glows
     Given the Eiffel Tower example page is open with its offline archives
     Then streetlights and the Eiffel Tower emit light only during simulated night

@@ -8,6 +8,6 @@ export function removeRasterTile(layer, tile) {
   if (!mesh) return;
   setParent(mesh, null);
   update(layer);
-  destroyTexture(layer, mesh.texture.texture);
+  if (mesh.texture !== tile.texture) destroyTexture(layer, mesh.texture.texture);
   layer._rasterTiles.delete(tile);
 }

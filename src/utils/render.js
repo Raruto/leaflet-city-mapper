@@ -8,8 +8,9 @@ import { updatePointLights } from './updatePointLights.js';
 import { renderSunlight } from './renderSunlight.js';
 import { sortMeshes } from "./sortMeshes.js";
 import { update } from "./update.js";
-import { getRasterTileSize } from "./rasterTiles.js";
+import { getRasterTileSize, pruneRasterTiles } from "./rasterTiles.js";
 import { getElevation } from "./getElevation.js";
+import { roofCoverage } from "./roofCoverage.js";
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
@@ -22,11 +23,12 @@ export function render(backend) {
   backend._frame = null;
   if (backend._shared !== backend || !backend.renderer) return;
   const map = backend._map;
+  const now = performance.now();
+  let appearing = false;
   const size = map.getSize();
   if (!size.x || !size.y) return;
   if (map._animatingZoom) {
     backend._zoomTransitions ||= new Map();
-    const now = performance.now();
     for (const animation of map.getContainer().getAnimations({ subtree: true })) {
       if (!(animation instanceof CSSTransition) || animation.transitionProperty !== 'transform' ||
         !animation.effect.target.classList.contains('leaflet-zoom-animated') ||
@@ -131,6 +133,9 @@ export function render(backend) {
       const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
       const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
       const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+      const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
+      const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
+      mesh._sortDepth = clipZ / clipW;
       const radius = bounds.radius * Math.max(
         Math.hypot(world[0], world[1], world[2]),
         Math.hypot(world[4], world[5], world[6]),
@@ -145,30 +150,18 @@ export function render(backend) {
         frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
       if (!mesh._visibleInFrame) return;
     }
-    if (mesh.program?.transparent) {
-      if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
-      const center = mesh.geometry.bounds.center, world = mesh.worldMatrix;
-      const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-      const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-      const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-      const projection = camera.projectionViewMatrix;
-      const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
-      const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
-      mesh._sortDepth = clipZ / clipW;
-    }
   });
   const renderer = backend.renderer;
+  let rasters = [];
   if ([...backend._layers].some(layer => layer.options.roofTexture)) {
-    const rasters = Object.values(map._layers).filter(layer => layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0);
-    const tiles = rasters.flatMap(layer => [...layer._rasterTiles.values()]
-      .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
-      .map(tile => ({ tile, layer })));
-    const signature = tiles.map(({ tile, layer }) =>
-      `${L.Util.stamp(tile.image)}:${tile.coords.z}:${tile.coords.x}:${tile.coords.y}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
-    const selection = rasters.map(layer => `${L.Util.stamp(layer)}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
-    // Retain the geographically aligned atlas until a tile batch finishes loading.
-    if (!backend._roofRaster || backend._roofRaster.selection !== selection ||
-      (!rasters.some(layer => layer._loadingTiles > 0) && backend._roofRaster.signature !== signature)) {
+    rasters = Object.values(map._layers).filter(layer => layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0);
+    const signature = rasters.map(layer =>
+      `${L.Util.stamp(layer)}:${layer._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
+    if (!backend._roofRaster || backend._roofRaster.signature !== signature &&
+      (!rasters.some(layer => layer._loadingTiles) || now - backend._roofRaster.updatedAt >= 50)) {
+      const tiles = rasters.flatMap(layer => [...layer._rasterTiles.values()]
+        .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
+        .map(tile => ({ tile, layer })));
       const zoom = tiles.length ? Math.max(...tiles.map(({ tile }) => tile.coords.z)) : map.getZoom();
       const bounds = new L.Bounds();
       for (const { tile: { coords }, layer } of tiles) {
@@ -200,7 +193,7 @@ export function render(backend) {
         texture.height = height;
       }
       backend._roofRaster = {
-        signature, selection, matrix: Array.from(matrix.toFloat64Array()),
+        signature, updatedAt: now, matrix: Array.from(matrix.toFloat64Array()),
         texture: texture || {
           device: renderer.device,
           texture: renderer.device.createTexture({
@@ -255,14 +248,6 @@ export function render(backend) {
           sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
         };
       }
-      // Raster tiles keep their GPU copy; terrain meshes already own one for the same image.
-      const roofTiles = backend._roofTiles ||= new Map();
-      for (const [el, source] of roofTiles) {
-        if (!tiles.some(({ tile }) => tile === el) || map._terrain3D?._rasterTiles.has(el)) {
-          source.texture.destroy();
-          roofTiles.delete(el);
-        }
-      }
       const opacities = new Float32Array(Math.max(1, tiles.length) * 64);
       const opacityBuffer = device.createBuffer({
         size: opacities.byteLength,
@@ -282,18 +267,7 @@ export function render(backend) {
         a.tile.coords.z - b.tile.coords.z);
       for (const [i, { tile, layer }] of tiles.entries()) {
         const { coords, image } = tile;
-        let source = map._terrain3D?._rasterTiles.get(tile)?.texture || roofTiles.get(tile);
-        if (!source) {
-          source = {
-            texture: device.createTexture({
-              size: [image.width, image.height],
-              format: 'rgba8unorm',
-              usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-            }),
-            image, uploaded: null,
-          };
-          roofTiles.set(tile, source);
-        }
+        const source = tile.texture;
         if (source.uploaded !== source.image) {
           device.queue.copyExternalImageToTexture({ source: image }, { texture: source.texture },
             [source.texture.width, source.texture.height]);
@@ -323,12 +297,29 @@ export function render(backend) {
   } else if (backend._roofRaster) {
     destroyTexture(backend, backend._roofRaster.texture.texture);
     backend._roofRaster = null;
-    for (const source of backend._roofTiles?.values() || []) source.texture.destroy();
-    backend._roofTiles = null;
   }
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   const meshes = [];
-  traverse(backend.scene, mesh => { if (!mesh.visible) return true; if (mesh.geometry && mesh._visibleInFrame) meshes.push(mesh); });
+  traverse(backend.scene, mesh => {
+    if (!mesh.visible) return true;
+    if (!mesh.geometry || !mesh._visibleInFrame) return;
+    if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
+    if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
+      if (mesh._roofCoverageSignature !== backend._roofRaster?.signature) {
+        mesh._roofCoverageSignature = backend._roofRaster?.signature;
+        mesh._roofCovered = roofCoverage(mesh, backend, rasters);
+      }
+      if (!mesh._roofCovered) { mesh._appearance = 0; return; }
+      mesh._roofRevealed = true;
+    }
+    if (mesh.fadeDuration) {
+      mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
+      const progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);
+      mesh._appearance = progress * progress * (3 - 2 * progress);
+      appearing ||= progress < 1;
+    }
+    meshes.push(mesh);
+  });
   sortMeshes(meshes);
   const encoder = renderer.device.createCommandEncoder();
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
@@ -339,7 +330,8 @@ export function render(backend) {
       if (layer._type === 'terrain') continue;
       traverse(layer.root, mesh => {
         if (!mesh.visible) return true;
-        if (mesh.geometry && !mesh.tile && !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
+        if (mesh.geometry && !mesh.tile && mesh._appearance !== 0 &&
+          !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
       });
     }
   }
@@ -407,5 +399,8 @@ export function render(backend) {
   pass.end();
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
   renderer.device.queue.submit([encoder.finish()]);
-  if (map._animatingZoom) update(backend);
+  for (const layer of backend._layers) {
+    if (layer._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
+  }
+  if (map._animatingZoom || appearing) update(backend);
 }

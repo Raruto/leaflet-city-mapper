@@ -1,6 +1,223 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
+Then('new ground tiles blend continuously while retained tiles stay opaque', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    map.setPitch(0); map.setBearing(0);
+    const zoom = map.getZoom(), cell = map.project(map.getCenter()).divideBy(256).floor();
+    map.setView(map.unproject(cell.add([0.5, 0.5]).multiplyBy(256)), zoom, { animate: false });
+    const nw = map.unproject(cell.multiplyBy(256)), se = map.unproject(cell.add([1, 1]).multiplyBy(256));
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#206040'; context.fillRect(0, 0, 256, 256);
+    const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
+    const raster = new L.Layer({ source: { type: 'pmtiles', url: 'smooth-ground.pmtiles', archive: {
+      getHeader: async () => ({ minZoom: zoom, maxZoom: zoom, minLon: nw.lng, maxLat: nw.lat,
+        maxLon: se.lng - 1e-7, minLat: se.lat + 1e-7 }),
+      getZxy: async () => ({ data: image }),
+    } } }).addTo(map);
+    await raster.ready;
+    const key = `${zoom}/${cell.x}/${cell.y}`;
+    while (!raster._rasterTiles.get(key)?.done) await new Promise(requestAnimationFrame);
+    const tile = raster._rasterTiles.get(key), mesh = tile.mesh;
+    const point = map.latLngToContainerPoint(map.unproject(cell.add([0.5, 0.5]).multiplyBy(256)));
+    await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1);
+    mesh.fadeStart = performance.now() - 125;
+    const middle = await nativeChecks.pixels(raster, Math.floor(point.x - 5), Math.floor(point.y - 5), 10, 10);
+    const alphas = middle.filter((_, i) => i % 4 === 3);
+    mesh.fadeStart = performance.now() - 300;
+    nativeChecks.render.render(raster._shared);
+    const start = mesh.fadeStart;
+    const opaque = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
+    const neighbor = map.unproject(cell.add([2, 1]).multiplyBy(256));
+    raster.header.maxLon = neighbor.lng - 1e-7;
+    const { updateRasterTiles } = await import('/dist/utils/rasterTiles.js');
+    updateRasterTiles(raster);
+    while (raster.isLoading()) await new Promise(requestAnimationFrame);
+    nativeChecks.render.render(raster._shared);
+    const retained = raster._rasterTiles.get(key) === tile && mesh.fadeStart === start && mesh._appearance === 1;
+    const after = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
+    const loadedNeighbor = raster._rasterTiles.get(`${zoom}/${cell.x + 1}/${cell.y}`)?.done;
+    raster.remove();
+    return { minimum: Math.min(...alphas), maximum: Math.max(...alphas), retained, loadedNeighbor, opaque, after };
+  });
+  assert.ok(result.minimum > 60 && result.maximum < 210, JSON.stringify(result));
+  assert.ok(result.maximum - result.minimum < 5, JSON.stringify(result));
+  assert.equal(result.retained, true);
+  assert.equal(result.loadedNeighbor, true);
+  assert.equal(result.opaque[3], 255);
+  assert.deepEqual(result.after, result.opaque);
+});
+
+Then('buildings wait only for their own roof imagery and never restart their appearance', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map, zoom = map.getZoom(), cell = map.project(map.getCenter()).divideBy(256).floor();
+    map.setPitch(0); map.setBearing(0);
+    map.setView(map.unproject(cell.add([0.5, 0.5]).multiplyBy(256)), zoom, { animate: false });
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ff0000'; context.fillRect(0, 0, 256, 256);
+    const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
+    const releases = new Map(), started = new Set();
+    const nw = map.unproject(cell.subtract([1, 1]).multiplyBy(256));
+    const se = map.unproject(cell.add([2, 2]).multiplyBy(256));
+    const raster = new L.Layer({ source: { type: 'pmtiles', url: 'delayed-roofs.pmtiles', archive: {
+      getHeader: async () => ({ minZoom: zoom, maxZoom: zoom, minLon: nw.lng, maxLat: nw.lat,
+        maxLon: se.lng - 1e-7, minLat: se.lat + 1e-7 }),
+      getZxy: async (z, x, y) => {
+        started.add(`${x}/${y}`);
+        await new Promise(resolve => releases.set(`${x}/${y}`, resolve));
+        return { data: image };
+      },
+    } } }).addTo(map);
+    await raster.ready;
+    const ring = [[-30,-30],[30,-30],[30,30],[-30,30],[-30,-30]].map(offset => {
+      const p = map.unproject(cell.add([0.5,0.5]).multiplyBy(256).add(offset)); return [p.lng,p.lat];
+    });
+    const building = new L.Layer({ source: { type:'geojson', roofTexture:true, style:()=>({top:20,color:0x00ff00}),
+      data:{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[ring]}}]},
+    } }).addTo(map);
+    await nativeChecks.ready(building);
+    while (![...building._areas.values()].some(area=>area.mesh)) await new Promise(requestAnimationFrame);
+    const mesh = [...building._areas.values()][0].mesh;
+    nativeChecks.render.render(building._shared);
+    const hidden = mesh._appearance === 0 && mesh.fadeStart === undefined;
+    const rect = map.getContainer().getBoundingClientRect();
+    const pointer = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
+    const hiddenHits = nativeChecks.picking.raycast(building, pointer).length;
+    const key = `${cell.x}/${cell.y}`;
+    while (!releases.has(key)) await new Promise(requestAnimationFrame);
+    releases.get(key)(); releases.delete(key);
+    while (!raster._rasterTiles.get(`${zoom}/${key}`)?.done) await new Promise(requestAnimationFrame);
+    building._shared._roofRaster.updatedAt = 0;
+    nativeChecks.render.render(building._shared);
+    const simultaneous = mesh._roofRevealed && mesh.fadeStart !== undefined && raster.isLoading();
+    mesh.fadeStart = performance.now() - 300;
+    const pixel = [...await nativeChecks.pixels(building, 200, 150, 1, 1)];
+    const visibleHits = nativeChecks.picking.raycast(building, pointer).length;
+    const fadeStart = mesh.fadeStart;
+    let remaining = started.size;
+    for (const resolve of releases.values()) resolve();
+    releases.clear();
+    await new Promise(requestAnimationFrame);
+    nativeChecks.render.render(building._shared);
+    const retained = mesh.fadeStart === fadeStart && mesh._appearance === 1;
+    raster.remove(); building.remove();
+    for (const resolve of releases.values()) resolve();
+    return {hidden, hiddenHits, visibleHits, simultaneous, pixel, retained, remaining};
+  });
+  assert.equal(result.hidden, true, JSON.stringify(result));
+  assert.equal(result.hiddenHits, 0);
+  assert.equal(result.visibleHits, 1);
+  assert.equal(result.simultaneous, true, JSON.stringify(result));
+  assert.ok(result.pixel[0] > 100 && result.pixel[1] < 5 && result.pixel[3] === 255, JSON.stringify(result));
+  assert.equal(result.retained, true);
+});
+
+Then('coarse ground imagery precedes detail and survives delayed replacements', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map, zoom = map.getZoom();
+    map.setPitch(80);
+    const center = map.project(map.getCenter(), zoom).divideBy(256).floor();
+    const nw = map.unproject(center.subtract([1, 1]).multiplyBy(256), zoom);
+    const se = map.unproject(center.add([2, 2]).multiplyBy(256), zoom);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#426842'; context.fillRect(0, 0, 256, 256);
+    const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
+    let release, active = 0, maximum = 0, fail = false;
+    const pending = new Promise(resolve => { release = resolve; }), requests = [];
+    const raster = new L.Layer({ source: { type: 'pmtiles', url: 'progressive.pmtiles', archive: {
+      getHeader: async () => ({ minZoom: zoom - 2, maxZoom: zoom, minLon: nw.lng, maxLat: nw.lat,
+        maxLon: se.lng - 1e-7, minLat: se.lat + 1e-7 }),
+      getZxy: async (z, x, y) => {
+        requests.push(z);
+        if (fail && z === zoom && x === center.x && y === center.y) throw new Error('Expected detail failure');
+        active++; maximum = Math.max(maximum, active);
+        if (z === zoom) await pending;
+        active--;
+        return { data: image };
+      },
+    } } }).addTo(map);
+    const errors = [];
+    raster.on('error', event => errors.push(event.error.message));
+    const wait = async condition => {
+      const deadline = performance.now() + 10000;
+      while (!condition()) {
+        if (performance.now() > deadline) throw new Error('Progressive raster fixture did not settle');
+        await new Promise(requestAnimationFrame);
+      }
+    };
+    try {
+      await raster.ready;
+      await wait(() => {
+        const parents = [...raster._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
+        return parents.length && parents.every(tile => tile.done);
+      });
+      const parents = [...raster._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
+      for (const tile of parents) tile.mesh.fadeStart = performance.now() - 300;
+      const pixels = await nativeChecks.pixels(raster, 190, 140, 20, 20);
+      const coverage = pixels.filter((_, index) => index % 4 === 3 && pixels[index] === 255).length;
+      const retained = parents.every(tile => raster._rasterTiles.has(`${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`));
+      release();
+      await wait(() => !raster.isLoading() && [...raster._wantedRasterTiles].every(key => raster._rasterTiles.get(key)?.done));
+      for (const tile of raster._rasterTiles.values()) {
+        tile.loadedAt = tile.mesh.fadeStart = performance.now() - 300;
+      }
+      raster._pruneAfter = 0;
+      nativeChecks.render.render(raster._shared);
+      const replaced = [...raster._rasterTiles.values()].every(tile => tile.coords.z === zoom);
+      raster.remove();
+      fail = true;
+      raster.addTo(map);
+      await wait(() => errors.length && !raster.isLoading());
+      for (const tile of raster._rasterTiles.values()) {
+        if (tile.done) tile.loadedAt = tile.mesh.fadeStart = performance.now() - 300;
+      }
+      raster._pruneAfter = 0;
+      nativeChecks.render.render(raster._shared);
+      const preservedOnError = [...raster._rasterTiles.values()].some(tile => tile.done && tile.coords.z < zoom);
+      return { coarseFirst: requests[0] === zoom - 2, bounded: maximum <= 4, coverage, retained, replaced,
+        preservedOnError, errors };
+    } finally { release(); raster.remove(); }
+  });
+  assert.deepEqual(result, { coarseFirst: true, bounded: true, coverage: 400, retained: true, replaced: true,
+    preservedOnError: true, errors: ['Expected detail failure'] });
+});
+
+Then('streamed geometry dissolves progressively while remaining opaque', { timeout: 30000 }, async function () {
+  await this.page.emulateMedia({ reducedMotion: 'reduce' });
+  await this.page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    map.setPitch(0); map.setBearing(0);
+    const layer = new L.Layer({ source: { type: 'geojson', data: {
+      type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+        [-60, -60], [60, -60], [60, 60], [-60, 60], [-60, -60],
+      ].map(offset => { const p = map.containerPointToLatLng(map.getSize().divideBy(2).add(offset)); return [p.lng, p.lat]; })] } }],
+    }, style: () => ({ top: 10 }) } }).addTo(map);
+    await nativeChecks.ready(layer);
+    while (![...layer._areas.values()].some(area => area.mesh)) await new Promise(requestAnimationFrame);
+    const mesh = [...layer._areas.values()][0].mesh;
+    const count = async elapsed => {
+      mesh.fadeStart = performance.now() - elapsed;
+      const pixels = await nativeChecks.pixels(layer, 180, 130, 40, 40);
+      return pixels.filter((_, index) => index % 4 === 3 && pixels[index] === 255).length;
+    };
+    const early = await count(0), middle = await count(125), full = await count(300);
+    layer.remove();
+    return { early, middle, full, opaque: !mesh.program.transparent && mesh.program.depthWrite };
+  });
+  assert.ok(result.early < 200, JSON.stringify(result));
+  assert.ok(result.middle > 400 && result.middle < 1400, JSON.stringify(result));
+  assert.equal(result.full, 1600);
+  assert.equal(result.opaque, true);
+});
+
 Then('roof imagery follows raster loading, background changes and renderer ownership', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map, zoom = 17;
@@ -16,6 +233,8 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     layer.options.style = () => ({ top: 20, color: 0x00ff00 });
     await nativeChecks.loadBlock(layer, area, [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]);
     const mesh = area.mesh;
+    nativeChecks.render.render(layer._shared);
+    mesh.fadeStart = performance.now() - 300;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 256;
     const context = canvas.getContext('2d');
@@ -117,7 +336,9 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     }
   });
   const green = pixel => pixel[1] > 100 && pixel[0] < 5 && pixel[2] < 5 && pixel[3] === 255;
-  for (const name of ['before', 'empty', 'transparent']) assert.ok(result[name].every(green), `${name}: ${result[name]}`);
+  assert.ok(result.before.every(pixel => pixel[1] > 100 && pixel[0] < 5 && pixel[3] === 255),
+    'Previously revealed buildings retain their styled roofs while a background loads');
+  for (const name of ['empty', 'transparent']) assert.ok(result[name].every(green), `${name}: ${result[name]}`);
   const imagery = (pixels, swapped) => pixels.forEach((pixel, i) => {
     const red = (i === 0 ? result.westRed : !result.westRed) !== swapped;
     assert.ok(pixel[red ? 0 : 2] > 100 && pixel[red ? 2 : 0] < 5 && pixel[1] < 5, JSON.stringify({ pixel, red }));
@@ -207,7 +428,8 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       await raster.ready;
       await wait(() => raster._rasterTiles.size > 0 && [...raster._rasterTiles.values()].every(tile => tile.done));
       if (order === 'after') terrain.addTo(map);
-      const initiallyFlat = [...raster._rasterTiles.values()].every(tile => tile.image);
+      const initiallyFlat = [...raster._rasterTiles.values()].every(tile =>
+        tile.image && tile.mesh.parent === raster.root && tile.mesh.visible);
       terrain._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
       nativeChecks.render.render(buildings._shared);
       const partialElevation = nativeChecks.getElevation(terrain, map.getCenter());
@@ -220,6 +442,9 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       await wait(settled);
       let elevationError = 0, deformation = 0, buildingError = 0, uvError = 0;
       for (const [tile, mesh] of terrain._rasterTiles) {
+        if (mesh.texture !== tile.texture || mesh.fadeStart !== tile.loadedAt || tile.mesh.visible) {
+          throw new Error('DEM adaptation must reuse the imagery texture and appearance without a duplicate flat tile');
+        }
         const tileCoords = tile.coords;
         const positions = mesh.geometry.attributes.position.data;
         const uv = mesh.geometry.attributes.uv.data;

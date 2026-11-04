@@ -5,6 +5,41 @@ import { startServer } from '../../build/server.js';
 
 setDefaultTimeout(10000);
 
+// Shared by the 3D scenarios when COVERAGE_3D is enabled.
+const coveredFunctions = new Map();
+
+Before({ tags: '@coverage' }, async function () {
+  if (process.env.COVERAGE_3D) {
+    await this.page.coverage.startJSCoverage({ resetOnNavigation: false });
+  }
+});
+
+After({ tags: '@coverage' }, async function () {
+  if (!process.env.COVERAGE_3D) return;
+  const entries = await this.page.coverage.stopJSCoverage();
+  for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
+    for (const fn of entry.functions) {
+      const range = fn.ranges[0];
+      if (!fn.functionName) continue;
+      const key = `${entry.url}:${range.startOffset}:${range.endOffset}`;
+      const previous = coveredFunctions.get(key);
+      coveredFunctions.set(key, {
+        name: fn.functionName,
+        line: entry.source.slice(0, range.startOffset).split('\n').length,
+        covered: Boolean(range.count || previous?.covered),
+      });
+    }
+  }
+});
+
+AfterAll(function () {
+  if (!process.env.COVERAGE_3D || !coveredFunctions.size) return;
+  const functions = [...coveredFunctions.values()];
+  const covered = functions.filter(fn => fn.covered).length;
+  console.log(`Layer3D named-function coverage: ${covered}/${functions.length} (${(covered / functions.length * 100).toFixed(1)}%)`);
+  console.log('Uncovered functions:', functions.filter(fn => !fn.covered).map(fn => `${fn.name}:${fn.line}`).join(', '));
+});
+
 let server;
 let browser;
 let baseUrl;
@@ -29,7 +64,7 @@ async function getBrowser() {
     : options;
   browser = await engine.launch(launchOptions);
   // Headless Firefox (and some GPUs/drivers) expose no WebGPU adapter: retry with a window when one can open.
-  // Without any adapter the @3d-layer scenarios fail instead of being skipped.
+  // Without any adapter the @coverage scenarios fail instead of being skipped.
   const page = await browser.newPage();
   await page.goto(baseUrl);
   const webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
@@ -109,7 +144,7 @@ After({ tags: 'not @unit' }, async function () {
 });
 
 // Firefox may take several seconds to create its first WebGPU adapter.
-Before({ tags: '@3d-layer', timeout: 30000 }, async function () {
+Before({ tags: '@coverage', timeout: 30000 }, async function () {
   await this.page.goto(baseUrl);
   const supported = await this.page.evaluate(async () =>
     Boolean(navigator.gpu && await navigator.gpu.requestAdapter()));

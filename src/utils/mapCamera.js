@@ -45,9 +45,9 @@ function animationPoint(map, point, inverse = false) {
     point.subtract(half).multiplyBy(scale).add(shift).add(half);
 }
 
-function groundBounds(map) {
-  const size = map.getSize();
-  return new L.Bounds([[0, 0], [size.x, 0], [0, size.y], [size.x, size.y]]
+function groundBounds(map, padding = [0, 0]) {
+  const min = pointOf(padding).divideBy(2), max = map.getSize().subtract(min);
+  return new L.Bounds([[min.x, min.y], [max.x, min.y], [min.x, max.y], [max.x, max.y]]
     .map(point => project(map, point, true, true)));
 }
 
@@ -212,7 +212,7 @@ L.Map.include({
     if (!this.getPitch() && !this.getBearing()) return mapMethods.getBoundsZoom.call(this, bounds, inside, padding);
     if (!inside) return fitCameraBounds(this, bounds, { padding: pointOf(padding || [0, 0]).divideBy(2) }).zoom;
     bounds = bounds instanceof L.LatLngBounds ? bounds : new L.LatLngBounds(bounds);
-    const footprint = groundBounds(this).getSize(), size = this.project(bounds.getSouthEast()).subtract(this.project(bounds.getNorthWest()));
+    const footprint = groundBounds(this, padding).getSize(), size = this.project(bounds.getSouthEast()).subtract(this.project(bounds.getNorthWest()));
     const zoom = this.getScaleZoom(Math.max(footprint.x / size.x, footprint.y / size.y));
     const snap = this.options.zoomSnap;
     return Math.max(this.getMinZoom(), Math.min(this.getMaxZoom(), snap ? Math.ceil(zoom / snap) * snap : zoom));
@@ -264,7 +264,7 @@ L.Map.addInitHook(function () {
     draggable.on('predrag', pan);
     this.once('unload', () => draggable.off('predrag', pan));
   });
-  if (this.options.rotate) {
+  if (this.options.rotate || this.options.trackContainerMutation) {
     this.cameraReady = import('./cameraControls.js').then(({ cameraControls }) => {
       if (!this._container?._leaflet_id) return;
       cameraControls(this);
@@ -311,14 +311,19 @@ L.Marker.include({
   },
   _updateZIndex(offset) {
     markerMethods._updateZIndex.call(this, offset);
+    const changed = this._cameraZIndexOffset !== offset;
     this._cameraZIndexOffset = offset;
-    this._nativeGPU?.refresh?.();
+    if (changed) this._nativeGPU?.refresh?.();
+  },
+  _initInteraction() {
+    const result = markerMethods._initInteraction.call(this);
+    cameraMarkerDrag.call(this);
+    return result;
   },
 });
 
 // Keep Leaflet's focusable marker and its drag events; only translate its screen position back to ground.
-L.Marker.addInitHook(function () {
-  this.on('add', () => {
+function cameraMarkerDrag() {
     if (!this.dragging || this.dragging._cameraDrag) return;
     const drag = this.dragging, original = drag._onDrag, adjustPan = drag._adjustPan;
     drag._onDrag = function (event) {
@@ -356,8 +361,7 @@ L.Marker.addInitHook(function () {
       drag._draggable.on('drag', drag._onDrag, drag);
     }
     drag._cameraDrag = true;
-  });
-});
+}
 
 for (const Class of [L.Popup, L.Tooltip]) {
   const events = Class.prototype.getEvents;

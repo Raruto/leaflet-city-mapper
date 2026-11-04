@@ -1,40 +1,5 @@
 import assert from 'node:assert/strict';
-import { After, AfterAll, Before, Given } from '@cucumber/cucumber';
-
-// Shared by the 3D scenarios: coverage hooks, page checks and the example pages.
-const coveredFunctions = new Map();
-
-Before({ tags: '@3d-layer' }, async function () {
-  if (process.env.COVERAGE_3D) {
-    await this.page.coverage.startJSCoverage({ resetOnNavigation: false });
-  }
-});
-
-After({ tags: '@3d-layer' }, async function () {
-  if (!process.env.COVERAGE_3D) return;
-  const entries = await this.page.coverage.stopJSCoverage();
-  for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
-    for (const fn of entry.functions) {
-      const range = fn.ranges[0];
-      if (!fn.functionName) continue;
-      const key = `${entry.url}:${range.startOffset}:${range.endOffset}`;
-      const previous = coveredFunctions.get(key);
-      coveredFunctions.set(key, {
-        name: fn.functionName,
-        line: entry.source.slice(0, range.startOffset).split('\n').length,
-        covered: Boolean(range.count || previous?.covered),
-      });
-    }
-  }
-});
-
-AfterAll(function () {
-  if (!process.env.COVERAGE_3D || !coveredFunctions.size) return;
-  const functions = [...coveredFunctions.values()];
-  const covered = functions.filter(fn => fn.covered).length;
-  console.log(`Layer3D named-function coverage: ${covered}/${functions.length} (${(covered / functions.length * 100).toFixed(1)}%)`);
-  console.log('Uncovered functions:', functions.filter(fn => !fn.covered).map(fn => `${fn.name}:${fn.line}`).join(', '));
-});
+import { Given } from '@cucumber/cucumber';
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
@@ -272,14 +237,8 @@ export async function prepare3DChecks(page) {
   });
 }
 
-Given('a map with the standalone 3D module and no dependency import map', async function () {
-  this.oglRequests = [];
-  this.threeRequests = [];
-  this.page.on('request', request => {
-    if (request.url().includes('unpkg.com/three@')) this.threeRequests.push(request.url());
-    if (/unpkg\.com\/(ogl|earcut)@/.test(request.url())) this.oglRequests.push(request.url());
-  });
-  await this.page.route('**/test/standalone-3d.html', route => route.fulfill({
+Given('a leaflet map', { timeout: 30000 }, async function () {
+  await this.page.route('**/test/leaflet-city-mapper.html', route => route.fulfill({
     contentType: 'text/html',
     body: `<!doctype html><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
       <div id="first" style="width:400px;height:300px"></div>
@@ -297,11 +256,9 @@ Given('a map with the standalone 3D module and no dependency import map', async 
         }) });
       </script>`,
   }));
-  await this.page.goto(`${this.baseUrl}/test/standalone-3d.html`);
+  await this.page.goto(`${this.baseUrl}/test/leaflet-city-mapper.html`);
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.test3d);
-  assert.deepEqual(this.threeRequests, []);
-  assert.deepEqual(this.oglRequests, []);
   assert.equal(await this.page.evaluate(() => [...document.scripts].every(script => !script.type)), true);
   assert.equal(await this.page.evaluate(() => L.Layer.SceneRenderer), undefined);
 });

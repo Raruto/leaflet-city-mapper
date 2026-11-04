@@ -45,28 +45,6 @@ const buildings = new L.Layer({
 
 Vector and raster layers are initialized in [`src/index.js`](./src/index.js); their rendering utilities are loaded only when needed. Terrain, sunlight, traffic and walk initializers are also loaded lazily from [`src/utils`](./src/utils).
 
-Initialization and shared renderer state live directly on `L.Layer`, without a type registry. Supported `source.type` values are `3d`, `geojson`, `pmtiles`, `terrain`, `sunlight`, `traffic` and `walk`; unknown types emit an `error` event and reject `layer.ready`. Leaflet subclasses keep their own initialization.
-
-### Camera and accessible navigation
-
-Rotation and pitch are handled by the WebGPU camera, not CSS transforms of the map panes. Use `bearing` and `pitch` map options, `getBearing()` / `setBearing(degrees, options)`, `getPitch()` / `setPitch(degrees, options)`, `resetNorth()` and `resetNorthPitch()`. Pitch is clamped to 0–85 degrees; animated setters accept `{ animate: true, duration: 0.3 }` and respect reduced-motion preferences. Camera changes emit `rotate` / `pitch`; bounds and pointer coordinates follow the same projection as the GPU. `pitchMaxDistance` (default 3 viewport heights) limits ground loading near the horizon.
-
-The lazily loaded camera controls are ready at `map.cameraReady`. `rotateControl` preserves the compact two-tone compass: the arrow follows bearing and tilts with pitch; click resets both angles, horizontal drag rotates (0.8°/px) and vertical drag tilts (0.5°/px). The focusable button also supports Enter/Space, arrow-key bearing/pitch adjustment and Home to reset. Set `rotateControl: false` to omit it, or pass `position`, `closeOnZeroBearing` (default true) and `visualizePitch` (default true). With `visualizePitch: false`, the control changes/resets bearing only. With `closeOnZeroBearing: false`, it stays visible at north; a focused control is never auto-hidden. It is also available as `new L.Control.Rotate(options)` after camera readiness.
-
-`shiftKeyRotate` enables Shift + wheel; `pitchDrag` enables Ctrl + left-drag or right-drag. Optional `touchRotate` / `touchPitch` handlers add two-finger twist / vertical pitch while preserving pinch zoom and pan. Each handler supports `enable()` / `disable()`. Native Leaflet zoom controls, keyboard navigation, marker focus, dragging, popups and tooltips remain available. On supported devices, the optional `compassBearing` handler follows device orientation; enable it from a user gesture for permission prompts. Permission failures emit `error`. Removing a map releases gesture listeners and camera animations.
-
-Marker options `rotation` (radians), `rotateWithView`, `keepUpright` and `scale`, plus `marker.setRotation(radians)`, apply to GPU icons and their accessible DOM targets.
-
-### Native Leaflet layers
-
-Loading the plugin automatically renders native `TileLayer` (including WMS), image/canvas `GridLayer` tiles, `ImageOverlay`, image-icon `Marker`, `Polyline`, `Polygon`, `Rectangle`, `Circle` and `CircleMarker` content in the shared WebGPU canvas. `GeoJSON`, `LayerGroup` and `FeatureGroup` work through their children, with their original constructors and methods.
-
-The common `L.Layer` lifecycle loads the adapter lazily. Paths are triangulated directly from coordinates, without creating SVG or Canvas 2D renderers, and use GPU-scene raycasting for pointer events. Tiles and overlay images load in detached elements: they are texture sources, not DOM snapshots. Image markers use coordinate-derived GPU billboards; only their transparent, accessible DOM controls remain for keyboard focus and dragging, without per-frame layout measurements. Leaflet still owns requests, popups and attribution.
-
-Mutators such as `setLatLng`, `setStyle`, `setRadius`, `setOpacity`, `setUrl` and `redraw`, as well as removal/re-adding, update GPU resources. Path buffers remain unchanged during pan, rotation and pitch; pixel-width strokes are retessellated on `zoomend` or source changes. The untransformed GPU canvas sits above the pitch sky and below Leaflet's panes: tall objects remain visible above the horizon, while popups, tooltips and controls stay in front. `layer.ready` reports GPU initialization; native `load`/`tileload` events still report image/tile loading. Rendering failures emit `error`, without silently falling back to DOM rendering.
-
-Cross-origin images and tile services must permit CORS; the plugin enables `crossOrigin` before loading. HTML `DivIcon`, video/SVG overlays, popup, tooltip and controls intentionally stay in the DOM. Custom HTML `GridLayer` tiles are not raster images and report an error. The [native gallery](./examples/leaflet-city-mapper-native.html) includes every supported native layer type; append `?canvas` to verify that `preferCanvas` also uses direct GPU paths instead of a duplicate Canvas 2D renderer.
-
 ### Update demo data
 
 The Paris example makes extensive use of [PMTiles](./build/pmtiles.js) to ensure offline access / long-term availability of the map. To update them:
@@ -74,7 +52,11 @@ The Paris example makes extensive use of [PMTiles](./build/pmtiles.js) to ensure
 ```shell
 npm run pmtiles
 node build/pmtiles.js --only=trees
+node build/pmtiles.js --jobs=6
+
 ```
+
+All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `--bbox=west,south,east,north` to override it.
 
 ### Build Guide
 
@@ -90,7 +72,7 @@ npm run build # generate "dist" files (once)
 npm run test  # build and run browser tests
 ```
 
-After that you can start developing inside the `src` and `test` folders (eg. open "http://localhost:8080" in your browser to preview changes).
+After that you can start developing inside the `src` folder (eg. open "http://localhost:8080/examples" in your browser to preview changes).
 
 
 **Compatibile with:**
