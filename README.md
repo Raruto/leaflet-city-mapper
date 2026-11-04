@@ -1,6 +1,6 @@
 # leaflet-city-mapper
 
-[![NPM version](https://img.shields.io/npm/v/leaflet-city-builder.svg?color=red)](https://www.npmjs.com/package/leaflet-city-builder)
+[![NPM version](https://img.shields.io/npm/v/leaflet-city-mapper.svg?color=red)](https://www.npmjs.com/package/leaflet-city-mapper)
 [![License](https://img.shields.io/badge/license-GPL%203-blue.svg?style=flat)](LICENSE)
 
 **Your data, on a rotated and pitched Leaflet map:** a small 3D rendering engine (WebGPU) packaged onto standard `L.Layer`. Available sources: extruded GeoJSON, glTF models, raster PMTiles and terrain layers.
@@ -63,8 +63,8 @@ All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `-
 Within your local development environment:
 
 ```shell
-git clone git@github.com:Raruto/leaflet-city-builder.git
-cd ./leaflet-city-builder
+git clone git@github.com:Raruto/leaflet-city-mapper.git
+cd ./leaflet-city-mapper
 
 npm i         # install dependencies
 npm run dev   # start dev server at: http://localhost:8080
