@@ -97,7 +97,6 @@ L.Layer.types.traffic = function (layer, { url, vehicle = 'car', side, outline, 
 
   // Dashed lane outline, just above the lanes.
   const drawRoute = () => {
-
     route = createMesh(routeGeometry(lanes), [], { emissive: [0.03, 0.25, 0.3] });
   };
   // One batched mesh, `vertices` per vehicle; the compute pass writes its position/normal buffers (STORAGE).

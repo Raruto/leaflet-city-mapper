@@ -124,6 +124,12 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
     const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
     walk.walker.latlng = new L.LatLng(48.8560, 2.2950);
     walk.walker.heading = Math.PI;
+    map.setView(walk.walker.latlng, map.getZoom(), { animate: false });
+  });
+  await this.page.waitForFunction(() => {
+    const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
+    return buildings._areas.size > 0 && buildings._inflight === 0 &&
+      [...buildings._areas.values()].every(area => area.done);
   });
   await this.page.keyboard.down('KeyW');
   let previous, stuck;
