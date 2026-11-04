@@ -13,7 +13,7 @@ _For a working example see one of the following demos:_
 
 - [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
 - [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-geojson.html)
-- [Native Leaflet layers on WebGPU](./examples/leaflet-city-mapper-native.html)
+- [Native Leaflet layers on WebGPU](https://raruto.github.io/leaflet-city-mapper/examples/examples/leaflet-city-mapper-native.html)
 
 ## How to use
 
