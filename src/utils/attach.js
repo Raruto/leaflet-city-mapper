@@ -132,7 +132,9 @@ export async function attach(backend, map) {
     let pane = map.getPane('webgpuPane');
     if (!pane) {
       pane = map.createPane('webgpuPane', map.getContainer());
-      pane.style.zIndex = 450;
+      // The pitch sky uses 0 and may be inserted after this pane.
+      pane.style.zIndex = 1;
+      pane.style.pointerEvents = 'none';
     }
     pane.append(canvas);
     map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange, shared);

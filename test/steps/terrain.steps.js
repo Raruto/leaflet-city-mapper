@@ -348,9 +348,13 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
 Then('raster zoom transitions stay paused between WebGPU frames and resume on removal', async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const tiles = new L.TileLayer('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=').addTo(map);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const tiles = new L.TileLayer(canvas.toDataURL());
     const first = new L.Layer({ source: { type: '3d' } }).addTo(map), second = new L.Layer({ source: { type: '3d' } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
+    tiles.addTo(map);
+    await tiles.ready;
     let samples = 0, frozen = true, transferred = false, resumed = false;
     const { device } = first.renderer;
     const submit = device.queue.submit;
@@ -384,11 +388,12 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
     first.remove();
     transferred = second._zoomTransitions === transitions;
     second.remove();
+    const retained = L.Layer._renderers.get(map)?._zoomTransitions === transitions;
+    tiles.remove();
     resumed = [...transitions.keys()].every(animation => animation.playState !== 'paused');
     await moved;
-    tiles.remove();
-    return { samples, frozen, cleaned, transferred, resumed };
+    return { samples, frozen, cleaned, transferred, retained, resumed };
   });
   assert.ok(result.samples > 0, 'Exercise actual CSS zoom transitions');
-  for (const name of ['frozen', 'cleaned', 'transferred', 'resumed']) assert.equal(result[name], true, name);
+  for (const name of ['frozen', 'cleaned', 'transferred', 'retained', 'resumed']) assert.equal(result[name], true, name);
 });

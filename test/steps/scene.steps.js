@@ -155,7 +155,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     const renderer = second.renderer;
     const canvasDefaults = renderer.canvas.parentNode === map.getPane('webgpuPane') &&
       map.getPane('webgpuPane').parentNode === map.getContainer() &&
-      map.getPane('webgpuPane').style.zIndex === '450' &&
+      map.getPane('webgpuPane').style.zIndex === '1' &&
       renderer.dpr === Math.min(window.devicePixelRatio, 2);
     let disposals = 0;
     const destroy = renderer.device.destroy.bind(renderer.device);

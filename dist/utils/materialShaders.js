@@ -1,4 +1,4 @@
-function T(e={},t=!1,x=""){const n=!!e.baseTexture,l=!!e.metalTexture,c=!!e.emissiveTexture,u=!!e.occlusionTexture,o=!!e.roofTexture,s=!!e.terrain,i=n||l||c||u||e.nightLight,p=`
+function T(e={},t=!1,x=""){const a=!!e.baseTexture,l=!!e.metalTexture,c=!!e.emissiveTexture,u=!!e.occlusionTexture,o=!!e.roofTexture,s=!!e.terrain,i=a||l||c||u||e.nightLight,p=`
     struct Mesh {
       worldMatrix: mat4x4<f32>,
       baseColor: vec4<f32>,
@@ -62,8 +62,8 @@ function T(e={},t=!1,x=""){const n=!!e.baseTexture,l=!!e.metalTexture,c=!!e.emis
       output.position = frame.projectionMatrix * viewPosition;
       return output;
     }
-  `,v=[];let a=3;const r=(f,$)=>{if(!$)return"";v.push({name:f,texture:a,sampler:a+1});const m=a;return a+=2,`@group(0) @binding(${m}) var ${f}: texture_2d<f32>;
-      @group(0) @binding(${m+1}) var ${f}Sampler: sampler;`},g=r("baseTexture",n),d=r("metalTexture",l),h=r("emissiveTexture",c),w=r("occlusionTexture",u),b=r("roofTexture",o),y=`
+  `,v=[];let n=3;const r=(f,$)=>{if(!$)return"";v.push({name:f,texture:n,sampler:n+1});const m=n;return n+=2,`@group(0) @binding(${m}) var ${f}: texture_2d<f32>;
+      @group(0) @binding(${m+1}) var ${f}Sampler: sampler;`},g=r("baseTexture",a),d=r("metalTexture",l),h=r("emissiveTexture",c),w=r("occlusionTexture",u),b=r("roofTexture",o),y=`
     struct Mesh {
       worldMatrix: mat4x4<f32>,
       baseColor: vec4<f32>,
@@ -148,11 +148,11 @@ function T(e={},t=!1,x=""){const n=!!e.baseTexture,l=!!e.metalTexture,c=!!e.emis
       let worldNormal = normalize(transpose(mat3x3<f32>(frame.viewMatrix[0].xyz, frame.viewMatrix[1].xyz, frame.viewMatrix[2].xyz)) * normalize(input.normal)) * select(-1.0, 1.0, frontFacing);
       let artificial = localLighting(input.worldPosition, worldNormal);
       ${e.unlit?`
-        let rasterTexel = textureSample(baseTexture, baseTextureSampler, input.uv);
+        let rasterTexel = ${a?"textureSample(baseTexture, baseTextureSampler, input.uv)":"vec4<f32>(input.color, 1.0)"};
         return vec4<f32>(toSRGB(toLinear(rasterTexel.rgb) * (frame.atmosphereTint.rgb * (0.55 + 0.45 * sunlight) + artificial)), ${e.alphaMode==="BLEND"?"u.material.z * rasterTexel.a":"1.0"});
       `:`
       var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);
-      let texel = ${n?"textureSample(baseTexture, baseTextureSampler, input.uv)":"vec4<f32>(1.0)"};
+      let texel = ${a?"textureSample(baseTexture, baseTextureSampler, input.uv)":"vec4<f32>(1.0)"};
       let alpha = u.material.z * texel.a;
       ${e.alphaMode==="MASK"?"if (alpha < u.material.w) { discard; }":""}
       ${e.alphaMode==="BLEND"?"if (alpha < 0.01) { discard; }":""}

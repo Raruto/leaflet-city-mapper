@@ -13,6 +13,7 @@ _For a working example see one of the following demos:_
 
 - [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
 - [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-geojson.html)
+- [Native Leaflet layers on WebGPU](./examples/leaflet-city-mapper-native.html)
 
 ## How to use
 
@@ -46,6 +47,16 @@ const buildings = new L.Layer({
 Vector and raster layers are initialized in [`src/index.js`](./src/index.js); their rendering utilities are loaded only when needed. Terrain, sunlight, traffic and walk initializers are also loaded lazily from [`src/utils`](./src/utils).
 
 Initialization and shared renderer state live directly on `L.Layer`, without a type registry. Supported `source.type` values are `3d`, `geojson`, `pmtiles`, `terrain`, `sunlight`, `traffic` and `walk`; unknown types emit an `error` event and reject `layer.ready`. Leaflet subclasses keep their own initialization.
+
+### Native Leaflet layers
+
+Loading the plugin automatically renders native `TileLayer` (including WMS), image/canvas `GridLayer` tiles, `ImageOverlay`, image-icon `Marker`, `Polyline`, `Polygon`, `Rectangle`, `Circle` and `CircleMarker` content in the shared WebGPU canvas. `GeoJSON`, `LayerGroup` and `FeatureGroup` work through their children, with their original constructors and methods.
+
+The common `L.Layer` lifecycle loads the adapter lazily. Paths are triangulated directly from coordinates, without creating SVG or Canvas 2D renderers, and use GPU-scene raycasting for pointer events. Tiles and overlay images load in detached elements: they are texture sources, not DOM snapshots. Image markers use coordinate-derived GPU billboards; only their transparent, accessible DOM controls remain for keyboard focus and dragging, without per-frame layout measurements. Leaflet still owns requests, popups and attribution.
+
+Mutators such as `setLatLng`, `setStyle`, `setRadius`, `setOpacity`, `setUrl` and `redraw`, as well as removal/re-adding, update GPU resources. Path buffers remain unchanged during pan, rotation and pitch; pixel-width strokes are retessellated on `zoomend` or source changes. The untransformed GPU canvas sits above the pitch sky and below Leaflet's panes: tall objects remain visible above the horizon, while popups, tooltips and controls stay in front. `layer.ready` reports GPU initialization; native `load`/`tileload` events still report image/tile loading. Rendering failures emit `error`, without silently falling back to DOM rendering.
+
+Cross-origin images and tile services must permit CORS; the plugin enables `crossOrigin` before loading. HTML `DivIcon`, video/SVG overlays, popup, tooltip and controls intentionally stay in the DOM. Custom HTML `GridLayer` tiles are not raster images and report an error. The [native gallery](./examples/leaflet-city-mapper-native.html) includes every supported native layer type; append `?canvas` to verify that `preferCanvas` also uses direct GPU paths instead of a duplicate Canvas 2D renderer.
 
 ### Update demo data
 

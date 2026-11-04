@@ -74,7 +74,8 @@ export function intersectMeshes(ray, meshes, night = 0) {
             f = sub(c, a),
             p = cross(direction, f),
             det = dot(e, p);
-      if (mesh.program.cullFace !== null ? det < 1e-9 : Math.abs(det) < 1e-9) {
+      if (mesh.program.cullMode === 'none' || mesh.program.cullFace === null
+        ? Math.abs(det) < 1e-9 : det < 1e-9) {
         continue;
       }
       const t = sub(origin, a), u = dot(t, p) / det;

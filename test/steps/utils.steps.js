@@ -291,6 +291,8 @@ Then('standalone browser math preserves scene transforms and picking', async fun
     updateWorldMatrix(far);
     const ray = { origin: [0, 0, 0], direction: [0, 0, -1] };
     const hits = intersectMeshes(ray, [far, near]);
+    near.program = { cullMode: 'none' };
+    const backfaceHits = intersectMeshes({ origin: [0, 0, -10], direction: [0, 0, 1] }, [near]).length;
     near.program.nightLight = true;
     near.geometry.attributes.uv = { data: [0, 0, 0, 0, 0, 0] };
     const dayHits = intersectMeshes(ray, [near]).length;
@@ -298,7 +300,7 @@ Then('standalone browser math preserves scene transforms and picking', async fun
     return {
       position, cached, updated, projection: [project(-1), project(-100)],
       hits: hits.map(hit => ({ distance: hit.distance, point: hit.point, faceIndex: hit.faceIndex })),
-      dayHits, nightHits,
+      dayHits, nightHits, backfaceHits,
     };
   }, this.baseUrl);
   assert.deepEqual(result.position, [12, 26, 42]);
@@ -311,4 +313,5 @@ Then('standalone browser math preserves scene transforms and picking', async fun
     { distance: 10, point: [0, 0, -10], faceIndex: 0 },
   ]);
   assert.deepEqual([result.dayHits, result.nightHits], [0, 1]);
+  assert.equal(result.backfaceHits, 1);
 });

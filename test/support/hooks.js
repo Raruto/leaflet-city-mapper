@@ -55,7 +55,7 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
   await getBrowser();
   this.baseUrl = baseUrl;
   this.context = await browser.newContext();
-  await this.context.route(/.html$/, async route => {
+  await this.context.route(/\.html(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
     let body = (await response.text())

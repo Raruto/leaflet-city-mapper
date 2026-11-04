@@ -174,7 +174,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       let worldNormal = normalize(transpose(mat3x3<f32>(frame.viewMatrix[0].xyz, frame.viewMatrix[1].xyz, frame.viewMatrix[2].xyz)) * normalize(input.normal)) * select(-1.0, 1.0, frontFacing);
       let artificial = localLighting(input.worldPosition, worldNormal);
       ${material.unlit ? `
-        let rasterTexel = textureSample(baseTexture, baseTextureSampler, input.uv);
+        let rasterTexel = ${hasBase ? 'textureSample(baseTexture, baseTextureSampler, input.uv)' : 'vec4<f32>(input.color, 1.0)'};
         return vec4<f32>(toSRGB(toLinear(rasterTexel.rgb) * (frame.atmosphereTint.rgb * (0.55 + 0.45 * sunlight) + artificial)), ${material.alphaMode === 'BLEND' ? 'u.material.z * rasterTexel.a' : '1.0'});
       ` : `
       var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);

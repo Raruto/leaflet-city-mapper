@@ -1,6 +1,6 @@
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
- * load their specialized utilities on first use. Subclasses are unchanged.
+ * load their specialized utilities on first use. Native map layers also join the WebGPU scene.
  */
 
 /**
@@ -24,6 +24,7 @@ const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(
 // One chain for every pending layer: they become real layers in creation order, whatever the import timing.
 let loading = Promise.resolve();
 let sceneModules, sceneLoading, rasterModules;
+let nativeLoading;
 
 /**
  * The '3d' layer type: native WebGPU scene synchronized with the map camera.
@@ -82,6 +83,53 @@ L.Layer._renderers = new WeakMap();
 L.Layer._nextId = 0;
 
 L.Layer.include({
+  _layerAdd(event) {
+    const native = !this._3d && (
+      this instanceof L.GridLayer ||
+      this instanceof L.Polyline ||
+      this instanceof L.CircleMarker ||
+      this instanceof L.Marker && !(this.options.icon instanceof L.DivIcon) ||
+      this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)
+    );
+    if (native) {
+      if (this instanceof L.GridLayer || this instanceof L.ImageOverlay) {
+        this.options.crossOrigin ||= true;
+      }
+      if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
+    }
+    layerProto._layerAdd.call(this, event);
+    if (!native || !event.target.hasLayer(this)) return;
+    if (!document.getElementById('leaflet-webgpu-targets')) {
+      const style = document.createElement('style');
+      style.id = 'leaflet-webgpu-targets';
+      style.textContent = '.leaflet-webgpu-target{opacity:0!important}';
+      document.head.append(style);
+    }
+    const state = this._nativeGPU = { source: this, map: event.target, hidden: new Set() };
+    state.hide = () => {
+      const htmlIcon = this instanceof L.Marker && this.options.icon instanceof L.DivIcon;
+      for (const element of [htmlIcon ? null : this._icon, htmlIcon ? null : this._shadow]) {
+        if (!element || state.hidden.has(element)) continue;
+        element.classList.add('leaflet-webgpu-target');
+        state.hidden.add(element);
+      }
+    };
+    state.hide();
+    this.once('remove', () => {
+      if (this._nativeGPU === state) this._nativeGPU = null;
+      state.dispose?.();
+      for (const element of state.hidden) {
+        element.classList.remove('leaflet-webgpu-target');
+      }
+    });
+
+    nativeLoading ||= import('./utils/nativeLayer.js');
+    this.ready = nativeLoading.then(({ nativeLayer }) => {
+      if (this._nativeGPU !== state) return this;
+      return nativeLayer(state);
+    });
+    this.ready.catch(error => this.fire('error', { error }));
+  },
   _init3D(options = {}) {
     const layer = this;
     const ready = sceneLoading ||= Promise.all([
@@ -270,4 +318,41 @@ L.Layer.include({
     });
     ready.catch(error => this.fire('error', { error }));
   },
+});
+
+L.Layer.addInitHook(function () {
+  if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
+    const refresh = () => this._nativeGPU?.refresh?.();
+    this.beforeAdd = this.onAdd = this.onRemove = this._updateBounds = () => {};
+    this.getEvents = () => ({});
+    // Leaflet mutators call this renderer contract, but no SVG/Canvas renderer is created.
+    this._renderer = {
+      options: { tolerance: 0 },
+      _updatePath: refresh,
+      _updateStyle: refresh,
+      _bringToFront: () => this._nativeGPU?.reorder?.(true),
+      _bringToBack: () => this._nativeGPU?.reorder?.(false),
+    };
+    if (this instanceof L.Circle) {
+      const getBounds = this.getBounds;
+      this.getBounds = function () {
+        this._project();
+        return getBounds.call(this);
+      };
+    }
+  } else if (this instanceof L.GridLayer) {
+    const initialize = this._initContainer;
+    this._initContainer = function () {
+      initialize.call(this);
+      this._container.remove();
+    };
+  } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
+    this.onAdd = function () {
+      if (!this._image) this._initImage();
+      if (this._image.complete && this._image.naturalWidth) queueMicrotask(() => this.fire('load'));
+    };
+    this.onRemove = () => {};
+    this.getEvents = () => ({});
+    this._reset = () => this._nativeGPU?.refresh?.();
+  }
 });

@@ -34,7 +34,7 @@
 				touchPitch: true
 			});
 			const layers = new L.Control.Layers({
-				'Empty': new L.TileLayer(''),
+				'Empty': new L.LayerGroup(),
 				// Offline archive built by `node build/pmtiles.js`.
 				'Plan IGN': new L.Layer({
 					source: {

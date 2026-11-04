@@ -84,6 +84,8 @@ export function render(backend) {
   camera.target[0] = target[0]; camera.target[1] = target[1]; camera.target[2] = target[2];
   // Refresh the camera view, projection and combined projection-view matrices.
   updateCamera(camera);
+  updateWorldMatrix(backend.scene);
+  for (const layer of backend._layers) layer._beforeRender?.();
   const sunlight = map._sunlight;
   const lightPoint = new DOMPoint(...(sunlight?.direction || [-300, 500, 300]), 0).matrixTransform(new DOMMatrix(camera.viewMatrix));
   const lightLength = Math.hypot(lightPoint.x, lightPoint.y, lightPoint.z) || 1;
