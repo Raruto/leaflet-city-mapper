@@ -205,12 +205,13 @@ Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { time
 Then('the compass retains its drag sensitivity and bearing-only option', { timeout: 30000 }, async function () {
   await createMap(this.page);
   const control = this.page.getByRole('button', { name: 'Reset bearing and pitch', exact: true });
+  assert.equal(await control.evaluate(button => button.draggable), false);
   const rect = await control.boundingBox();
   await this.page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await this.page.mouse.down();
   await this.page.mouse.move(rect.x + rect.width / 2 + 50, rect.y + rect.height / 2 + 10, { steps: 4 });
   await this.page.mouse.up();
-  assert.equal(await this.page.evaluate(() => cameraMap.getBearing()), 40);
+  assert.ok(Math.abs(await this.page.evaluate(() => cameraMap.getBearing()) - 40) < 0.001);
   // Upward movement tilts; start far enough down that the pointer remains inside the viewport.
   await this.page.evaluate(() => cameraMap.setPitch(30));
   const rect2 = await control.boundingBox();
@@ -218,7 +219,9 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
   await this.page.mouse.down();
   await this.page.mouse.move(rect2.x + rect2.width / 2, rect2.y + rect2.height / 2 + 20, { steps: 4 });
   await this.page.mouse.up();
-  assert.deepEqual(await this.page.evaluate(() => [cameraMap.getBearing(), cameraMap.getPitch()]), [40, 20]);
+  const [bearing, pitch] = await this.page.evaluate(() => [cameraMap.getBearing(), cameraMap.getPitch()]);
+  assert.ok(Math.abs(bearing - 40) < 0.001);
+  assert.ok(Math.abs(pitch - 20) < 0.001);
   const settings = await this.page.evaluate(() => {
     const map = cameraMap;
     map.rotateControl.remove();

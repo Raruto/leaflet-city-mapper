@@ -75,6 +75,7 @@ L.Control.Rotate = L.Control.extend({
     const container = L.DomUtil.create('div', 'leaflet-control-rotate leaflet-bar');
     const button = L.DomUtil.create('a', 'leaflet-control-rotate-toggle', container);
     button.href = '#';
+    button.draggable = false;
     button.setAttribute('role', 'button');
     button.title = this.options.visualizePitch ? 'Reset bearing and pitch' : 'Reset bearing to north';
     button.setAttribute('aria-label', button.title);
