@@ -48,7 +48,7 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
 Then('sky and terrain change from day to night and celestial bodies follow the camera', { timeout: 90000 }, async function () {
   await this.page.waitForFunction(() => sunlightOverlay.control && map._sunlight);
   const result = await this.page.evaluate(async () => {
-    const owner = L.Layer._renderers.get(map), { device } = owner.renderer;
+    const owner = cityMapperTestState.renderers.get(map), { device } = owner.renderer;
     const input = sunlightOverlay.control.getContainer().querySelector('input[type=range]');
     const date = sunlightOverlay.control.getContainer().querySelector('input[type=date]');
     date.value = '2026-06-21';
@@ -143,8 +143,8 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(initial.date, initial.time.slice(0, 10));
   assert.equal(initial.minute, Number(initial.time.slice(11, 13)) * 60 + Number(initial.time.slice(14, 16)));
   assert.equal(initial.inLayers, true);
-  assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Metro (M + numero)',
-    'Bus & tram (nome linea)', 'Eiffel Tower', 'Streetlights', 'Bateaux-Mouches', 'Traffic', 'Shadows']);
+  assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Bus (simulated)',
+    'Tram (simulated)', 'Metro (surface simulation)', 'Eiffel Tower', 'Streetlights', 'Bateaux-Mouches', 'Traffic', 'Shadows']);
   await this.page.getByLabel('Solar date (UTC)').fill('2026-06-21');
   const slider = this.page.getByRole('slider', { name: 'Time of day (UTC)' });
   await slider.focus();
@@ -184,11 +184,11 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     input.value = '720'; input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await this.page.waitForFunction(() => {
-    const renderer = L.Layer._renderers.get(map).renderer;
+    const renderer = cityMapperTestState.renderers.get(map).renderer;
     return map._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
   });
   const result = await this.page.evaluate(async () => {
-    const owner = L.Layer._renderers.get(map), renderer = owner.renderer;
+    const owner = cityMapperTestState.renderers.get(map), renderer = owner.renderer;
     nativeChecks.render.render(owner);
     await renderer.device.queue.onSubmittedWorkDone();
     const { device, sunlight } = renderer;
@@ -242,7 +242,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
   });
   await this.page.waitForFunction(() => map._sunlight.altitude < 0);
   assert.equal(await this.page.evaluate(() => {
-    const owner = L.Layer._renderers.get(map);
+    const owner = cityMapperTestState.renderers.get(map);
     nativeChecks.render.render(owner);
     return owner.renderer.uniformData[51];
   }), 0);

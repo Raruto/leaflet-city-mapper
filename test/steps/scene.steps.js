@@ -136,7 +136,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     nativeChecks.graph.setParent(object, second.root);
     nativeChecks.render.update(second);
     const shared = first._shared === first && second._shared === first &&
-      L.Layer._renderers.get(map) === first &&
+      cityMapperTestState.renderers.get(map) === first &&
       first.renderer === second.renderer && first.camera === second.camera &&
       first.scene === second.scene && first.root !== second.root &&
       first.root.parent === second.root.parent && document.querySelectorAll('.leaflet-3d').length === 1;
@@ -166,7 +166,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     first.remove();
     await new Promise(requestAnimationFrame);
     const retained = second.renderer === renderer && renderer.canvas.isConnected && disposals === 0 &&
-      second._shared === second && L.Layer._renderers.get(map) === second &&
+      second._shared === second && cityMapperTestState.renderers.get(map) === second &&
       second._sceneOrigin === sceneOrigin && !first._frame &&
       second.camera.projectionViewMatrix.every((value, index) => Math.abs(value - matrix[index]) < 1e-10);
     const otherMap = new L.Map('second', { center: second.location, zoom: 17, rotate: true });

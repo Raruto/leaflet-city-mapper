@@ -1,3 +1,4 @@
+import { init3D } from '../scene/init3D.js';
 import {
   controlOnAdd, onBlur, onKey, onLayerAdd, onLayerRemove, onPointer, onReady, onTerrain, start, step, stop, toggle
 } from './walk.js';
@@ -16,7 +17,7 @@ export function initWalk(layer, {
   position = 'bottomright',
   ...options
 } = {}) {
-  layer._init3D(options);
+  init3D(layer, options);
   const keys = new Set();
   const control = new L.Control({ position });
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');

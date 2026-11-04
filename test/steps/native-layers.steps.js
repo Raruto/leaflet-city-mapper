@@ -32,7 +32,7 @@ Given('the native WebGPU gallery uses the {string} renderer preference', { timeo
 Then('native map content is drawn by WebGPU while HTML UI remains native', async function () {
   const result = await this.page.evaluate(async () => {
     const layers = Object.values(map._layers).filter(layer => layer._nativeGPU);
-    const owner = L.Layer._renderers.get(map);
+    const owner = cityMapperTestState.renderers.get(map);
     const target = map.latLngToContainerPoint(nativeLayers.CircleMarker.getLatLng());
     const dpr = owner.renderer.dpr;
     const pixel = [...await nativeChecks.pixels(owner, Math.round(target.x * dpr),
@@ -90,7 +90,7 @@ Then('native map content is drawn by WebGPU while HTML UI remains native', async
 Then('native rendering avoids DOM geometry reads and pan-time path rebuilds', async function () {
   const result = await this.page.evaluate(async () => {
     map.closePopup();
-    const owner = L.Layer._renderers.get(map), backend = nativeLayers.Marker._nativeGPU.backend;
+    const owner = cityMapperTestState.renderers.get(map), backend = nativeLayers.Marker._nativeGPU.backend;
     const paths = Object.values(map._layers).filter(layer => layer instanceof L.Path);
     const positions = paths.flatMap(layer => [...layer._nativeGPU.meshes.values()])
       .map(mesh => ({ mesh, buffer: mesh.geometry.attributes.position.buffer,
@@ -157,7 +157,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
   const result = await this.page.evaluate(async () => {
     const layer = nativeLayers.Rectangle;
     map.setBearing(30); map.setPitch(35);
-    const owner = L.Layer._renderers.get(map);
+    const owner = cityMapperTestState.renderers.get(map);
     nativeChecks.render.render(owner);
     const crs = map.options.crs, latlng = nativeLayers.CircleMarker.getLatLng(),
       origin = crs.project(owner._sceneOrigin), point = crs.project(latlng),
@@ -173,7 +173,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
     const rect = popup.querySelector('.leaflet-popup-content').getBoundingClientRect();
     const visible = document.elementsFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
       .some(element => popup.contains(element));
-    const canvas = L.Layer._renderers.get(map).renderer.canvas;
+    const canvas = cityMapperTestState.renderers.get(map).renderer.canvas;
     const pane = map.getPane('webgpuPane'), mapPane = map.getPane('mapPane');
     const below = Number(getComputedStyle(pane).zIndex) < Number(getComputedStyle(mapPane).zIndex);
     map.closePopup();
@@ -305,7 +305,7 @@ Then('native layer changes, interactions and removal preserve Leaflet behavior',
   assert.equal(dragged, true);
   const teardown = await this.page.evaluate(() => {
     map.remove();
-    return { disposed: !L.Layer._renderers.has(map) && document.querySelectorAll('canvas.leaflet-3d').length === 0,
+    return { disposed: !cityMapperTestState.renderers.has(map) && document.querySelectorAll('canvas.leaflet-3d').length === 0,
       errors: nativeErrors };
   });
   assert.deepEqual(teardown, { disposed: true, errors: [] });
@@ -333,7 +333,7 @@ Then('native pointer events respect bubbling and propagation cancellation', asyn
     const layer = nativeLayers.CircleMarker;
     layer.unbindPopup().unbindTooltip();
     map.setView(layer.getLatLng(), 15, { animate: false });
-    nativeChecks.render.render(L.Layer._renderers.get(map));
+    nativeChecks.render.render(cityMapperTestState.renderers.get(map));
     const p = map.latLngToContainerPoint(layer.getLatLng()), rect = map.getContainer().getBoundingClientRect();
     window.eventCounts = { map: 0, layer: 0, down: 0, up: 0 };
     map.on('click', () => eventCounts.map++);
@@ -357,7 +357,7 @@ Then('native pointer events respect bubbling and propagation cancellation', asyn
 
 Then('native zoom animation interpolates the GPU camera and accessible marker targets', { timeout: 30000 }, async function () {
   await this.page.evaluate(() => {
-    const owner = L.Layer._renderers.get(map), marker = nativeLayers.Marker;
+    const owner = cityMapperTestState.renderers.get(map), marker = nativeLayers.Marker;
     map.setView(marker.getLatLng(), 15, { animate: false });
     map._setPitchAndBearing(50, 35);
     nativeChecks.render.render(owner);
@@ -365,7 +365,7 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
   await this.page.waitForFunction(() => Object.values(nativeLayers).filter(layer => layer instanceof L.GridLayer)
     .every(layer => !layer.isLoading() && Object.values(layer._tiles).every(tile => !tile.current || tile.active)));
   const result = await this.page.evaluate(async () => {
-    const owner = L.Layer._renderers.get(map), marker = nativeLayers.Marker;
+    const owner = cityMapperTestState.renderers.get(map), marker = nativeLayers.Marker;
     const distance = () => Math.hypot(...owner.camera.position.map((value, i) => value - owner.camera.target[i]));
     const start = distance(), samples = [];
     map.setZoomAround(new L.Point(500, 300), 16, { animate: true });
@@ -400,7 +400,7 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     marker.setIcon(icon);
     await marker.ready;
     await marker._icon.decode();
-    const owner = L.Layer._renderers.get(map);
+    const owner = cityMapperTestState.renderers.get(map);
     nativeChecks.render.render(owner);
     const gpu = marker._nativeGPU.meshes.get('icon');
     const adapted = Boolean(gpu) && marker._icon.classList.contains('leaflet-webgpu-target');
@@ -440,7 +440,7 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     closestPoint: true, upright: true, shadowScaled: true, front: true, back: true });
   const drag = await this.page.evaluate(() => {
     map._setPitchAndBearing(45, 30);
-    nativeChecks.render.render(L.Layer._renderers.get(map));
+    nativeChecks.render.render(cityMapperTestState.renderers.get(map));
     const r = changedIconMarker._icon.getBoundingClientRect(), container = map.getContainer().getBoundingClientRect();
     const point = map.latLngToContainerPoint(changedIconMarker.getLatLng());
     window.expectedDragPoint = point.add([45, 30]);

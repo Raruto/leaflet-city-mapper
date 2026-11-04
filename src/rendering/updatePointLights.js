@@ -1,38 +1,60 @@
 import { lightGrid } from './lightGrid.js';
-import { traverse } from '../scene/traverse.js';
 import { worldLights } from './worldLights.js';
 import { destroyTexture } from './destroyTexture.js';
 import { bindSunlight } from '../sunlight/bindSunlight.js';
 
-/** A cached spatial grid limits fragment lighting to nearby lamps, without dropping dense cells. */
+/** Keep fixed lamps cached when moving headlights change. */
+
+export function cacheLightGrid(meshes, previous, maxBytes) {
+  let unchanged = previous?.meshes.length === meshes.length;
+  const packed = [], snapshots = [];
+  for (let i = 0; i < meshes.length; i++) {
+    const mesh = meshes[i], matrix = mesh.worldMatrix, lights = mesh.extras.lights;
+    let cache = mesh._worldLights;
+    let sameMatrix = Boolean(cache);
+    for (let j = 0; j < matrix.length && sameMatrix; j++) sameMatrix = matrix[j] === cache.matrix[j];
+    if (!sameMatrix || cache.lights !== lights) {
+      cache = mesh._worldLights = { lights, matrix: [...matrix], data: worldLights(lights, matrix) };
+    }
+    unchanged &&= previous.meshes[i].mesh === mesh && previous.meshes[i].cache === cache;
+    packed.push(cache.data);
+    snapshots.push({ mesh, cache });
+  }
+  if (unchanged) return previous;
+  return { ...lightGrid(packed, maxBytes), meshes: snapshots };
+}
 
 export function updatePointLights(backend) {
   const { device, sunlight: sun } = backend.renderer;
-  const meshes = [];
+  const fixed = [], moving = [];
   for (const layer of backend._layers) {
     if (!layer.options.nightLight || !layer.root.visible) continue;
-    traverse(layer.root, mesh => {
-      if (!mesh.visible) return true;
-      if (mesh.extras?.lights) meshes.push(mesh);
-    });
+    collectLightMeshes(layer.root, fixed, moving);
   }
-  if (sun.lightMeshes?.length === meshes.length && meshes.every((mesh, i) => sun.lightMeshes[i].mesh === mesh &&
-    sun.lightMeshes[i].lights === mesh.extras.lights && mesh.worldMatrix.every((v, j) => v === sun.lightMeshes[i].matrix[j]))) return;
-  // Per mesh, world-space [x, y, z, radius, r, g, b, intensity] per light: re-packed only when its lights or matrix change.
-  const packed = meshes.map(mesh => {
-    const cache = mesh._worldLights, m = mesh.worldMatrix, lights = mesh.extras.lights;
-    if (cache?.lights === lights && m.every((v, j) => v === cache.matrix[j])) return cache.data;
-    const values = worldLights(lights, m);
-    mesh._worldLights = { lights, matrix: [...m], data: values };
-    return values;
-  });
-  const { data, count } = lightGrid(packed, device.limits.maxStorageBufferBindingSize);
-  if (sun.lights.size < data.byteLength) {
+  const maxBytes = device.limits.maxStorageBufferBindingSize;
+  const staticGrid = cacheLightGrid(fixed, sun.staticLightGrid, maxBytes);
+  const dynamicGrid = cacheLightGrid(moving, sun.dynamicLightGrid, maxBytes);
+  if (staticGrid === sun.staticLightGrid && dynamicGrid === sun.dynamicLightGrid) return;
+  const size = staticGrid.data.byteLength + dynamicGrid.data.byteLength;
+  if (size > maxBytes) throw new Error('Streetlight grid exceeds GPU storage limit');
+  let uploadStatic = staticGrid !== sun.staticLightGrid;
+  if (sun.lights.size < size) {
     destroyTexture(backend, sun.lights);
-    sun.lights = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    sun.lights = device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     bindSunlight(backend);
+    uploadStatic = true;
   }
-  device.queue.writeBuffer(sun.lights, 0, data);
-  sun.lightCount = count;
-  sun.lightMeshes = meshes.map(mesh => ({ mesh, lights: mesh.extras.lights, matrix: [...mesh.worldMatrix] }));
+  // The spare header component points to a second grid in the same storage binding.
+  staticGrid.data[6] = staticGrid.data.length / 4;
+  if (uploadStatic) device.queue.writeBuffer(sun.lights, 0, staticGrid.data);
+  device.queue.writeBuffer(sun.lights, staticGrid.data.byteLength, dynamicGrid.data);
+  sun.lightCount = staticGrid.count + dynamicGrid.count;
+  sun.staticLightGrid = staticGrid;
+  sun.dynamicLightGrid = dynamicGrid;
+}
+
+function collectLightMeshes(node, fixed, moving) {
+  if (!node.visible) return;
+  if (node.extras?.lights) (node.extras.dynamicLights ? moving : fixed).push(node);
+  for (const child of node.children || []) collectLightMeshes(child, fixed, moving);
 }

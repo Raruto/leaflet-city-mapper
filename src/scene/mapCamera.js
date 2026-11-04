@@ -1,3 +1,5 @@
+import { initNativeGPU } from './initNativeGPU.js';
+
 const mapMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
 const radians = Math.PI / 180;
 const pointOf = point => Array.isArray(point) ? new L.Point(point[0], point[1]) : new L.Point(point.x, point.y);
@@ -279,7 +281,7 @@ L.Marker.include({
   setIcon(icon) {
     if (!(icon instanceof L.DivIcon)) icon.options.crossOrigin ||= true;
     const result = markerMethods.setIcon.call(this, icon);
-    if (this._map && !(icon instanceof L.DivIcon)) this._initNativeGPU(this._map);
+    if (this._map && !(icon instanceof L.DivIcon)) initNativeGPU(this, this._map);
     return result;
   },
   setRotation(rotation) {

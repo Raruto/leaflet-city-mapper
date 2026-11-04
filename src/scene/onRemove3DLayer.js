@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import * as destroyTexture from '../rendering/destroyTexture.js';
 import * as endZoom from './endZoom.js';
 import * as onMapChange from './onMapChange.js';
@@ -41,7 +42,7 @@ export function onRemove3DLayer(backend, map) {
         delete backend[key];
       }
       for (const layer of next._layers) layer._shared = next;
-      L.Layer._renderers.set(map, next);
+      cityMapper.renderers.set(map, next);
       map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, next);
       map.on('zoomstart', startZoom.startZoom, next);
       map.on('zoomanim', onZoomAnim.onZoomAnim, next);
@@ -70,7 +71,7 @@ export function onRemove3DLayer(backend, map) {
           backend.fire('error', { error });
           renderer.device.destroy();
         });
-      L.Layer._renderers.delete(map);
+      cityMapper.renderers.delete(map);
       for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete backend[key];
     }
   } else update.update(shared);

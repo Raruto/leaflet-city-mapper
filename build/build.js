@@ -1,4 +1,3 @@
-import { mkdir, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build as esbuildBuild, context } from 'esbuild';

@@ -288,7 +288,8 @@ const openEiffelExample = async function () {
       viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
       preferCanvas: map.options.preferCanvas,
       classicScriptsOnly: [...document.scripts].every(script => !script.type),
-      globalLibraries: typeof L.Layer.prototype._init3D === 'function' && typeof L.Layer.prototype._initRaster === 'function',
+      globalLibraries: typeof L.Layer.prototype.initialize === 'function' &&
+        !('_init3D' in L.Layer.prototype) && !('_initRaster' in L.Layer.prototype),
       vectorLayers: Object.values(map._layers).filter(layer => layer instanceof L.Path).length,
       backgrounds: [...document.querySelectorAll('.leaflet-control-layers-base label')].map(label => label.textContent.trim()),
       activeBackgrounds: layers._layers.filter(entry => !entry.overlay && map.hasLayer(entry.layer)).map(entry => entry.name),
@@ -310,6 +311,7 @@ Given('the Eiffel Tower example page is open', { timeout: 60000 }, openEiffelExa
 
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
 Given('the Eiffel Tower example page is open with its offline archives', { timeout: 60000 }, async function () {
-  await this.context.unroute('**/dist/leaflet-city-mapper.js');
+  await this.context.route('**/dist/leaflet-city-mapper.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await openEiffelExample.call(this);
 });

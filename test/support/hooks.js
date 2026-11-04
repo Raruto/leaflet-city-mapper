@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { After, AfterAll, Before, BeforeAll, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium, firefox } from 'playwright';
+import { build } from 'esbuild';
 import { startServer } from '../../build/server.js';
 
 setDefaultTimeout(10000);
@@ -43,8 +44,17 @@ AfterAll(function () {
 let server;
 let browser;
 let baseUrl;
+let pluginBundle;
 
 BeforeAll({ timeout: 60000 }, async () => {
+  const result = await build({
+    entryPoints: ['test/fixtures/plugin.js'],
+    bundle: true,
+    format: 'iife',
+    minify: true,
+    write: false,
+  });
+  pluginBundle = result.outputFiles[0].text;
   server = await startServer(0);
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -112,12 +122,14 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `const initialize = L.Layer.prototype._init3D;
+  const pmtilesMock = `const initialize = L.Layer.prototype.initialize;
     if (initialize && !initialize._testArchive) {
-      L.Layer.prototype._init3D = Object.assign(function (options = {}) {
-        if (options.url && !/\\.(glb|gltf)(?:[?#]|$)/i.test(options.url) && !options.archive) {
-          const url = new URL(options.url, document.baseURI).href;
-          options = { ...options, archive: {
+      L.Layer.prototype.initialize = Object.assign(function (options = {}) {
+        const source = options.source;
+        if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' &&
+          !/\\.(glb|gltf)(?:[?#]|$)/i.test(source.url) && !source.archive) {
+          const url = new URL(source.url, document.baseURI).href;
+          options = { ...options, source: { ...source, archive: {
             getHeader: async () => ['buildings', 'trees', 'streetlights'].some(name => url.endsWith('/paris-' + name + '.pmtiles'))
               ? { minZoom: 16, maxZoom: 16, minLon: 2.2424, minLat: 48.8162, maxLon: 2.416, maxLat: 48.9022 }
               : { minZoom: 11, maxZoom: 19 },
@@ -126,15 +138,20 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
               if (tile?.error) throw new Error(tile.error);
               return tile ? { data: new TextEncoder().encode(tile).buffer } : undefined;
             },
-          } };
+          } } };
         }
         return initialize.call(this, options);
       }, initialize, { _testArchive: true });
     }`;
   const mockPMTiles = async route => {
-    const response = await route.fetch();
-    await route.fulfill({ response, body: `${await response.text()}\n${pmtilesMock}` });
+    await route.fulfill({ contentType: 'text/javascript', body: `${pluginBundle}\n${pmtilesMock}` });
   };
+  this.pluginBundle = pluginBundle;
+  // Source-level checks and the instrumented bundle must share the same private state.
+  await this.context.route('**/src/state.js', route => route.fulfill({
+    contentType: 'text/javascript',
+    body: 'export const cityMapper = globalThis.cityMapperTestState;',
+  }));
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
   this.page = await this.context.newPage();
 });

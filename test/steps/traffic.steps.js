@@ -82,7 +82,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     }
   });
   const result = await this.page.evaluate(async () => {
-    const layer = cruiseBoats, owner = L.Layer._renderers.get(map);
+    const layer = cruiseBoats, owner = cityMapperTestState.renderers.get(map);
     const [{ along }, { scheduledTrips }] = await Promise.all([
       import(new URL('../src/traffic/along.js', location.href)),
       import(new URL('../src/traffic/scheduledTrips.js', location.href)),

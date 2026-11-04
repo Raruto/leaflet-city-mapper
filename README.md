@@ -59,7 +59,7 @@ node build/pmtiles.js --jobs=6
 
 ```
 
-All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `--bbox=west,south,east,north` to override it. The transit archives use Île-de-France Mobilités route data; metro and bus/tram names are labeled on the map.
+All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `--bbox=west,south,east,north` to override it.
 
 ### Build Guide
 

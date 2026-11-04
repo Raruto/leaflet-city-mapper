@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { underEntry } from '../scene/underEntry.js';
 import { update as updateScene } from "../scene/update.js";
 import { atmosphere } from './atmosphere.js';
@@ -36,7 +37,7 @@ export function onAddSun(layer, map) {
       }
     };
     const render = () => {
-      const renderer = L.Layer._renderers.get(map);
+      const renderer = cityMapper.renderers.get(map);
       if (renderer) updateScene(renderer);
     };
     const update = () => {

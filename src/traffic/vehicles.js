@@ -6,12 +6,16 @@ import { white } from "./white.js";
 import { paints } from './paints.js';
 import { headlight } from './headlight.js';
 import { taillight } from './taillight.js';
+import { busModel, tramModel, metroModel } from './transitModels.js';
 
 /**
  * `side`: default offset (metres) to the right of the lane centreline. `model(i)` gives the prisms of the i-th vehicle.
  * `lights`: night point lights in model space (see the night lighting grid), e.g. the pool cast by the headlights.
  */
 export const vehicles = {
+  bus: { side: 1.5, model: busModel },
+  tram: { side: 0, model: tramModel },
+  metro: { side: 0, model: metroModel },
   car: {
     side: 1.8,
     model: i => {

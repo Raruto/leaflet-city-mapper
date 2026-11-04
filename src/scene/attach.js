@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { emptyNode } from './emptyNode.js';
 import { setParent } from './setParent.js';
 import { traverse } from './traverse.js';
@@ -37,7 +38,7 @@ function showWebGPUWarning(map) {
  */
 
 export async function attach(backend, map) {
-  let shared = L.Layer._renderers.get(map);
+  let shared = cityMapper.renderers.get(map);
   if (shared?._rendererReady) {
     await shared._rendererReady.promise;
   }
@@ -45,11 +46,11 @@ export async function attach(backend, map) {
     shared = backend;
     backend._rendererReady = Promise.withResolvers();
     backend._rendererReady.promise.catch(() => { });
-    L.Layer._renderers.set(map, shared);
+    cityMapper.renderers.set(map, shared);
     const fail = error => {
       showWebGPUWarning(map);
       backend._rendererReady.reject(error);
-      L.Layer._renderers.delete(map);
+      cityMapper.renderers.delete(map);
       throw error;
     };
     const canvas = document.createElement('canvas');
@@ -62,7 +63,7 @@ export async function attach(backend, map) {
     }
     const device = await adapter.requestDevice().catch(fail);
     device.addEventListener('uncapturederror', event => {
-      const owner = L.Layer._renderers.get(map);
+      const owner = cityMapper.renderers.get(map);
       if (owner?.renderer?.device !== device) {
         return;
       }
@@ -71,7 +72,7 @@ export async function attach(backend, map) {
       }
     });
     device.lost.then(info => {
-      const owner = L.Layer._renderers.get(map);
+      const owner = cityMapper.renderers.get(map);
       if (!owner || owner.renderer?.device !== device) {
         return;
       }
@@ -163,7 +164,7 @@ export async function attach(backend, map) {
     backend._rendererReady.resolve();
     delete shared._rendererReady;
     render(shared);
-    L.Layer._renderers.set(map, shared);
+    cityMapper.renderers.set(map, shared);
   }
   const origin = map.options.crs.project(shared._sceneOrigin);
   const point = map.options.crs.project(backend.location);

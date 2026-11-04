@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { emptyNode } from '../scene/emptyNode.js';
 import { createProgram } from './createProgram.js';
 import { setParent } from '../scene/setParent.js';
@@ -23,7 +24,7 @@ export function createMesh(backend, data, material = {}, usage = 0, program) {
     device,
     geometry: { device, attributes, drawRange: { start: 0, count: attributes.position.count } },
     program: program || createProgram(backend, { vertexColors: true, doubleSided: true, ...material }),
-    id: L.Layer._nextId++, renderOrder: 0, extras: {},
+    id: cityMapper.nextId++, renderOrder: 0, extras: {},
   };
   setParent(mesh, backend.root);
   update(backend);

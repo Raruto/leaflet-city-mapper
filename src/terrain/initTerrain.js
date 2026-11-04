@@ -1,5 +1,6 @@
 import { onTerrainRemove } from './onTerrainRemove.js';
 import { onTerrainAdd } from './onTerrainAdd.js';
+import { init3D } from '../scene/init3D.js';
 
 /**
  * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
@@ -9,7 +10,7 @@ export function initTerrain(layer, options) {
   const terrainSource = options.url;
   const layerOptions = { ...options };
   delete layerOptions.url;
-  layer._init3D(layerOptions);
+  init3D(layer, layerOptions);
   layer.terrainSource = terrainSource;
   layer._terrainTiles = new Map();
   layer._rasterTiles = new Map();

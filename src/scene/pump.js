@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { emptyNode } from "./emptyNode.js";
 import { isClockWise } from "../geometry/isClockWise.js";
 import { lampPostGeometry } from "../geometry/lampPostGeometry.js";
@@ -16,7 +17,7 @@ import { getElevation } from "../terrain/getElevation.js";
 
 export function pump(backend, map = backend._map) {
   // Meshes need the shared renderer; _attach() re-runs _updateArea() once it exists.
-  const shared = map && L.Layer._renderers.get(map);
+  const shared = map && cityMapper.renderers.get(map);
   if (!shared) return;
   const layers = [...shared._layers].filter(layer =>
     Number.isFinite(layer._inflight) && layer._areas && (layer.url || layer._geojson));
@@ -201,7 +202,7 @@ export function pump(backend, map = backend._map) {
               vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
               ...(backend.options.nightLight ? { nightLight: true, alphaMode: 'BLEND', doubleSided: true } : {})
             }),
-            id: L.Layer._nextId++,
+            id: cityMapper.nextId++,
             renderOrder: 0,
             fadeDuration: 250,
             extras: { featureFaces, lights },

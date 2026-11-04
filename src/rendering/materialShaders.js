@@ -143,23 +143,31 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       }
       return textureSampleCompareLevel(shadowTexture, shadowSampler, uv, p.z - 0.0003);
     }
-    fn localLighting(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
-      if (frame.skyDirection.w <= 0.0 || lightGrid[0].w < 1.0) { return vec3<f32>(0.0); }
-      let cell = vec2<i32>(floor((position.xz - lightGrid[0].xy) / lightGrid[0].z));
-      if (any(cell < vec2<i32>(0)) || cell.x >= i32(lightGrid[0].w) || cell.y >= i32(lightGrid[1].x)) {
+    fn gridLighting(position: vec3<f32>, normal: vec3<f32>, offset: u32) -> vec3<f32> {
+      let grid = lightGrid[offset];
+      if (grid.w < 1.0) { return vec3<f32>(0.0); }
+      let cell = vec2<i32>(floor((position.xz - grid.xy) / grid.z));
+      if (any(cell < vec2<i32>(0)) || cell.x >= i32(grid.w) || cell.y >= i32(lightGrid[offset + 1u].x)) {
         return vec3<f32>(0.0);
       }
-      let header = lightGrid[2u + u32(cell.y) * u32(lightGrid[0].w) + u32(cell.x)];
+      let header = lightGrid[offset + 2u + u32(cell.y) * u32(grid.w) + u32(cell.x)];
       var light = vec3<f32>(0.0);
       for (var i = 0u; i < u32(header.y); i++) {
-        let source = lightGrid[u32(header.x) + i * 2u];
-        let colour = lightGrid[u32(header.x) + i * 2u + 1u];
+        let source = lightGrid[offset + u32(header.x) + i * 2u];
+        let colour = lightGrid[offset + u32(header.x) + i * 2u + 1u];
         let delta = source.xyz - position;
         let distance2 = max(dot(delta, delta), 1.0);
         let falloff = max(0.0, 1.0 - distance2 / (source.w * source.w));
         let lambert = max(0.0, dot(normal, delta / sqrt(distance2)));
         light += toLinear(colour.rgb) * colour.w * lambert * falloff * falloff / distance2;
       }
+      return light;
+    }
+    fn localLighting(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
+      if (frame.skyDirection.w <= 0.0) { return vec3<f32>(0.0); }
+      var light = gridLighting(position, normal, 0u);
+      let moving = u32(lightGrid[1].z);
+      if (moving > 0u) { light += gridLighting(position, normal, moving); }
       return light * frame.skyDirection.w;
     }
     fn appearance(position: vec2<f32>) {

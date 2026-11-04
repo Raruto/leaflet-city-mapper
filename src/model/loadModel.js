@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { decodeModel } from './decodeModel.js';
 import { emptyNode } from '../scene/emptyNode.js';
 import { nodeMatrix } from './nodeMatrix.js';
@@ -169,7 +170,7 @@ export async function loadModel(backend) {
             geometry,
             program,
             fadeDuration: 250,
-            id: L.Layer._nextId++,
+            id: cityMapper.nextId++,
             renderOrder: 0
           };
           mesh.name = description.meshes[spec.mesh].name; mesh.extras = spec.extras || {};

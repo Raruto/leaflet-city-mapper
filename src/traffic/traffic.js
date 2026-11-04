@@ -73,7 +73,7 @@ export function prepareTraffic(state) {
 }
 
 export function drawTrafficRoute(state) {
-  state.route = createTrafficMesh(state, routeGeometry(state.lanes), [], { emissive: [0.03, 0.25, 0.3] });
+  state.route = createTrafficMesh(state, routeGeometry(state.lanes), [], { unlit: true });
 }
 
 export function rebuildTrafficMesh(state) {
@@ -81,18 +81,25 @@ export function rebuildTrafficMesh(state) {
   disposeTrafficObject(state, state.mesh);
   state.mesh = null;
   if (!trips.length) return;
-  const color = trips.flatMap((trip, i) => build(model(i)).color), count = color.length / 3;
+  const color = trips.flatMap((trip, i) => build(model(i, trip.properties)).color), count = color.length / 3;
   state.mesh = createTrafficMesh(state, { position: color.map(() => 0), normal: color.map(() => 0), color },
     trips.map((trip, i) => ({
       id: trip.id, properties: trip.properties, faceStart: i * vertices / 3, faceEnd: (i + 1) * vertices / 3,
       vertexStart: i * vertices, vertexEnd: (i + 1) * vertices
     })), {}, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
   state.mesh.geometry.drawRange.count = count;
+  state.mesh.extras.dynamicLights = true;
   trafficBounds(state);
 }
 
 export function trafficBounds(state) {
-  const extent = { attributes: { position: { data: state.lanes.flatMap(lane => lane.points.flatMap(([x, z, y]) => [x - 20, y, z - 20, x + 20, y + 5, z + 20])) } } };
+  let radius = 20, height = 5;
+  for (let i = 0; i < state.template.position.length; i += 3) {
+    radius = Math.max(radius, Math.hypot(state.template.position[i], state.template.position[i + 2]) + Math.abs(state.side));
+    height = Math.max(height, state.template.position[i + 1]);
+  }
+  const extent = { attributes: { position: { data: state.lanes.flatMap(lane => lane.points.flatMap(([x, z, y]) =>
+    [x - radius, y, z - radius, x + radius, y + height, z + radius])) } } };
   computeBounds(extent);
   state.mesh.geometry.bounds = extent.bounds;
 }
@@ -296,6 +303,7 @@ export function readyTraffic(state) {
 }
 
 export function addTraffic(state) {
+  state.layer._beforeRaycast = placeTraffic.bind(null, state);
   if (state.ready) startTraffic(state);
 }
 

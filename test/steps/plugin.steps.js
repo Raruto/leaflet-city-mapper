@@ -9,7 +9,7 @@ Then('every local source in the city example is available', async function () {
   await response.dispose();
   const sources = [...html.matchAll(/\b(?:url|bridges):\s*'([^']+)'/g)]
     .map(([, source]) => new URL(source, url));
-  assert.equal(sources.length, 10);
+  assert.equal(sources.length, 13);
   for (const source of sources) {
     assert.equal(source.origin, new URL(url).origin);
     const asset = await this.context.request.get(source.href, { headers: { Range: 'bytes=0-0' } });
@@ -19,6 +19,7 @@ Then('every local source in the city example is available', async function () {
 });
 
 Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }, async function () {
+  await this.context.unroute('**/dist/leaflet-city-mapper.js');
   this.sourceRequests = [];
   this.page.on('request', request => {
     const url = new URL(request.url());
@@ -34,7 +35,7 @@ Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }
   });
   if (leaflet2) await this.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
   await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
-  await this.page.waitForFunction(() => L.Layer.prototype._init3D);
+  await this.page.waitForFunction(() => typeof L.Layer.prototype.initialize === 'function');
 });
 
 Then('each source initializes from the single bundle', async function () {
@@ -60,7 +61,8 @@ Then('each source initializes from the single bundle', async function () {
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {
   const result = await this.page.evaluate(async () => {
     const lazy = !Object.hasOwn(L.Layer, 'types') &&
-      typeof L.Layer.prototype._init3D === 'function' && L.Layer._renderers instanceof WeakMap;
+      !Object.hasOwn(L.Layer, '_renderers') && !Object.hasOwn(L.Layer, '_nextId') &&
+      ['_init3D', '_initRaster', '_initNativeGPU'].every(name => !(name in L.Layer.prototype));
     const archive = { getHeader: async () => ({ maxZoom: 19 }) };
     const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
     const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });

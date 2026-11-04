@@ -15,17 +15,6 @@
 				padding: 0;
 			}
 			.leaflet-pitch-sky { overflow: hidden; }
-			.transit-line-label { border: 0; background: transparent; }
-			.transit-line-label span {
-				display: block;
-				transform: translate(-50%, -50%);
-				padding: 2px 6px;
-				border: 2px solid white;
-				border-radius: 12px;
-				box-shadow: 0 1px 4px #000b;
-				font: 700 11px/1.2 sans-serif;
-				white-space: nowrap;
-			}
 		</style>
 	</head>
 	<body>
@@ -43,106 +32,6 @@
 				touchRotate: true,
 				touchPitch: true
 			});
-			const transitLayer = (archiveName, types) => {
-				const attribution = '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Île-de-France Mobilités: transit routes</a> (<a href="https://doc.transport.data.gouv.fr/le-point-d-acces-national/cadre-juridique/conditions-dutilisation-des-donnees/licence-odbl">ODbL</a>)';
-				const archive = new L.Layer({ source: { type: 'pmtiles', url: `data/paris-${archiveName}.pmtiles` } });
-				const casing = L.geoJSON(null, {
-					interactive: false,
-					style: { color: '#fff', weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round' },
-					attribution,
-				});
-				const routes = L.geoJSON(null, {
-					style({ properties: p }) {
-						const color = /^[\da-f]{6}$/i.test(p.route_color) ? `#${p.route_color}` : '#555';
-						return {
-							color,
-							weight: p.route_type === 'Subway' ? 3 : 4,
-							opacity: p.route_type === 'Subway' ? 0.65 : 0.9,
-							dashArray: p.route_type === 'Subway' ? '7 7' : null,
-							lineCap: 'round',
-							lineJoin: 'round',
-						};
-					},
-					onEachFeature(feature, line) {
-						const { route_short_name: shortName, route_long_name: longName, route_type: mode } = feature.properties;
-						const tooltip = document.createElement('span');
-						tooltip.textContent = `${mode} ${shortName}${longName && longName !== shortName ? ` · ${longName}` : ''}`;
-						line.bindTooltip(tooltip, { sticky: true });
-					},
-					attribution,
-				});
-				const labels = L.layerGroup();
-				const layer = L.layerGroup([casing, routes, labels]);
-				let features, request;
-				const updateLabels = () => {
-					if (!features || !map.hasLayer(layer)) return;
-					labels.clearLayers();
-					const bounds = map.getBounds(), seen = new Set();
-					for (const feature of features) {
-						const { route_id: id, route_short_name: name, route_type: mode, route_color: rawColor } = feature.properties;
-						if (seen.has(id)) continue;
-						const lines = feature.geometry.type === 'LineString'
-							? [feature.geometry.coordinates] : feature.geometry.coordinates;
-						const visible = lines.flat().filter(([lng, lat]) => bounds.contains([lat, lng]));
-						if (!visible.length) continue;
-						seen.add(id);
-						const color = /^[\da-f]{6}$/i.test(rawColor) ? `#${rawColor}` : '#555';
-						const rgb = color.slice(1).match(/.{2}/g).map(value => parseInt(value, 16));
-						const textColor = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 > 150 ? '#111' : '#fff';
-						const badge = document.createElement('span');
-						badge.textContent = mode === 'Subway' ? `M ${name}` : name;
-						badge.style.cssText = `background:${color};color:${textColor}`;
-						const description = `${mode} ${name}${feature.properties.route_long_name && feature.properties.route_long_name !== name
-							? ` · ${feature.properties.route_long_name}` : ''}`;
-						badge.setAttribute('aria-label', description);
-						labels.addLayer(L.marker([visible[Math.floor(visible.length / 2)][1],
-							visible[Math.floor(visible.length / 2)][0]], {
-							title: description,
-							icon: L.divIcon({ className: 'transit-line-label', html: badge, iconSize: [0, 0] }),
-						}));
-					}
-				};
-				const load = async () => {
-					if (features) {
-						updateLabels();
-						return;
-					}
-					const current = request = new AbortController();
-					try {
-						await archive.ready;
-						const header = await archive.getHeader();
-						const tilePoint = map.project([header.centerLat, header.centerLon], header.maxZoom).divideBy(256);
-						const tile = await archive.getZxy(header.maxZoom, Math.floor(tilePoint.x),
-							Math.floor(tilePoint.y), current.signal);
-						if (!tile) throw new Error(`No transit data in ${archiveName} PMTiles`);
-						const data = JSON.parse(new TextDecoder().decode(tile.data));
-						if (data.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
-							throw new Error(`Invalid ${archiveName} PMTiles GeoJSON`);
-						}
-						if (current.signal.aborted || !map.hasLayer(layer)) return;
-						features = data.features;
-						casing.addData(data);
-						routes.addData(data);
-						updateLabels();
-					} catch (error) {
-						if (!current.signal.aborted) {
-							console.error(`Unable to load ${archiveName} transit routes`, error);
-							layer.fire('error', { error });
-						}
-					}
-				};
-				layer.on('add', () => {
-					request = new AbortController();
-					map.on('moveend', updateLabels);
-					load();
-				});
-				layer.on('remove', () => {
-					map.off('moveend', updateLabels);
-					request?.abort();
-					labels.clearLayers();
-				});
-				return layer;
-			};
 			const layers = new L.Control.Layers({
 				'Empty': new L.LayerGroup(),
 				// Offline archive built by `node build/pmtiles.js`.
@@ -240,8 +129,18 @@
 					},
 					attribution: '<a href="https://opendata.paris.fr/explore/dataset/les-arbres/">Trees: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
-				'Metro (M + numero)': transitLayer('metro', ['Subway']),
-				'Bus & tram (nome linea)': transitLayer('bus-tram', ['Bus', 'Tram']),
+				'Bus (simulated)': new L.Layer({
+					source: { type: 'traffic', url: 'data/paris-transit.js', transitMode: 'bus', vehicle: 'bus', speed: 5, outline: true },
+					attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Bus routes: IDFM</a> (ODbL) · simulated, not live',
+				}).addTo(map),
+				'Tram (simulated)': new L.Layer({
+					source: { type: 'traffic', url: 'data/paris-transit.js', transitMode: 'tram', vehicle: 'tram', speed: 7, outline: true },
+					attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Tram routes: IDFM</a> (ODbL) · simulated, not live',
+				}).addTo(map),
+				'Metro (surface simulation)': new L.Layer({
+					source: { type: 'traffic', url: 'data/paris-transit.js', transitMode: 'metro', vehicle: 'metro', speed: 10, outline: true },
+					attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Metro routes: IDFM</a> (ODbL) · simulated on surface, not live',
+				}).addTo(map),
 				// OSM way 5013364 links to 3dmr=4; revision 3 is a CC0, metre-scale GLB.
 				// Register the four ground corners to OSM pillars 69034127/135/179/180.
 				// The GLB is axis-aligned, not north-aligned; its horizontal footprint is slightly undersized.

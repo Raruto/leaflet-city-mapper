@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { addRasterTile } from './addRasterTile.js';
 import { createProgram } from '../rendering/createProgram.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
@@ -214,7 +215,7 @@ function createRasterMesh(backend, tile) {
     worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     children: [], visible: true, device, geometry: backend._rasterGeometry,
     program: backend._rasterProgram, texture,
-    opacity: backend.options.opacity, id: L.Layer._nextId++,
+    opacity: backend.options.opacity, id: cityMapper.nextId++,
     renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
   };
   setParent(tile.mesh, backend.root);

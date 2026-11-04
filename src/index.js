@@ -1,17 +1,25 @@
 import './scene/mapCamera.js';
+import { init3D } from './scene/init3D.js';
+import { initNativeGPU } from './scene/initNativeGPU.js';
+import { initRaster } from './pmtiles/initRaster.js';
+import { setGeoJSONData } from './scene/setGeoJSONData.js';
+import { initTerrain } from './terrain/initTerrain.js';
+import { initSunlight } from './sunlight/initSunlight.js';
+import { initTraffic } from './traffic/initTraffic.js';
+import { initWalk } from './walk/initWalk.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
- * load their specialized utilities on first use. Native map layers also join the WebGPU scene.
+ * initialize their specialized behavior on first use. Native map layers also join the WebGPU scene.
  */
 
 /**
  * Router for `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`.
- * It imports source utilities on demand and initializes the existing instance;
+ * It initializes the existing instance from the bundled source modules;
  * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
- * - Vector ('3d', 'geojson') and raster ('pmtiles') initialization lives here.
+ * - Source routing lives here; initializers live in their respective domain folders.
  * - scene/: Leaflet lifecycle, interaction and scene updates; rendering/: WebGPU pipelines.
  * - geometry/, model/ and pmtiles/: shared mesh, glTF and archive operations.
  * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
@@ -24,10 +32,8 @@ import './scene/mapCamera.js';
 
 const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
 
-// One chain for every pending layer: they become real layers in creation order, whatever the import timing.
+// One chain for every pending layer: they become real layers in creation order.
 let loading = Promise.resolve();
-let sceneModules, sceneLoading, rasterModules;
-let nativeLoading;
 
 /**
  * The '3d' layer type: native WebGPU scene synchronized with the map camera.
@@ -82,9 +88,6 @@ let nativeLoading;
  * @param {Layer3DOptions} [options] World origin comes from center or the first map centre.
  */
 
-L.Layer._renderers = new WeakMap();
-L.Layer._nextId = 0;
-
 L.Layer.include({
   _layerAdd(event) {
     const native = !this._3d && (
@@ -102,158 +105,7 @@ L.Layer.include({
     }
     layerProto._layerAdd.call(this, event);
     if (!native || !event.target.hasLayer(this)) return;
-    this._initNativeGPU(event.target);
-  },
-  _initNativeGPU(map) {
-    if (this._nativeGPU) return;
-    if (!document.getElementById('leaflet-webgpu-targets')) {
-      const style = document.createElement('style');
-      style.id = 'leaflet-webgpu-targets';
-      style.textContent = '.leaflet-webgpu-target{opacity:0!important}';
-      document.head.append(style);
-    }
-    const state = this._nativeGPU = { source: this, map, hidden: new Set() };
-    state.hide = () => {
-      const htmlIcon = this instanceof L.Marker && this.options.icon instanceof L.DivIcon;
-      const targets = [htmlIcon ? null : this._icon, htmlIcon ? null : this._shadow];
-      for (const element of state.hidden) {
-        if (targets.includes(element)) continue;
-        element.classList.remove('leaflet-webgpu-target');
-        state.hidden.delete(element);
-      }
-      for (const element of targets) {
-        if (!element || state.hidden.has(element)) continue;
-        element.classList.add('leaflet-webgpu-target');
-        state.hidden.add(element);
-      }
-    };
-    state.hide();
-    this.once('remove', () => {
-      if (this._nativeGPU === state) this._nativeGPU = null;
-      state.dispose?.();
-      for (const element of state.hidden) {
-        element.classList.remove('leaflet-webgpu-target');
-      }
-    });
-
-    nativeLoading ||= import('./scene/nativeLayer.js');
-    this.ready = nativeLoading.then(({ nativeLayer }) => {
-      if (this._nativeGPU !== state) return this;
-      return nativeLayer(state);
-    });
-    this.ready.catch(error => this.fire('error', { error }));
-  },
-  _init3D(options = {}) {
-    const layer = this;
-    const ready = sceneLoading ||= Promise.all([
-      import('./scene/onAdd3DLayer.js'),
-      import('./scene/onRemove3DLayer.js'),
-      import('./scene/updateArea.js'),
-      import('./terrain/onTerrainChange.js'),
-    ]).then(([add, remove, update, terrain]) => sceneModules = { ...add, ...remove, ...update, ...terrain });
-    layer._3d = true;
-    L.Util.setOptions(layer, { ariaLabel: '3D scene', ...options });
-    layer.onAdd = map => {
-      if (sceneModules) return sceneModules.onAdd3DLayer(layer, map);
-      ready.then(({ onAdd3DLayer }) => {
-        if (layer._map === map) onAdd3DLayer(layer, map);
-      }).catch(error => layer.fire('error', { error }));
-    };
-    layer.onRemove = map => {
-      if (sceneModules) return sceneModules.onRemove3DLayer(layer, map);
-      ready.then(({ onRemove3DLayer }) => onRemove3DLayer(layer, map))
-        .catch(error => layer.fire('error', { error }));
-    };
-    layer.getEvents = () => {
-      const events = {};
-      if (layer.url) {
-        events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = () =>
-          sceneModules ? sceneModules.updateArea(layer) : ready.then(({ updateArea }) => updateArea(layer));
-      }
-      if (layer._geojson || layer.url) {
-        events.terrainchange = () => sceneModules
-          ? sceneModules.onTerrainChange(layer)
-          : ready.then(({ onTerrainChange }) => onTerrainChange(layer));
-      }
-      return events;
-    };
-    // ponytail: models are recognised by extension; extensionless model URLs need a .glb/.gltf suffix or query.
-    const isModel = !layer._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
-    layer.modelUrl = isModel ? layer.options.url : null;
-    layer.url = layer.options.url && !isModel && !layer._geojson ? new URL(layer.options.url, document.baseURI).href : null;
-    layer._directories = new Map();
-    if (layer.options.center) {
-      layer.location = new L.LatLng(layer.options.center[0], layer.options.center[1]);
-    }
-    /** @type {Map<string, SourceArea>} Keys are archive x/y, not screen tiles. */
-    layer._areas = new Map();
-    layer._inflight = 0;
-    layer._added = Promise.withResolvers();
-    queueMicrotask(async () => {
-      try {
-        await ready;
-        layer.root = (await import('./scene/emptyNode.js')).emptyNode();
-        layer.raycaster = { origin: [0, 0, 0], direction: [0, 0, 0] };
-        if (layer.url || layer._geojson) {
-          layer.group = layer.root;
-          if (layer.url) layer.header = await (await import('./pmtiles/getHeader.js')).getHeader(layer);
-        }
-        if (layer._map) {
-          await (await import('./scene/attach.js')).attach(layer, layer._map);
-          layer._added.resolve();
-        }
-        if (layer.modelUrl) await (await import('./model/loadModel.js')).loadModel(layer);
-        if (layer._shared) (await import('./scene/update.js')).update(layer);
-        layer.fire('ready');
-      } catch (error) {
-        layer.fire('error', { error });
-      }
-    });
-  },
-  _initRaster(options) {
-    const layer = this;
-    const [{ read }, { getHeader }, { getZxy }, { onPMTileAdd }, { onPMTileRemove },
-      { getRasterTileSize, updateRasterTiles }, { setPMTileOpacity }, { setPMTileZIndex }, { emptyNode }] = rasterModules;
-    layer._read = (offset, length, signal) => read(layer, offset, length, signal);
-    layer.getHeader = () => getHeader(layer);
-    layer.getZxy = (z, x, y, signal) => getZxy(layer, z, x, y, signal);
-    layer.getTileSize = () => getRasterTileSize();
-    layer.isLoading = () => layer._loadingTiles > 0;
-    layer.setOpacity = opacity => setPMTileOpacity(layer, opacity);
-    layer.setZIndex = zIndex => setPMTileZIndex(layer, zIndex);
-    layer.onAdd = map => onPMTileAdd(layer, map);
-    layer.onRemove = map => onPMTileRemove(layer, map);
-    const update = () => updateRasterTiles(layer);
-    layer.getEvents = () => ({
-      moveend: update,
-      zoomend: update,
-      rotate: update,
-      pitch: update,
-      resize: update,
-    });
-    options = { ariaLabel: 'PMTiles raster', maxZoom: 18, opacity: 1, zIndex: 0, ...options };
-    L.Util.setOptions(layer, options);
-    layer.root = emptyNode();
-    layer._areas = new Map();
-    layer._rasterTiles = new Map();
-    layer._loadingTiles = 0;
-    layer._added = Promise.withResolvers();
-    layer.url = new URL(options.url, document.baseURI).href;
-    layer._directories = new Map();
-    layer.ready = Promise.resolve(layer.options.archive || layer).then(async archive => {
-      const header = await archive.getHeader();
-      layer.options.archive = archive;
-      layer.header = header;
-      if (layer.options.maxNativeZoom === undefined) {
-        layer.options.maxNativeZoom = header.maxZoom;
-      }
-      layer.options.maxZoom = Math.max(layer.options.minZoom || 0, layer.options.maxZoom);
-      layer.fire('ready');
-      return layer;
-    }).catch(error => {
-      layer.fire('error', { error });
-      throw error;
-    });
+    initNativeGPU(this, event.target);
   },
   initialize(options = {}) {
     if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options.source) {
@@ -274,48 +126,30 @@ L.Layer.include({
     L.Util.setOptions(this, core);
     this._type = type;
     if (type === '3d') {
-      this._init3D(settings);
-      return;
-    }
-    if (type === 'pmtiles' && rasterModules) {
-      this._initRaster(settings);
+      init3D(this, settings);
       return;
     }
     this.onAdd = () => {};
     this.onRemove = () => {};
     // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
-    loading = loading.catch(() => {}).then(async () => {
+    loading = loading.catch(() => {}).then(() => {
       switch (type) {
-        case 'geojson': {
-          const { setGeoJSONData } = await import('./scene/setGeoJSONData.js');
+        case 'geojson':
           return (layer, options) => {
             layer._geojson = true;
             layer.setData = data => setGeoJSONData(layer, data);
-            layer._init3D(options);
+            init3D(layer, options);
           };
-        }
-        case 'pmtiles': {
-          rasterModules = await Promise.all([
-            import('./pmtiles/read.js'),
-            import('./pmtiles/getHeader.js'),
-            import('./pmtiles/getZxy.js'),
-            import('./pmtiles/onPMTileAdd.js'),
-            import('./pmtiles/onPMTileRemove.js'),
-            import('./pmtiles/rasterTiles.js'),
-            import('./pmtiles/setPMTileOpacity.js'),
-            import('./pmtiles/setPMTileZIndex.js'),
-            import('./scene/emptyNode.js'),
-          ]);
-          return (layer, options) => layer._initRaster(options);
-        }
+        case 'pmtiles':
+          return initRaster;
         case 'terrain':
-          return (await import('./terrain/initTerrain.js')).initTerrain;
+          return initTerrain;
         case 'sunlight':
-          return (await import('./sunlight/initSunlight.js')).initSunlight;
+          return initSunlight;
         case 'traffic':
-          return (await import('./traffic/initTraffic.js')).initTraffic;
+          return initTraffic;
         case 'walk':
-          return (await import('./walk/initWalk.js')).initWalk;
+          return initWalk;
         default:
           throw new Error(`Unknown layer type: ${type}`);
       }

@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { createProgram } from '../rendering/createProgram.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { terrainAtlas } from '../terrain/terrainAtlas.js';
@@ -99,7 +100,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
     ],
     tile,
     opacity: layer.options.opacity ?? 1,
-    id: L.Layer._nextId++,
+    id: cityMapper.nextId++,
     renderOrder: layer.options.zIndex || 0,
     fadeDuration: 250,
     fadeStart: tile.loadedAt,

@@ -208,9 +208,11 @@ Then('fading terrain detail covers retained ground without depth interference', 
     }));
     let release;
     const pending = new Promise(resolve => { release = resolve; });
-    const initialize = L.Layer.prototype._initRaster;
-    L.Layer.prototype._initRaster = function (options) {
-      if (options.url === 'overlap-terrain.pmtiles') options = { ...options, archive: {
+    const initialize = L.Layer.prototype.initialize;
+    L.Layer.prototype.initialize = function (settings = {}) {
+      let options = settings.source;
+      if (!options) return initialize.call(this, settings);
+      if (options.type === 'pmtiles' && options.url === 'overlap-terrain.pmtiles') options = { ...options, archive: {
         getHeader: async () => ({ ...header, minZoom: zoom - 2, maxZoom: zoom - 2, tileType: 0 }),
         getZxy: async (z, x, y) => {
           const values = new Float32Array(256 * 256);
@@ -223,7 +225,7 @@ Then('fading terrain detail covers retained ground without depth interference', 
           return { data: values.buffer };
         },
       } };
-      return initialize.call(this, options);
+      return initialize.call(this, { ...settings, source: options });
     };
     const terrain = new L.Layer({ source: { type: 'terrain', url: 'overlap-terrain.pmtiles' } }).addTo(map);
     const raster = new L.Layer({ source: { type: 'pmtiles', url: 'overlap-imagery.pmtiles', archive: {
@@ -288,7 +290,7 @@ Then('fading terrain detail covers retained ground without depth interference', 
       return { failures, above, steadyDepth };
     } finally {
       release(); raster.remove(); terrain.remove();
-      L.Layer.prototype._initRaster = initialize;
+      L.Layer.prototype.initialize = initialize;
     }
   });
   assert.ok(result.failures.every(frame => frame.bad === 0 && frame.coarse > 0), JSON.stringify(result));
@@ -481,11 +483,13 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 256, 128);
     ctx.fillStyle = '#0000ff'; ctx.fillRect(0, 128, 256, 128);
     const image = await (await fetch(canvas.toDataURL())).arrayBuffer();
-    const initialize = L.Layer.prototype._initRaster;
+    const initialize = L.Layer.prototype.initialize;
     let release;
     let pending = new Promise(resolve => { release = resolve; });
-    L.Layer.prototype._initRaster = function (options) {
-      if (options.url.endsWith('fixture-terrain.pmtiles')) options = { ...options, archive: {
+    L.Layer.prototype.initialize = function (settings = {}) {
+      let options = settings.source;
+      if (!options) return initialize.call(this, settings);
+      if (options.type === 'pmtiles' && options.url.endsWith('fixture-terrain.pmtiles')) options = { ...options, archive: {
         getHeader: async () => header,
         getZxy: async (z, x, y, signal) => {
           await pending;
@@ -499,7 +503,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
           return { data: values.buffer };
         },
       } };
-      return initialize.call(this, options);
+      return initialize.call(this, { ...settings, source: options });
     };
     const wait = async condition => {
       const deadline = performance.now() + 12000;
@@ -660,7 +664,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
     } finally {
       release();
       raster.remove(); terrain.remove(); buildings.remove(); model.remove();
-      L.Layer.prototype._initRaster = initialize;
+      L.Layer.prototype.initialize = initialize;
     }
   }, order);
   for (const name of ['initiallyFlat', 'hidden', 'restored', 'cancelled', 'reattached']) assert.equal(result[name], true, name);
@@ -720,7 +724,7 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
     first.remove();
     transferred = second._zoomTransitions === transitions;
     second.remove();
-    const retained = L.Layer._renderers.get(map)?._zoomTransitions === transitions;
+    const retained = cityMapperTestState.renderers.get(map)?._zoomTransitions === transitions;
     tiles.remove();
     resumed = [...transitions.keys()].every(animation => animation.playState !== 'paused');
     await moved;

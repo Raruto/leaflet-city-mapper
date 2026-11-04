@@ -1,3 +1,4 @@
+import { cityMapper } from '../state.js';
 import { raycast } from './raycast.js';
 
 const maps = new WeakMap();
@@ -14,7 +15,7 @@ export function nativeEvents(state) {
     const descriptor = Object.getOwnPropertyDescriptor(map, '_fireDOMEvent');
     const fireDOMEvent = map._fireDOMEvent;
     const handle = function (event, type = event.type, targets) {
-      const owner = L.Layer._renderers.get(map);
+      const owner = cityMapper.renderers.get(map);
       if (!owner?.renderer || targets || !['click', 'preclick', 'dblclick', 'contextmenu',
         'mousedown', 'mouseup', 'mousemove', 'mouseover', 'mouseout',
         'pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout'].includes(type)) {
