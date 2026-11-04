@@ -1,27 +1,18 @@
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
- * load their specialized type module on first use. Subclasses are unchanged.
+ * load their specialized utilities on first use. Subclasses are unchanged.
  */
 
 /**
  * Router for `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`.
- * It imports the type module on demand and initializes the existing instance;
+ * It imports source utilities on demand and initializes the existing instance;
  * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
- * - types/: specialized modules for non-base `source.type`s, imported on demand:
- *   - 'pmtiles': raster PMTiles basemap rendered in the shared WebGPU canvas;
- *   - 'geojson': inline or URL-backed GeoJSON features rendered by the shared 3D scene;
- *   - 'terrain': Float32 PMTiles DEM that deforms raster tiles, buildings and the camera, plus optional bridge decks;
- *   - 'sunlight': simulation clock control, sun/moon lighting and shadows;
- *   - 'traffic': vehicles moving along GeoJSON lanes (measured flow or timetable);
- *   - 'walk': third-person pedestrian moved with the keyboard, the camera following behind.
- * - The base '3d' type and its Leaflet lifecycle are defined below.
- * - scene/: named operations for GPU resources, model/archive loading, lighting, sources, picking
- *   and rendering. They receive the layer explicitly; the 3D Leaflet lifecycle is defined here.
- * - utils/: computations and scene-data helpers, independent of Leaflet layers and GPU devices.
- *   Geometry, decoders, lighting grids, terrain sampling, traffic and collisions can be tested in Node;
- *   scene transforms/picking use browser DOMMatrix/DOMPoint, and CSS colors use a canvas.
+ * - Vector ('3d', 'geojson') and raster ('pmtiles') initialization lives here.
+ * - utils/: lazy operations for rendering, archives, geometry and specialized layers:
+ *   terrain (Float32 DEM), sunlight (clock and lighting), traffic and walking.
+ *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
  * When `type` is omitted, inline FeatureCollections use 'geojson'; otherwise *.pmtiles URLs use
@@ -159,6 +150,77 @@ L.Layer.types['3d'] = function (layer, options = {}) {
 L.Layer.types['3d']._renderers = new WeakMap();
 L.Layer.types['3d']._nextId = 0;
 
+const initializers = {
+  async geojson() {
+    const { setGeoJSONData } = await import('./utils/setGeoJSONData.js');
+    return (layer, options) => {
+      layer._geojson = true;
+      layer.setData = data => setGeoJSONData(layer, data);
+      L.Layer.types['3d'](layer, options);
+    };
+  },
+  async pmtiles() {
+    const [{ read }, { getHeader }, { getZxy }, { onPMTileAdd }, { onPMTileRemove },
+      { getRasterTileSize, updateRasterTiles }, { setPMTileOpacity }, { setPMTileZIndex }, { emptyNode }] = await Promise.all([
+      import('./utils/read.js'),
+      import('./utils/getHeader.js'),
+      import('./utils/getZxy.js'),
+      import('./utils/onPMTileAdd.js'),
+      import('./utils/onPMTileRemove.js'),
+      import('./utils/rasterTiles.js'),
+      import('./utils/setPMTileOpacity.js'),
+      import('./utils/setPMTileZIndex.js'),
+      import('./utils/emptyNode.js'),
+    ]);
+    return (layer, options) => {
+      layer._read = (offset, length, signal) => read(layer, offset, length, signal);
+      layer.getHeader = () => getHeader(layer);
+      layer.getZxy = (z, x, y, signal) => getZxy(layer, z, x, y, signal);
+      layer.getTileSize = () => getRasterTileSize();
+      layer.isLoading = () => layer._loadingTiles > 0;
+      layer.setOpacity = opacity => setPMTileOpacity(layer, opacity);
+      layer.setZIndex = zIndex => setPMTileZIndex(layer, zIndex);
+      layer.onAdd = map => onPMTileAdd(layer, map);
+      layer.onRemove = map => onPMTileRemove(layer, map);
+      const update = () => updateRasterTiles(layer);
+      layer.getEvents = () => ({
+        moveend: update,
+        zoomend: update,
+        rotate: update,
+        pitch: update,
+        resize: update,
+      });
+      options = { ariaLabel: 'PMTiles raster', maxZoom: 18, opacity: 1, zIndex: 0, ...options };
+      L.Util.setOptions(layer, options);
+      layer.root = emptyNode();
+      layer._areas = new Map();
+      layer._rasterTiles = new Map();
+      layer._loadingTiles = 0;
+      layer._added = Promise.withResolvers();
+      layer.url = new URL(options.url, document.baseURI).href;
+      layer._directories = new Map();
+      layer.ready = Promise.resolve(layer.options.archive || layer).then(async archive => {
+        const header = await archive.getHeader();
+        layer.options.archive = archive;
+        layer.header = header;
+        if (layer.options.maxNativeZoom === undefined) {
+          layer.options.maxNativeZoom = header.maxZoom;
+        }
+        layer.options.maxZoom = Math.max(layer.options.minZoom || 0, layer.options.maxZoom);
+        layer.fire('ready');
+        return layer;
+      }).catch(error => {
+        layer.fire('error', { error });
+        throw error;
+      });
+    };
+  },
+  terrain: () => import('./utils/initTerrain.js').then(module => module.initTerrain),
+  sunlight: () => import('./utils/initSunlight.js').then(module => module.initSunlight),
+  traffic: () => import('./utils/initTraffic.js').then(module => module.initTraffic),
+  walk: () => import('./utils/initWalk.js').then(module => module.initWalk),
+};
+
 L.Layer.include({
   initialize(options = {}) {
     if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options.source) {
@@ -190,7 +252,13 @@ L.Layer.include({
     this.onRemove = () => {};
     map?.addLayer(this);
     // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
-    loading = loading.catch(() => {}).then(() => import(new URL(`./types/${type}.js`, scriptUrl).href));
+    loading = loading.catch(() => {}).then(async () => {
+      if (Object.hasOwn(initializers, type)) {
+        L.Layer.types[type] ||= await initializers[type]();
+      } else {
+        await import(new URL(`./types/${type}.js`, scriptUrl).href);
+      }
+    });
     const pending = this.ready = loading.then(() => {
       const map = this._map;
       map?.removeLayer(this);

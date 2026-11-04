@@ -288,7 +288,11 @@ Given('a map with the standalone 3D module and no dependency import map', async 
       <script src="https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js"></script>
       <script src="../dist/leaflet-city-mapper.js"></script>
       <script>
-        import('../dist/types/terrain.js').then(() => window.test3d = { map: new L.Map('first', {
+        Promise.all([
+          new L.Layer({ source: { type: 'terrain' } }).ready,
+          new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+            archive: { getHeader: async () => ({ maxZoom: 19 }) } } }).ready,
+        ]).then(() => window.test3d = { map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30
         }) });
       </script>`,
@@ -350,6 +354,5 @@ Given('the Eiffel Tower example page is open', { timeout: 60000 }, openEiffelExa
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
 Given('the Eiffel Tower example page is open with its offline archives', { timeout: 60000 }, async function () {
   await this.context.unroute('**/dist/leaflet-city-mapper.js');
-  await this.context.unroute('**/dist/types/*.js');
   await openEiffelExample.call(this);
 });

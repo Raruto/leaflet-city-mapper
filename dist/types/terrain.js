@@ -1,2 +1,0 @@
-import"./pmtiles.js";import"../utils/removeRasterTile.js";import{elevationWGSL as n}from"../utils/elevationWGSL.js";import{onTerrainRemove as a}from"../utils/onTerrainRemove.js";import{onTerrainAdd as m}from"../utils/onTerrainAdd.js";L.Layer.types.terrain=(e,o)=>{const i=o.url,t={...o};delete t.url,L.Layer.types["3d"](e,t),e.terrainSource=i,e._terrainTiles=new Map,e._rasterTiles=new Map,e._terrainReady=!1,e.onAdd=r=>m(e,r),e.onRemove=r=>a(e,r)},L.Layer.types.terrain.elevationWGSL=n;
-//# sourceMappingURL=terrain.js.map

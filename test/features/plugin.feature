@@ -3,6 +3,10 @@ Feature: Separate plugin integration
     Given the city mapper plugin is loaded after leaflet-rotate
     Then source layers load lazily and Leaflet subclasses keep their behavior
 
+  Scenario: Specialized source utilities are loaded only on first use
+    Given the city mapper plugin is loaded after leaflet-rotate
+    Then each source loads only its requested initializer
+
   @offline
   Scenario: The city example references existing local assets
     Given the city mapper plugin is loaded after leaflet-rotate

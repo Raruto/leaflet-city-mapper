@@ -8,10 +8,10 @@
  * in metres, `name`/`description` for the default tooltip. The status line (vehicle count, then the FeatureCollection `note`) sits under the layer's entry in the layers control.
  * The 'sunlight' layer on the same map drives the time; without one, vehicles run live.
  */
-import { build } from '../utils/build.js';
-import { tooltip } from '../utils/tooltip.js';
-import { speed } from '../utils/speed.js';
-import { vehicles } from '../utils/vehicles.js';
+import { build } from './build.js';
+import { tooltip } from './tooltip.js';
+import { speed } from './speed.js';
+import { vehicles } from './vehicles.js';
 import {
   addTraffic,
   placeTraffic,
@@ -20,9 +20,9 @@ import {
   tickTraffic,
   updateTraffic,
   updateTrafficTerrain,
-} from '../utils/traffic.js';
+} from './traffic.js';
 
-L.Layer.types.traffic = function (layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
+export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
   side ??= defaultSide;
   L.Layer.types['3d'](layer, {

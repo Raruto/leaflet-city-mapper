@@ -6,7 +6,6 @@ import { build as esbuildBuild, context } from 'esbuild';
 const options = {
   entryPoints: [
     { in: 'src/index.js', out: 'leaflet-city-mapper' },
-    'src/types/**/*.js',
     'src/utils/**/*.js',
   ],
   format: 'esm',

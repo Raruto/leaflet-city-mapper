@@ -43,9 +43,9 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
-After that, the [`dist/types/geojson.js`](./src/types/geojson.js) will be dynamically imported into the page and a 3D layer should appear onto the map.
+Vector and raster layers are initialized in [`src/index.js`](./src/index.js); their rendering utilities are loaded only when needed. Terrain, sunlight, traffic and walk initializers are also loaded lazily from [`src/utils`](./src/utils).
 
-For further customization, you can define custom [`types`](./src/types/geojson.js): just upload them to the same folder and they will be loaded automatically.
+For further customization, register an initializer as `L.Layer.types.custom = (layer, options) => { ... }`. It configures the existing layer instance. Unregistered types still load from `dist/types/<type>.js`, where custom modules can register their initializer.
 
 After `layer.ready`, raster PMTiles layers expose `getTileSize()`, `isLoading()`, and chainable `setOpacity(value)` / `setZIndex(value)` methods.
 

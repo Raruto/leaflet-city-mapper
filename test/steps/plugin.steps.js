@@ -19,6 +19,10 @@ Then('every local source in the city example is available', async function () {
 });
 
 Given('the city mapper plugin is loaded after leaflet-rotate', async function () {
+  this.sourceRequests = [];
+  this.page.on('request', request => {
+    if (/\/dist\/(?:utils|types)\//.test(request.url())) this.sourceRequests.push(request.url());
+  });
   await this.page.goto(this.baseUrl);
   await this.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
   const leaflet2 = process.env.LEAFLET_VERSION === '2';
@@ -31,6 +35,30 @@ Given('the city mapper plugin is loaded after leaflet-rotate', async function ()
   await this.page.addScriptTag({ url: 'https://unpkg.com/leaflet-rotate@0.5.3/dist/leaflet-rotate-src.js' });
   await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
   await this.page.waitForFunction(() => L.Layer.types);
+});
+
+Then('each source loads only its requested initializer', async function () {
+  assert.deepEqual(this.sourceRequests, []);
+  const specialized = ['terrain', 'sunlight', 'traffic', 'walk'];
+  for (const [index, type] of ['pmtiles', 'geojson', ...specialized].entries()) {
+    await this.page.evaluate(async type => {
+      const layer = new L.Layer({ source: {
+        type,
+        url: 'fixture.pmtiles',
+        ...(type === 'pmtiles' ? { archive: { getHeader: async () => ({ maxZoom: 19 }) } } : {}),
+        ...(type === 'geojson' ? { data: { type: 'FeatureCollection', features: [] } } : {}),
+      } });
+      await layer.ready;
+      if (type === 'geojson' && layer.setData({ type: 'FeatureCollection', features: [] }) !== layer) {
+        throw new Error('setData must remain chainable');
+      }
+    }, type);
+    for (const [offset, name] of specialized.entries()) {
+      const file = `init${name[0].toUpperCase()}${name.slice(1)}.js`;
+      assert.equal(this.sourceRequests.some(url => url.endsWith(`/${file}`)), offset + 2 <= index, file);
+    }
+  }
+  assert.ok(this.sourceRequests.every(url => !url.includes('/dist/types/')));
 });
 
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {

@@ -1,14 +1,12 @@
-import './pmtiles.js';
-import { removeRasterTile } from '../utils/removeRasterTile.js';
-import { elevationWGSL } from '../utils/elevationWGSL.js';
-import { onTerrainRemove } from '../utils/onTerrainRemove.js';
-import { onTerrainAdd } from '../utils/onTerrainAdd.js';
+import { elevationWGSL } from './elevationWGSL.js';
+import { onTerrainRemove } from './onTerrainRemove.js';
+import { onTerrainAdd } from './onTerrainAdd.js';
 
 /**
  * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
  * Source options: `url` (single-zoom Float32 PMTiles DEM); `bridges` (optional GeoJSON deck polygons with Z, see _addBridges).
  */
-L.Layer.types.terrain = (layer, options) => {
+export function initTerrain(layer, options) {
   const terrainSource = options.url;
   const layerOptions = { ...options };
   delete layerOptions.url;
@@ -19,6 +17,6 @@ L.Layer.types.terrain = (layer, options) => {
   layer._terrainReady = false;
   layer.onAdd = map => onTerrainAdd(layer, map);
   layer.onRemove = map => onTerrainRemove(layer, map);
-};
+}
 
-L.Layer.types.terrain.elevationWGSL = elevationWGSL;
+initTerrain.elevationWGSL = elevationWGSL;

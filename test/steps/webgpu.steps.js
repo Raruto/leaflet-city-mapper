@@ -6,6 +6,7 @@ When('I pan the shared WebGPU renderer', async function () {
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
   try {
+    await this.page.waitForFunction(() => map._terrain3D?._terrainReady);
     this.webgpuPan = await this.page.evaluate(async () => {
       const modelLayer = layers._layers.find(({ layer }) => layer.modelUrl)?.layer;
       const owner = modelLayer?._shared;

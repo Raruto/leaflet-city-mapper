@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/types/geojson.js"],
-  "sourcesContent": ["import { setGeoJSONData } from '../utils/setGeoJSONData.js';\r\n\r\n/** One GeoJSON batch, independent of the viewport, using the existing extrusion pipeline. */\r\nL.Layer.types.geojson = (layer, options) => {\r\n  layer._geojson = true;\r\n  layer.setData = data => setGeoJSONData(layer, data);\r\n  L.Layer.types['3d'](layer, options);\r\n};\r\n"],
-  "mappings": "AAAA,OAAS,kBAAAA,MAAsB,6BAG/B,EAAE,MAAM,MAAM,QAAU,CAACC,EAAOC,IAAY,CAC1CD,EAAM,SAAW,GACjBA,EAAM,QAAUE,GAAQH,EAAeC,EAAOE,CAAI,EAClD,EAAE,MAAM,MAAM,IAAI,EAAEF,EAAOC,CAAO,CACpC",
-  "names": ["setGeoJSONData", "layer", "options", "data"]
-}

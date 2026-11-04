@@ -1,6 +1,6 @@
 import {
   controlOnAdd, onBlur, onKey, onLayerAdd, onLayerRemove, onPointer, onReady, onTerrain, start, step, stop, toggle
-} from '../utils/walk.js';
+} from './walk.js';
 
 /**
  * Third-person walk mode, toggled by a map button (and Esc): a pedestrian at the map centre runs with W/S (or ↑/↓) and
@@ -10,7 +10,7 @@ import {
  * Source options: `speed` (m/s, default 6), `distance` (camera distance in metres, default 20), `position` (button corner, default 'topleft').
  * Visible meshes of the other 3D layers (buildings, trees, models, streetlights) are solid; terrain and traffic are not.
  */
-L.Layer.types.walk = function (layer, {
+export function initWalk(layer, {
   speed = 70,
   distance = 20,
   position = 'bottomright',
@@ -50,7 +50,7 @@ L.Layer.types.walk = function (layer, {
     drag: null,
     ready: false,
     state: layer.walker = { latlng: null, heading: 0, phase: 0 }
-  };
+  }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);
   context.onBlur = onBlur.bind(context);

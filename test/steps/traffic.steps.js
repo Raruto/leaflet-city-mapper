@@ -76,6 +76,11 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.waitForFunction(() => cruiseBoats?.renderer && map._terrain3D?._terrainReady);
+  await this.page.evaluate(() => {
+    for (const { name, overlay, layer } of layers._layers) {
+      if (overlay && !['Terrain (3D)', 'Bateaux-Mouches', 'Shadows'].includes(name)) layer.remove();
+    }
+  });
   const result = await this.page.evaluate(async () => {
     const layer = cruiseBoats, owner = L.Layer.types['3d']._renderers.get(map);
     const [{ along }, { scheduledTrips }] = await Promise.all([
@@ -138,7 +143,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const finite = positions.every(Number.isFinite) && layer.root.children.every(mesh =>
       Object.values(mesh.geometry.attributes).every(attribute => [...attribute.data].every(Number.isFinite)));
     const tooltip = layer.options.tooltip({ properties: properties[0] }).textContent;
-    const shared = layer.renderer === streetlights.renderer;
+    const shared = layer.renderer === map._terrain3D.renderer;
     const noDuplicateNodes = new Set(boats().extras.featureFaces.map(face => face.id)).size === twoTrips;
     select('2026-06-21', 600);
     // Exercise live ticking with a deterministic clock in an operating interval.

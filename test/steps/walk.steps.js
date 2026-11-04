@@ -63,6 +63,11 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
 
 Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls and Esc restores the map', { timeout: 90000 }, async function () {
   await this.page.waitForFunction(() => map._terrain3D?._bridgeMesh, null, { timeout: 30000 });
+  await this.page.evaluate(() => {
+    for (const { name, overlay, layer } of layers._layers) {
+      if (overlay && !['Terrain (3D)', 'Buildings'].includes(name)) layer.remove();
+    }
+  });
   // Pont d'Iéna deck, about 9 m above the DEM's riverbed.
   await this.page.evaluate(() => map.setView([48.8597, 2.2924], 17, { animate: false }));
   const before = await this.page.evaluate(() => ({ zoom: map.getZoom(), pitch: map.getPitch() }));
@@ -110,9 +115,15 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
 
   await this.page.keyboard.down('KeyD');
   await this.page.keyboard.down('KeyW');
-  await this.page.waitForTimeout(600);
+  await this.page.waitForFunction(heading => {
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
+    return walk.walker.heading > heading + 0.6;
+  }, looked.heading);
   await this.page.keyboard.up('KeyD');
-  await this.page.waitForTimeout(1500);
+  await this.page.waitForFunction(() => {
+    const walk = Object.values(map._layers).find(layer => layer._type === 'walk');
+    return Math.abs(((-walk.walker.heading * 180 / Math.PI - map.getBearing()) % 360 + 540) % 360 - 180) < 5;
+  });
   await this.page.keyboard.up('KeyW');
   const turned = await state();
   const behind = Math.abs(((-turned.heading * 180 / Math.PI - turned.bearing) % 360 + 540) % 360 - 180);
