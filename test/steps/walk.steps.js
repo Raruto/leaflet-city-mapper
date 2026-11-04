@@ -4,6 +4,8 @@ import { Then } from '@cucumber/cucumber';
 Then('Time and Walk controls clean up and can be added again', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
+    const { trafficNow } = await import('/src/traffic/traffic.js');
+    const traffic = { layer: { _map: map } };
     const time = new L.Control.Time({ position: 'topleft' }).addTo(map);
     const standalone = time instanceof L.Control && time.getPosition() === 'topleft' &&
       time.getContainer().parentNode === map._controlCorners.topleft && !!map._sunlight;
@@ -12,13 +14,20 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     slider.value = '720';
     slider.dispatchEvent(new Event('input'));
     const selected = time.time.getTime();
+    const trafficTime = !trafficNow(traffic).live && trafficNow(traffic).time.getTime() === selected;
     time.remove();
-    const timeRemoved = !map._sunlight && !time.getContainer().isConnected;
+    const timeRemoved = !map._sunlight && !time.getContainer().isConnected && trafficNow(traffic).live;
     time.layer.addTo(map);
     const layers = new L.Control.Layers({}, { Shadows: time.layer }).addTo(map);
     await new Promise(resolve => queueMicrotask(resolve));
     const nested = layers.getContainer().contains(time.getContainer()) &&
       !time.getContainer().classList.contains('leaflet-control') && time.time.getTime() === selected;
+    layers.getContainer().querySelector('input').click();
+    const unchecked = !map.hasLayer(time.layer) && !map._sunlight && !time.getContainer().isConnected;
+    layers.getContainer().querySelector('input').click();
+    await new Promise(resolve => queueMicrotask(resolve));
+    const rechecked = map.hasLayer(time.layer) && !!map._sunlight &&
+      layers.getContainer().contains(time.getContainer()) && time.time.getTime() === selected;
     time.remove();
     const adapterRemoved = !map.hasLayer(time.layer) && !map._sunlight;
     time.addTo(map);
@@ -40,7 +49,8 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     control.getContainer().querySelector('button').click();
     const restarted = control.getContainer().querySelector('button').getAttribute('aria-pressed') === 'true';
     control.remove();
-    return { standalone, timeRemoved, nested, adapterRemoved, restoredStandalone, walking, walkRemoved, restarted };
+    return { standalone, trafficTime, timeRemoved, nested, unchecked, rechecked, adapterRemoved,
+      restoredStandalone, walking, walkRemoved, restarted };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });

@@ -127,10 +127,16 @@ export function render(backend) {
     Math.hypot(frustum[4][0], frustum[4][1], frustum[4][2]),
     Math.hypot(frustum[5][0], frustum[5][1], frustum[5][2]),
   ];
+  const candidates = backend._visibleMeshes ||= [];
+  candidates.length = 0;
+  const shadowMeshes = backend._shadowMeshes ||= [];
+  shadowMeshes.length = 0;
   if (sceneChanged) updateWorldMatrix(backend.scene);
   traverse(backend.scene, mesh => {
     if (!mesh.visible) return true;
     if (mesh.geometry) {
+      if (sunlight?.altitude >= 3 && !mesh.tile && mesh._appearance !== 0 &&
+        !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
       if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
       const bounds = mesh.geometry.bounds;
       const world = mesh.worldMatrix;
@@ -154,6 +160,7 @@ export function render(backend) {
         frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] &&
         frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
       if (!mesh._visibleInFrame) return;
+      candidates.push(mesh);
     }
   });
   const renderer = backend.renderer;
@@ -305,16 +312,14 @@ export function render(backend) {
   }
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   const meshes = [];
-  traverse(backend.scene, mesh => {
-    if (!mesh.visible) return true;
-    if (!mesh.geometry || !mesh._visibleInFrame) return;
+  for (const mesh of candidates) {
     if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
     if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
       if (mesh._roofCoverageSignature !== backend._roofRaster?.signature) {
         mesh._roofCoverageSignature = backend._roofRaster?.signature;
         mesh._roofCovered = roofCoverage(mesh, backend, rasters);
       }
-      if (!mesh._roofCovered) { mesh._appearance = 0; return; }
+      if (!mesh._roofCovered) { mesh._appearance = 0; continue; }
       mesh._roofRevealed = true;
     }
     if (mesh.fadeDuration) {
@@ -324,23 +329,24 @@ export function render(backend) {
       appearing ||= progress < 1;
     }
     meshes.push(mesh);
-  });
+  }
+  candidates.length = 0;
   sortMeshes(meshes);
-  renderer.groundOverlap = new Set(meshes.filter(mesh => mesh.ground).map(mesh => mesh.tile.coords.z)).size > 1;
+  let minGroundZoom = Infinity, maxGroundZoom = -Infinity;
+  for (const mesh of meshes) {
+    if (!mesh.ground) continue;
+    minGroundZoom = Math.min(minGroundZoom, mesh.tile.coords.z);
+    maxGroundZoom = Math.max(maxGroundZoom, mesh.tile.coords.z);
+  }
+  renderer.groundOverlap = minGroundZoom !== maxGroundZoom;
+  let shadowCount = 0;
+  for (const mesh of shadowMeshes) {
+    if (mesh.visible && mesh._appearance !== 0) shadowMeshes[shadowCount++] = mesh;
+  }
+  shadowMeshes.length = shadowCount;
   const encoder = renderer.device.createCommandEncoder();
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
   // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).
-  const shadowMeshes = [];
-  if (sunlight?.altitude >= 3) {
-    for (const layer of backend._layers) {
-      if (layer._type === 'terrain') continue;
-      traverse(layer.root, mesh => {
-        if (!mesh.visible) return true;
-        if (mesh.geometry && !mesh.tile && mesh._appearance !== 0 &&
-          !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
-      });
-    }
-  }
   if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
     if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
     renderer.uniformBuffer = renderer.device.createBuffer({

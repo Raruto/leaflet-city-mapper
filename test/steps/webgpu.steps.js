@@ -164,19 +164,34 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         await frame();
         renders = 0;
         uniformWrites = 0;
-        const panRenders = [];
+        const panRenders = [], panDurations = [];
         for (let i = 0; i < 20; i++) {
           const before = renders;
+          const started = performance.now();
           map.panBy([6, -3], { animate: false });
+          panDurations.push(performance.now() - started);
           await Promise.resolve();
           panRenders.push(renders - before);
           await frame();
         }
         const panTotals = { renders, uniformWrites };
+        const sortedPanDurations = [...panDurations].sort((a, b) => a - b);
+        const gpuDrainStarted = performance.now();
+        await device.queue.onSubmittedWorkDone();
+        const performanceMetrics = {
+          panRenderCpuMs: {
+            p50: sortedPanDurations[Math.floor(sortedPanDurations.length * 0.5)],
+            p95: sortedPanDurations[Math.ceil(sortedPanDurations.length * 0.95) - 1],
+            max: sortedPanDurations.at(-1),
+          },
+          gpuDrainMs: performance.now() - gpuDrainStarted,
+          samples: panDurations.length,
+        };
 
-        let drawn = 0, sharedBindings = 0, ownBuffers = 0;
+        let drawn = 0, totalMeshes = 0, sharedBindings = 0, ownBuffers = 0;
         nativeChecks.graph.traverse(owner.scene, mesh => {
           if (!mesh.geometry) return;
+          totalMeshes++;
           if (mesh.uniformBuffer) ownBuffers++;
           if (!mesh.visible || !mesh._visibleInFrame || mesh._appearance === 0) return;
           drawn++;
@@ -184,6 +199,9 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         });
         const uniformSlots = owner.renderer.uniformSlot;
         const uniformCapacity = owner.renderer.uniformBuffer.size / 256;
+        performanceMetrics.sceneMeshes = {
+          drawn, total: totalMeshes, shadowCasters: owner._shadowMeshes?.length || 0,
+        };
 
         // Hover highlight is a shader vertex range: no vertex color re-upload.
         const buildings = [...owner._layers].find(layer => layer.group?.children.some(mesh => mesh.extras?.featureFaces?.length));
@@ -217,7 +235,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         await frame();
         await device.queue.onSubmittedWorkDone();
         return {
-          synchronousRenders, sameTickRenders, deferredRenders, frameRenders, panRenders, panTotals,
+          synchronousRenders, sameTickRenders, deferredRenders, frameRenders, panRenders, panTotals, performanceMetrics,
           drawn, sharedBindings, ownBuffers, uniformSlots, uniformCapacity, highlight,
           animating, zoomTickRenders, zoomFrameRenders, gpuErrors,
         };
@@ -235,12 +253,16 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
 Then('map events render in the same tick, updates share one animation frame and each frame writes uniforms once', function () {
   const result = this.webgpuPacing;
   const details = JSON.stringify(result);
+  console.log(`PERF Paris WebGPU pan: ${JSON.stringify(result.performanceMetrics)}`);
+  this.attach(JSON.stringify(result.performanceMetrics, null, 2), 'application/json');
   assert.equal(result.synchronousRenders, 0, details);
   assert.equal(result.sameTickRenders, 1, details);
   assert.equal(result.deferredRenders, 0, details);
   assert.equal(result.frameRenders, 1, details);
   assert.deepEqual(result.panRenders, Array(20).fill(1), details);
   assert.equal(result.panTotals.uniformWrites, result.panTotals.renders, details);
+  assert.equal(result.performanceMetrics.samples, 20, details);
+  assert.ok(result.performanceMetrics.panRenderCpuMs.p50 < 100, details);
   assert.ok(result.drawn > 1, details);
   assert.equal(result.sharedBindings, result.drawn, details);
   assert.equal(result.ownBuffers, 0, details);

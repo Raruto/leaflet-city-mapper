@@ -11,10 +11,6 @@ Feature: Traffic lanes, flows and timetables
     Then all traffic models match CPU poses on GPU workgroup boundaries
 
   @unit
-  Scenario: Open-data cycling and pedestrian paths produce bounded, distinct simulations
-    Then mobility snapshots preserve provenance and contain moving bicycles and pedestrians
-
-  @unit
   Scenario: Mobility conversion excludes roads for pedestrians and obsolete route records
     Then mobility paths are clipped, deduplicated and validated without inventing pedestrian roads
 

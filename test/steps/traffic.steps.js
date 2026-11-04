@@ -1,22 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import { Given, Then } from '@cucumber/cucumber';
 import { along } from '../../src/traffic/along.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
 import { speed } from '../../src/traffic/speed.js';
 import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
-import { trafficHour } from '../../examples/data/paris-traffic.js';
-import { mobilityLanes } from '../../examples/data/mobilityLanes.js';
-import { vehicles } from '../../src/traffic/vehicles.js';
-import { build } from '../../src/geometry/build.js';
-import { tripsAt } from '../../src/traffic/tripsAt.js';
-import { decodeHeader } from '../../src/pmtiles/decodeHeader.js';
-import { decodeDirectory } from '../../src/pmtiles/decodeDirectory.js';
-import { cyclingCounts } from '../../examples/data/cyclingCounts.js';
+import { cyclingCounts, mobilityLanes, trafficHour, parisMobility, parisTransit } from '../../examples/data/paris-traffic.js';
 import parisTraffic from '../../examples/data/paris-traffic.js';
-import parisMobility from '../../examples/data/paris-mobility.js';
-import parisTransit from '../../examples/data/paris-transit.js';
 import { trafficResponse, fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 
 const [cruise] = JSON.parse(readFileSync(new URL('../../examples/data/seine-cruises.geojson', import.meta.url))).features;
@@ -99,52 +89,6 @@ Then('all traffic models match CPU poses on GPU workgroup boundaries', { timeout
   });
   assert.equal(result.length, Object.keys(vehicles).length);
 });
-Then('mobility snapshots preserve provenance and contain moving bicycles and pedestrians', function () {
-  for (const mode of ['bicycle', 'pedestrian']) {
-    const bytes = readFileSync(new URL(`../../examples/data/paris-${mode}.pmtiles`, import.meta.url));
-    const header = decodeHeader(Uint8Array.from(bytes.subarray(0, 127)).buffer);
-    assert.equal(header.tileCompression, 2);
-    const root = gunzipSync(bytes.subarray(header.rootDirectoryOffset, header.rootDirectoryOffset + header.rootDirectoryLength));
-    const directory = decodeDirectory(Uint8Array.from(root).buffer);
-    assert.ok(directory.length > 0);
-    const tile = directory[0], offset = header.tileDataOffset + tile.offset;
-    const data = JSON.parse(gunzipSync(bytes.subarray(offset, offset + tile.length)));
-    assert.equal(data.license, 'ODbL-1.0');
-    assert.match(data.source, /amenagements-cyclables/);
-    assert.ok(Number.isFinite(Date.parse(data.retrievedAt)));
-    assert.match(data.note, /not measured/);
-    const [west, south, east, north] = data.bounds, lanes = [];
-    for (const { geometry, properties } of data.features) {
-      assert.equal(geometry.type, 'LineString');
-      assert.ok(properties.osm_id);
-      assert.ok(Number.isFinite(Date.parse(properties.date_export)));
-      assert.match(properties.description, /not live GPS or measured counts/);
-      if (mode === 'pedestrian') assert.ok(/pi\u00e9tonne|verte|bois/.test(properties.amenagement));
-      let length = 0;
-      for (let i = 0; i < geometry.coordinates.length; i++) {
-        const [lng, lat] = geometry.coordinates[i];
-        assert.ok(lng >= west - 1e-10 && lng <= east + 1e-10 && lat >= south - 1e-10 && lat <= north + 1e-10);
-        if (i) {
-          const previous = geometry.coordinates[i - 1];
-          length += Math.hypot((lng - previous[0]) * 73000, (lat - previous[1]) * 111195);
-        }
-      }
-      lanes.push({ length, properties });
-    }
-    const speed = mode === 'bicycle' ? 4.2 : 1.4;
-    const first = tripsAt(100000, lanes, speed), next = tripsAt(101000, lanes, speed);
-    assert.ok(first.length > 0);
-    assert.equal(next.length, first.length);
-    assert.notEqual(first[0].distance, next[0].distance);
-    const model = build(vehicles[mode].model(0));
-    const other = build(vehicles[mode].model(1));
-    assert.equal(model.position.length, other.position.length);
-    assert.ok(model.position.every(Number.isFinite) && model.normal.every(Number.isFinite));
-    assert.ok(model.position.length / 3 <= 432, 'Keep active-mobility models inexpensive');
-    assert.notDeepEqual(model.color, other.color);
-  }
-});
-
 Then('mobility paths are clipped, deduplicated and validated without inventing pedestrian roads', function () {
   const path = { type: 'Feature', properties: { osm_id: 1, date_export: '2026-01-01', amenagement: 'voie verte' },
     geometry: { type: 'LineString', coordinates: [[-1, 0.5], [2, 0.5], [2, 2], [0.5, 2], [0.5, -1]] } };

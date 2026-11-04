@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { gunzipSync } from 'node:zlib';
 import { Then } from '@cucumber/cucumber';
-import { decodeHeader } from '../../src/pmtiles/decodeHeader.js';
-import { transitLanes, transitSettings } from '../../examples/data/paris-transit.js';
+import { transitLanes, transitSettings } from '../../examples/data/paris-traffic.js';
 import { vehicles } from '../../src/traffic/vehicles.js';
 import { build } from '../../src/geometry/build.js';
 import { tripsAt } from '../../src/traffic/tripsAt.js';
@@ -23,18 +20,26 @@ Then('transit route dashes follow line colours and sloping terrain', function ()
   assert.deepEqual(routeGeometry([lane]).color.slice(0, 3), [0.08, 0.7, 0.85]);
 });
 
-Then('Paris transit archives produce moving bus, tram and metro simulations', async function () {
+Then('Paris transit routes produce moving bus, tram and metro simulations', function () {
+  const bounds = [2.26, 48.835, 2.38, 48.885];
+  const data = {
+    type: 'FeatureCollection',
+    features: [
+      ['Bus', 'bus'],
+      ['Tram', 'tram'],
+      ['Subway', 'metro'],
+    ].map(([route_type, route_id]) => ({
+      type: 'Feature',
+      properties: { route_id, route_type, route_short_name: '1', route_color: 'FF0000' },
+      geometry: { type: 'LineString', coordinates: [[2.29, 48.85], [2.30, 48.86]] },
+    })),
+  };
+  const before = JSON.stringify(data);
   for (const mode of ['bus', 'tram', 'metro']) {
     const settings = transitSettings(mode);
-    const bytes = await readFile(new URL(`../../examples/data/paris-${settings.archive}.pmtiles`, import.meta.url));
-    const header = decodeHeader(Uint8Array.from(bytes.subarray(0, 127)).buffer);
-    const data = JSON.parse(gunzipSync(bytes.subarray(header.tileDataOffset, header.tileDataOffset + header.tileDataLength)));
-    const bounds = [header.minLon, header.minLat, header.maxLon, header.maxLat];
-    const before = JSON.stringify(data);
     const lanes = transitLanes(data, mode, bounds);
     assert.ok(lanes.features.length > 0, mode);
     let active = 0;
-    assert.equal(JSON.stringify(data), before, 'Do not mutate open-data routes');
     for (const feature of lanes.features) {
       assert.equal(feature.properties.route_type, settings.type);
       assert.equal(feature.properties.flow, settings.flow);
@@ -52,7 +57,7 @@ Then('Paris transit archives produce moving bus, tram and metro simulations', as
       }
       active += tripsAt(100000, [{ length, properties: feature.properties }], settings.speed).length;
     }
-    assert.ok(active > 0, `${mode} must actually emit vehicles on the archived routes`);
+    assert.ok(active > 0, `${mode} must actually emit vehicles on the routes`);
     const model = vehicles[mode].model;
     const red = build(model(0, { route_color: 'FF0000' }));
     const blue = build(model(0, { route_color: '0000FF' }));
@@ -70,6 +75,7 @@ Then('Paris transit archives produce moving bus, tram and metro simulations', as
       assert.ok(Math.abs((next[i].distance - first[i].distance + lane.length) % lane.length - settings.speed) < 1e-6);
     }
   }
+  assert.equal(JSON.stringify(data), before, 'Do not mutate open-data routes');
 });
 
 Then('transit clipping preserves disjoint route parts and reports invalid data', function () {

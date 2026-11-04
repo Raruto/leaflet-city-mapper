@@ -6,6 +6,7 @@ import { projectCelestialBody } from './projectCelestialBody.js';
 import { solarPosition } from './solarPosition.js';
 
 export function onAddSun(control, map) {
+  map._timeControl = control;
   let date, slider, output, status, timer;
   const originalSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
   const disc = 'position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;';
@@ -115,6 +116,7 @@ export function onAddSun(control, map) {
   map.on('move rotate pitch resize', updateSky);
   control.onRemove = () => {
     clearInterval(timer);
+    delete map._timeControl;
     map.fire('simulationtimechange', { time: null, live: false });
     map.off('moveend', update);
     map.off('move rotate pitch resize', updateSky);

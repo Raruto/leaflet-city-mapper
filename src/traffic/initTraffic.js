@@ -6,7 +6,7 @@
  * - `speed`: m/s of `flow` lanes; `outline`: draw the lanes.
  * Lane properties: `flow` (vehicles/h) or `timetable` (see scheduledTrips.js), optional fixed `elevation`
  * in metres, `name`/`description` for the default tooltip. The status line (vehicle count, then the FeatureCollection `note`) sits under the layer's entry in the layers control.
- * The 'sunlight' layer on the same map drives the time; without one, vehicles run live.
+ * L.Control.Time on the same map drives the time; without one, vehicles run live.
  */
 import { build } from '../geometry/build.js';
 import { init3D } from '../scene/init3D.js';

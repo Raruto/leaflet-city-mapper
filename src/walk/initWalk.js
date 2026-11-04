@@ -31,9 +31,8 @@ L.Control.Walk = L.Control.extend({
 });
 
 function initWalk(control, {
-  speed = 70,
-  distance = 20,
-  position = 'bottomright',
+  speed,
+  distance,
   ...options
 } = {}) {
   const layer = new L.Layer();
@@ -59,7 +58,6 @@ function initWalk(control, {
     speed,
     distance,
     keys,
-    control,
     container,
     button,
     hint,

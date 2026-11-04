@@ -13,8 +13,7 @@ import { underEntry } from '../scene/underEntry.js';
 import { getElevation } from '../terrain/getElevation.js';
 
 export function trafficNow(state) {
-  let control = { live: true };
-  state.layer._map?.eachLayer(other => { if (other.control?.time) control = other.control; });
+  const control = state.layer._map?._timeControl || { live: true };
   return { live: control.live, time: control.live ? new Date() : control.time };
 }
 

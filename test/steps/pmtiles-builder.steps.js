@@ -70,14 +70,8 @@ Then('all archives and building queries use the same default or custom bbox', fu
   for (const cli of [[], ['--bbox=0,-1,1,0', '--only=trees']]) {
     const { archives, tileBounds, tilesIn } = configuration(cli);
     const bbox = cli.length ? [0, -1, 1, 0] : [2.26, 48.835, 2.38, 48.885];
-    assert.equal(Object.keys(archives).length, 10);
-    assert.deepEqual([archives.metro.minZoom, archives.metro.maxZoom], [10, 10]);
-    assert.deepEqual([archives['bus-tram'].minZoom, archives['bus-tram'].maxZoom], [10, 10]);
-    for (const mode of ['bicycle', 'pedestrian']) {
-      assert.deepEqual([archives[mode].minZoom, archives[mode].maxZoom], [10, 10]);
-      assert.equal(archives[mode].tileCompression, 2);
-      assert.equal(archives[mode].metadata.license, 'ODbL-1.0');
-    }
+    assert.deepEqual(Object.keys(archives).sort(),
+      ['buildings', 'orthophotos', 'plan-ign', 'streetlights', 'terrain', 'trees']);
     for (const archive of Object.values(archives)) assert.deepEqual(archive.bbox, bbox);
     if (cli.length) {
       assert.deepEqual(tilesIn(bbox, 2, 2), [[2, 2, 2]]);
