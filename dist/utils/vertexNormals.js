@@ -1,2 +1,0 @@
-function s(l,o){const f=new Float32Array(l.length);for(let t=0;t<(o?.length||l.length/3);t+=3){const h=o?o[t]:t,n=o?o[t+1]:t+1,m=o?o[t+2]:t+2,a=[0,1,2].map(r=>l[n*3+r]-l[h*3+r]),e=[0,1,2].map(r=>l[m*3+r]-l[h*3+r]),u=[a[1]*e[2]-a[2]*e[1],a[2]*e[0]-a[0]*e[2],a[0]*e[1]-a[1]*e[0]];for(const r of[h,n,m])for(let g=0;g<3;g++)f[r*3+g]+=u[g]}for(let t=0;t<f.length;t+=3){const h=Math.hypot(...f.subarray(t,t+3))||1;for(let n=0;n<3;n++)f[t+n]/=h}return f}export{s as vertexNormals};
-//# sourceMappingURL=vertexNormals.js.map

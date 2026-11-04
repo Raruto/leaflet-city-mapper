@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/startZoom.js"],
-  "sourcesContent": ["/** Preserve the outgoing tile level before Leaflet changes its logical zoom. */\n\nexport function startZoom() {\n  this._zoomLevel = null;\n}\n"],
-  "mappings": "AAEO,SAASA,GAAY,CAC1B,KAAK,WAAa,IACpB",
-  "names": ["startZoom"]
-}

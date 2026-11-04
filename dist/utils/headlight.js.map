@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/headlight.js"],
-  "sourcesContent": ["export const headlight = [1.9, 1.85, 1.7];\n"],
-  "mappings": "AAAO,MAAMA,EAAY,CAAC,IAAK,KAAM,GAAG",
-  "names": ["headlight"]
-}

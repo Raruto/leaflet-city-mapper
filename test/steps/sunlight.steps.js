@@ -143,7 +143,8 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(initial.date, initial.time.slice(0, 10));
   assert.equal(initial.minute, Number(initial.time.slice(11, 13)) * 60 + Number(initial.time.slice(14, 16)));
   assert.equal(initial.inLayers, true);
-  assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Eiffel Tower', 'Streetlights', 'Bateaux-Mouches', 'Traffic', 'Shadows']);
+  assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Metro (M + numero)',
+    'Bus & tram (nome linea)', 'Eiffel Tower', 'Streetlights', 'Bateaux-Mouches', 'Traffic', 'Shadows']);
   await this.page.getByLabel('Solar date (UTC)').fill('2026-06-21');
   const slider = this.page.getByRole('slider', { name: 'Time of day (UTC)' });
   await slider.focus();

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/traverse.js"],
-  "sourcesContent": ["/** Depth-first walk; a truthy callback result skips that node's descendants. */\n\nexport function traverse(node, callback) {\n  if (callback(node)) return;\n  for (const child of node.children) traverse(child, callback);\n}\n"],
-  "mappings": "AAEO,SAASA,EAASC,EAAMC,EAAU,CACvC,GAAI,CAAAA,EAASD,CAAI,EACjB,UAAWE,KAASF,EAAK,SAAUD,EAASG,EAAOD,CAAQ,CAC7D",
-  "names": ["traverse", "node", "callback", "child"]
-}

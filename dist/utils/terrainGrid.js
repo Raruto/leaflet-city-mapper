@@ -1,2 +1,0 @@
-function f(a){const o=[],u=[],l=[],c=[];for(let r=0;r<=a;r++)for(let t=0;t<=a;t++)if(o.push(t/a,0,r/a),u.push(0,1,0),l.push(t/a,r/a),r<a&&t<a){const e=r*(a+1)+t,p=e+1,n=e+a+1,w=n+1;c.push(e,n,p,p,n,w)}return{position:{size:3,data:new Float32Array(o)},normal:{size:3,data:new Float32Array(u)},uv:{size:2,data:new Float32Array(l)},index:{data:new Uint16Array(c)}}}export{f as terrainGrid};
-//# sourceMappingURL=terrainGrid.js.map

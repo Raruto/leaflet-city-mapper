@@ -33,7 +33,7 @@ Then('new ground tiles blend continuously while retained tiles stay opaque', { t
     const opaque = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
     const neighbor = map.unproject(cell.add([2, 1]).multiplyBy(256));
     raster.header.maxLon = neighbor.lng - 1e-7;
-    const { updateRasterTiles } = await import('/dist/utils/rasterTiles.js');
+    const { updateRasterTiles } = await import('/src/pmtiles/rasterTiles.js');
     updateRasterTiles(raster);
     while (raster.isLoading()) await new Promise(requestAnimationFrame);
     nativeChecks.render.render(raster._shared);
@@ -187,6 +187,113 @@ Then('coarse ground imagery precedes detail and survives delayed replacements', 
   });
   assert.deepEqual(result, { coarseFirst: true, bounded: true, coverage: 400, retained: true, replaced: true,
     preservedOnError: true, errors: ['Expected detail failure'] });
+});
+
+Then('fading terrain detail covers retained ground without depth interference', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map, zoom = map.getZoom();
+    map.setPitch(45); map.setBearing(30);
+    const cell = map.project(map.getCenter(), zoom).divideBy(256).floor();
+    map.setView(map.unproject(cell.add([0.5, 0.5]).multiplyBy(256), zoom), zoom, { animate: false });
+    const nw = map.unproject(cell.subtract([1, 1]).multiplyBy(256), zoom);
+    const se = map.unproject(cell.add([2, 2]).multiplyBy(256), zoom);
+    const header = { minZoom: zoom - 2, maxZoom: zoom, minLon: nw.lng, maxLat: nw.lat,
+      maxLon: se.lng - 1e-7, minLat: se.lat + 1e-7 };
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    const images = await Promise.all(['#ff0000', '#0000ff'].map(async color => {
+      context.fillStyle = color; context.fillRect(0, 0, 256, 256);
+      return (await fetch(canvas.toDataURL())).arrayBuffer();
+    }));
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    const initialize = L.Layer.prototype._initRaster;
+    L.Layer.prototype._initRaster = function (options) {
+      if (options.url === 'overlap-terrain.pmtiles') options = { ...options, archive: {
+        getHeader: async () => ({ ...header, minZoom: zoom - 2, maxZoom: zoom - 2, tileType: 0 }),
+        getZxy: async (z, x, y) => {
+          const values = new Float32Array(256 * 256);
+          for (let row = 0; row < 256; row++) {
+            for (let col = 0; col < 256; col++) {
+              values[row * 256 + col] = 40 + 2 * Math.sin((x * 256 + col) * 0.3) *
+                Math.cos((y * 256 + row) * 0.3);
+            }
+          }
+          return { data: values.buffer };
+        },
+      } };
+      return initialize.call(this, options);
+    };
+    const terrain = new L.Layer({ source: { type: 'terrain', url: 'overlap-terrain.pmtiles' } }).addTo(map);
+    const raster = new L.Layer({ source: { type: 'pmtiles', url: 'overlap-imagery.pmtiles', archive: {
+      getHeader: async () => header,
+      getZxy: async z => {
+        if (z === zoom) await pending;
+        return { data: images[z === zoom ? 1 : 0] };
+      },
+    } } }).addTo(map);
+    raster.on('tileload', ({ tile }) => {
+      if (tile.coords.z === zoom) tile.loadedAt = performance.now() + 60000;
+    });
+    const wait = async condition => {
+      const deadline = performance.now() + 10000;
+      while (!condition()) {
+        if (performance.now() > deadline) throw new Error('Overlapping terrain fixture did not settle');
+        await new Promise(requestAnimationFrame);
+      }
+    };
+    try {
+      await Promise.all([raster.ready, terrain.ready]);
+      await terrain._terrainPromise;
+      await wait(() => terrain._rasterTiles.size > 0 && [...raster._rasterTiles.values()]
+        .filter(tile => tile.coords.z < zoom).every(tile => tile.done));
+      for (const [tile, mesh] of terrain._rasterTiles) tile.loadedAt = mesh.fadeStart = performance.now() - 300;
+      release();
+      await wait(() => !raster.isLoading() && terrain._rasterTiles.size === raster._rasterTiles.size);
+      const object = nativeChecks.gpu.createMesh(terrain, {
+        position: [-500, -10, -500, 500, -10, -500, 500, -10, 500,
+          -500, -10, -500, 500, -10, 500, -500, -10, 500],
+        normal: Array.from({ length: 6 }, () => [0, 1, 0]).flat(),
+        color: Array.from({ length: 6 }, () => [0, 1, 0]).flat(),
+      }, { unlit: true });
+      const failures = [];
+      map.options.zoomSnap = 0;
+      for (const [pitch, bearing, pan, delta] of [[45, 30, 0, 0], [60, 75, 12, 0.25], [0, 0, -24, 0.4]]) {
+        map.setPitch(pitch); map.setBearing(bearing);
+        map.setZoom(zoom + delta, { animate: false });
+        map.panBy([pan, 0], { animate: false });
+        for (const [tile, mesh] of terrain._rasterTiles) {
+          // Keep the coarse tiles until their replacements finish fading.
+          tile.loadedAt = performance.now() + 60000;
+          mesh.fadeStart = performance.now() - (tile.coords.z === zoom ? 125 : 300);
+        }
+        raster._pruneAfter = 0;
+        const pixels = await nativeChecks.pixels(raster, 180, 130, 40, 40);
+        const bad = pixels.filter((value, i) => i % 4 === 3 &&
+          (value !== 255 || pixels[i - 1] < 60 || pixels[i - 2] !== 0 || pixels[i - 3] < 60)).length;
+        failures.push({ bad, sample: [...pixels.slice(0, 4)], coarse: [...terrain._rasterTiles.keys()]
+          .filter(tile => tile.coords.z < zoom).length });
+      }
+      object.position[1] = 20;
+      const above = [...await nativeChecks.pixels(raster, 200, 150, 1, 1)];
+      nativeChecks.gpu.disposeMesh(terrain, object);
+      for (const tile of raster._rasterTiles.values()) tile.loadedAt = performance.now() - 300;
+      raster._pruneAfter = 0;
+      const { pruneRasterTiles } = await import('/src/pmtiles/rasterTiles.js');
+      pruneRasterTiles(raster);
+      nativeChecks.render.render(raster._shared);
+      const steadyDepth = !raster.renderer.groundOverlap &&
+        terrain._rasterProgram.pipelineCache.has('back:ccw:less-equal');
+      return { failures, above, steadyDepth };
+    } finally {
+      release(); raster.remove(); terrain.remove();
+      L.Layer.prototype._initRaster = initialize;
+    }
+  });
+  assert.ok(result.failures.every(frame => frame.bad === 0 && frame.coarse > 0), JSON.stringify(result));
+  assert.deepEqual(result.above, [0, 255, 0, 255]);
+  assert.equal(result.steadyDepth, true);
 });
 
 Then('streamed geometry dissolves progressively while remaining opaque', { timeout: 30000 }, async function () {

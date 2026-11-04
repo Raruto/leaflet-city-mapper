@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/colliders.js"],
-  "sourcesContent": ["\nexport const colliders = new WeakMap();\n"],
-  "mappings": "AACO,MAAMA,EAAY,IAAI",
-  "names": ["colliders"]
-}

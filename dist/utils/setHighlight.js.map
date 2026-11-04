@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/setHighlight.js"],
-  "sourcesContent": ["import { update } from './update.js';\n\n/** Highlight a source vertex range in the shader; vertex colors stay untouched. */\n\nexport function setHighlight(backend, feature) {\n  if (feature?.model) feature = null;\n  if (backend.highlightedFeature?.mesh === feature?.mesh &&\n    backend.highlightedFeature?.vertexStart === feature?.vertexStart) return;\n  if (backend.highlightedFeature) backend.highlightedFeature.mesh.highlight = null;\n  backend.highlightedFeature = feature;\n  if (feature) feature.mesh.highlight = [feature.vertexStart, feature.vertexEnd];\n  update(backend);\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAIhB,SAASC,EAAaC,EAASC,EAAS,CACzCA,GAAS,QAAOA,EAAU,MAC1B,EAAAD,EAAQ,oBAAoB,OAASC,GAAS,MAChDD,EAAQ,oBAAoB,cAAgBC,GAAS,eACnDD,EAAQ,qBAAoBA,EAAQ,mBAAmB,KAAK,UAAY,MAC5EA,EAAQ,mBAAqBC,EACzBA,IAASA,EAAQ,KAAK,UAAY,CAACA,EAAQ,YAAaA,EAAQ,SAAS,GAC7EH,EAAOE,CAAO,EAChB",
-  "names": ["update", "setHighlight", "backend", "feature"]
-}

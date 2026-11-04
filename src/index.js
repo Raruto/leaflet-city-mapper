@@ -1,4 +1,4 @@
-import './utils/mapCamera.js';
+import './scene/mapCamera.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -12,8 +12,9 @@ import './utils/mapCamera.js';
  *
  * Folder layout:
  * - Vector ('3d', 'geojson') and raster ('pmtiles') initialization lives here.
- * - utils/: lazy operations for rendering, archives, geometry and specialized layers:
- *   terrain (Float32 DEM), sunlight (clock and lighting), traffic and walking.
+ * - scene/: Leaflet lifecycle, interaction and scene updates; rendering/: WebGPU pipelines.
+ * - geometry/, model/ and pmtiles/: shared mesh, glTF and archive operations.
+ * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
@@ -135,7 +136,7 @@ L.Layer.include({
       }
     });
 
-    nativeLoading ||= import('./utils/nativeLayer.js');
+    nativeLoading ||= import('./scene/nativeLayer.js');
     this.ready = nativeLoading.then(({ nativeLayer }) => {
       if (this._nativeGPU !== state) return this;
       return nativeLayer(state);
@@ -145,10 +146,10 @@ L.Layer.include({
   _init3D(options = {}) {
     const layer = this;
     const ready = sceneLoading ||= Promise.all([
-      import('./utils/onAdd3DLayer.js'),
-      import('./utils/onRemove3DLayer.js'),
-      import('./utils/updateArea.js'),
-      import('./utils/onTerrainChange.js'),
+      import('./scene/onAdd3DLayer.js'),
+      import('./scene/onRemove3DLayer.js'),
+      import('./scene/updateArea.js'),
+      import('./terrain/onTerrainChange.js'),
     ]).then(([add, remove, update, terrain]) => sceneModules = { ...add, ...remove, ...update, ...terrain });
     layer._3d = true;
     L.Util.setOptions(layer, { ariaLabel: '3D scene', ...options });
@@ -191,18 +192,18 @@ L.Layer.include({
     queueMicrotask(async () => {
       try {
         await ready;
-        layer.root = (await import('./utils/emptyNode.js')).emptyNode();
+        layer.root = (await import('./scene/emptyNode.js')).emptyNode();
         layer.raycaster = { origin: [0, 0, 0], direction: [0, 0, 0] };
         if (layer.url || layer._geojson) {
           layer.group = layer.root;
-          if (layer.url) layer.header = await (await import('./utils/getHeader.js')).getHeader(layer);
+          if (layer.url) layer.header = await (await import('./pmtiles/getHeader.js')).getHeader(layer);
         }
         if (layer._map) {
-          await (await import('./utils/attach.js')).attach(layer, layer._map);
+          await (await import('./scene/attach.js')).attach(layer, layer._map);
           layer._added.resolve();
         }
-        if (layer.modelUrl) await (await import('./utils/loadModel.js')).loadModel(layer);
-        if (layer._shared) (await import('./utils/update.js')).update(layer);
+        if (layer.modelUrl) await (await import('./model/loadModel.js')).loadModel(layer);
+        if (layer._shared) (await import('./scene/update.js')).update(layer);
         layer.fire('ready');
       } catch (error) {
         layer.fire('error', { error });
@@ -286,7 +287,7 @@ L.Layer.include({
     loading = loading.catch(() => {}).then(async () => {
       switch (type) {
         case 'geojson': {
-          const { setGeoJSONData } = await import('./utils/setGeoJSONData.js');
+          const { setGeoJSONData } = await import('./scene/setGeoJSONData.js');
           return (layer, options) => {
             layer._geojson = true;
             layer.setData = data => setGeoJSONData(layer, data);
@@ -295,26 +296,26 @@ L.Layer.include({
         }
         case 'pmtiles': {
           rasterModules = await Promise.all([
-            import('./utils/read.js'),
-            import('./utils/getHeader.js'),
-            import('./utils/getZxy.js'),
-            import('./utils/onPMTileAdd.js'),
-            import('./utils/onPMTileRemove.js'),
-            import('./utils/rasterTiles.js'),
-            import('./utils/setPMTileOpacity.js'),
-            import('./utils/setPMTileZIndex.js'),
-            import('./utils/emptyNode.js'),
+            import('./pmtiles/read.js'),
+            import('./pmtiles/getHeader.js'),
+            import('./pmtiles/getZxy.js'),
+            import('./pmtiles/onPMTileAdd.js'),
+            import('./pmtiles/onPMTileRemove.js'),
+            import('./pmtiles/rasterTiles.js'),
+            import('./pmtiles/setPMTileOpacity.js'),
+            import('./pmtiles/setPMTileZIndex.js'),
+            import('./scene/emptyNode.js'),
           ]);
           return (layer, options) => layer._initRaster(options);
         }
         case 'terrain':
-          return (await import('./utils/initTerrain.js')).initTerrain;
+          return (await import('./terrain/initTerrain.js')).initTerrain;
         case 'sunlight':
-          return (await import('./utils/initSunlight.js')).initSunlight;
+          return (await import('./sunlight/initSunlight.js')).initSunlight;
         case 'traffic':
-          return (await import('./utils/initTraffic.js')).initTraffic;
+          return (await import('./traffic/initTraffic.js')).initTraffic;
         case 'walk':
-          return (await import('./utils/initWalk.js')).initWalk;
+          return (await import('./walk/initWalk.js')).initWalk;
         default:
           throw new Error(`Unknown layer type: ${type}`);
       }

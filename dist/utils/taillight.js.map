@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/taillight.js"],
-  "sourcesContent": ["export const taillight = [1.7, 0.06, 0.05];\n"],
-  "mappings": "AAAO,MAAMA,EAAY,CAAC,IAAK,IAAM,GAAI",
-  "names": ["taillight"]
-}

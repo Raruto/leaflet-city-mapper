@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onRemoveSun.js"],
-  "sourcesContent": ["export function onRemoveSun(layer) {\n  layer.control.remove();\n}\n"],
-  "mappings": "AAAO,SAASA,EAAYC,EAAO,CACjCA,EAAM,QAAQ,OAAO,CACvB",
-  "names": ["onRemoveSun", "layer"]
-}

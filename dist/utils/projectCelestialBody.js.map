@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/projectCelestialBody.js"],
-  "sourcesContent": ["/** Perspective projection of a celestial direction; null when behind the camera. */\n\nexport function projectCelestialBody(dir, size, pitch, bearing) {\n  const [x, y, z] = dir;\n  const forward = -x * Math.sin(bearing) * Math.sin(pitch) - y * Math.cos(pitch) - z * Math.cos(bearing) * Math.sin(pitch);\n  if (forward > 0) {\n    return {\n      left: size.x / 2 + size.y * 1.5 * (x * Math.cos(bearing) - z * Math.sin(bearing)) / forward,\n      top:  size.y / 2 - size.y * 1.5 * (-x * Math.sin(bearing) * Math.cos(pitch) + y * Math.sin(pitch) - z * Math.cos(bearing) * Math.cos(pitch)) / forward\n    };\n  }\n  return null;\n}\n"],
-  "mappings": "AAEO,SAASA,EAAqBC,EAAKC,EAAMC,EAAOC,EAAS,CAC9D,KAAM,CAACC,EAAGC,EAAGC,CAAC,EAAIN,EACZO,EAAU,CAACH,EAAI,KAAK,IAAID,CAAO,EAAI,KAAK,IAAID,CAAK,EAAIG,EAAI,KAAK,IAAIH,CAAK,EAAII,EAAI,KAAK,IAAIH,CAAO,EAAI,KAAK,IAAID,CAAK,EACvH,OAAIK,EAAU,EACL,CACL,KAAMN,EAAK,EAAI,EAAIA,EAAK,EAAI,KAAOG,EAAI,KAAK,IAAID,CAAO,EAAIG,EAAI,KAAK,IAAIH,CAAO,GAAKI,EACpF,IAAMN,EAAK,EAAI,EAAIA,EAAK,EAAI,KAAO,CAACG,EAAI,KAAK,IAAID,CAAO,EAAI,KAAK,IAAID,CAAK,EAAIG,EAAI,KAAK,IAAIH,CAAK,EAAII,EAAI,KAAK,IAAIH,CAAO,EAAI,KAAK,IAAID,CAAK,GAAKK,CACjJ,EAEK,IACT",
-  "names": ["projectCelestialBody", "dir", "size", "pitch", "bearing", "x", "y", "z", "forward"]
-}

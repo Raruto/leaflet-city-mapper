@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onClick.js"],
-  "sourcesContent": ["import { findFeature } from './findFeature.js';\nimport { setHighlight } from './setHighlight.js';\nimport { showFeature } from './showFeature.js';\n\n/** Emit click without moving the map or pinning the tooltip. */\n\nexport function onClick(layer, event) {\n  const feature = findFeature(layer, event);\n  layer.hoveredFeature = feature;\n  setHighlight(layer, feature);\n  showFeature(layer, feature, event);\n  layer.fire('featureclick', { feature, originalEvent: event });\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,gBAAAC,MAAoB,oBAC7B,OAAS,eAAAC,MAAmB,mBAIrB,SAASC,EAAQC,EAAOC,EAAO,CACpC,MAAMC,EAAUN,EAAYI,EAAOC,CAAK,EACxCD,EAAM,eAAiBE,EACvBL,EAAaG,EAAOE,CAAO,EAC3BJ,EAAYE,EAAOE,EAASD,CAAK,EACjCD,EAAM,KAAK,eAAgB,CAAE,QAAAE,EAAS,cAAeD,CAAM,CAAC,CAC9D",
-  "names": ["findFeature", "setHighlight", "showFeature", "onClick", "layer", "event", "feature"]
-}

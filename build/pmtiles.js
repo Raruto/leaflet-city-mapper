@@ -1,5 +1,5 @@
 // Builds the offline PMTiles archives used by examples/leaflet-city-mapper.html.
-// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,orthophotos,plan-ign,terrain] [--jobs=3]
+// Usage: node build/pmtiles.js [--bbox=west,south,east,north] [--minzoom=11] [--maxzoom=17] [--only=buildings,trees,streetlights,metro,bus-tram,orthophotos,plan-ign,terrain] [--jobs=3]
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
@@ -12,7 +12,7 @@ const { values: args } = parseArgs({
     bbox: { type: 'string', default: '2.26,48.835,2.38,48.885' },
     minzoom: { type: 'string', default: '11' },
     maxzoom: { type: 'string', default: '17' },
-    only: { type: 'string', default: 'buildings,trees,streetlights,orthophotos,plan-ign,terrain' },
+    only: { type: 'string', default: 'buildings,trees,streetlights,metro,bus-tram,orthophotos,plan-ign,terrain' },
     jobs: { type: 'string', default: '3' },
   },
 });
@@ -31,9 +31,45 @@ const outDir = new URL('../examples/data/', import.meta.url);
 const ignUrl = (layer, format) => (z, x, y) => `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer}&STYLE=normal&FORMAT=${format}&TILEMATRIXSET=PM_0_19&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}`;
 const ignAttribution = 'IGN — Licence Ouverte Etalab 2.0';
 const terrainZoom = 14;
+const transitZoom = 10;
 const terrainSourceTiles = new Map();
 let treeTiles;
 let lightTiles;
+
+function transitArchive(types) {
+  return {
+    tileType: 0,
+    tileCompression: 2,
+    bbox: buildingsBbox,
+    minZoom: transitZoom,
+    maxZoom: transitZoom,
+    concurrency: 1,
+    attribution: 'Île-de-France Mobilités — ODbL',
+    metadata: {
+      format: 'geojson',
+      source: 'https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/',
+    },
+    async tile() {
+      const [west, south, east, north] = buildingsBbox;
+      const ring = [[west, south], [east, south], [east, north], [west, north], [west, south]]
+        .map(([lng, lat]) => `${lng} ${lat}`).join(',');
+      const url = new URL('https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-des-lignes-de-transport-en-commun-idfm/exports/geojson');
+      url.search = new URLSearchParams({
+        select: 'route_id,route_short_name,route_long_name,route_type,route_color,shape',
+        where: `intersects(shape,geom'POLYGON((${ring}))') AND route_type IN (${types.map(type => `'${type}'`).join(',')})`,
+      });
+      const data = JSON.parse(await download(url));
+      if (data.type !== 'FeatureCollection' || !Array.isArray(data.features) ||
+        data.features.some(feature => !feature?.properties?.route_id ||
+          !types.includes(feature.properties.route_type) ||
+          !['LineString', 'MultiLineString'].includes(feature.geometry?.type))) {
+        throw new Error(`Invalid transit GeoJSON for ${types.join(', ')}`);
+      }
+      for (const feature of data.features) feature.id = feature.properties.route_id;
+      return gzipSync(JSON.stringify(data));
+    },
+  };
+}
 
 const archives = {
   streetlights: {
@@ -135,6 +171,8 @@ const archives = {
     metadata: { format: 'float32-le', source: 'IGN RGE ALTI', tileSize: 256 },
     tile: buildTerrainTile,
   },
+  metro: transitArchive(['Subway']),
+  'bus-tram': transitArchive(['Bus', 'Tram']),
 };
 
 function indexPointTiles(data, z, [west, south, east, north], idProperty = 'idbase', label = 'tree') {

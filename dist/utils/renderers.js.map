@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/renderers.js"],
-  "sourcesContent": ["/** Rendering owner per map; entries are removed on the last layer removal. */\nexport const renderers = new WeakMap();\n"],
-  "mappings": "AACO,MAAMA,EAAY,IAAI",
-  "names": ["renderers"]
-}

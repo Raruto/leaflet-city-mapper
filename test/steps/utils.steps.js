@@ -4,39 +4,39 @@ import { readFile } from 'node:fs/promises';
 import { Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
 import { parseColor } from '../../src/utils/parseColor.js';
-import { triangulate } from '../../src/utils/triangulate.js';
-import { computeBounds } from '../../src/utils/computeBounds.js';
-import { setVertexColor } from '../../src/utils/setVertexColor.js';
-import { treeGeometry } from '../../src/utils/treeGeometry.js';
-import { lightGeometry } from '../../src/utils/lightGeometry.js';
-import { lampPostGeometry } from '../../src/utils/lampPostGeometry.js';
-import { emptyNode } from '../../src/utils/emptyNode.js';
-import { setParent } from '../../src/utils/setParent.js';
-import { traverse } from '../../src/utils/traverse.js';
-import { decodeDirectory } from '../../src/utils/decodeDirectory.js';
-import { decodeHeader } from '../../src/utils/decodeHeader.js';
-import { decompress } from '../../src/utils/decompress.js';
-import { tileId } from '../../src/utils/tileId.js';
-import { decodeModel } from '../../src/utils/decodeModel.js';
-import { readAccessor } from '../../src/utils/readAccessor.js';
-import { nodeMatrix } from '../../src/utils/nodeMatrix.js';
-import { vertexNormals } from '../../src/utils/vertexNormals.js';
-import { textureSampler } from '../../src/utils/textureSampler.js';
-import { lightGrid } from '../../src/utils/lightGrid.js';
-import { worldLights } from '../../src/utils/worldLights.js';
-import { bridgeElevation } from '../../src/utils/bridgeElevation.js';
-import { terrainElevation } from '../../src/utils/terrainElevation.js';
-import { terrainGrid } from '../../src/utils/terrainGrid.js';
-import { terrainAtlas } from '../../src/utils/terrainAtlas.js';
-import { toLanes } from '../../src/utils/toLanes.js';
-import { tripsAt } from '../../src/utils/tripsAt.js';
-import { routeGeometry } from '../../src/utils/routeGeometry.js';
-import { collider } from '../../src/utils/collider.js';
-import { horizontalRay } from '../../src/utils/horizontalRay.js';
-import { materialShaders } from '../../src/utils/materialShaders.js';
-import { sortMeshes } from '../../src/utils/sortMeshes.js';
-import { projectCelestialBody } from '../../src/utils/projectCelestialBody.js';
-import { roofCoverage } from '../../src/utils/roofCoverage.js';
+import { triangulate } from '../../src/geometry/triangulate.js';
+import { computeBounds } from '../../src/geometry/computeBounds.js';
+import { setVertexColor } from '../../src/geometry/setVertexColor.js';
+import { treeGeometry } from '../../src/geometry/treeGeometry.js';
+import { lightGeometry } from '../../src/geometry/lightGeometry.js';
+import { lampPostGeometry } from '../../src/geometry/lampPostGeometry.js';
+import { emptyNode } from '../../src/scene/emptyNode.js';
+import { setParent } from '../../src/scene/setParent.js';
+import { traverse } from '../../src/scene/traverse.js';
+import { decodeDirectory } from '../../src/pmtiles/decodeDirectory.js';
+import { decodeHeader } from '../../src/pmtiles/decodeHeader.js';
+import { decompress } from '../../src/pmtiles/decompress.js';
+import { tileId } from '../../src/pmtiles/tileId.js';
+import { decodeModel } from '../../src/model/decodeModel.js';
+import { readAccessor } from '../../src/model/readAccessor.js';
+import { nodeMatrix } from '../../src/model/nodeMatrix.js';
+import { vertexNormals } from '../../src/geometry/vertexNormals.js';
+import { textureSampler } from '../../src/model/textureSampler.js';
+import { lightGrid } from '../../src/rendering/lightGrid.js';
+import { worldLights } from '../../src/rendering/worldLights.js';
+import { bridgeElevation } from '../../src/geometry/bridgeElevation.js';
+import { terrainElevation } from '../../src/terrain/terrainElevation.js';
+import { terrainGrid } from '../../src/terrain/terrainGrid.js';
+import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
+import { toLanes } from '../../src/traffic/toLanes.js';
+import { tripsAt } from '../../src/traffic/tripsAt.js';
+import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { collider } from '../../src/geometry/collider.js';
+import { horizontalRay } from '../../src/geometry/horizontalRay.js';
+import { materialShaders } from '../../src/rendering/materialShaders.js';
+import { sortMeshes } from '../../src/rendering/sortMeshes.js';
+import { projectCelestialBody } from '../../src/sunlight/projectCelestialBody.js';
+import { roofCoverage } from '../../src/geometry/roofCoverage.js';
 
 const checks = {
   'roof-coverage'() {
@@ -290,11 +290,11 @@ Then('the standalone 3D {string} utilities preserve their results and errors', a
 Then('standalone browser math preserves scene transforms and picking', async function () {
   const result = await this.page.evaluate(async base => {
     const [{ emptyNode }, { setParent }, { updateWorldMatrix }, { updateCamera }, { intersectMeshes }] = await Promise.all([
-      import(`${base}/dist/utils/emptyNode.js`),
-      import(`${base}/dist/utils/setParent.js`),
-      import(`${base}/dist/utils/updateWorldMatrix.js`),
-      import(`${base}/dist/utils/updateCamera.js`),
-      import(`${base}/dist/utils/intersectMeshes.js`),
+      import(`${base}/src/scene/emptyNode.js`),
+      import(`${base}/src/scene/setParent.js`),
+      import(`${base}/src/scene/updateWorldMatrix.js`),
+      import(`${base}/src/scene/updateCamera.js`),
+      import(`${base}/src/geometry/intersectMeshes.js`),
     ]);
     const parent = emptyNode(), child = emptyNode();
     parent.position = [10, 20, 30];

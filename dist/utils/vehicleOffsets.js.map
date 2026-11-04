@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/vehicleOffsets.js"],
-  "sourcesContent": ["import { speed } from \"./speed.js\";\n\n/** Evenly spaced starting offsets (metres) for `flow` vehicles/h moving at `velocity` m/s on a `length` metres lane. */\n\nexport function vehicleOffsets(length, flow, velocity = speed) {\n  const count = Math.round(length * flow / 3600 / velocity);\n  return Array.from({ length: count }, (_, i) => (i + 0.5) * length / count);\n}\n"],
-  "mappings": "AAAA,OAAS,SAAAA,MAAa,aAIf,SAASC,EAAeC,EAAQC,EAAMC,EAAWJ,EAAO,CAC7D,MAAMK,EAAQ,KAAK,MAAMH,EAASC,EAAO,KAAOC,CAAQ,EACxD,OAAO,MAAM,KAAK,CAAE,OAAQC,CAAM,EAAG,CAACC,EAAGC,KAAOA,EAAI,IAAOL,EAASG,CAAK,CAC3E",
-  "names": ["speed", "vehicleOffsets", "length", "flow", "velocity", "count", "_", "i"]
-}

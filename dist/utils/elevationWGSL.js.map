@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/elevationWGSL.js"],
-  "sourcesContent": ["/**\n * WGSL twin of getElevation for the vertex shader: bilinear DEM pixels, or the first valid\n * neighbour near no-data (stored as -1e9), else `base`. Expects `dem: texture_2d<f32>`.\n */\nexport const elevationWGSL = `\n  fn demSample(pixel: vec2<i32>) -> f32 {\n    if (any(pixel < vec2<i32>(0)) || any(pixel >= vec2<i32>(textureDimensions(dem)))) { return -1e9; }\n    return textureLoad(dem, pixel, 0).r;\n  }\n  fn elevation(pixel: vec2<f32>, base: f32) -> f32 {\n    let p = pixel - vec2<f32>(0.5);\n    let f = fract(p);\n    let i = vec2<i32>(floor(p));\n    let v00 = demSample(i);\n    let v10 = demSample(i + vec2<i32>(1, 0));\n    let v01 = demSample(i + vec2<i32>(0, 1));\n    let v11 = demSample(i + vec2<i32>(1, 1));\n    if (v00 > -1000.0 && v10 > -1000.0 && v01 > -1000.0 && v11 > -1000.0) {\n      return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);\n    }\n    if (v00 > -1000.0) { return v00; }\n    if (v10 > -1000.0) { return v10; }\n    if (v01 > -1000.0) { return v01; }\n    if (v11 > -1000.0) { return v11; }\n    return base;\n  }\n`;\n"],
-  "mappings": "AAIO,MAAMA,EAAgB;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;",
-  "names": ["elevationWGSL"]
-}

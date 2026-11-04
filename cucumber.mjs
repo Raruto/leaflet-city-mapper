@@ -5,5 +5,5 @@ export default {
     import: ['test/support/**/*.js', 'test/steps/**/*.js'],
     format: ['progress'],
     parallel: 1, // availableParallelism(),
-    failFast: true,
+    failFast: false,
 };

@@ -21,7 +21,8 @@ Then('every local source in the city example is available', async function () {
 Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }, async function () {
   this.sourceRequests = [];
   this.page.on('request', request => {
-    if (/\/dist\/(?:utils|types)\//.test(request.url())) this.sourceRequests.push(request.url());
+    const url = new URL(request.url());
+    if (url.origin === this.baseUrl && url.pathname.startsWith('/dist/')) this.sourceRequests.push(url.pathname);
   });
   await this.page.goto(this.baseUrl);
   await this.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
@@ -36,8 +37,8 @@ Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }
   await this.page.waitForFunction(() => L.Layer.prototype._init3D);
 });
 
-Then('each source loads only its requested initializer', async function () {
-  assert.deepEqual(this.sourceRequests, []);
+Then('each source initializes from the single bundle', async function () {
+  assert.deepEqual(this.sourceRequests, ['/dist/leaflet-city-mapper.js']);
   const specialized = ['terrain', 'sunlight', 'traffic', 'walk'];
   for (const [index, type] of ['pmtiles', 'geojson', ...specialized].entries()) {
     await this.page.evaluate(async type => {
@@ -52,12 +53,8 @@ Then('each source loads only its requested initializer', async function () {
         throw new Error('setData must remain chainable');
       }
     }, type);
-    for (const [offset, name] of specialized.entries()) {
-      const file = `init${name[0].toUpperCase()}${name.slice(1)}.js`;
-      assert.equal(this.sourceRequests.some(url => url.endsWith(`/${file}`)), offset + 2 <= index, file);
-    }
+    assert.deepEqual(this.sourceRequests, ['/dist/leaflet-city-mapper.js']);
   }
-  assert.ok(this.sourceRequests.every(url => !url.includes('/dist/types/')));
 });
 
 Then('source layers load lazily and Leaflet subclasses keep their behavior', async function () {

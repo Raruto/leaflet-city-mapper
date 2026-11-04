@@ -1,2 +1,0 @@
-function s(e,l){for(const f of l?.get(`${Math.floor(e.x/64)}/${Math.floor(e.y/64)}`)||[])if(!(e.x<f.min[0]||e.x>f.max[0]||e.y<f.min[1]||e.y>f.max[1]))for(const[c,o,r]of f.triangles){const n=(o[1]-r[1])*(c[0]-r[0])+(r[0]-o[0])*(c[1]-r[1]),x=((o[1]-r[1])*(e.x-r[0])+(r[0]-o[0])*(e.y-r[1]))/n,a=((r[1]-c[1])*(e.x-r[0])+(c[0]-r[0])*(e.y-r[1]))/n;if(x>=0&&a>=0&&x+a<=1)return x*c[2]+a*o[2]+(1-x-a)*r[2]}return null}export{s as bridgeElevation};
-//# sourceMappingURL=bridgeElevation.js.map

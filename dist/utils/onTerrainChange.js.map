@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onTerrainChange.js"],
-  "sourcesContent": ["import { releaseArea } from \"./releaseArea.js\";\nimport { updateArea } from \"./updateArea.js\";\n\n/** GeoJSON source areas: loading, building and releasing. */\n\nexport function onTerrainChange(layer) {\n  if (!layer._map) return;\n  for (const area of layer._areas.values()) {\n    releaseArea(layer, area);\n  }\n  layer._areas.clear();\n  updateArea(layer);\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,cAAAC,MAAkB,kBAIpB,SAASC,EAAgBC,EAAO,CACrC,GAAKA,EAAM,KACX,WAAWC,KAAQD,EAAM,OAAO,OAAO,EACrCH,EAAYG,EAAOC,CAAI,EAEzBD,EAAM,OAAO,MAAM,EACnBF,EAAWE,CAAK,EAClB",
-  "names": ["releaseArea", "updateArea", "onTerrainChange", "layer", "area"]
-}

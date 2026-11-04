@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/along.js"],
-  "sourcesContent": ["/** Point and unit direction at distance `s` along `points` ([x, z, y?]) with cumulative `lengths`. */\n\nexport function along(points, lengths, s) {\n  let i = 1;\n  while (i < lengths.length - 1 && lengths[i] < s) i++;\n  const a = points[i - 1], b = points[i], d = lengths[i] - lengths[i - 1] || 1;\n  const t = (s - lengths[i - 1]) / d;\n  return { x: a[0] + (b[0] - a[0]) * t, y: (a[2] ?? 0) + ((b[2] ?? 0) - (a[2] ?? 0)) * t, z: a[1] + (b[1] - a[1]) * t, dx: (b[0] - a[0]) / d, dz: (b[1] - a[1]) / d };\n}\n"],
-  "mappings": "AAEO,SAASA,EAAMC,EAAQC,EAASC,EAAG,CACxC,IAAIC,EAAI,EACR,KAAOA,EAAIF,EAAQ,OAAS,GAAKA,EAAQE,CAAC,EAAID,GAAGC,IACjD,MAAMC,EAAIJ,EAAOG,EAAI,CAAC,EAAGE,EAAIL,EAAOG,CAAC,EAAGG,EAAIL,EAAQE,CAAC,EAAIF,EAAQE,EAAI,CAAC,GAAK,EACrEI,GAAKL,EAAID,EAAQE,EAAI,CAAC,GAAKG,EACjC,MAAO,CAAE,EAAGF,EAAE,CAAC,GAAKC,EAAE,CAAC,EAAID,EAAE,CAAC,GAAKG,EAAG,GAAIH,EAAE,CAAC,GAAK,KAAOC,EAAE,CAAC,GAAK,IAAMD,EAAE,CAAC,GAAK,IAAMG,EAAG,EAAGH,EAAE,CAAC,GAAKC,EAAE,CAAC,EAAID,EAAE,CAAC,GAAKG,EAAG,IAAKF,EAAE,CAAC,EAAID,EAAE,CAAC,GAAKE,EAAG,IAAKD,EAAE,CAAC,EAAID,EAAE,CAAC,GAAKE,CAAE,CACpK",
-  "names": ["along", "points", "lengths", "s", "i", "a", "b", "d", "t"]
-}

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/glass.js"],
-  "sourcesContent": ["export const glass = [0.12, 0.15, 0.18], tyre = [0.05, 0.05, 0.05];\n"],
-  "mappings": "AAAO,MAAMA,EAAQ,CAAC,IAAM,IAAM,GAAI,EAAGC,EAAO,CAAC,IAAM,IAAM,GAAI",
-  "names": ["glass", "tyre"]
-}

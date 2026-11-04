@@ -12,6 +12,10 @@ Feature: Terrain and raster imagery
     Given a leaflet map
     Then coarse ground imagery precedes detail and survives delayed replacements
 
+  Scenario: Overlapping terrain tiles never punch holes during zoom and pan
+    Given a leaflet map
+    Then fading terrain detail covers retained ground without depth interference
+
   Scenario: Streamed objects appear progressively without changing opaque depth
     Given a leaflet map
     Then streamed geometry dissolves progressively while remaining opaque

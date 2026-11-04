@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/getElevation.js"],
-  "sourcesContent": ["import { bridgeElevation } from './bridgeElevation.js';\nimport { terrainElevation } from './terrainElevation.js';\n\n/** @param {L.LatLng|L.Point} location LatLng, or a pixel point at the terrain zoom. */\n\nexport function getElevation(backend, location) {\n  if (!backend._map || !backend._terrainReady) return null;\n  const point = location instanceof L.Point ? location : backend._map.project(location, backend._terrainZoom);\n  return bridgeElevation(point, backend._bridges) ?? terrainElevation(point, backend._terrainTiles);\n}\n"],
-  "mappings": "AAAA,OAAS,mBAAAA,MAAuB,uBAChC,OAAS,oBAAAC,MAAwB,wBAI1B,SAASC,EAAaC,EAASC,EAAU,CAC9C,GAAI,CAACD,EAAQ,MAAQ,CAACA,EAAQ,cAAe,OAAO,KACpD,MAAME,EAAQD,aAAoB,EAAE,MAAQA,EAAWD,EAAQ,KAAK,QAAQC,EAAUD,EAAQ,YAAY,EAC1G,OAAOH,EAAgBK,EAAOF,EAAQ,QAAQ,GAAKF,EAAiBI,EAAOF,EAAQ,aAAa,CAClG",
-  "names": ["bridgeElevation", "terrainElevation", "getElevation", "backend", "location", "point"]
-}

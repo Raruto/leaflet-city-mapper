@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/initSunlight.js"],
-  "sourcesContent": ["import { onAddSun } from './onAddSun.js';\nimport { onRemoveSun } from './onRemoveSun.js';\n\n// Sun/moon clock control and sky colours; the control is created on first add (`layer.control`).\nexport function initSunlight(layer, options) {\n  L.Util.setOptions(layer, options);\n  layer.onAdd = map => onAddSun(layer, map);\n  layer.onRemove = () => onRemoveSun(layer);\n}"],
-  "mappings": "AAAA,OAAS,YAAAA,MAAgB,gBACzB,OAAS,eAAAC,MAAmB,mBAGrB,SAASC,EAAaC,EAAOC,EAAS,CAC3C,EAAE,KAAK,WAAWD,EAAOC,CAAO,EAChCD,EAAM,MAAQE,GAAOL,EAASG,EAAOE,CAAG,EACxCF,EAAM,SAAW,IAAMF,EAAYE,CAAK,CAC1C",
-  "names": ["onAddSun", "onRemoveSun", "initSunlight", "layer", "options", "map"]
-}

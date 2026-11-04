@@ -1,2 +1,0 @@
-import{attach as i}from"./attach.js";import{setRasterTerrain as s,updateRasterTiles as f}from"./rasterTiles.js";function a(r,t){r.location||(r.location=t.getCenter());const e=i(r,t);e.then(()=>{r._added.resolve(),s(r,t._terrain3D)}).catch(o=>r.fire("error",{error:o})),Promise.all([e,r.ready]).then(()=>{r._map===t&&t.hasLayer(r)&&f(r)}).catch(o=>r.fire("error",{error:o}))}export{a as onPMTileAdd};
-//# sourceMappingURL=onPMTileAdd.js.map

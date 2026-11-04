@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onPointerLeave.js"],
-  "sourcesContent": ["import { setHighlight } from './setHighlight.js';\nimport { showFeature } from './showFeature.js';\n\n/** Clear hover, highlight and tooltip without retaining a selected feature. */\n\nexport function onPointerLeave(layer) {\n  layer.hoveredFeature = null;\n  setHighlight(layer, null);\n  showFeature(layer, null);\n  layer.fire('featurehover', { feature: null });\n}\n"],
-  "mappings": "AAAA,OAAS,gBAAAA,MAAoB,oBAC7B,OAAS,eAAAC,MAAmB,mBAIrB,SAASC,EAAeC,EAAO,CACpCA,EAAM,eAAiB,KACvBH,EAAaG,EAAO,IAAI,EACxBF,EAAYE,EAAO,IAAI,EACvBA,EAAM,KAAK,eAAgB,CAAE,QAAS,IAAK,CAAC,CAC9C",
-  "names": ["setHighlight", "showFeature", "onPointerLeave", "layer"]
-}

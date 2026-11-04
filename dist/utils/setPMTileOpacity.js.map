@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/setPMTileOpacity.js"],
-  "sourcesContent": ["import { setRasterOpacity } from './rasterTiles.js';\n\nexport function setPMTileOpacity(backend, opacity) {\n  backend.options.opacity = opacity;\n  setRasterOpacity(backend, opacity);\n  return backend;\n}\n"],
-  "mappings": "AAAA,OAAS,oBAAAA,MAAwB,mBAE1B,SAASC,EAAiBC,EAASC,EAAS,CACjD,OAAAD,EAAQ,QAAQ,QAAUC,EAC1BH,EAAiBE,EAASC,CAAO,EAC1BD,CACT",
-  "names": ["setRasterOpacity", "setPMTileOpacity", "backend", "opacity"]
-}

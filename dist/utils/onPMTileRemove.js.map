@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onPMTileRemove.js"],
-  "sourcesContent": ["import { releaseRasterTiles } from './rasterTiles.js';\nimport { onRemove3DLayer } from './onRemove3DLayer.js';\n\nexport function onPMTileRemove(backend, map) {\n  releaseRasterTiles(backend);\n  backend._terrain3D = null;\n  onRemove3DLayer(backend, map);\n}\n"],
-  "mappings": "AAAA,OAAS,sBAAAA,MAA0B,mBACnC,OAAS,mBAAAC,MAAuB,uBAEzB,SAASC,EAAeC,EAASC,EAAK,CAC3CJ,EAAmBG,CAAO,EAC1BA,EAAQ,WAAa,KACrBF,EAAgBE,EAASC,CAAG,CAC9B",
-  "names": ["releaseRasterTiles", "onRemove3DLayer", "onPMTileRemove", "backend", "map"]
-}

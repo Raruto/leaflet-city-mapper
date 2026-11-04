@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/initTerrain.js"],
-  "sourcesContent": ["import { onTerrainRemove } from './onTerrainRemove.js';\nimport { onTerrainAdd } from './onTerrainAdd.js';\n\n/**\n * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.\n * Source options: `url` (single-zoom Float32 PMTiles DEM); `bridges` (optional GeoJSON deck polygons with Z, see _addBridges).\n */\nexport function initTerrain(layer, options) {\n  const terrainSource = options.url;\n  const layerOptions = { ...options };\n  delete layerOptions.url;\n  layer._init3D(layerOptions);\n  layer.terrainSource = terrainSource;\n  layer._terrainTiles = new Map();\n  layer._rasterTiles = new Map();\n  layer._terrainReady = false;\n  layer.onAdd = map => onTerrainAdd(layer, map);\n  layer.onRemove = map => onTerrainRemove(layer, map);\n}\n"],
-  "mappings": "AAAA,OAAS,mBAAAA,MAAuB,uBAChC,OAAS,gBAAAC,MAAoB,oBAMtB,SAASC,EAAYC,EAAOC,EAAS,CAC1C,MAAMC,EAAgBD,EAAQ,IACxBE,EAAe,CAAE,GAAGF,CAAQ,EAClC,OAAOE,EAAa,IACpBH,EAAM,QAAQG,CAAY,EAC1BH,EAAM,cAAgBE,EACtBF,EAAM,cAAgB,IAAI,IAC1BA,EAAM,aAAe,IAAI,IACzBA,EAAM,cAAgB,GACtBA,EAAM,MAAQI,GAAON,EAAaE,EAAOI,CAAG,EAC5CJ,EAAM,SAAWI,GAAOP,EAAgBG,EAAOI,CAAG,CACpD",
-  "names": ["onTerrainRemove", "onTerrainAdd", "initTerrain", "layer", "options", "terrainSource", "layerOptions", "map"]
-}

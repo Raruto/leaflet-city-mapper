@@ -43,7 +43,9 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
-Vector and raster layers are initialized in [`src/index.js`](./src/index.js); their rendering utilities are loaded only when needed. Terrain, sunlight, traffic and walk initializers are also loaded lazily from [`src/utils`](./src/utils).
+The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`.
+
+Raster imagery blends coarse-to-fine on the terrain, retaining depth occlusion for 3D objects.
 
 ### Update demo data
 
@@ -52,11 +54,12 @@ The Paris example makes extensive use of [PMTiles](./build/pmtiles.js) to ensure
 ```shell
 npm run pmtiles
 node build/pmtiles.js --only=trees
+node build/pmtiles.js --only=metro,bus-tram
 node build/pmtiles.js --jobs=6
 
 ```
 
-All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `--bbox=west,south,east,north` to override it.
+All archives use the buildings bbox (default: `2.26,48.835,2.38,48.885`). Use `--bbox=west,south,east,north` to override it. The transit archives use Île-de-France Mobilités route data; metro and bus/tram names are labeled on the map.
 
 ### Build Guide
 

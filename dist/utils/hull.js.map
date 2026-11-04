@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/hull.js"],
-  "sourcesContent": ["export const hull = [[-5.5, 30], [5.5, 30], [5.5, -20], [4, -26], [1.5, -30], [-1.5, -30], [-4, -26], [-5.5, -20]];\n"],
-  "mappings": "AAAO,MAAMA,EAAO,CAAC,CAAC,KAAM,EAAE,EAAG,CAAC,IAAK,EAAE,EAAG,CAAC,IAAK,GAAG,EAAG,CAAC,EAAG,GAAG,EAAG,CAAC,IAAK,GAAG,EAAG,CAAC,KAAM,GAAG,EAAG,CAAC,GAAI,GAAG,EAAG,CAAC,KAAM,GAAG,CAAC",
-  "names": ["hull"]
-}

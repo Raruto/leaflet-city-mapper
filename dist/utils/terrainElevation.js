@@ -1,2 +1,0 @@
-function g(a,M){const f=a.x-.5,c=a.y-.5,e=Math.floor(f),l=Math.floor(c),o=f-e,h=c-l,r=(n,i)=>{const m=Math.floor(n/256),v=Math.floor(i/256),x=M.get(`${m}/${v}`);if(!x)return null;const u=x[(i-v*256)*256+n-m*256];return Number.isFinite(u)&&u>-1e3?u:null},t=[r(e,l),r(e+1,l),r(e,l+1),r(e+1,l+1)],s=t.map((n,i)=>Number.isFinite(n)?i:-1).filter(n=>n>=0);return s.length?s.length<4?t[s[0]]:(t[0]*(1-o)+t[1]*o)*(1-h)+(t[2]*(1-o)+t[3]*o)*h:null}export{g as terrainElevation};
-//# sourceMappingURL=terrainElevation.js.map

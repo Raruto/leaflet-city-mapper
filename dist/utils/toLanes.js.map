@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/toLanes.js"],
-  "sourcesContent": ["// GeoJSON (Multi)LineStrings become lanes ({latlngs, properties, elevation?}); prepare() adds `points` ([x, z, ground]),\n// `lengths` and `length` in layer-local metres.\n\nexport const toLanes = ({ features = [] }) => features.flatMap(({ geometry, properties }) => {\n  const lines = geometry?.type === 'LineString' ? [geometry.coordinates] : geometry?.type === 'MultiLineString' ? geometry.coordinates : [];\n  return lines.map(line => ({ latlngs: line.map(([lng, lat]) => [lat, lng]), properties: properties ?? {}, elevation: properties?.elevation }));\n});\n"],
-  "mappings": "AAGO,MAAMA,EAAU,CAAC,CAAE,SAAAC,EAAW,CAAC,CAAE,IAAMA,EAAS,QAAQ,CAAC,CAAE,SAAAC,EAAU,WAAAC,CAAW,KACvED,GAAU,OAAS,aAAe,CAACA,EAAS,WAAW,EAAIA,GAAU,OAAS,kBAAoBA,EAAS,YAAc,CAAC,GAC3H,IAAIE,IAAS,CAAE,QAASA,EAAK,IAAI,CAAC,CAACC,EAAKC,CAAG,IAAM,CAACA,EAAKD,CAAG,CAAC,EAAG,WAAYF,GAAc,CAAC,EAAG,UAAWA,GAAY,SAAU,EAAE,CAC7I",
-  "names": ["toLanes", "features", "geometry", "properties", "line", "lng", "lat"]
-}

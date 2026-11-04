@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/nodeMatrix.js"],
-  "sourcesContent": ["/** glTF quaternion/translation/scale to a column-major matrix. */\n\nexport function nodeMatrix(spec) {\n  if (spec.matrix) return Array.from(spec.matrix);\n  // glTF stores quaternions [x,y,z,w]; convert directly to a scaled column-major matrix.\n  const [x, y, z, w] = spec.rotation || [0, 0, 0, 1], [sx, sy, sz] = spec.scale || [1, 1, 1];\n  return [\n    (1 - 2 * (y * y + z * z)) * sx,\n    2 * (x * y + z * w) * sx,\n    2 * (x * z - y * w) * sx,\n    0,\n    2 * (x * y - z * w) * sy,\n    (1 - 2 * (x * x + z * z)) * sy,\n    2 * (y * z + x * w) * sy, 0,\n    2 * (x * z + y * w) * sz,\n    2 * (y * z - x * w) * sz,\n    (1 - 2 * (x * x + y * y)) * sz,\n    0,\n    ...(spec.translation || [0, 0, 0]),\n    1,\n  ];\n}\n"],
-  "mappings": "AAEO,SAASA,EAAWC,EAAM,CAC/B,GAAIA,EAAK,OAAQ,OAAO,MAAM,KAAKA,EAAK,MAAM,EAE9C,KAAM,CAACC,EAAGC,EAAGC,EAAGC,CAAC,EAAIJ,EAAK,UAAY,CAAC,EAAG,EAAG,EAAG,CAAC,EAAG,CAACK,EAAIC,EAAIC,CAAE,EAAIP,EAAK,OAAS,CAAC,EAAG,EAAG,CAAC,EACzF,MAAO,EACJ,EAAI,GAAKE,EAAIA,EAAIC,EAAIA,IAAME,EAC5B,GAAKJ,EAAIC,EAAIC,EAAIC,GAAKC,EACtB,GAAKJ,EAAIE,EAAID,EAAIE,GAAKC,EACtB,EACA,GAAKJ,EAAIC,EAAIC,EAAIC,GAAKE,GACrB,EAAI,GAAKL,EAAIA,EAAIE,EAAIA,IAAMG,EAC5B,GAAKJ,EAAIC,EAAIF,EAAIG,GAAKE,EAAI,EAC1B,GAAKL,EAAIE,EAAID,EAAIE,GAAKG,EACtB,GAAKL,EAAIC,EAAIF,EAAIG,GAAKG,GACrB,EAAI,GAAKN,EAAIA,EAAIC,EAAIA,IAAMK,EAC5B,EACA,GAAIP,EAAK,aAAe,CAAC,EAAG,EAAG,CAAC,EAChC,CACF,CACF",
-  "names": ["nodeMatrix", "spec", "x", "y", "z", "w", "sx", "sy", "sz"]
-}

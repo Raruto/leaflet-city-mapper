@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/setPMTileZIndex.js"],
-  "sourcesContent": ["import { setRasterZIndex } from './rasterTiles.js';\n\nexport function setPMTileZIndex(backend, zIndex) {\n  backend.options.zIndex = zIndex;\n  setRasterZIndex(backend, zIndex);\n  return backend;\n}\n"],
-  "mappings": "AAAA,OAAS,mBAAAA,MAAuB,mBAEzB,SAASC,EAAgBC,EAASC,EAAQ,CAC/C,OAAAD,EAAQ,QAAQ,OAASC,EACzBH,EAAgBE,EAASC,CAAM,EACxBD,CACT",
-  "names": ["setRasterZIndex", "setPMTileZIndex", "backend", "zIndex"]
-}

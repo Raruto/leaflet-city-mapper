@@ -1,2 +1,0 @@
-import{bindSunlight as i}from"./bindSunlight.js";import{destroyTexture as o}from"./destroyTexture.js";function x(r,t){const u=r.renderer.device,e=r.renderer.sunlight;e.size!==t&&(e.texture&&o(r,e.texture),e.size=t,e.texture=u.createTexture({size:[t,t],format:"depth32float",usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC}),i(r))}export{x as resizeSunlight};
-//# sourceMappingURL=resizeSunlight.js.map

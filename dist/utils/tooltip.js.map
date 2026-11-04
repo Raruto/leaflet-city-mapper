@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/tooltip.js"],
-  "sourcesContent": ["export const tooltip = ({ properties: p }) => {\n  const content = document.createElement('div');\n  content.style.whiteSpace = 'pre-line';\n  content.textContent = [p.name, p.departure && `Departure ${p.departure} ${p.timetable.timeZone}`, p.description].filter(Boolean).join('\\n');\n  return content;\n};\n"],
-  "mappings": "AAAO,MAAMA,EAAU,CAAC,CAAE,WAAYC,CAAE,IAAM,CAC5C,MAAMC,EAAU,SAAS,cAAc,KAAK,EAC5C,OAAAA,EAAQ,MAAM,WAAa,WAC3BA,EAAQ,YAAc,CAACD,EAAE,KAAMA,EAAE,WAAa,aAAaA,EAAE,SAAS,IAAIA,EAAE,UAAU,QAAQ,GAAIA,EAAE,WAAW,EAAE,OAAO,OAAO,EAAE,KAAK;AAAA,CAAI,EACnIC,CACT",
-  "names": ["tooltip", "p", "content"]
-}

@@ -3,9 +3,9 @@ Feature: Separate plugin integration
     Given the city mapper plugin is loaded after Leaflet alone
     Then source layers load lazily and Leaflet subclasses keep their behavior
 
-  Scenario: Specialized source utilities are loaded only on first use
+  Scenario: Specialized source initializers remain lazy in the single bundle
     Given the city mapper plugin is loaded after Leaflet alone
-    Then each source loads only its requested initializer
+    Then each source initializes from the single bundle
 
   Scenario: Invalid source types report errors without blocking subsequent layers
     Given the city mapper plugin is loaded after Leaflet alone

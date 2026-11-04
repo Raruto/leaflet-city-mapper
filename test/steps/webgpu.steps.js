@@ -414,7 +414,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       const origin = crs.project(terrain.location);
       const metres = Math.cos(terrain.location.lat * Math.PI / 180);
       const base = terrain._terrainOriginElevation;
-      const { terrainElevation } = await import('../dist/utils/terrainElevation.js');
+      const { terrainElevation } = await import('../src/terrain/terrainElevation.js');
       // Run the shader's own elevation code on every grid vertex, as the vertex stage does.
       const vertices = [];
       let wrongVertexCount = 0, notUploaded = 0, wrongSize = 0, missingCoords = 0, raisedGrid = 0;

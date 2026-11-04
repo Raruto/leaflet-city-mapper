@@ -1,2 +1,0 @@
-function r(e){return{addressModeU:e.wrapS===33071?"clamp-to-edge":e.wrapS===33648?"mirror-repeat":"repeat",addressModeV:e.wrapT===33071?"clamp-to-edge":e.wrapT===33648?"mirror-repeat":"repeat",magFilter:e.magFilter===9728?"nearest":"linear",minFilter:e.minFilter===9728||e.minFilter===9984||e.minFilter===9986?"nearest":"linear"}}export{r as textureSampler};
-//# sourceMappingURL=textureSampler.js.map

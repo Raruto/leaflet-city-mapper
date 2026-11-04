@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/white.js"],
-  "sourcesContent": ["export const white = [0.92, 0.93, 0.92];\n"],
-  "mappings": "AAAO,MAAMA,EAAQ,CAAC,IAAM,IAAM,GAAI",
-  "names": ["white"]
-}

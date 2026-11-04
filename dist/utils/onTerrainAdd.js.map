@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onTerrainAdd.js"],
-  "sourcesContent": ["import { loadTerrain } from \"./loadTerrain.js\";\nimport { setRasterTerrain } from \"./rasterTiles.js\";\nimport { onAdd3DLayer } from './onAdd3DLayer.js';\n\nexport function onTerrainAdd(backend, map) {\n  if (map._terrain3D && map._terrain3D !== backend) {\n    throw new Error('Only one terrain layer can be active per map');\n  }\n  map._terrain3D = backend;\n  onAdd3DLayer(backend, map);\n  backend._terrainPromise = backend.root\n    ? loadTerrain(backend)\n    : new Promise(resolve => backend.once('ready', () => loadTerrain(backend).then(resolve), backend));\n  map.eachLayer(layer => {\n    if (layer._type === 'pmtiles') setRasterTerrain(layer, backend);\n  });\n  map.fire('terrainchange');\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,oBAAAC,MAAwB,mBACjC,OAAS,gBAAAC,MAAoB,oBAEtB,SAASC,EAAaC,EAASC,EAAK,CACzC,GAAIA,EAAI,YAAcA,EAAI,aAAeD,EACvC,MAAM,IAAI,MAAM,8CAA8C,EAEhEC,EAAI,WAAaD,EACjBF,EAAaE,EAASC,CAAG,EACzBD,EAAQ,gBAAkBA,EAAQ,KAC9BJ,EAAYI,CAAO,EACnB,IAAI,QAAQE,GAAWF,EAAQ,KAAK,QAAS,IAAMJ,EAAYI,CAAO,EAAE,KAAKE,CAAO,EAAGF,CAAO,CAAC,EACnGC,EAAI,UAAUE,GAAS,CACjBA,EAAM,QAAU,WAAWN,EAAiBM,EAAOH,CAAO,CAChE,CAAC,EACDC,EAAI,KAAK,eAAe,CAC1B",
-  "names": ["loadTerrain", "setRasterTerrain", "onAdd3DLayer", "onTerrainAdd", "backend", "map", "resolve", "layer"]
-}

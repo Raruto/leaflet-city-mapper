@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/update.js"],
-  "sourcesContent": ["import { render } from \"./render.js\";\n\n/** Scene graph, shared camera and frame rendering. */\n/** Content changes: render once on the next animation frame. */\n\nexport function update(backend) {\n  const shared = backend._shared;\n  if (!shared) return backend;\n  if (shared !== backend) {\n    update(shared);\n    return backend;\n  }\n  backend._frame ||= requestAnimationFrame(() => {\n    backend._frame = null;\n    if (backend._shared === backend && backend.renderer) render(backend);\n  });\n  return backend;\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,cAKhB,SAASC,EAAOC,EAAS,CAC9B,MAAMC,EAASD,EAAQ,QACvB,OAAKC,EACDA,IAAWD,GACbD,EAAOE,CAAM,EACND,IAETA,EAAQ,SAAW,sBAAsB,IAAM,CAC7CA,EAAQ,OAAS,KACbA,EAAQ,UAAYA,GAAWA,EAAQ,UAAUF,EAAOE,CAAO,CACrE,CAAC,EACMA,GATaA,CAUtB",
-  "names": ["render", "update", "backend", "shared"]
-}

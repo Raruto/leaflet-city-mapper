@@ -1,2 +1,0 @@
-function u(m,t){const o=t.max.x-t.min.x+1,c=t.max.y-t.min.y+1,l=new Float32Array(o*c*65536).fill(-1e9);let r=1/0,a=-1/0;for(const[f,s]of m){const[x,y]=f.split("/").map(Number),h=(y-t.min.y)*256*o*256+(x-t.min.x)*256;for(let i=0;i<256;i++)for(let e=0;e<256;e++){const n=s[i*256+e];!Number.isFinite(n)||n<=-1e3||(l[h+i*o*256+e]=n,r=Math.min(r,n),a=Math.max(a,n))}}return{elevations:l,low:r,high:a}}export{u as terrainAtlas};
-//# sourceMappingURL=terrainAtlas.js.map

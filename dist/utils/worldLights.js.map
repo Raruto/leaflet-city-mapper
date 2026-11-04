@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/worldLights.js"],
-  "sourcesContent": ["\n/** World-space [x, y, z, radius, r, g, b, intensity] for one mesh's point lights. */\nexport function worldLights(lights, m) {\n  const values = new Float32Array(lights.length * 8);\n  lights.forEach(({\n    position: [x, y, z],\n    radius,\n    color,\n    flux\n  }, i) => {\n    const w = m[3] * x + m[7] * y + m[11] * z + m[15];\n    values.set(\n      [\n        (m[0] * x + m[4] * y + m[8] * z + m[12]) / w,\n        (m[1] * x + m[5] * y + m[9] * z + m[13]) / w,\n       (m[2] * x + m[6] * y + m[10] * z + m[14]) / w,\n       radius,\n       ...color,\n       flux / (4 * Math.PI) * 0.03\n      ],\n       i * 8\n    );\n  });\n  return values;\n}"],
-  "mappings": "AAEO,SAASA,EAAYC,EAAQC,EAAG,CACrC,MAAMC,EAAS,IAAI,aAAaF,EAAO,OAAS,CAAC,EACjD,OAAAA,EAAO,QAAQ,CAAC,CACd,SAAU,CAACG,EAAGC,EAAGC,CAAC,EAClB,OAAAC,EACA,MAAAC,EACA,KAAAC,CACF,EAAGC,IAAM,CACP,MAAMC,EAAIT,EAAE,CAAC,EAAIE,EAAIF,EAAE,CAAC,EAAIG,EAAIH,EAAE,EAAE,EAAII,EAAIJ,EAAE,EAAE,EAChDC,EAAO,IACL,EACGD,EAAE,CAAC,EAAIE,EAAIF,EAAE,CAAC,EAAIG,EAAIH,EAAE,CAAC,EAAII,EAAIJ,EAAE,EAAE,GAAKS,GAC1CT,EAAE,CAAC,EAAIE,EAAIF,EAAE,CAAC,EAAIG,EAAIH,EAAE,CAAC,EAAII,EAAIJ,EAAE,EAAE,GAAKS,GAC3CT,EAAE,CAAC,EAAIE,EAAIF,EAAE,CAAC,EAAIG,EAAIH,EAAE,EAAE,EAAII,EAAIJ,EAAE,EAAE,GAAKS,EAC5CJ,EACA,GAAGC,EACHC,GAAQ,EAAI,KAAK,IAAM,GACxB,EACCC,EAAI,CACP,CACF,CAAC,EACMP,CACT",
-  "names": ["worldLights", "lights", "m", "values", "x", "y", "z", "radius", "color", "flux", "i", "w"]
-}

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/channel.js"],
-  "sourcesContent": ["export const channel = (n, h, l, a) => {\n  const k = (n + h * 12) % 12;\n  return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));\n};\n"],
-  "mappings": "AAAO,MAAMA,EAAU,CAACC,EAAGC,EAAGC,EAAGC,IAAM,CACrC,MAAMC,GAAKJ,EAAIC,EAAI,IAAM,GACzB,OAAOC,EAAIC,EAAI,KAAK,IAAI,GAAI,KAAK,IAAIC,EAAI,EAAG,EAAIA,EAAG,CAAC,CAAC,CACvD",
-  "names": ["channel", "n", "h", "l", "a", "k"]
-}

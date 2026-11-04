@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/utils/onMapChange.js"],
-  "sourcesContent": ["import { update } from \"./update.js\";\nimport { render } from \"./render.js\";\n\n/** Map movement: render within the frame of Leaflet's CSS transforms, coalescing same-tick events. */\n\nexport function onMapChange() {\n  const layer = this;\n  if (layer._queued) return;\n  layer._queued = true;\n  queueMicrotask(() => {\n    layer._queued = false;\n    if (layer._shared !== layer || !layer.renderer) return;\n    if (layer._map._animatingZoom) update(layer);\n    else render(layer);\n  });\n}\n"],
-  "mappings": "AAAA,OAAS,UAAAA,MAAc,cACvB,OAAS,UAAAC,MAAc,cAIhB,SAASC,GAAc,CAC5B,MAAMC,EAAQ,KACVA,EAAM,UACVA,EAAM,QAAU,GAChB,eAAe,IAAM,CACnBA,EAAM,QAAU,GACZ,EAAAA,EAAM,UAAYA,GAAS,CAACA,EAAM,YAClCA,EAAM,KAAK,eAAgBH,EAAOG,CAAK,EACtCF,EAAOE,CAAK,EACnB,CAAC,EACH",
-  "names": ["update", "render", "onMapChange", "layer"]
-}
