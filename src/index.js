@@ -24,7 +24,8 @@
  *   scene transforms/picking use browser DOMMatrix/DOMPoint, and CSS colors use a canvas.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
- * When `type` is omitted it is inferred from `source.url`: *.pmtiles -> 'pmtiles', anything else -> '3d'.
+ * When `type` is omitted, inline FeatureCollections use 'geojson'; otherwise *.pmtiles URLs use
+ * 'pmtiles' and other sources use '3d'.
  */
 
 const layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
@@ -167,7 +168,9 @@ L.Layer.include({
     }
     const {
       source: {
-        type = /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles' : '3d',
+        type = options.source.data?.type === 'FeatureCollection'
+          ? 'geojson'
+          : /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles' : '3d',
         ...source
       },
       ...core

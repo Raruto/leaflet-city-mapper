@@ -13,17 +13,23 @@ When('I pan the shared WebGPU renderer', async function () {
       nativeChecks.render.render(owner);
       await owner.renderer.device.queue.onSubmittedWorkDone();
       let probe;
-      let sortProbe;
       nativeChecks.graph.traverse(modelLayer.model, mesh => {
         if (!probe && mesh.geometry && mesh.program.bindings.length && mesh._visibleInFrame) probe = mesh;
-        if (!sortProbe && mesh.geometry && mesh.program.transparent && mesh._visibleInFrame) sortProbe = mesh;
       });
       if (!probe) throw new Error('The model has no textured geometry to inspect');
-      if (!sortProbe) throw new Error('The scene has no transparent geometry to inspect');
-      const sortedPoint = new DOMPoint(...sortProbe.geometry.bounds.center, 1)
-        .matrixTransform(new DOMMatrix(sortProbe.worldMatrix))
-        .matrixTransform(new DOMMatrix(owner.camera.projectionViewMatrix));
-      const sortDepthError = Math.abs(sortProbe._sortDepth - sortedPoint.z / sortedPoint.w);
+      // The example uses MASK materials; explicitly exercise transparent sorting.
+      const transparent = probe.program.transparent;
+      let sortDepthError;
+      try {
+        probe.program.transparent = true;
+        nativeChecks.render.render(owner);
+        const sortedPoint = new DOMPoint(...probe.geometry.bounds.center, 1)
+          .matrixTransform(new DOMMatrix(probe.worldMatrix))
+          .matrixTransform(new DOMMatrix(owner.camera.projectionViewMatrix));
+        sortDepthError = Math.abs(probe._sortDepth - sortedPoint.z / sortedPoint.w);
+      } finally {
+        probe.program.transparent = transparent;
+      }
       const canvas = owner.renderer.canvas;
       const device = owner.renderer.device;
       const renderer = owner.renderer;

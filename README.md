@@ -47,11 +47,7 @@ After that, the [`dist/types/geojson.js`](./src/types/geojson.js) will be dynami
 
 For further customization, you can define custom [`types`](./src/types/geojson.js): just upload them to the same folder and they will be loaded automatically.
 
-Each module registers an initializer, `L.Layer.types[type] = (layer, options) => { ... }`.
-It adds methods and state directly to the existing `L.Layer`; no subclass or prototype replacement is needed.
-`options` contains the flattened source settings and standard Leaflet options.
-Call `L.Layer.types['3d'](layer, options)` to reuse the shared 3D initialization.
-For lazily loaded types, await `layer.ready` before calling their custom methods.
+After `layer.ready`, raster PMTiles layers expose `getTileSize()`, `isLoading()`, and chainable `setOpacity(value)` / `setZIndex(value)` methods.
 
 ### Update demo data
 

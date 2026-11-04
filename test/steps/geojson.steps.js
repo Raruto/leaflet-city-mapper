@@ -21,8 +21,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const data = await (await fetch('/buildings.geojson')).json();
     const errors = [];
     const layer = new L.Layer({ source: {
-      type: 'geojson',
-      ...(input === 'inline' ? { data } : { url: '/buildings.geojson' }),
+      ...(input === 'inline' ? { data } : { type: 'geojson', url: '/buildings.geojson' }),
       style: feature => ({ top: feature.properties.height }),
       tooltip: feature => feature.id,
     } });
@@ -38,6 +37,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     let done = completed();
     layer.addTo(map);
     const first = await done;
+    const type = layer._type;
     let area = layer._areas.get('geojson');
     const mesh = area.mesh;
     const face = mesh.extras.featureFaces[0];
@@ -76,11 +76,12 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const tooltip = Boolean(layer._tooltip);
     layer.remove();
     map.remove();
-    return { first, empty, replaced, readded, identity, geometry, retained, terrainUpdated, released, removed, tooltip, errors };
+    return { first, empty, replaced, readded, type, identity, geometry, retained, terrainUpdated, released, removed, tooltip, errors };
   }, input);
   const progress = loaded => ({ loaded, errors: [] });
   assert.deepEqual(result, {
     first: progress(1), empty: progress(0), replaced: progress(1), readded: progress(1),
+    type: 'geojson',
     identity: true, geometry: true, retained: true, terrainUpdated: true, released: true, removed: true, tooltip: true, errors: [],
   });
 });

@@ -124,8 +124,8 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   }
   const real = await this.page.evaluate(async () => {
     const { getZxy } = await import('/dist/utils/getZxy.js');
-    const buildings = new L.Layer({ source: { type: '3d', url: '../examples/data/paris-buildings.pmtiles' } });
-    await nativeChecks.ready(buildings);
+    const buildings = new L.Layer({ source: { type: 'pmtiles', url: '../examples/data/paris-buildings.pmtiles' } });
+    await buildings.ready;
     const header = buildings.header;
     const point = test3d.map.project(new L.LatLng(48.85826, 2.2945), header.minZoom).divideBy(256).floor();
     const tile = await getZxy(buildings, header.minZoom, point.x, point.y);

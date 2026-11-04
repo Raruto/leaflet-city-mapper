@@ -294,6 +294,9 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   const lightsControl = this.page.getByRole('checkbox', { name: 'Streetlights', exact: true });
   const boatsControl = this.page.getByRole('checkbox', { name: 'Bateaux-Mouches', exact: true });
   const trafficControl = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
+  const background = await this.page.evaluate(() => layers._layers.find(entry =>
+    !entry.overlay && map.hasLayer(entry.layer)).name);
+  await this.page.getByRole('radio', { name: 'Empty', exact: true }).check();
   await trafficControl.uncheck();
   await boatsControl.uncheck();
   await lightsControl.uncheck();
@@ -344,6 +347,7 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await lightsControl.check();
   await boatsControl.check();
   await trafficControl.check();
+  await this.page.getByRole('radio', { name: background, exact: true }).check();
   await this.page.waitForFunction(() => layers._layers.filter(entry => entry.overlay && entry.layer._3d)
     .every(({ layer }) => layer.root && layer.renderer));
   const bothRestored = await this.page.evaluate(() => {

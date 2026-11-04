@@ -349,6 +349,7 @@ Given('the Eiffel Tower example page is open', { timeout: 60000 }, openEiffelExa
 
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
 Given('the Eiffel Tower example page is open with its offline archives', { timeout: 60000 }, async function () {
+  await this.context.unroute('**/dist/leaflet-city-mapper.js');
   await this.context.unroute('**/dist/types/*.js');
   await openEiffelExample.call(this);
 });

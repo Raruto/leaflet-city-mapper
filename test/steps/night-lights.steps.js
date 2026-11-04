@@ -60,7 +60,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const owner = L.Layer.types['3d']._renderers.get(map);
     return owner?._roofRaster && map._terrain3D?._rasterTiles.size > 0 &&
       !Object.values(map._layers).some(layer => layer.isLoading?.()) &&
-      [...owner._layers].every(layer => !layer.url || (layer._inflight === 0 &&
+      [...owner._layers].every(layer => !layer._3d || !layer.url || (layer._inflight === 0 &&
         [...layer._areas.values()].every(area => area.done || area.error)));
   }, null, { timeout: 60000 });
   const result = await this.page.evaluate(async () => {

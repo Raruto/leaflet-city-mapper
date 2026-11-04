@@ -491,6 +491,7 @@ Then('the tower information is shown without moving the map or pinning the toolt
 });
 
 When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async function () {
+  await this.page.evaluate(() => map.setZoom(15, { animate: false }));
   await this.page.waitForFunction(() =>
     Object.values(map._layers).some(layer => layer.model && layer.renderer),
   null, { timeout: 45000 });

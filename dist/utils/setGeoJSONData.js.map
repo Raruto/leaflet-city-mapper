@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/utils/setGeoJSONData.js"],
-  "sourcesContent": ["import { releaseArea } from './releaseArea.js';\nimport { updateArea } from './updateArea.js';\n\nexport function setGeoJSONData(backend, data) {\n  backend.options.data = data;\n  delete backend.options.url;\n  for (const area of backend._areas.values()) releaseArea(backend, area);\n  backend._areas.clear();\n  updateArea(backend);\n  return backend;\n}\n"],
-  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,cAAAC,MAAkB,kBAEpB,SAASC,EAAeC,EAASC,EAAM,CAC5CD,EAAQ,QAAQ,KAAOC,EACvB,OAAOD,EAAQ,QAAQ,IACvB,UAAWE,KAAQF,EAAQ,OAAO,OAAO,EAAGH,EAAYG,EAASE,CAAI,EACrE,OAAAF,EAAQ,OAAO,MAAM,EACrBF,EAAWE,CAAO,EACXA,CACT",
-  "names": ["releaseArea", "updateArea", "setGeoJSONData", "backend", "data", "area"]
+  "sourcesContent": ["import { releaseArea } from './releaseArea.js';\nimport { updateArea } from './updateArea.js';\n\nexport function setGeoJSONData(layer, data) {\n  layer.options.data = data;\n  delete layer.options.url;\n  for (const area of layer._areas.values()) releaseArea(layer, area);\n  layer._areas.clear();\n  updateArea(layer);\n  return layer;\n}\n"],
+  "mappings": "AAAA,OAAS,eAAAA,MAAmB,mBAC5B,OAAS,cAAAC,MAAkB,kBAEpB,SAASC,EAAeC,EAAOC,EAAM,CAC1CD,EAAM,QAAQ,KAAOC,EACrB,OAAOD,EAAM,QAAQ,IACrB,UAAWE,KAAQF,EAAM,OAAO,OAAO,EAAGH,EAAYG,EAAOE,CAAI,EACjE,OAAAF,EAAM,OAAO,MAAM,EACnBF,EAAWE,CAAK,EACTA,CACT",
+  "names": ["releaseArea", "updateArea", "setGeoJSONData", "layer", "data", "area"]
 }

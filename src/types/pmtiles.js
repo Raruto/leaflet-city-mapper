@@ -3,7 +3,9 @@ import { getHeader } from '../utils/getHeader.js';
 import { getZxy } from '../utils/getZxy.js';
 import { onPMTileAdd } from '../utils/onPMTileAdd.js';
 import { onPMTileRemove } from '../utils/onPMTileRemove.js';
-import { updateRasterTiles } from '../utils/rasterTiles.js';
+import { getRasterTileSize, updateRasterTiles } from '../utils/rasterTiles.js';
+import { setPMTileOpacity } from '../utils/setPMTileOpacity.js';
+import { setPMTileZIndex } from '../utils/setPMTileZIndex.js';
 
 import { emptyNode } from '../utils/emptyNode.js';
 
@@ -12,6 +14,10 @@ L.Layer.types.pmtiles = (layer, options) => {
   layer._read = (offset, length, signal) => read(layer, offset, length, signal);
   layer.getHeader = () => getHeader(layer);
   layer.getZxy = (z, x, y, signal) => getZxy(layer, z, x, y, signal);
+  layer.getTileSize = () => getRasterTileSize();
+  layer.isLoading = () => layer._loadingTiles > 0;
+  layer.setOpacity = opacity => setPMTileOpacity(layer, opacity);
+  layer.setZIndex = zIndex => setPMTileZIndex(layer, zIndex);
   layer.onAdd = map => onPMTileAdd(layer, map);
   layer.onRemove = map => onPMTileRemove(layer, map);
   const update = () => updateRasterTiles(layer);
