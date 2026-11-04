@@ -1,6 +1,6 @@
 {
   "name": "leaflet-city-mapper",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A small 3D rendering engine for leaflet",
   "type": "module",
   "main": "dist/leaflet-city-mapper.js",
