@@ -33,7 +33,6 @@ export function onRemove3DLayer(backend, map) {
     map.off('zoomend', endZoom.endZoom, backend);
     cancelAnimationFrame(backend._frame);
     backend._frame = null;
-    backend._queued = false;
     if (backend._layers.size) {
       // Keep the original scene origin and GPU resources when ownership changes.
       const next = backend._layers.values().next().value;

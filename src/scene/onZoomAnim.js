@@ -1,5 +1,4 @@
-import { render } from "../rendering/render.js";
-
+import { update } from "./update.js";
 
 export function onZoomAnim(event) {
   const map = this._map;
@@ -8,7 +7,5 @@ export function onZoomAnim(event) {
       targetZoom: event.zoom, start: performance.now() };
     map.getContainer().classList.add('leaflet-camera-zoom');
   }
-  queueMicrotask(() => {
-    if (this._shared === this && this.renderer) render(this);
-  });
+  update(this);
 }

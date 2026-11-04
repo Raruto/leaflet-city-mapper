@@ -211,16 +211,16 @@
 					},
 					attribution: '<a href="https://opendata.paris.fr/explore/dataset/eclairage-public/">Streetlights: Ville de Paris / Cielis</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
-				'Bateaux-Mouches': new L.Layer({
-					source: {
-						type: 'traffic',
-						url: 'data/seine-cruises.geojson',
-						vehicle: 'boat',
-						outline: true,
-					},
-					attribution: '<a href="https://www.bateaux-mouches.fr/fr/croisiere/informations">Cruise timetable: Bateaux-Mouches</a>',
-				}).addTo(map),
 				'Traffic': new L.LayerGroup([
+					new L.Layer({
+						source: {
+							type: 'traffic',
+							url: 'data/seine-cruises.geojson',
+							vehicle: 'boat',
+							outline: true,
+						},
+						attribution: '<a href="https://www.bateaux-mouches.fr/fr/croisiere/informations">Cruise timetable: Bateaux-Mouches</a>',
+					}),
 					new L.Layer({
 						source: {
 							type: 'traffic',

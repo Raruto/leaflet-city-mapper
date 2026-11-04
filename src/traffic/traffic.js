@@ -216,7 +216,7 @@ export function tickTraffic(state) {
     try {
       state.trips = valid ? tripsAt(time, state.lanes, state.velocity) : [];
       text = !valid ? 'Select a valid simulation date' : !state.loaded ? 'Loading…' :
-        `${state.trips.length} vehicle${state.trips.length === 1 ? '' : 's'}${state.loaded.note ? ` · ${state.loaded.note}` : ''}`;
+        `${state.trips.length} ${state.vehicle === 'boat' ? 'boats' : state.vehicle}`;
     } catch (error) { return failTraffic(state, error); }
     state.rebasedAt = ms;
     state.nextCheck = ms + 1000;

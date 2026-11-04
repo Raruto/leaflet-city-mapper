@@ -5,7 +5,7 @@
  * - `vehicle`: 'car' (default), 'boat', 'bus', 'tram', 'metro', 'bicycle' or 'pedestrian'; `side`: offset right of the lane centreline in metres (vehicle default);
  * - `speed`: m/s of `flow` lanes; `outline`: draw the lanes.
  * Lane properties: `flow` (vehicles/h) or `timetable` (see scheduledTrips.js), optional fixed `elevation`
- * in metres, `name`/`description` for the default tooltip. The status line (vehicle count, then the FeatureCollection `note`) sits under the layer's entry in the layers control.
+ * in metres, `name`/`description` for the default tooltip. The status line (count and vehicle type) sits under the layer's entry in the layers control.
  * L.Control.Time on the same map drives the time; without one, vehicles run live.
  */
 import { build } from '../geometry/build.js';
@@ -37,7 +37,7 @@ export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed:
   const template = build(model(0)), stride = template.position.length, vertices = stride / 3;
   const params = new ArrayBuffer(16), paramFloats = new Float32Array(params), paramInts = new Uint32Array(params);
   const state = {
-    layer, url, model, lights, side, outline, velocity, status, template, stride, vertices,
+    layer, url, model, lights, side, outline, velocity, vehicle, status, template, stride, vertices,
     params, paramFloats, paramInts,
     ready: false, frame: undefined, request: undefined, lanes: [], tripsKey: undefined,
     mesh: undefined, route: undefined, litAt: -Infinity,
