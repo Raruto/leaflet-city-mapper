@@ -105,6 +105,16 @@ release the texture without delaying cleanup by an extra Promise continuation.
 `try/catch` remains where synchronous external operations can fail or where it
 protects error reporting and resource cleanup; it is not replaced mechanically
 with asynchronous wrappers.
+Raycasting transforms coordinates with scalar matrix arithmetic rather than
+temporary `DOMPoint` instances, inverts each mesh matrix in place and reuses
+call-owned local ray buffers. Returned hit points remain independent.
+PMTiles directory decoding validates its entry count before allocating an array
+of exactly that length, fills indexed slots instead of growing it with `push`,
+and initializes every record's fields together. A source regression test guards
+this layout; genuinely variable collections remain allowed elsewhere.
+Tree/lamp rings, vector subtraction and light-grid packing also preallocate
+known-size outputs; bounds centers are three-element literals. Targeted source
+guards reject empty array initializers and growth methods in these helpers.
 
 The source-style tests also reject object literals, array literals and `new`
 expressions inside every function in `src`, including default parameters and

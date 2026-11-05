@@ -77,6 +77,43 @@ import { metroModel } from '../../src/vehicles/metroModel.js';
 import { sortHits } from '../../src/collision/sortHits.js';
 import { addBridges } from '../../src/geometry/addBridges.js';
 import { quad } from '../../src/geometry/quad.js';
+import { ring as lampRing } from '../../src/geometry/lampRing.js';
+import { ring as treeRing } from '../../src/geometry/treeRing.js';
+
+Then('preallocated geometry arrays retain their shape and ownership', function () {
+  for (const [ring, directions] of [[lampRing, globals.lampDirections], [treeRing, globals.ringDirections]]) {
+    const point = { x: 10, y: -3, ground: 4 };
+    const first = ring(point, 2), second = ring(point, 2);
+    assert.equal(first.length, directions.length);
+    assert.notEqual(first, second);
+    for (let i = 0; i < first.length; i++) {
+      assert.ok(Object.hasOwn(first, i));
+      assert.equal(first[i].x, point.x + directions[i].x * 2);
+      assert.equal(first[i].y, point.y + directions[i].y * 2);
+      assert.equal(first[i].ground, point.ground);
+      assert.notEqual(first[i], second[i]);
+      if (ring === lampRing) {
+        assert.deepEqual(first[i].uv, [3, 3]);
+        assert.notEqual(first[i].uv, second[i].uv);
+      }
+    }
+    first[0].x = 99;
+    assert.notEqual(second[0].x, 99);
+  }
+  for (const [a, b] of [[[], []], [[3], [1]], [[3, 5, 8, 13], [1, 2, 3, 5]]]) {
+    const first = sub(a, b), second = sub(a, b);
+    assert.equal(first.length, a.length);
+    assert.deepEqual(first, a.map((value, i) => value - b[i]));
+    assert.notEqual(first, second);
+  }
+  const geometry = { attributes: { position: { data: [-2, -4, -6, 4, 8, 12] } } };
+  computeBounds(geometry);
+  assert.deepEqual(geometry.bounds.center, [1, 2, 3]);
+  const center = geometry.bounds.center;
+  computeBounds(geometry);
+  assert.notEqual(geometry.bounds.center, center);
+  assert.deepEqual(center, [1, 2, 3]);
+});
 
 Then('precomputed constants match their original numeric formulas', function () {
   assert.equal(globals.radians, Math.PI / 180);
@@ -367,6 +404,18 @@ const checks = {
       assert.deepEqual(decodeDirectory(bytes.buffer), firstDirectory);
     }
     assert.deepEqual(decodeDirectory(Uint8Array.of(0).buffer), []);
+    const count = 130;
+    const encoded = Uint8Array.from([
+      130, 1, ...new Array(count).fill(1), ...new Array(count).fill(1),
+      ...new Array(count).fill(2), 1, ...new Array(count - 1).fill(0),
+    ]);
+    const sizedDirectory = decodeDirectory(encoded.buffer);
+    assert.equal(sizedDirectory.length, count);
+    for (let i = 0; i < count; i++) {
+      assert.ok(Object.hasOwn(sizedDirectory, i), 'The preallocated array must have no uninitialized slots');
+      assert.deepEqual(sizedDirectory[i], { tileId: i + 1, runLength: 1, length: 2, offset: i * 2 });
+      assert.deepEqual(Object.keys(sizedDirectory[i]), ['tileId', 'runLength', 'length', 'offset']);
+    }
     assert.deepEqual(firstDirectory, [
       { tileId: 1, runLength: 1, length: 2, offset: 0 },
       { tileId: 4, runLength: 1, length: 3, offset: 2 },
@@ -699,6 +748,18 @@ const checks = {
     lamp.extras.lights = [...lamp.extras.lights];
     assert.notEqual(cacheLightGrid([lamp], moved, 1024), moved);
     assert.equal(cacheLightGrid([], moved, 1024).count, 0);
+    const otherLamp = { ...lamp, worldMatrix: [...matrix] };
+    const lamps = [lamp, otherLamp];
+    const combined = cacheLightGrid(lamps, undefined, 4096);
+    assert.equal(combined.meshes.length, lamps.length);
+    assert.deepEqual(combined.meshes.map(snapshot => snapshot.mesh), lamps);
+    assert.deepEqual(combined.data,
+      lightGrid(lamps.map(mesh => mesh._worldLights.data), 4096).data);
+    assert.equal(cacheLightGrid(lamps, combined, 4096), combined);
+    const reordered = cacheLightGrid([otherLamp, lamp], combined, 4096);
+    assert.notEqual(reordered, combined);
+    assert.equal(combined.meshes[0].mesh, lamp);
+    assert.equal(reordered.meshes[0].mesh, otherLamp);
 
     const headlight = { ...lamp, worldMatrix: [...matrix],
       extras: { lights: [...lamp.extras.lights], dynamicLights: true } };
@@ -1007,10 +1068,47 @@ Then('standalone browser math preserves scene transforms and picking', async fun
     near.geometry.attributes.uv = { data: [0, 0, 0, 0, 0, 0] };
     const dayHits = intersectMeshes(ray, [near]).length;
     const nightHits = intersectMeshes(ray, [near], 1).length;
+    const transformed = [];
+    for (const matrix of [
+      new DOMMatrix().translate(3, -2, -7).rotate(12, 31, 7).scale(2, 3, 4),
+      new DOMMatrix().translate(-4, 5, -12).rotate(0, 40, 0).scale(-2, 1, 0.5),
+      new DOMMatrix([2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 3, -2, -7, 2]),
+    ]) {
+      const object = mesh(0);
+      object.worldMatrix = matrix.toFloat64Array();
+      const origin = new DOMPoint(0, 0, 5, 1).matrixTransform(matrix);
+      const direction = new DOMPoint(0, 0, -1, 0).matrixTransform(matrix);
+      const expected = new DOMPoint(0, 0, 0, 1).matrixTransform(matrix);
+      const found = intersectMeshes({
+        origin: [origin.x / origin.w, origin.y / origin.w, origin.z / origin.w],
+        direction: [direction.x, direction.y, direction.z],
+      }, [object])[0];
+      transformed.push(found && found.point.every((value, i) =>
+        Math.abs(value - [expected.x / expected.w, expected.y / expected.w, expected.z / expected.w][i]) < 1e-10));
+    }
+    const NativePoint = globalThis.DOMPoint, NativeMatrix = globalThis.DOMMatrix;
+    let matrixCount = 0, noPointHits;
+    try {
+      globalThis.DOMPoint = class { constructor() { throw new Error('Raycasting must not allocate DOMPoint'); } };
+      globalThis.DOMMatrix = new Proxy(NativeMatrix, {
+        construct(target, args) {
+          matrixCount++;
+          return new target(...args);
+        },
+      });
+      noPointHits = intersectMeshes(ray, [far, near], 1).length;
+    } finally {
+      globalThis.DOMPoint = NativePoint;
+      globalThis.DOMMatrix = NativeMatrix;
+    }
+    const singular = mesh(0);
+    singular.worldMatrix = new DOMMatrix().scale(0, 1, 1).toFloat64Array();
+    let singularError;
+    try { intersectMeshes(ray, [singular]); } catch (error) { singularError = error.message; }
     return {
       position, cached, updated, projection: [project(-1), project(-100)],
       hits: hits.map(hit => ({ distance: hit.distance, point: hit.point, faceIndex: hit.faceIndex })),
-      dayHits, nightHits, backfaceHits,
+      dayHits, nightHits, backfaceHits, transformed, matrixCount, noPointHits, singularError,
     };
   }, this.baseUrl);
   assert.deepEqual(result.position, [12, 26, 42]);
@@ -1024,4 +1122,8 @@ Then('standalone browser math preserves scene transforms and picking', async fun
   ]);
   assert.deepEqual([result.dayHits, result.nightHits], [0, 1]);
   assert.equal(result.backfaceHits, 1);
+  assert.deepEqual(result.transformed, [true, true, true]);
+  assert.equal(result.matrixCount, 2);
+  assert.equal(result.noPointHits, 2);
+  assert.equal(result.singularError, 'Singular 3D transform');
 });

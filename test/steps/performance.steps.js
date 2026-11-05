@@ -215,6 +215,64 @@ Then('local allocation checks accept source file {string}', async function (file
   assert.deepEqual(localAllocationErrors(await readFile(file, 'utf8'), file), []);
 });
 
+Then('the PMTiles directory decoder uses a sized array and complete records', async function () {
+  const ast = parse(await readFile('src/archives/decodeDirectory.js', 'utf8'),
+    { ecmaVersion: 'latest', sourceType: 'module' });
+  const body = ast.body.find(node => node.type === 'ExportNamedDeclaration').declaration.body.body;
+  const statements = body.find(node => node.type === 'TryStatement').block.body;
+  const entries = statements.filter(node => node.type === 'VariableDeclaration')
+    .flatMap(node => node.declarations).find(node => node.id.name === 'entries');
+  assert.equal(entries.init.type, 'NewExpression');
+  assert.equal(entries.init.callee.name, 'Array');
+  assert.equal(entries.init.arguments.length, 1);
+  assert.equal(entries.init.arguments[0].name, 'count');
+  const validation = statements.findIndex(node => node.type === 'IfStatement');
+  assert.ok(validation >= 0, 'The directory count must be validated');
+  assert.ok(validation < statements.findIndex(node => node.type === 'VariableDeclaration' &&
+    node.declarations.includes(entries)), 'Validate the input count before allocating the directory');
+  const loop = statements.find(node => node.type === 'ForStatement');
+  const assignment = loop.body.body.find(node => node.type === 'ExpressionStatement' &&
+    node.expression.type === 'AssignmentExpression' && node.expression.left.object?.name === 'entries');
+  assert.ok(assignment, 'Write directly into a preallocated entry slot instead of growing the array');
+  assert.equal(assignment.expression.left.computed, true);
+  assert.equal(assignment.expression.left.property.name, loop.init.left.name);
+  assert.equal(assignment.expression.right.type, 'ObjectExpression');
+  assert.deepEqual(assignment.expression.right.properties.map(property => property.key.name),
+    ['tileId', 'runLength', 'length', 'offset']);
+});
+
+function inspectSizedArrays(node, file, errors) {
+  if (!node || typeof node.type !== 'string') return;
+  if (node.type === 'ArrayExpression' && !node.elements.length ||
+      ['NewExpression', 'CallExpression'].includes(node.type) && node.callee.name === 'Array' &&
+      node.arguments.length !== 1 ||
+      node.type === 'CallExpression' && node.callee.type === 'MemberExpression' &&
+      ['push', 'unshift', 'splice'].includes(memberKey(node.callee))) {
+    errors.push(`${file}:${node.loc.start.line} use an explicitly sized array and indexed writes`);
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) inspectSizedArrays(child, file, errors);
+    } else if (value && typeof value.type === 'string') inspectSizedArrays(value, file, errors);
+  }
+}
+
+Then('source file {string} avoids unsized arrays and array growth methods', async function (file) {
+  const errors = [];
+  inspectSizedArrays(parse(await readFile(file, 'utf8'),
+    { ecmaVersion: 'latest', sourceType: 'module', locations: true }), file, errors);
+  assert.deepEqual(errors, []);
+});
+
+Then('sized array checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    const errors = [];
+    inspectSizedArrays(parse(source,
+      { ecmaVersion: 'latest', sourceType: 'module', locations: true }), 'example.js', errors);
+    assert.equal(errors.length, Number(violations), source);
+  }
+});
+
 function bindingCount(pattern) {
   if (!pattern) return 0;
   switch (pattern.type) {

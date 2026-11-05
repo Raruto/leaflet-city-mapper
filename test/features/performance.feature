@@ -91,6 +91,38 @@ Feature: Performance-oriented source style
     Then local allocation checks accept source file "src/archives/decodeHeader.js"
 
   @unit
+  Scenario: Directory decoding preallocates its validated entry count and record shape
+    Then the PMTiles directory decoder uses a sized array and complete records
+
+  @unit
+  Scenario: Sized array checks distinguish preallocation from incremental growth
+    Then sized array checks handle these modules:
+      | source                                      | violations |
+      | const values = [];                          | 1          |
+      | const values = [0, 0, 0];                   | 0          |
+      | const values = new Array(count);            | 0          |
+      | const values = Array(count);                | 0          |
+      | const values = new Array();                 | 1          |
+      | const values = Array();                     | 1          |
+      | values.push(value);                         | 1          |
+      | values['unshift'](value);                   | 1          |
+      | values.splice(0, 0, value);                 | 1          |
+      | values[i] = value;                          | 0          |
+      | const text = '[] and values.push(value)';   | 0          |
+
+  @unit
+  Scenario Outline: Known-size geometry and lighting arrays do not grow incrementally
+    Then source file "<file>" avoids unsized arrays and array growth methods
+
+    Examples:
+      | file                            |
+      | src/geometry/lampRing.js         |
+      | src/geometry/treeRing.js         |
+      | src/geometry/sub.js              |
+      | src/geometry/computeBounds.js    |
+      | src/lighting/cacheLightGrid.js   |
+
+  @unit
   Scenario Outline: Sky projection and atmosphere justify every necessary local allocation
     Then local allocation checks accept source file "<file>"
 

@@ -4,6 +4,10 @@ Feature: Standalone 3D utilities
     Then precomputed constants match their original numeric formulas
 
   @unit
+  Scenario: Known-size geometry arrays preserve coordinates and independent results
+    Then preallocated geometry arrays retain their shape and ownership
+
+  @unit
   Scenario Outline: Scene computations do not require a Leaflet layer or GPU
     Then the standalone 3D "<domain>" utilities preserve their results and errors
 

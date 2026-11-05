@@ -20,12 +20,13 @@ export function cacheLightGrid(meshes, previous, maxBytes) {
     unchanged &&= previous.meshes[i].mesh === mesh && previous.meshes[i].cache === cache;
   }
   if (unchanged) return previous;
-  const packed = /* alloc */ [];
-  const snapshots = /* alloc */ [];
-  for (mesh of meshes) {
+  const packed = /* alloc */ new Array(meshes.length);
+  const snapshots = /* alloc */ new Array(meshes.length);
+  for (i = 0; i < meshes.length; i++) {
+    mesh = meshes[i];
     cache = mesh._worldLights;
-    packed.push(cache.data);
-    snapshots.push(/* alloc */ { mesh, cache });
+    packed[i] = cache.data;
+    snapshots[i] = /* alloc */ { mesh, cache };
   }
   return /* alloc */ { ...lightGrid(packed, maxBytes), meshes: snapshots };
 }

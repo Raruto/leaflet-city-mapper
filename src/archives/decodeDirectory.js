@@ -13,7 +13,7 @@ export function decodeDirectory(data) {
     if (count > (bytes.length - reader.cursor) / 4) {
       throw /* alloc */ new Error('Invalid PMTiles directory count');
     }
-    const entries = /* alloc */ [];
+    const entries = /* alloc */ new Array(count);
     let tileId = 0;
     let i, entry, value;
     for (i = 0; i < count; i++) {
@@ -21,7 +21,7 @@ export function decodeDirectory(data) {
       if (!Number.isSafeInteger(tileId) || (i && tileId <= entries[i - 1].tileId)) {
         throw /* alloc */ new Error('Invalid PMTiles directory tile IDs');
       }
-      entries.push(/* alloc */ { tileId });
+      entries[i] = /* alloc */ { tileId, runLength: 0, length: 0, offset: 0 };
     }
     for (entry of entries) entry.runLength = varint(reader);
     for (entry of entries) {

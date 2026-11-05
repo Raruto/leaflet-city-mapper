@@ -23,8 +23,11 @@ export function computeBounds(geometry) {
       max[axis] = Math.fround(max[axis] + high);
     }
   }
-  const center = /* alloc */ [];
-  for (i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
+  const center = /* alloc */ [
+    (min[0] + max[0]) / 2,
+    (min[1] + max[1]) / 2,
+    (min[2] + max[2]) / 2,
+  ];
   let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : 0;
   for (i = 0; !instances && i < data.length; i += 3) {
     radius = Math.max(radius, Math.hypot(
