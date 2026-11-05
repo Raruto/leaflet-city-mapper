@@ -93,42 +93,33 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 
 ### Source layout
 
-Modules are grouped by feature, with direct imports rather than barrel re-exports:
-
 ```text
 src/
-  scene/
-    camera/          Camera API, projection, animation, controls and gestures
-    core/            Leaflet layer integration with the shared WebGPU scene
-      events/        Leaflet event forwarding
-      methods/       Layer mutation hooks
-      markers/       Marker geometry, positioning and dragging
-      vectors/       Vector layer synchronization
-      images/        Image overlay synchronization
-      tiles/         GridLayer tiles and fading
-      overlays/      Popup and tooltip positioning
-      meshes/        Layer mesh and texture helpers
-    layers/          Source routing and layer initialization
-    lifecycle/       Renderer attachment, map events and frame scheduling
-    sources/         GeoJSON and streamed source geometry
-    picking/         Raycasting, highlighting and feature interaction
-    graph/           Scene nodes, transforms and placement
-  rendering/         Pipelines, shaders, meshes, textures and lighting
-  geometry/          Triangulation, collision, trees, lights, bridges and primitives
-    core/            Geometry generation for Leaflet vector layers
-  model/             glTF loading, decoding and materials
-  pmtiles/           Archive access and raster tile lifecycle
-  traffic/           Vehicles, routes, scheduling, simulation, loading and rendering
+  index.js           Public entry point and source registration
+  constants/         Exported module-level const bindings
+  camera/            Camera API, projection and animation
+  controls/          Compass, dragging, touch and resizing
+  core/              Leaflet layer integration, events, mutations and overlays
+  scene/             Source routing, lifecycle, graph nodes and transforms
+  sources/           GeoJSON and streamed source geometry
+  picking/           Raycasting, highlighting and feature interaction
+  rendering/         Frame stages, roof atlases, pipelines, meshes and textures
+  shadows/           Directional shadow maps, bounds and cache
+  lighting/          Point lights and spatial light grids
+  shaders/           Material shader generation
+  geometry/          Trees, lights, bridges, primitives and Leaflet vector geometry
+  triangulation/     Polygon triangulation and ring operations
+  collision/         Mesh intersection and collision queries
+  models/            glTF loading, decoding and materials
+  archives/          PMTiles archive reading and decompression
+  raster/            Raster tile loading, attachment and lifecycle
+  traffic/           Routes, scheduling, simulation, loading and rendering
+  vehicles/          Vehicle model geometry
   terrain/           Terrain loading and sampling
   sunlight/          Sun, moon, sky and time controls
   walk/              First-person walking
   utils/             Shared colour and numeric helpers
 ```
-
-Keep helpers and their `constants`/`state` folders close to their consumers.
-The one-function and one-export rules still apply. Folder organization is for
-navigation; it does not imply a runtime performance improvement.
-
 
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--alpha.1-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)

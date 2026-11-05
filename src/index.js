@@ -1,16 +1,16 @@
-import './scene/camera/mapCamera.js';
-import { init3D } from './scene/lifecycle/init3D.js';
-import { initNativeGPU } from './scene/core/initNativeGPU.js';
-import { initRaster } from './pmtiles/initRaster.js';
-import { setGeoJSONData } from './scene/sources/setGeoJSONData.js';
+import './camera/mapCamera.js';
+import { init3D } from './scene/init3D.js';
+import { initNativeGPU } from './core/initNativeGPU.js';
+import { initRaster } from './raster/initRaster.js';
+import { setGeoJSONData } from './sources/setGeoJSONData.js';
 import { initTerrain } from './terrain/initTerrain.js';
 import './sunlight/initSunlight.js';
 import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
-import { indexState } from './scene/layers/constants/indexState.js';
-import { initializeNativeLayer } from './scene/core/initializeNativeLayer.js';
-import { layerLayerAdd } from './scene/layers/layerLayerAdd.js';
-import { layerInitialize } from './scene/layers/layerInitialize.js';
+import { indexState } from './constants/indexState.js';
+import { initializeNativeLayer } from './core/initializeNativeLayer.js';
+import { layerLayerAdd } from './scene/layerLayerAdd.js';
+import { layerInitialize } from './scene/layerInitialize.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -23,11 +23,13 @@ import { layerInitialize } from './scene/layers/layerInitialize.js';
  * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
- * - scene/layers/: source routing; initializers live in their domain folders.
- * - scene/core/: Leaflet layer integration; scene/camera/: camera and controls.
- * - scene/lifecycle/, sources/, picking/ and graph/: scene updates and interaction.
- * - rendering/: WebGPU pipelines, shaders, meshes, textures and lighting.
- * - geometry/, model/ and pmtiles/: mesh operations, glTF loading and archive/raster operations.
+ * - scene/: source routing, lifecycle and graph; initializers live in their domain folders.
+ * - core/: Leaflet layer integration; camera/ and controls/: camera and interaction.
+ * - sources/ and picking/: source geometry and feature interaction.
+ * - rendering/, shaders/, shadows/ and lighting/: WebGPU drawing and illumination.
+ * - geometry/, triangulation/ and collision/: mesh operations and spatial queries.
+ * - models/, archives/ and raster/: glTF loading, archive access and raster tiles.
+ * - constants/ and state/: exported module-level const and let bindings.
  * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.

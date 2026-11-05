@@ -7,30 +7,30 @@ export async function prepare3DChecks(page) {
       findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
       renderModule, update, sortMeshes, pump, releaseArea, emptyNode, setParent, traverse,
       updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry, getElevation] = await Promise.all([
-      import('/src/rendering/meshes/createMesh.js'),
-      import('/src/rendering/pipelines/createProgram.js'),
-      import('/src/rendering/textures/destroyTexture.js'),
-      import('/src/rendering/meshes/disposeMesh.js'),
-      import('/src/scene/picking/findFeature.js'),
-      import('/src/scene/picking/raycast.js'),
-      import('/src/scene/picking/onClick.js'),
-      import('/src/scene/picking/onPointerLeave.js'),
-      import('/src/scene/picking/setHighlight.js'),
-      import('/src/scene/picking/showFeature.js'),
+      import('/src/rendering/createMesh.js'),
+      import('/src/rendering/createProgram.js'),
+      import('/src/rendering/destroyTexture.js'),
+      import('/src/rendering/disposeMesh.js'),
+      import('/src/picking/findFeature.js'),
+      import('/src/picking/raycast.js'),
+      import('/src/picking/onClick.js'),
+      import('/src/picking/onPointerLeave.js'),
+      import('/src/picking/setHighlight.js'),
+      import('/src/picking/showFeature.js'),
       import('/src/rendering/render.js'),
-      import('/src/scene/lifecycle/update.js'),
-      import('/src/rendering/meshes/sortMeshes.js'),
-      import('/src/scene/sources/pump.js'),
-      import('/src/scene/sources/releaseArea.js'),
-      import('/src/scene/graph/emptyNode.js'),
-      import('/src/scene/graph/setParent.js'),
-      import('/src/scene/graph/traverse.js'),
-      import('/src/scene/graph/updateWorldMatrix.js'),
-      import('/src/scene/graph/updateCamera.js'),
+      import('/src/scene/update.js'),
+      import('/src/rendering/sortMeshes.js'),
+      import('/src/sources/pump.js'),
+      import('/src/sources/releaseArea.js'),
+      import('/src/scene/emptyNode.js'),
+      import('/src/scene/setParent.js'),
+      import('/src/scene/traverse.js'),
+      import('/src/scene/updateWorldMatrix.js'),
+      import('/src/scene/updateCamera.js'),
       import('/src/utils/parseColor.js'),
-      import('/src/geometry/triangulation/triangulate.js'),
-      import('/src/geometry/lights/lampPostGeometry.js'),
-      import('/src/geometry/lights/lightGeometry.js'),
+      import('/src/triangulation/triangulate.js'),
+      import('/src/geometry/lampPostGeometry.js'),
+      import('/src/geometry/lightGeometry.js'),
       import('/src/terrain/getElevation.js'),
     ]);
     const graph = {
@@ -116,7 +116,7 @@ export async function prepare3DChecks(page) {
         return pixels;
       },
       async terrainHeights(terrain, vertices) {
-        const { elevationWGSL } = await import('/src/rendering/shaders/constants/elevationWGSL.js');
+        const { elevationWGSL } = await import('/src/constants/elevationWGSL.js');
         const { device } = terrain.renderer;
         const module = device.createShaderModule({ code: `
           @group(0) @binding(0) var dem: texture_2d<f32>;

@@ -1,4 +1,4 @@
-import { moves } from './constants/moves.js';
+import { moves } from '../constants/moves.js';
 import { stop } from './stop.js';
 
 export function onKey(event) {

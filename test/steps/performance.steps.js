@@ -208,3 +208,25 @@ Then('module constants and state are exported from their dedicated folders', asy
   }
   assert.deepEqual(errors, []);
 });
+
+function isNestedSourceDirectory(directory) {
+  return directory.replaceAll('\\', '/').split('/').filter(Boolean).length > 2;
+}
+
+Then('source directory checks handle these folders:', function (table) {
+  for (const { directory, violations } of table.hashes()) {
+    assert.equal(Number(isNestedSourceDirectory(directory)), Number(violations), directory);
+  }
+});
+
+Then('source directories are direct children of src', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const directory = relative(process.cwd(), `${entry.parentPath}/${entry.name}`).split(sep).join('/');
+    if (isNestedSourceDirectory(directory)) {
+      errors.push(`${directory}: nested source directory; move its contents to a direct child of src`);
+    }
+  }
+  assert.deepEqual(errors, []);
+});

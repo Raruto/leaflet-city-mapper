@@ -1,7 +1,7 @@
-import { trafficShader } from '../../src/traffic/rendering/constants/trafficShader.js';
-import { vehicles } from '../../src/traffic/vehicles/constants/vehicles.js';
+import { trafficShader } from '../../src/constants/trafficShader.js';
+import { vehicles } from '../../src/constants/vehicles.js';
 import { build } from '../../src/geometry/build.js';
-import { along } from '../../src/traffic/simulation/along.js';
+import { along } from '../../src/traffic/along.js';
 
 /** Exercise the real GPU shader independently of map loading and animation-frame throttling. */
 export async function checkTrafficCompute(device) {

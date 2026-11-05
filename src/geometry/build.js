@@ -1,4 +1,4 @@
-import { triangle } from './primitives/triangle.js';
+import { triangle } from './triangle.js';
 
 export function build(parts) {
   const position = [], normal = [], color = [];

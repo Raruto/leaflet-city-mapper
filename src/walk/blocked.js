@@ -1,4 +1,4 @@
-import { hit } from '../scene/picking/hit.js';
+import { hit } from '../picking/hit.js';
 
 export function blocked(east, north, feet) {
   const length = Math.hypot(east, north);

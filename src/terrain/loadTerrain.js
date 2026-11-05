@@ -1,8 +1,8 @@
-import { addBridges } from '../geometry/bridges/addBridges.js';
-import { conformModelToTerrain } from '../geometry/terrain/conformModelToTerrain.js';
+import { addBridges } from '../geometry/addBridges.js';
+import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { getElevation } from './getElevation.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
-import { update } from '../scene/lifecycle/update.js';
+import { update } from '../scene/update.js';
 import { compareTerrainTiles } from './compareTerrainTiles.js';
 import { loadTerrainTiles } from './loadTerrainTiles.js';
 import { readBridges } from './readBridges.js';

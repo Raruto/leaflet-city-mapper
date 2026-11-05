@@ -77,3 +77,23 @@ Feature: Performance-oriented source style
   @unit
   Scenario: Module variables live in dedicated constants and state folders
     Then module constants and state are exported from their dedicated folders
+
+  @unit
+  Scenario: Directory depth checks reject all nested source folders
+    Then source directory checks handle these folders:
+      | directory                 | violations |
+      | src                       | 0          |
+      | src/constants             | 0          |
+      | src/state                 | 0          |
+      | src/geometry              | 0          |
+      | src/constants/            | 0          |
+      | src/foo/constants         | 1          |
+      | src/bar/state             | 1          |
+      | src/scene/camera           | 1          |
+      | src/scene/camera/controls  | 1          |
+      | src\constants             | 0          |
+      | src\foo\constants         | 1          |
+
+  @unit
+  Scenario: Source directories have only one level below src
+    Then source directories are direct children of src

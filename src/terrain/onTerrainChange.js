@@ -1,5 +1,5 @@
-import { releaseArea } from '../scene/sources/releaseArea.js';
-import { updateArea } from "../scene/sources/updateArea.js";
+import { releaseArea } from '../sources/releaseArea.js';
+import { updateArea } from "../sources/updateArea.js";
 
 /** GeoJSON source areas: loading, building and releasing. */
 

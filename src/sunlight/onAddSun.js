@@ -1,5 +1,5 @@
 import { cityMapper } from '../constants/cityMapper.js';
-import { update as updateScene } from '../scene/lifecycle/update.js';
+import { update as updateScene } from '../scene/update.js';
 import { atmosphere } from './atmosphere.js';
 import { moonPosition } from './moonPosition.js';
 import { projectCelestialBody } from './projectCelestialBody.js';

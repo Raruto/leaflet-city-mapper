@@ -1,6 +1,6 @@
 import { loadTerrain } from "./loadTerrain.js";
-import { setRasterTerrain } from '../pmtiles/raster/setRasterTerrain.js';
-import { onAdd3DLayer } from '../scene/lifecycle/onAdd3DLayer.js';
+import { setRasterTerrain } from '../raster/setRasterTerrain.js';
+import { onAdd3DLayer } from '../scene/onAdd3DLayer.js';
 import { loadReadyTerrain } from './loadReadyTerrain.js';
 import { setLayerTerrain } from './setLayerTerrain.js';
 

@@ -1,4 +1,4 @@
-import { renderers } from '../rendering/constants/renderers.js';
+import { renderers } from './renderers.js';
 
 export const cityMapper = {
   renderers,

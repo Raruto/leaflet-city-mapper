@@ -1,4 +1,4 @@
-import { bridgeElevation } from '../geometry/bridges/bridgeElevation.js';
+import { bridgeElevation } from '../geometry/bridgeElevation.js';
 import { terrainElevation } from './terrainElevation.js';
 
 /** @param {L.LatLng|L.Point} location LatLng, or a pixel point at the terrain zoom. */

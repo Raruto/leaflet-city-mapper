@@ -1,8 +1,8 @@
-import * as createMesh from '../rendering/meshes/createMesh.js';
+import * as createMesh from '../rendering/createMesh.js';
 import { build } from '../geometry/build.js';
-import { limbs } from './constants/limbs.js';
-import { moves } from './constants/moves.js';
-import { parts } from './constants/parts.js';
+import { limbs } from '../constants/limbs.js';
+import { moves } from '../constants/moves.js';
+import { parts } from '../constants/parts.js';
 import { wrap } from '../utils/wrap.js';
 import { local } from './local.js';
 import { place } from './place.js';
