@@ -3,12 +3,15 @@ import { updatePointLights } from '../lighting/updatePointLights.js';
 
 export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   const renderer = backend.renderer, camera = backend.camera;
-  const lightPoint = new DOMPoint(...(sunlight?.direction || [-300, 500, 300]), 0).matrixTransform(new DOMMatrix(camera.viewMatrix));
-  const lightLength = Math.hypot(lightPoint.x, lightPoint.y, lightPoint.z) || 1;
-  const light = [lightPoint.x / lightLength, lightPoint.y / lightLength, lightPoint.z / lightLength];
-  const skyPoint = new DOMPoint(0, 1, 0, 0).matrixTransform(new DOMMatrix(camera.viewMatrix));
-  const skyLength = Math.hypot(skyPoint.x, skyPoint.y, skyPoint.z) || 1;
-  const sky = [skyPoint.x / skyLength, skyPoint.y / skyLength, skyPoint.z / skyLength];
+  const view = camera.viewMatrix, direction = sunlight?.direction;
+  const x = direction ? direction[0] : -300;
+  const y = direction ? direction[1] : 500;
+  const z = direction ? direction[2] : 300;
+  const lightX = view[0] * x + view[4] * y + view[8] * z;
+  const lightY = view[1] * x + view[5] * y + view[9] * z;
+  const lightZ = view[2] * x + view[6] * y + view[10] * z;
+  const lightLength = Math.hypot(lightX, lightY, lightZ) || 1;
+  const skyLength = Math.hypot(view[4], view[5], view[6]) || 1;
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
   // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).
   if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
@@ -22,13 +25,24 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   const frameData = renderer.uniformData;
   frameData.set(camera.viewMatrix, 0);
   frameData.set(camera.projectionMatrix, 16);
-  frameData.set(backend._roofRaster?.matrix || [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 32);
-  frameData.set(light, 48);
+  if (backend._roofRaster?.matrix) frameData.set(backend._roofRaster.matrix, 32);
+  else {
+    frameData.fill(0, 32, 48);
+    frameData[32] = frameData[37] = frameData[42] = frameData[47] = 1;
+  }
+  frameData[48] = lightX / lightLength;
+  frameData[49] = lightY / lightLength;
+  frameData[50] = lightZ / lightLength;
   frameData[51] = sunlight && sunlight.altitude <= 0 ? 0 : 1;
-  frameData.set(sky, 52);
+  frameData[52] = view[4] / skyLength;
+  frameData[53] = view[5] / skyLength;
+  frameData[54] = view[6] / skyLength;
   const night = sunlight ? Math.max(0, Math.min(1, (3 - sunlight.altitude) / 9)) : 0;
   frameData[55] = night * night * (3 - 2 * night);
-  frameData.set(sunlight?.tint || [1, 1, 1], 56);
+  const tint = sunlight?.tint;
+  frameData[56] = tint ? tint[0] : 1;
+  frameData[57] = tint ? tint[1] : 1;
+  frameData[58] = tint ? tint[2] : 1;
   frameData[59] = 0;
   if (night > 0) updatePointLights(backend);
   renderer.uniformSlot = 1;

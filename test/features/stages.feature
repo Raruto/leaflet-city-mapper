@@ -22,3 +22,6 @@ Feature: Decomposed rendering and source stages
   @unit
   Scenario: Shadow stages retain cache invalidation and draw ranges
     Then shadow stages preserve cache invalidation and draw ranges
+
+  Scenario: Frame optimizations reuse buffers and preserve transforms
+    Then frame optimizations preserve buffer isolation, directions and winding

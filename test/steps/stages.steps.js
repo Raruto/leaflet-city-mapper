@@ -20,6 +20,144 @@ import { cameraControlsState } from '../../src/constants/cameraControlsState.js'
 import { nativeGeometry } from '../../src/geometry/nativeGeometry.js';
 import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
 
+Then('frame optimizations preserve buffer isolation, directions and winding', { timeout: 30000 }, async function () {
+  await this.page.goto(this.baseUrl);
+  const result = await this.page.evaluate(async () => {
+    const { render } = await import('/src/rendering/render.js');
+    const { collectFrameMeshes } = await import('/src/rendering/collectFrameMeshes.js');
+    const { prepareFrameUniforms } = await import('/src/rendering/prepareFrameUniforms.js');
+    const { drawSceneMeshes } = await import('/src/rendering/drawSceneMeshes.js');
+    const { updateWorldMatrix } = await import('/src/scene/updateWorldMatrix.js');
+    const { emptyNode } = await import('/src/scene/emptyNode.js');
+    const identity = new DOMMatrix().toFloat64Array();
+    const createBackend = () => {
+      const size = { x: 320, y: 240, equals(other) { return this.x === other.x && this.y === other.y; } };
+      const pass = {
+        setViewport() {}, setBindGroup() {}, setPipeline() {}, setVertexBuffer() {}, draw() {}, end() {},
+      };
+      const encoder = { beginRenderPass: () => pass, finish: () => ({}) };
+      const backend = {
+        _size: size, _sceneOrigin: { lat: 0 }, _layers: new Set(), scene: emptyNode(),
+        _map: { getSize: () => size, getZoom: () => 10, getCenter: () => ({ lat: 0, lng: 0 }),
+          getPitch: () => 30, getBearing: () => 20, options: { crs: { scale: () => 40075016.68557849 } },
+          project: () => ({ subtract: () => ({ x: 0, y: 0 }) }) },
+        camera: { position: [0, 0, 0], target: [0, 0, 0], up: [0, 1, 0],
+          viewMatrix: [...identity], projectionMatrix: [...identity], projectionViewMatrix: [...identity] },
+        renderer: {
+          canvas: { width: 320, height: 240 }, sunlight: { enabled: false, bindGroup: {} },
+          context: { getCurrentTexture: () => ({ createView: () => ({}) }) },
+          depthTexture: { createView: () => ({}) },
+          device: {
+            createCommandEncoder: () => encoder, createBuffer: descriptor => ({ ...descriptor }),
+            createBindGroup: () => ({}), queue: { writeBuffer() {}, submit() {} },
+          },
+        },
+      };
+      backend._shared = backend;
+      return backend;
+    };
+    const first = createBackend(), second = createBackend();
+    render(first);
+    const meshes = first.renderer.frameMeshes, frustum = first.renderer.frustum;
+    const planes = [...frustum], lengths = first.renderer.frustumLengths;
+    meshes.push({ stale: true });
+    render(first);
+    render(second);
+    const reuse = first.renderer.frameMeshes === meshes && meshes.length === 0 &&
+      first.renderer.frustum === frustum && first.renderer.frustumLengths === lengths &&
+      frustum.every((plane, i) => plane === planes[i]);
+    const isolation = second.renderer.frameMeshes !== meshes && second.renderer.frustum !== frustum &&
+      second.renderer.frustumLengths !== lengths && second.renderer.frustum[0] !== planes[0];
+    const projection = new DOMMatrix().rotate(12, 31, 7).scale(2, 3, 4).translate(5, 6, 7).toFloat64Array();
+    first.camera.projectionViewMatrix = projection;
+    const visible = { ...emptyNode(), program: {}, worldMatrix: [...identity], geometry: {
+      bounds: { center: [0, 0, 0], radius: 1 },
+    } };
+    const outside = { ...visible, worldMatrix: [...identity] };
+    outside.worldMatrix[0] = 0.001;
+    outside.worldMatrix[5] = 0.001;
+    outside.worldMatrix[10] = 0.001;
+    outside.worldMatrix[12] = 1e6;
+    first.scene.children = [visible, outside];
+    collectFrameMeshes(first);
+    const expectedPlanes = [
+      [projection[3] + projection[0], projection[7] + projection[4], projection[11] + projection[8], projection[15] + projection[12]],
+      [projection[3] - projection[0], projection[7] - projection[4], projection[11] - projection[8], projection[15] - projection[12]],
+      [projection[3] + projection[1], projection[7] + projection[5], projection[11] + projection[9], projection[15] + projection[13]],
+      [projection[3] - projection[1], projection[7] - projection[5], projection[11] - projection[9], projection[15] - projection[13]],
+      [projection[2], projection[6], projection[10], projection[14]],
+      [projection[3] - projection[2], projection[7] - projection[6], projection[11] - projection[10], projection[15] - projection[14]],
+    ];
+    const frustumMatches = frustum.every((plane, i) =>
+      plane.every((value, j) => value === expectedPlanes[i][j]) &&
+      lengths[i] === Math.hypot(...expectedPlanes[i].slice(0, 3)));
+    first.camera.projectionViewMatrix = [...identity];
+    collectFrameMeshes(first);
+    const visibility = first._visibleMeshes.length === 1 && first._visibleMeshes[0] === visible;
+    const directions = [];
+    for (const view of [identity, new DOMMatrix().rotate(15, 70, 25).translate(40, 50, 60).toFloat64Array(),
+      new DOMMatrix().scale(2, 3, 4).toFloat64Array(), new Float64Array(16)]) {
+      first.camera.viewMatrix = view;
+      for (const direction of [[3, -4, 5], [0, 0, 0], undefined]) {
+        prepareFrameUniforms(first, [], [], direction ? { direction, altitude: 20 } : undefined);
+        const matrix = new DOMMatrix(view);
+        const light = new DOMPoint(...(direction || [-300, 500, 300]), 0).matrixTransform(matrix);
+        const sky = new DOMPoint(0, 1, 0, 0).matrixTransform(matrix);
+        const lightLength = Math.hypot(light.x, light.y, light.z) || 1;
+        const skyLength = Math.hypot(sky.x, sky.y, sky.z) || 1;
+        directions.push({
+          actual: Array.from(first.renderer.uniformData.slice(48, 55)),
+          expected: [light.x / lightLength, light.y / lightLength, light.z / lightLength,
+            1, sky.x / skyLength, sky.y / skyLength, sky.z / skyLength].map(Math.fround),
+        });
+      }
+    }
+    const mesh = { ...emptyNode(), program: {
+      uniforms: { baseColor: { value: [1, 1, 1] }, metallic: { value: 0 }, roughness: { value: 1 },
+        opacity: { value: 1 }, alphaCutoff: { value: 0 }, emissive: { value: [0, 0, 0] },
+        occlusionStrength: { value: 1 } },
+      cullMode: 'back', bindings: [], pipelineCache: new Map([['back:ccw:less-equal', {}], ['back:cw:less-equal', {}]]),
+    }, geometry: { attributes: { position: { buffer: {} }, normal: { buffer: {} } }, drawRange: { start: 0, count: 3 } } };
+    updateWorldMatrix(mesh);
+    let reads = 0;
+    mesh.worldMatrix = new Proxy(mesh.worldMatrix, {
+      get(target, key) { if (key === '0') reads++; return Reflect.get(target, key); },
+    });
+    const draw = () => {
+      first.renderer.uniformSlot = 1;
+      drawSceneMeshes(first, first.renderer.device.createCommandEncoder(), [mesh]);
+    };
+    draw();
+    const firstReads = reads;
+    reads = 0;
+    draw();
+    const cached = reads < firstReads && mesh._frontFace === 'ccw';
+    const winding = [];
+    for (const scale of [-1, 1, 0, NaN]) {
+      mesh.scale[0] = scale;
+      updateWorldMatrix(mesh);
+      try { draw(); winding.push(mesh._frontFace); }
+      catch (error) { winding.push(error.message); }
+    }
+    const parent = emptyNode();
+    parent.scale[0] = -1;
+    mesh.parent = parent;
+    mesh.scale[0] = 1;
+    parent.children.push(mesh);
+    updateWorldMatrix(parent);
+    draw();
+    winding.push(mesh._frontFace);
+    return { reuse, isolation, frustumMatches, visibility, directions, cached, winding };
+  });
+  assert.equal(result.reuse, true);
+  assert.equal(result.isolation, true);
+  assert.equal(result.frustumMatches, true);
+  assert.equal(result.visibility, true);
+  for (const { actual, expected } of result.directions) assert.deepEqual(actual, expected);
+  assert.equal(result.cached, true);
+  assert.deepEqual(result.winding, ['cw', 'ccw', 'Singular 3D transform', 'Singular 3D transform', 'cw']);
+});
+
 Then('operation contexts isolate nested geometry and source mesh attachment', function () {
   const previous = globalThis.L;
   class LatLng {

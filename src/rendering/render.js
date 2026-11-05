@@ -40,7 +40,8 @@ export function render(backend) {
   const shadowMeshes = backend._shadowMeshes;
   const renderer = backend.renderer;
   const rasters = updateRoofRaster(backend, now);
-  const meshes = [];
+  const meshes = renderer.frameMeshes ||= [];
+  meshes.length = 0;
   let appearing = prepareFrameMeshes(backend, rasters, now, meshes);
   const encoder = renderer.device.createCommandEncoder();
   prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight);

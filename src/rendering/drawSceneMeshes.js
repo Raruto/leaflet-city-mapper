@@ -26,13 +26,18 @@ export function drawSceneMeshes(backend, encoder, meshes) {
     }
     const uniforms = mesh.program.uniforms;
     if (uniforms.roofTexture) uniforms.roofTexture.value = backend._roofRaster?.texture || renderer.roofFallbackTexture;
-    const determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
-      world[4] * (world[1] * world[10] - world[2] * world[9]) +
-      world[8] * (world[1] * world[6] - world[2] * world[5]);
-    if (!Number.isFinite(determinant) || determinant === 0) {
-      throw new Error('Singular 3D transform');
+    if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion ||
+        mesh._worldMatrixVersion === undefined) {
+      const determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
+        world[4] * (world[1] * world[10] - world[2] * world[9]) +
+        world[8] * (world[1] * world[6] - world[2] * world[5]);
+      if (!Number.isFinite(determinant) || determinant === 0) {
+        throw new Error('Singular 3D transform');
+      }
+      mesh._frontFace = determinant < 0 ? 'cw' : 'ccw';
+      mesh._frontFaceWorldVersion = mesh._worldMatrixVersion;
     }
-    const frontFace = determinant < 0 ? 'cw' : 'ccw';
+    const frontFace = mesh._frontFace;
     const program = mesh.program;
     if (program.transparent && program._layerMaterial.doubleSided && !mesh._nativeSource) {
       drawGeometry(backend, mesh, pass, 'front', frontFace);
