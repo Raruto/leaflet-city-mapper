@@ -7,6 +7,8 @@ import { updateArea } from './updateArea.js';
 import { onTerrainChange } from '../terrain/onTerrainChange.js';
 import { getHeader } from '../pmtiles/getHeader.js';
 import { loadModel } from '../model/loadModel.js';
+import { get3DEvents } from './get3DEvents.js';
+import { ready3D } from './ready3D.js';
 
 export function init3D(layer, options = {}) {
   layer._3d = true;
@@ -25,35 +27,4 @@ export function init3D(layer, options = {}) {
   layer._inflight = 0;
   layer._added = Promise.withResolvers();
   queueMicrotask(ready3D.bind(null, layer));
-}
-
-function get3DEvents(layer) {
-  const events = {};
-  if (layer.url) {
-    events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
-  }
-  if (layer._geojson || layer.url) {
-    events.terrainchange = onTerrainChange.bind(null, layer);
-  }
-  return events;
-}
-
-async function ready3D(layer) {
-  try {
-    layer.root = emptyNode();
-    layer.raycaster = { origin: [0, 0, 0], direction: [0, 0, 0] };
-    if (layer.url || layer._geojson) {
-      layer.group = layer.root;
-      if (layer.url) layer.header = await getHeader(layer);
-    }
-    if (layer._map) {
-      await attach(layer, layer._map);
-      layer._added.resolve();
-    }
-    if (layer.modelUrl) await loadModel(layer);
-    if (layer._shared) update(layer);
-    layer.fire('ready');
-  } catch (error) {
-    layer.fire('error', { error });
-  }
 }

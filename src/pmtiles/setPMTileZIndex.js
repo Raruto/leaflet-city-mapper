@@ -1,4 +1,4 @@
-import { setRasterZIndex } from './rasterTiles.js';
+import { setRasterZIndex } from './setRasterZIndex.js';
 
 export function setPMTileZIndex(backend, zIndex) {
   backend.options.zIndex = zIndex;

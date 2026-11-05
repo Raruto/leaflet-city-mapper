@@ -33,7 +33,7 @@ Then('new ground tiles blend continuously while retained tiles stay opaque', { t
     const opaque = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
     const neighbor = map.unproject(cell.add([2, 1]).multiplyBy(256));
     raster.header.maxLon = neighbor.lng - 1e-7;
-    const { updateRasterTiles } = await import('/src/pmtiles/rasterTiles.js');
+    const { updateRasterTiles } = await import('/src/pmtiles/updateRasterTiles.js');
     updateRasterTiles(raster);
     while (raster.isLoading()) await new Promise(requestAnimationFrame);
     nativeChecks.render.render(raster._shared);
@@ -282,7 +282,7 @@ Then('fading terrain detail covers retained ground without depth interference', 
       nativeChecks.gpu.disposeMesh(terrain, object);
       for (const tile of raster._rasterTiles.values()) tile.loadedAt = performance.now() - 300;
       raster._pruneAfter = 0;
-      const { pruneRasterTiles } = await import('/src/pmtiles/rasterTiles.js');
+      const { pruneRasterTiles } = await import('/src/pmtiles/pruneRasterTiles.js');
       pruneRasterTiles(raster);
       nativeChecks.render.render(raster._shared);
       const steadyDepth = !raster.renderer.groundOverlap &&

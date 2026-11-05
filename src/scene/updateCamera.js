@@ -1,9 +1,10 @@
+import { cross } from './cross.js';
+
 /** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
 export function updateCamera(camera) {
-  const z = camera.position.map((v, i) => v - camera.target[i]);
+  const z = [];
+  for (let i = 0; i < camera.position.length; i++) z.push(camera.position[i] - camera.target[i]);
   const zLength = Math.hypot(...z) || 1;
   for (let i = 0; i < 3; i++) {
     z[i] /= zLength;
@@ -14,8 +15,8 @@ export function updateCamera(camera) {
   }
   const y = cross(z, x);
   const view = new DOMMatrix([x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, ...camera.position, 1]).inverse().toFloat64Array();
-  if (![...view].every(Number.isFinite)) {
-    throw new Error('Singular 3D transform');
+  for (const value of view) {
+    if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
   }
   for (let i = 0; i < 16; i++) {
     camera.viewMatrix[i] = view[i];

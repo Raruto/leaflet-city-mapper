@@ -1,4 +1,8 @@
-import { update } from "./update.js";
+import { render } from "../rendering/render.js";
+import { onZoomAnimState } from './constants/onZoomAnimState.js';
+import { renderPendingZoomAnimation } from './renderPendingZoomAnimation.js';
+
+onZoomAnimState.pendingZoomAnimations = [];
 
 export function onZoomAnim(event) {
   const map = this._map;
@@ -7,5 +11,6 @@ export function onZoomAnim(event) {
       targetZoom: event.zoom, start: performance.now() };
     map.getContainer().classList.add('leaflet-camera-zoom');
   }
-  update(this);
+  onZoomAnimState.pendingZoomAnimations.push(this);
+  queueMicrotask(renderPendingZoomAnimation);
 }

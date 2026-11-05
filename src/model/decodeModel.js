@@ -1,4 +1,5 @@
 /** Decode a static glTF JSON document or GLB v2 container. */
+import { hasUnsupportedPrimitives } from './hasUnsupportedPrimitives.js';
 
 export function decodeModel(data) {
   const view = new DataView(data), decoder = new TextDecoder();
@@ -36,7 +37,7 @@ export function decodeModel(data) {
   } else {
     description = JSON.parse(decoder.decode(data));
   }
-  if (description.skins?.length || description.animations?.length || description.extensionsRequired?.length || description.meshes?.some(mesh => mesh.primitives.some(primitive => primitive.targets || (primitive.mode !== undefined && primitive.mode !== 4)))) {
+  if (description.skins?.length || description.animations?.length || description.extensionsRequired?.length || hasUnsupportedPrimitives(description.meshes)) {
     throw new Error('Layer3D supports static triangle glTF models without required extensions');
   }
   return description;

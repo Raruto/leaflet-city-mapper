@@ -1,4 +1,4 @@
-import { decodeDirectory } from './decodeDirectory.js';
+import { loadDirectory } from './loadDirectory.js';
 import { decompress } from './decompress.js';
 import { tileId } from './tileId.js';
 import { read } from './read.js';
@@ -29,18 +29,16 @@ export async function getZxy(backend, z, x, y, signal) {
       if (backend._directories.size >= 32) {
         backend._directories.delete(backend._directories.keys().next().value);
       }
-      const pending = read(backend, offset, length)
-        .then(data => decompress(data, header.internalCompression))
-        .then(decodeDirectory)
-        .catch(error => {
-          if (backend._directories.get(key) === pending) {
-            backend._directories.delete(key);
-          }
-          throw error;
-        });
-      backend._directories.set(key, pending);
+      backend._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
     }
-    const entries = await backend._directories.get(key);
+    const pending = backend._directories.get(key);
+    let entries;
+    try {
+      entries = await pending;
+    } catch (error) {
+      if (backend._directories.get(key) === pending) backend._directories.delete(key);
+      throw error;
+    }
     signal?.throwIfAborted();
     let low = 0, high = entries.length - 1;
     while (low <= high) {

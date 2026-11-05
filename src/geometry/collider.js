@@ -1,5 +1,5 @@
-import { CELL } from './CELL.js';
-import { colliders } from './colliders.js';
+import { CELL } from './constants/CELL.js';
+import { colliders } from './constants/colliders.js';
 
 
 export function collider(mesh) {

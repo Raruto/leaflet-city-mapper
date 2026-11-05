@@ -1,6 +1,8 @@
 import { loadTerrain } from "./loadTerrain.js";
-import { setRasterTerrain } from "../pmtiles/rasterTiles.js";
+import { setRasterTerrain } from '../pmtiles/setRasterTerrain.js';
 import { onAdd3DLayer } from '../scene/onAdd3DLayer.js';
+import { loadReadyTerrain } from './loadReadyTerrain.js';
+import { setLayerTerrain } from './setLayerTerrain.js';
 
 export function onTerrainAdd(backend, map) {
   if (map._terrain3D && map._terrain3D !== backend) {
@@ -8,11 +10,12 @@ export function onTerrainAdd(backend, map) {
   }
   map._terrain3D = backend;
   onAdd3DLayer(backend, map);
-  backend._terrainPromise = backend.root
-    ? loadTerrain(backend)
-    : new Promise(resolve => backend.once('ready', () => loadTerrain(backend).then(resolve), backend));
-  map.eachLayer(layer => {
-    if (layer._type === 'pmtiles') setRasterTerrain(layer, backend);
-  });
+  if (backend.root) backend._terrainPromise = loadTerrain(backend);
+  else {
+    const pending = Promise.withResolvers();
+    backend._terrainPromise = pending.promise;
+    backend.once('ready', loadReadyTerrain, { backend, ...pending });
+  }
+  map.eachLayer(setLayerTerrain, backend);
   map.fire('terrainchange');
 }

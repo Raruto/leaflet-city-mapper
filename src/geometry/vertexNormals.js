@@ -7,8 +7,11 @@ export function vertexNormals(p, indices) {
     const a = indices ? indices[i] : i,
           b = indices ? indices[i + 1] : i + 1,
           c = indices ? indices[i + 2] : i + 2;
-    const u = [0, 1, 2].map(j => p[b * 3 + j] - p[a * 3 + j]),
-          v = [0, 1, 2].map(j => p[c * 3 + j] - p[a * 3 + j]);
+    const u = [], v = [];
+    for (let j = 0; j < 3; j++) {
+      u.push(p[b * 3 + j] - p[a * 3 + j]);
+      v.push(p[c * 3 + j] - p[a * 3 + j]);
+    }
     const n = [
       u[1] * v[2] - u[2] * v[1],
       u[2] * v[0] - u[0] * v[2],

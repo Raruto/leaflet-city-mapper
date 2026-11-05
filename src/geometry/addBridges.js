@@ -1,5 +1,8 @@
 import { createMesh } from '../rendering/createMesh.js';
 import { triangulate } from './triangulate.js';
+import { local } from './local.js';
+import { push } from './push.js';
+import { below } from './below.js';
 
 /**
  * Bare-earth DEMs drop bridges: `getElevation` returns the deck height inside these polygons (GeoJSON
@@ -11,29 +14,46 @@ export function addBridges(backend, geojson) {
   const map = backend._map, crs = map.options.crs, zoom = backend._terrainZoom;
   const origin = crs.project(backend.location), metres = Math.cos(backend.location.lat * Math.PI / 180);
   const base = backend.root.position[1], position = [], normal = [], color = [];
-  const local = ([lng, lat, z]) => {
-    const p = crs.project(new L.LatLng(lat, lng));
-    return [(p.x - origin.x) * metres, z - base, -(p.y - origin.y) * metres];
-  };
-  const push = (p, n) => { position.push(...p); normal.push(...n); color.push(0.6, 0.58, 0.54); };
   backend._bridges = new Map();
   for (const { geometry } of geojson.features) {
     const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
     for (const polygon of polygons) {
-      const rings = polygon.map(ring => ring.slice(0, -1)).filter(ring => ring.length >= 3);
+      const rings = [];
+      for (const ring of polygon) {
+        const path = ring.slice(0, -1);
+        if (path.length >= 3) rings.push(path);
+      }
       if (!rings.length) continue;
-      const pixels = rings.flat().map(([lng, lat, z]) => { const p = map.project([lat, lng], zoom); return [p.x, p.y, z]; });
-      const points = rings.flat().map(local);
+      const pixels = [], points = [];
+      for (const ring of rings) for (const [lng, lat, z] of ring) {
+        const p = map.project([lat, lng], zoom);
+        pixels.push([p.x, p.y, z]);
+      }
+      for (const ring of rings) for (const coordinate of ring) points.push(local(coordinate, crs, origin, metres, base));
       let triangles;
       try {
-        const starts = rings.map((ring, r) => rings.slice(0, r).reduce((sum, previous) => sum + previous.length, 0));
-        const [contour, ...holes] = rings.map((ring, r) => ring.map((c, i) => ({ x: pixels[starts[r] + i][0], y: pixels[starts[r] + i][1] })));
+        const paths = [];
+        let start = 0;
+        for (const ring of rings) {
+          const path = [];
+          for (let i = 0; i < ring.length; i++) path.push({ x: pixels[start + i][0], y: pixels[start + i][1] });
+          paths.push(path);
+          start += ring.length;
+        }
+        const [contour, ...holes] = paths;
         triangles = triangulate(contour, holes);
       } catch { continue; }
+      const bridgeTriangles = [], xs = [], ys = [];
+      for (const t of triangles) {
+        const triangle = [];
+        for (const i of t) triangle.push(pixels[i]);
+        bridgeTriangles.push(triangle);
+      }
+      for (const p of pixels) { xs.push(p[0]); ys.push(p[1]); }
       const bridge = {
-        triangles: triangles.map(t => t.map(i => pixels[i])),
-        min: [Math.min(...pixels.map(p => p[0])), Math.min(...pixels.map(p => p[1]))],
-        max: [Math.max(...pixels.map(p => p[0])), Math.max(...pixels.map(p => p[1]))],
+        triangles: bridgeTriangles,
+        min: [Math.min(...xs), Math.min(...ys)],
+        max: [Math.max(...xs), Math.max(...ys)],
       };
       for (let x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
         for (let y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
@@ -41,20 +61,19 @@ export function addBridges(backend, geojson) {
           backend._bridges.set(key, [...backend._bridges.get(key) || [], bridge]);
         }
       }
-      const below = p => [p[0], p[1] - 1.2, p[2]];
       for (let [a, b, c] of triangles) {
         // Counter-clockwise seen from above, so double-sided shading keeps the top lit.
         const [pa, pb, pc] = [points[a], points[b], points[c]];
         if ((pb[2] - pa[2]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[2] - pa[2]) < 0) [b, c] = [c, b];
-        for (const i of [a, b, c]) push(points[i], [0, 1, 0]);
-        for (const i of [a, c, b]) push(below(points[i]), [0, -1, 0]);
+        for (const i of [a, b, c]) push(position, normal, color, points[i], [0, 1, 0]);
+        for (const i of [a, c, b]) push(position, normal, color, below(points[i]), [0, -1, 0]);
       }
       let start = 0;
       for (const ring of rings) {
         for (let i = 0; i < ring.length; i++) {
           const p = points[start + i], q = points[start + (i + 1) % ring.length];
           const length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1, n = [(q[2] - p[2]) / length, 0, -(q[0] - p[0]) / length];
-          for (const corner of [p, q, below(q), p, below(q), below(p)]) push(corner, n);
+          for (const corner of [p, q, below(q), p, below(q), below(p)]) push(position, normal, color, corner, n);
         }
         start += ring.length;
       }

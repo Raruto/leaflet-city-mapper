@@ -3,6 +3,9 @@ import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { getElevation } from './getElevation.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
 import { update } from '../scene/update.js';
+import { compareTerrainTiles } from './compareTerrainTiles.js';
+import { loadTerrainTiles } from './loadTerrainTiles.js';
+import { readBridges } from './readBridges.js';
 
 
 export async function loadTerrain(backend) {
@@ -24,26 +27,19 @@ export async function loadTerrain(backend) {
     const southeast = map.project([header.minLat, header.maxLon], backend._terrainZoom).divideBy(256).floor();
     backend._terrainBounds = new L.Bounds(northwest, southeast);
     const tiles = [];
-    for (let x = northwest.x; x <= southeast.x; x++) {
-      for (let y = northwest.y; y <= southeast.y; y++) tiles.push({ z: backend._terrainZoom, x, y });
-    }
     const center = map.project(map.getCenter(), backend._terrainZoom).divideBy(256);
-    tiles.sort((a, b) => Math.hypot(a.x + 0.5 - center.x, a.y + 0.5 - center.y) -
-      Math.hypot(b.x + 0.5 - center.x, b.y + 0.5 - center.y));
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(4, tiles.length) }, async () => {
-      while (next < tiles.length) {
-        controller.signal.throwIfAborted();
-        const coords = tiles[next++];
-        const result = await archive.getZxy(coords.z, coords.x, coords.y, controller.signal);
-        if (!result || result.data.byteLength !== 256 * 256 * 4) {
-          throw new Error(`Missing or invalid Float32 terrain tile ${coords.z}/${coords.x}/${coords.y}`);
-        }
-        backend._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(result.data));
+    for (let x = northwest.x; x <= southeast.x; x++) {
+      for (let y = northwest.y; y <= southeast.y; y++) {
+        tiles.push({ z: backend._terrainZoom, x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) });
       }
-    }));
+    }
+    tiles.sort(compareTerrainTiles);
+    const state = { backend, archive, controller, tiles, next: 0 };
+    const workers = [];
+    for (let i = 0; i < Math.min(4, tiles.length); i++) workers.push(loadTerrainTiles(state));
+    await Promise.all(workers);
     const bridges = backend.options.bridges && await fetch(backend.options.bridges, { signal: controller.signal })
-      .then(response => { if (!response.ok) throw new Error(`Bridges: HTTP ${response.status}`); return response.json(); });
+      .then(readBridges);
     if (controller.signal.aborted || backend._map !== map) return;
     backend._terrainReady = true;
     backend._terrainOriginElevation = getElevation(backend, backend.location) ?? 0;
@@ -51,6 +47,7 @@ export async function loadTerrain(backend) {
       setTerrainHeight(layer);
       conformModelToTerrain(layer, backend);
     }
+
     if (bridges) addBridges(backend, bridges);
     map.fire('terrainchange');
     update(backend);

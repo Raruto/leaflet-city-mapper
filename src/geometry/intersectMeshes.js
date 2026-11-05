@@ -1,8 +1,8 @@
 import { computeBounds } from "./computeBounds.js";
-
-const sub = (a, b) => a.map((v, i) => v - b[i]);
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a, b) => a.reduce((sum, v, i) => sum + v * b[i], 0);
+import { sub } from './sub.js';
+import { cross } from './cross.js';
+import { dot } from './dot.js';
+import { sortHits } from './sortHits.js';
 
 /** Nearest triangle hit per mesh, sorted by world-space distance. */
 
@@ -15,8 +15,8 @@ export function intersectMeshes(ray, meshes, night = 0) {
     // Test in mesh-local space; compare distances only after returning to shared world space.
     const inverse = new DOMMatrix(mesh.worldMatrix).inverse();
     const inverseValues = inverse.toFloat64Array();
-    if (![...inverseValues].every(Number.isFinite)) {
-      throw new Error('Singular 3D transform');
+    for (const value of inverseValues) {
+      if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
     }
     const localOrigin = new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
     const origin = [
@@ -117,5 +117,5 @@ export function intersectMeshes(ray, meshes, night = 0) {
       )
     });
   }
-  return hits.sort((a, b) => a.distance - b.distance);
+  return sortHits(hits);
 }

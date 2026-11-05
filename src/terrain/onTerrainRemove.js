@@ -1,24 +1,24 @@
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
-import { setRasterTerrain } from '../pmtiles/rasterTiles.js';
+import { setRasterTerrain } from '../pmtiles/setRasterTerrain.js';
 import { removeRasterTile } from '../pmtiles/removeRasterTile.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
 import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
+import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {
   layer._terrainController?.abort();
   layer._terrainLoading = false;
   layer._terrainReady = false;
-  map.eachLayer(layer => {
-    if (layer._type === 'pmtiles') setRasterTerrain(layer, null);
-  });
+  map.eachLayer(clearLayerTerrain);
   for (const tile of layer._rasterTiles.keys()) removeRasterTile(layer, tile);
   if (map._terrain3D === layer) delete map._terrain3D;
   for (const l of Object.values(map._layers)) {
     conformModelToTerrain(l, null);
     setTerrainHeight(l);
   }
+
   map.fire('terrainchange');
   layer._terrainTiles.clear();
   layer._terrainOriginElevation = 0;

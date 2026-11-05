@@ -1,4 +1,7 @@
 
+import { mix } from './mix.js';
+import { rgb } from './rgb.js';
+
 export function atmosphere(altitude) {
   if (!Number.isFinite(altitude)) {
     throw new Error('Invalid solar altitude');
@@ -10,11 +13,15 @@ export function atmosphere(altitude) {
     [10, [74, 147, 208], [197, 221, 237], [0.80, 0.75, 0.68]],
     [25, [53, 144, 213], [223, 238, 250], [1, 1, 1]],
   ];
-  const upper = stops.findIndex(stop => stop[0] >= altitude);
+  let upper = -1;
+  for (let i = 0; i < stops.length; i++) {
+    if (stops[i][0] >= altitude) { upper = i; break; }
+  }
   const b = stops[upper < 0 ? stops.length - 1 : upper],
         a = stops[Math.max(0, upper - 1)];
   const t = a === b || upper < 0 ? 1 : (altitude - a[0]) / (b[0] - a[0]);
-  const mix = index => a[index].map((value, i) => value + (b[index][i] - value) * t);
-  const rgb = values => `rgb(${values.map(Math.round).join(', ')})`;
-  return { background: `linear-gradient(${rgb(mix(1))}, ${rgb(mix(2))})`, tint: mix(3) };
+  return {
+    background: `linear-gradient(${rgb(mix(a[1], b[1], t))}, ${rgb(mix(a[2], b[2], t))})`,
+    tint: mix(a[3], b[3], t),
+  };
 }

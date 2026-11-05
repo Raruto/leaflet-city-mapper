@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { Given, Then } from '@cucumber/cucumber';
 import { along } from '../../src/traffic/along.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
-import { speed } from '../../src/traffic/speed.js';
+import { speed } from '../../src/traffic/constants/speed.js';
 import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
 import { cyclingCounts, mobilityLanes, trafficHour, parisMobility, parisTransit } from '../../examples/data/paris-traffic.js';
 import parisTraffic from '../../examples/data/paris-traffic.js';

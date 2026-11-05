@@ -29,17 +29,20 @@ export function roofCoverage(mesh, backend, rasters) {
       if (!tile.done && !tile.error) continue;
       const size = 256 * 2 ** (zoom - tile.coords.z);
       const left = tile.coords.x * size, top = tile.coords.y * size;
-      remaining = remaining.flatMap(([x0, y0, x1, y1]) => {
+      const pieces = [];
+      for (const [x0, y0, x1, y1] of remaining) {
         const l = Math.max(x0, left), t = Math.max(y0, top);
         const r = Math.min(x1, left + size), b = Math.min(y1, top + size);
-        if (l >= r || t >= b) return [[x0, y0, x1, y1]];
-        const pieces = [];
+        if (l >= r || t >= b) {
+          pieces.push([x0, y0, x1, y1]);
+          continue;
+        }
         if (y0 < t) pieces.push([x0, y0, x1, t]);
         if (b < y1) pieces.push([x0, b, x1, y1]);
         if (x0 < l) pieces.push([x0, t, l, b]);
         if (r < x1) pieces.push([r, t, x1, b]);
-        return pieces;
-      });
+      }
+      remaining = pieces;
       if (!remaining.length) return true;
     }
   }

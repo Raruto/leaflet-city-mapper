@@ -1,4 +1,79 @@
 Feature: Performance-oriented source style
   @unit
   Scenario: Sources avoid closures and functional iteration
-    Then no source file defines functions inside functions or uses callback array methods
+    Then no source file defines arrows, nested functions or callback array methods
+
+  @unit
+  Scenario: Function checks reject module-level arrow functions
+    Then source function checks handle these modules:
+      | source                                        | violations |
+      | function mirror(x) { return x; }               | 0          |
+      | export function mirror(x) { return x; }        | 0          |
+      | const mirror = (x) => x;                       | 1          |
+      | export const mirror = (x) => { return x; };    | 1          |
+      | const mirror = async (x) => x;                 | 1          |
+      | const obj = { mirror: (x) => x };              | 1          |
+      | function outer() { function inner() {} }       | 1          |
+      | values.filter(predicate);                     | 1          |
+      | const text = 'const mirror = (x) => x';        | 0          |
+
+  @unit
+  Scenario: Export counting cannot be bypassed with grouped declarations
+    Then source export counting handles these modules:
+      | source                                              | count    |
+      | const value = 1;                                     | 0        |
+      | export default function () {}                        | 1        |
+      | export function first() {} export class Second {}    | 2        |
+      | const a = 1, b = 2; export { a, b };                   | 2        |
+      | export const a = 1, b = 2;                            | 2        |
+      | export const { a, b: renamed, ...rest } = {};         | 3        |
+      | export const [a, , b = 1, ...rest] = [];               | 3        |
+      | export { first, second } from './other.js';           | 2        |
+      | export * as group from './other.js';                 | 1        |
+      | export * from './other.js';                          | Infinity |
+
+  @unit
+  Scenario: Source modules expose at most one export
+    Then each source file exports at most one binding
+
+  @unit
+  Scenario: Function counting includes private helpers and methods
+    Then source function counting handles these modules:
+      | source                                              | count |
+      | const value = 1;                                     | 0     |
+      | export function first() {}                           | 1     |
+      | function first() {} function second() {}              | 2     |
+      | function outer() { function inner() {} }              | 2     |
+      | const first = function () {}; const second = () => 1; | 2     |
+      | const object = { first() {}, second() {} };           | 2     |
+      | class Example { constructor() {} method() {} }        | 2     |
+      | async function first() {} function* second() {}       | 2     |
+      | const text = 'function first() {}';                   | 0     |
+      | /* function ignored() {} */ function first() {}       | 1     |
+
+  @unit
+  Scenario: Source modules define at most one function
+    Then each source file defines at most one function
+
+  @unit
+  Scenario: Module variable checks enforce exported constants and state
+    Then module variable checks handle these files:
+      | file                         | source                                                    | violations |
+      | src/geometry/example.js      | const HEIGHT = 8;                                         | 1          |
+      | src/geometry/example.js      | export const HEIGHT = 8;                                  | 1          |
+      | src/constants/HEIGHT.js      | export const HEIGHT = 8;                                  | 0          |
+      | src/constants/HEIGHT.js      | const HEIGHT = 8; export { HEIGHT };                       | 0          |
+      | src/constants/HEIGHT.js      | const HEIGHT = 8;                                         | 1          |
+      | src/state/count.js           | export let count = 0;                                     | 0          |
+      | src/state/count.js           | let count = 0;                                            | 1          |
+      | src/constants/count.js       | export let count = 0;                                     | 1          |
+      | src/state/HEIGHT.js          | export const HEIGHT = 8;                                  | 1          |
+      | src/constants/HEIGHT.js      | export var HEIGHT = 8;                                    | 1          |
+      | src/constants/HEIGHT.js      | export const { height: HEIGHT = 8 } = {};                  | 0          |
+      | src/geometry/example.js      | function example() { const HEIGHT = 8; let count = 0; }    | 0          |
+      | src/geometry/example.js      | import { HEIGHT } from '../constants/HEIGHT.js';           | 0          |
+      | src/geometry/example.js      | if (true) { const HEIGHT = 8; }                           | 1          |
+
+  @unit
+  Scenario: Module variables live in dedicated constants and state folders
+    Then module constants and state are exported from their dedicated folders

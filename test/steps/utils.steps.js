@@ -14,16 +14,19 @@ import { emptyNode } from '../../src/scene/emptyNode.js';
 import { setParent } from '../../src/scene/setParent.js';
 import { traverse } from '../../src/scene/traverse.js';
 import { decodeDirectory } from '../../src/pmtiles/decodeDirectory.js';
+import { getZxy } from '../../src/pmtiles/getZxy.js';
 import { decodeHeader } from '../../src/pmtiles/decodeHeader.js';
 import { decompress } from '../../src/pmtiles/decompress.js';
 import { tileId } from '../../src/pmtiles/tileId.js';
 import { decodeModel } from '../../src/model/decodeModel.js';
+import { loadModel } from '../../src/model/loadModel.js';
 import { readAccessor } from '../../src/model/readAccessor.js';
 import { nodeMatrix } from '../../src/model/nodeMatrix.js';
 import { vertexNormals } from '../../src/geometry/vertexNormals.js';
 import { textureSampler } from '../../src/model/textureSampler.js';
 import { lightGrid } from '../../src/rendering/lightGrid.js';
-import { cacheLightGrid, updatePointLights } from '../../src/rendering/updatePointLights.js';
+import { cacheLightGrid } from '../../src/rendering/cacheLightGrid.js';
+import { updatePointLights } from '../../src/rendering/updatePointLights.js';
 import { worldLights } from '../../src/rendering/worldLights.js';
 import { bridgeElevation } from '../../src/geometry/bridgeElevation.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
@@ -166,9 +169,32 @@ const checks = {
     assert.equal(await decompress(data, 1), data);
     assert.equal(new TextDecoder().decode(await decompress(gzipSync('utility'), 2)), 'utility');
     await assert.rejects(decompress(data, 3), /Unsupported PMTiles compression/);
+    const archive = {
+      options: {}, _directories: new Map(),
+      _header: Promise.resolve({
+        minZoom: 0, maxZoom: 0, rootDirectoryOffset: 0, rootDirectoryLength: 5,
+        tileDataOffset: 5, tileDataLength: 1, internalCompression: 1, tileCompression: 1,
+      }),
+      url: `data:application/octet-stream;base64,${Buffer.from([128, 128, 128, 128, 128, 42]).toString('base64')}`,
+    };
+    await assert.rejects(getZxy(archive, 0, 0, 0), /Truncated PMTiles directory/);
+    assert.equal(archive._directories.size, 0, 'Failed directory reads must be retryable');
+    archive.url = `data:application/octet-stream;base64,${Buffer.from([1, 0, 1, 1, 1, 42]).toString('base64')}`;
+    const tiles = await Promise.all([getZxy(archive, 0, 0, 0), getZxy(archive, 0, 0, 0)]);
+    for (const tile of tiles) assert.deepEqual([...new Uint8Array(tile.data)], [42]);
+    assert.equal(archive._directories.size, 1, 'Concurrent reads must share the directory cache');
+    let rejectDirectory;
+    archive._directories.set('0:5', new Promise((resolve, reject) => { rejectDirectory = reject; }));
+    const pending = getZxy(archive, 0, 0, 0);
+    await Promise.resolve();
+    const replacement = Promise.resolve([{ tileId: 0, runLength: 1, length: 1, offset: 0 }]);
+    archive._directories.set('0:5', replacement);
+    rejectDirectory(new Error('Evicted directory failed'));
+    await assert.rejects(pending, /Evicted directory failed/);
+    assert.equal(archive._directories.get('0:5'), replacement, 'An evicted request must not delete its replacement');
   },
 
-  models() {
+  async models() {
     const description = { asset: { version: '2.0' }, meshes: [] };
     const json = new TextEncoder().encode(JSON.stringify(description)).buffer;
     assert.deepEqual(decodeModel(json), description);
@@ -193,6 +219,27 @@ const checks = {
     assert.deepEqual([...vertexNormals([0, 0, 0, 1, 0, 0, 0, 1, 0])], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
     assert.deepEqual(textureSampler({ wrapS: 33071, wrapT: 33648, magFilter: 9728, minFilter: 9986 }),
       { addressModeU: 'clamp-to-edge', addressModeV: 'mirror-repeat', magFilter: 'nearest', minFilter: 'nearest' });
+    const originalFetch = globalThis.fetch;
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const root = emptyNode();
+    const backend = {
+      _added: { promise: Promise.resolve() }, modelUrl: 'model.gltf', root, options: {},
+    };
+    try {
+      globalThis.document = { baseURI: 'https://example.test/' };
+      globalThis.fetch = async () => new Response(JSON.stringify({
+        asset: { version: '2.0' }, scenes: [{ nodes: [0] }], nodes: [{}],
+      }));
+      await loadModel(backend);
+      assert.equal(backend.model.id, 'https://example.test/model.gltf');
+      assert.equal(backend.model.parent, root);
+      assert.equal(root.children[0], backend.model);
+      assert.equal(backend.model.children.length, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+      else delete globalThis.document;
+    }
   },
 
   lighting() {

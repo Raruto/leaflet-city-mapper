@@ -16,15 +16,24 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
     return;
   }
   const cache = sun.cache;
-  const unchanged = sun.enabled && cache?.meshes.size === meshes.length &&
-    sunlight.direction.every((value, i) => value === cache.direction[i]) &&
-    meshes.every(mesh => {
+  let unchanged = sun.enabled && cache?.meshes.size === meshes.length;
+  if (unchanged) {
+    for (let i = 0; i < sunlight.direction.length; i++) {
+      if (sunlight.direction[i] !== cache.direction[i]) { unchanged = false; break; }
+    }
+  }
+  if (unchanged) {
+    for (const mesh of meshes) {
       const previous = cache.meshes.get(mesh), range = mesh.geometry.drawRange;
-      return previous && previous.world === mesh._worldMatrixVersion && previous.geometry === mesh.geometry &&
+      if (!(previous && previous.world === mesh._worldMatrixVersion && previous.geometry === mesh.geometry &&
         previous.start === range.start && previous.count === range.count &&
-        previous.appearance === (mesh._appearance ?? 1) &&
-        Object.values(mesh.geometry.attributes).every(attribute => !attribute.needsUpdate);
-    });
+        previous.appearance === (mesh._appearance ?? 1))) { unchanged = false; break; }
+      for (const attribute of Object.values(mesh.geometry.attributes)) {
+        if (attribute.needsUpdate) { unchanged = false; break; }
+      }
+      if (!unchanged) break;
+    }
+  }
   if (unchanged) return;
   const values = new Float32Array(20);
   sun.enabled = true;
@@ -55,10 +64,15 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   }
   // Include ground receivers below/around the loaded buildings and trees.
   min[1] = Math.min(0, min[1]);
-  const radius = Math.max(100, Math.hypot(...min.map((v, i) => max[i] - v)));
-  const center = min.map((v, i) => (v + max[i]) / 2);
+  const span = [], center = [], position = [];
+  for (let i = 0; i < 3; i++) {
+    span[i] = max[i] - min[i];
+    center[i] = (min[i] + max[i]) / 2;
+  }
+  const radius = Math.max(100, Math.hypot(...span));
+  for (let i = 0; i < 3; i++) position[i] = center[i] + sunlight.direction[i] * radius * 2;
   const lightCamera = {
-    position: center.map((v, i) => v + sunlight.direction[i] * radius * 2),
+    position,
     target: center, up: [0, 0, -1], fov: 45, aspect: 1, near: 1, far: radius * 5,
     viewMatrix: [], projectionMatrix: [], projectionViewMatrix: [],
   };
@@ -66,13 +80,17 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   const view = new DOMMatrix(lightCamera.viewMatrix);
   const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < 8; i++) {
-    const point = new DOMPoint(...min.map((v, axis) => (i & (1 << axis)) ? max[axis] : v), 1).matrixTransform(view);
-    [point.x, point.y, point.z].forEach((value, axis) => {
+    const corner = [];
+    for (let axis = 0; axis < 3; axis++) corner[axis] = i & (1 << axis) ? max[axis] : min[axis];
+    const point = new DOMPoint(...corner, 1).matrixTransform(view);
+    const coordinates = [point.x, point.y, point.z];
+    for (let axis = 0; axis < 3; axis++) {
+      const value = coordinates[axis];
       low[axis] = Math.min(low[axis], value - 20);
       high[axis] = Math.max(high[axis], value + 20);
-    });
+    }
   }
-  const span = low.map((v, i) => high[i] - v);
+  for (let i = 0; i < 3; i++) span[i] = high[i] - low[i];
   const projection = new DOMMatrix([
     2 / span[0], 0, 0, 0, 0, 2 / span[1], 0, 0, 0, 0, -1 / span[2], 0,
     -(high[0] + low[0]) / span[0], -(high[1] + low[1]) / span[1], high[2] / span[2], 1,
@@ -159,12 +177,13 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
     } else pass.draw(range.count, 1, range.start, 0);
   }
   pass.end();
-  sun.cache = {
-    direction: [...sunlight.direction],
-    meshes: new Map(meshes.map(mesh => [mesh, {
+  const snapshots = new Map();
+  for (const mesh of meshes) {
+    snapshots.set(mesh, {
       world: mesh._worldMatrixVersion, geometry: mesh.geometry,
       start: mesh.geometry.drawRange.start, count: mesh.geometry.drawRange.count,
       appearance: mesh._appearance ?? 1,
-    }])),
-  };
+    });
+  }
+  sun.cache = { direction: [...sunlight.direction], meshes: snapshots };
 }

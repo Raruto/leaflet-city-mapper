@@ -148,7 +148,7 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
   };
   this.pluginBundle = pluginBundle;
   // Source-level checks and the instrumented bundle must share the same private state.
-  await this.context.route('**/src/state.js', route => route.fulfill({
+  await this.context.route('**/src/constants/cityMapper.js', route => route.fulfill({
     contentType: 'text/javascript',
     body: 'export const cityMapper = globalThis.cityMapperTestState;',
   }));

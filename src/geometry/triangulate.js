@@ -1,4 +1,12 @@
 import { isClockWise } from "./isClockWise.js";
+import { cross } from './triangulate/cross.js';
+import { clean } from './triangulate/clean.js';
+import { inside } from './triangulate/inside.js';
+import { insideHole } from './triangulate/insideHole.js';
+import { crossesBoundary } from './triangulate/crossesBoundary.js';
+import { containsVertex } from './triangulate/containsVertex.js';
+import { area } from './triangulate/area.js';
+import { sortHoles } from './triangulate/sortHoles.js';
 
 /**
  * Triangulates a polygon given as `{x, y}` points.
@@ -13,61 +21,36 @@ import { isClockWise } from "./isClockWise.js";
 
 export function triangulate(contour, holes = []) {
   const points = [contour, ...holes].flat();
-  if (points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) throw new Error('Invalid polygon coordinates');
+  for (const p of points) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) throw new Error('Invalid polygon coordinates');
+  }
   // Translate near the origin to avoid cancellation with geographic coordinates.
-  const vertices = points.map((p, index) => ({ x: p.x - contour[0].x, y: p.y - contour[0].y, index }));
-  const cross = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-  const equal = (a, b) => a.x === b.x && a.y === b.y;
+  const vertices = [];
+  for (let index = 0; index < points.length; index++) {
+    const p = points[index];
+    vertices.push({ x: p.x - contour[0].x, y: p.y - contour[0].y, index });
+  }
   // Remove zero-area corners before connecting holes; keep original vertex indices.
-  const clean = ring => {
-    let changed = true;
-    while (changed && ring.length > 3) {
-      changed = false;
-      for (let i = 0; i < ring.length; i++) {
-        const a = ring[(i + ring.length - 1) % ring.length], b = ring[i], c = ring[(i + 1) % ring.length];
-        if (equal(a, b) || Math.abs(cross(a, b, c)) < 1e-10) {
-          ring.splice(i, 1); changed = true; break;
-        }
-      }
-    }
-    if (ring.length < 3) throw new Error('Degenerate polygon ring');
-    return ring;
-  };
   let offset = 0;
-  const rings = [contour, ...holes].map((path, index) => {
+  const rings = [], paths = [contour, ...holes];
+  for (let index = 0; index < paths.length; index++) {
+    const path = paths[index];
     const ring = clean(vertices.slice(offset, offset += path.length));
     if (isClockWise(ring) !== Boolean(index)) ring.reverse();
-    return ring;
-  });
-  const inside = (point, ring) => {
-    let result = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const a = ring[i], b = ring[j];
-      if ((a.y > point.y) !== (b.y > point.y) &&
-        point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) result = !result;
-    }
-    return result;
-  };
-  const intersects = (a, b, c, d) => {
-    if (equal(a, c) || equal(a, d) || equal(b, c) || equal(b, d)) return false;
-    const abC = cross(a, b, c), abD = cross(a, b, d), cdA = cross(c, d, a), cdB = cross(c, d, b);
-    const on = (p, q, r) => Math.min(p.x, q.x) <= r.x && r.x <= Math.max(p.x, q.x) &&
-      Math.min(p.y, q.y) <= r.y && r.y <= Math.max(p.y, q.y);
-    return abC * abD < 0 && cdA * cdB < 0 ||
-      abC === 0 && on(a, b, c) || abD === 0 && on(a, b, d) ||
-      cdA === 0 && on(c, d, a) || cdB === 0 && on(c, d, b);
-  };
+    rings.push(ring);
+  }
   let polygon = rings[0].slice();
   // A bridge must stay inside the outer boundary, outside every hole, and cross no edge.
   // ponytail: quadratic ear clipping for building footprints; use spatial indexing for large rings.
-  for (const hole of rings.slice(1).sort((a, b) => Math.min(...a.map(p => p.x)) - Math.min(...b.map(p => p.x)))) {
+  const holesToConnect = sortHoles(rings.slice(1));
+  for (const hole of holesToConnect) {
     let bridge, distance = Infinity;
     for (let h = 0; h < hole.length; h++) for (let p = 0; p < polygon.length; p++) {
       const a = hole[h], b = polygon[p], d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
       if (d >= distance) continue;
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (!inside(mid, rings[0]) || rings.slice(1).some(r => inside(mid, r))) continue;
-      if ([polygon, ...rings.slice(1)].some(r => r.some((c, i) => intersects(a, b, c, r[(i + 1) % r.length])))) continue;
+      if (!inside(mid, rings[0]) || insideHole(mid, rings)) continue;
+      if (crossesBoundary(a, b, polygon, rings)) continue;
       bridge = [h, p]; distance = d;
     }
     if (!bridge) throw new Error('Unable to connect polygon hole');
@@ -82,19 +65,21 @@ export function triangulate(contour, holes = []) {
     for (let i = 0; i < polygon.length; i++) {
       const a = polygon[(i + polygon.length - 1) % polygon.length], b = polygon[i], c = polygon[(i + 1) % polygon.length];
       if (cross(a, b, c) <= 1e-10) continue;
-      if (polygon.some(p => !equal(p, a) && !equal(p, b) && !equal(p, c) &&
-        cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0)) continue;
+      if (containsVertex(polygon, a, b, c)) continue;
       result.push([a.index, b.index, c.index]); polygon.splice(i, 1); clipped = true; break;
     }
     if (!clipped) throw new Error('Unable to triangulate polygon: invalid or self-intersecting rings');
   }
-  if (cross(...polygon) > 1e-10) result.push(polygon.map(p => p.index));
-  const area = ring => Math.abs(ring.reduce((sum, p, i) => {
-    const q = ring[(i + 1) % ring.length]; return sum + p.x * q.y - q.x * p.y;
-  }, 0)) / 2;
+  if (cross(...polygon) > 1e-10) {
+    const triangle = [];
+    for (const p of polygon) triangle.push(p.index);
+    result.push(triangle);
+  }
   // Reject incomplete coverage instead of silently emitting a partial roof.
-  const expected = area(rings[0]) - rings.slice(1).reduce((sum, ring) => sum + area(ring), 0);
-  const actual = result.reduce((sum, triangle) => sum + cross(...triangle.map(i => vertices[i])) / 2, 0);
+  let holeArea = 0, actual = 0;
+  for (let i = 1; i < rings.length; i++) holeArea += area(rings[i]);
+  const expected = area(rings[0]) - holeArea;
+  for (const triangle of result) actual += cross(vertices[triangle[0]], vertices[triangle[1]], vertices[triangle[2]]) / 2;
   if (expected <= 0 || Math.abs(actual - expected) > Math.max(1e-7, expected * 1e-8)) throw new Error('Polygon triangulation area mismatch');
   return result;
 }

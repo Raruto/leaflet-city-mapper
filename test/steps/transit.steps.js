@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { transitLanes, transitSettings } from '../../examples/data/paris-traffic.js';
-import { vehicles } from '../../src/traffic/vehicles.js';
+import { vehicles } from '../../src/traffic/constants/vehicles.js';
 import { build } from '../../src/geometry/build.js';
 import { tripsAt } from '../../src/traffic/tripsAt.js';
 import { routeGeometry } from '../../src/traffic/routeGeometry.js';

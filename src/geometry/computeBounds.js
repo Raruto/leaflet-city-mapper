@@ -6,7 +6,8 @@ export function computeBounds(geometry) {
     min[i % 3] = Math.min(min[i % 3], data[i]);
     max[i % 3] = Math.max(max[i % 3], data[i]);
   }
-  const center = min.map((v, i) => (v + max[i]) / 2);
+  const center = [];
+  for (let i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
   let radius = 0;
   for (let i = 0; i < data.length; i += 3) {
     radius = Math.max(radius, Math.hypot(

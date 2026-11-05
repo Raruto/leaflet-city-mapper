@@ -1,4 +1,4 @@
-import { cityMapper } from '../state.js';
+import { cityMapper } from '../constants/cityMapper.js';
 import { createProgram } from '../rendering/createProgram.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { terrainAtlas } from '../terrain/terrainAtlas.js';

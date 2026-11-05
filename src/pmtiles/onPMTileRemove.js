@@ -1,4 +1,4 @@
-import { releaseRasterTiles } from './rasterTiles.js';
+import { releaseRasterTiles } from './releaseRasterTiles.js';
 import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 
 export function onPMTileRemove(backend, map) {

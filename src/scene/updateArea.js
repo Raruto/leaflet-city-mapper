@@ -1,5 +1,6 @@
 import { pump } from "./pump.js";
-import { releaseArea } from "./releaseArea.js";
+import { releaseArea } from './releaseArea.js';
+import { compareAreaDistance } from './compareAreaDistance.js';
 
 /** Cover the visible ground bounds and one bordering block, clipped to the archive. */
 
@@ -33,7 +34,10 @@ export function updateArea(backend) {
     }
   }
   // Load the nearest new blocks first without rebuilding retained geometry.
-  for (const [key, coords] of [...wanted].sort(([, a], [, b]) => Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y))) {
+  const areas = [];
+  for (const [key, coords] of wanted) areas.push([key, coords, center]);
+  areas.sort(compareAreaDistance);
+  for (const [key, coords] of areas) {
     if (!backend._areas.has(key)) backend._areas.set(key, { coords, request: new AbortController() });
   }
   pump(backend);

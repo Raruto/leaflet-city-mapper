@@ -11,18 +11,16 @@
 import { build } from '../geometry/build.js';
 import { init3D } from '../scene/init3D.js';
 import { tooltip } from './tooltip.js';
-import { speed } from './speed.js';
-import { vehicles } from './vehicles.js';
-import { trafficShader } from './trafficShader.js';
-import {
-  addTraffic,
-  placeTraffic,
-  removeTraffic,
-  readyTraffic,
-  tickTraffic,
-  updateTraffic,
-  updateTrafficTerrain,
-} from './traffic.js';
+import { speed } from './constants/speed.js';
+import { vehicles } from './constants/vehicles.js';
+import { trafficShader } from './constants/trafficShader.js';
+import { addTraffic } from './addTraffic.js';
+import { placeTraffic } from './placeTraffic.js';
+import { removeTraffic } from './removeTraffic.js';
+import { readyTraffic } from './readyTraffic.js';
+import { tickTraffic } from './tickTraffic.js';
+import { updateTraffic } from './updateTraffic.js';
+import { updateTrafficTerrain } from './updateTrafficTerrain.js';
 
 export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];

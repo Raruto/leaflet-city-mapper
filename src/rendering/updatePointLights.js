@@ -1,28 +1,7 @@
-import { lightGrid } from './lightGrid.js';
-import { worldLights } from './worldLights.js';
 import { destroyTexture } from './destroyTexture.js';
 import { bindSunlight } from '../sunlight/bindSunlight.js';
-
-/** Keep fixed lamps cached when moving headlights change. */
-
-export function cacheLightGrid(meshes, previous, maxBytes) {
-  let unchanged = previous?.meshes.length === meshes.length;
-  const packed = [], snapshots = [];
-  for (let i = 0; i < meshes.length; i++) {
-    const mesh = meshes[i], matrix = mesh.worldMatrix, lights = mesh.extras.lights;
-    let cache = mesh._worldLights;
-    let sameMatrix = Boolean(cache);
-    for (let j = 0; j < matrix.length && sameMatrix; j++) sameMatrix = matrix[j] === cache.matrix[j];
-    if (!sameMatrix || cache.lights !== lights) {
-      cache = mesh._worldLights = { lights, matrix: [...matrix], data: worldLights(lights, matrix) };
-    }
-    unchanged &&= previous.meshes[i].mesh === mesh && previous.meshes[i].cache === cache;
-    packed.push(cache.data);
-    snapshots.push({ mesh, cache });
-  }
-  if (unchanged) return previous;
-  return { ...lightGrid(packed, maxBytes), meshes: snapshots };
-}
+import { cacheLightGrid } from './cacheLightGrid.js';
+import { collectLightMeshes } from './collectLightMeshes.js';
 
 export function updatePointLights(backend) {
   const { device, sunlight: sun } = backend.renderer;
@@ -51,10 +30,4 @@ export function updatePointLights(backend) {
   sun.lightCount = staticGrid.count + dynamicGrid.count;
   sun.staticLightGrid = staticGrid;
   sun.dynamicLightGrid = dynamicGrid;
-}
-
-function collectLightMeshes(node, fixed, moving) {
-  if (!node.visible) return;
-  if (node.extras?.lights) (node.extras.dynamicLights ? moving : fixed).push(node);
-  for (const child of node.children || []) collectLightMeshes(child, fixed, moving);
 }

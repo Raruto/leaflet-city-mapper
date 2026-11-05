@@ -1,5 +1,6 @@
 import { materialShaders } from './materialShaders.js';
-import { elevationWGSL } from './elevationWGSL.js';
+import { elevationWGSL } from './constants/elevationWGSL.js';
+import { reportCompilation } from './reportCompilation.js';
 
 
 export function createProgram(backend, material = {}) {
@@ -10,17 +11,10 @@ export function createProgram(backend, material = {}) {
   );
   const vertex = backend.renderer.device.createShaderModule({ code: shaders.vertex });
   const fragment = backend.renderer.device.createShaderModule({ code: shaders.fragment });
-  Promise.all([
+  reportCompilation(backend, [
     vertex.getCompilationInfo(),
     fragment.getCompilationInfo()
-  ]).then(infos => {
-    const errors = infos.flatMap(info => info.messages).filter(message => message.type === 'error');
-    if (errors.length) {
-      backend.fire('error', {
-        error: new Error(`Unable to compile Layer3D WGSL: ${errors.map(error => error.message).join('\n')}`),
-      });
-    }
-  }).catch(error => backend.fire('error', { error }));
+  ]);
   const vertexBuffers = [
     { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },
     { arrayStride: 12, attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
@@ -43,6 +37,7 @@ export function createProgram(backend, material = {}) {
       texture: { sampleType: 'unfilterable-float', viewDimension: '2d' },
     });
   }
+
   for (const texture of shaders.bindings) {
     bindGroupEntries.push({
       binding: texture.texture,

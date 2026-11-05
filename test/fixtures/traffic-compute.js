@@ -1,5 +1,5 @@
-import { trafficShader } from '../../src/traffic/trafficShader.js';
-import { vehicles } from '../../src/traffic/vehicles.js';
+import { trafficShader } from '../../src/traffic/constants/trafficShader.js';
+import { vehicles } from '../../src/traffic/constants/vehicles.js';
 import { build } from '../../src/geometry/build.js';
 import { along } from '../../src/traffic/along.js';
 

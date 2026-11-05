@@ -1,4 +1,4 @@
-import { cityMapper } from '../state.js';
+import { cityMapper } from '../constants/cityMapper.js';
 import { emptyNode } from '../scene/emptyNode.js';
 import { createProgram } from './createProgram.js';
 import { setParent } from '../scene/setParent.js';

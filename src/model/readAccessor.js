@@ -1,5 +1,6 @@
-import { types } from "./types.js";
-import { sizes } from "./sizes.js";
+import { types } from "./constants/types.js";
+import { sizes } from "./constants/sizes.js";
+import { readAccessorValues } from './readAccessorValues.js';
 
 /** Decode packed, interleaved, normalized or sparse glTF accessor data. */
 
@@ -9,27 +10,13 @@ export function readAccessor(description, index) {
     throw new Error('Invalid glTF accessor');
   }
   const data = new Type(spec.count * size);
-  // The destination callback is sequential for base data and sparse-indexed for overrides.
-  const read = (viewIndex, offset, count, stride, output) => {
-    const view = description.bufferViews[viewIndex], bytes = Type.BYTES_PER_ELEMENT;
-    const buffer = description.buffers[view.buffer].binary;
-    stride ||= size * bytes;
-    if (!buffer || stride < size * bytes || offset < 0 ||
-      (view.byteOffset || 0) + view.byteLength > buffer.byteLength ||
-      (count - 1) * stride + size * bytes + offset > view.byteLength) throw new Error('glTF accessor outside buffer view');
-    for (let i = 0; i < count; i++) {
-      const values = new Type(buffer.slice((view.byteOffset || 0) + offset + i * stride,
-        (view.byteOffset || 0) + offset + i * stride + size * bytes));
-      data.set(values, output(i) * size);
-    }
-  };
   if (spec.bufferView !== undefined) {
-    read(
+    readAccessorValues(
+      description, Type, size, data, spec.count, null,
       spec.bufferView,
       spec.byteOffset || 0,
       spec.count,
-      description.bufferViews[spec.bufferView].byteStride,
-      i => i
+      description.bufferViews[spec.bufferView].byteStride
     );
   }
   if (spec.sparse) {
@@ -43,15 +30,12 @@ export function readAccessor(description, index) {
       throw new Error('Invalid sparse glTF indices');
     }
     const indices = new Index(description.buffers[view.buffer].binary.slice(offset, offset + sparse.count * Index.BYTES_PER_ELEMENT));
-    read(
+    readAccessorValues(
+      description, Type, size, data, spec.count, indices,
       sparse.values.bufferView,
       sparse.values.byteOffset || 0,
       sparse.count,
-      0,
-      i => {
-        if (indices[i] >= spec.count) throw new Error('Invalid sparse glTF index');
-        return indices[i];
-      }
+      0
     );
   }
   if (spec.componentType === 5126) {

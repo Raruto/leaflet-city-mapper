@@ -3,17 +3,13 @@ import { getElevation } from '../terrain/getElevation.js';
 import { update } from '../scene/update.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
 import { vertexNormals } from './vertexNormals.js';
-
-const HEIGHT = 8;
+import { collectMeshes } from './collectMeshes.js';
+import { HEIGHT } from './constants/HEIGHT.js';
 
 export function conformModelToTerrain(layer, terrain) {
   if (!layer.model) return;
   const meshes = [];
-  const visit = node => {
-    if (node.geometry?.attributes.position) meshes.push(node);
-    for (const child of node.children) visit(child);
-  };
-  visit(layer.model);
+  collectMeshes(layer.model, meshes);
   if (!terrain?._terrainReady || !layer.options.terrainConform) {
     for (const mesh of meshes) {
       const positions = mesh.geometry._terrainBasePositions;

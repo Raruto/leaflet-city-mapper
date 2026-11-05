@@ -1,4 +1,4 @@
-import { setRasterOpacity } from './rasterTiles.js';
+import { setRasterOpacity } from './setRasterOpacity.js';
 
 export function setPMTileOpacity(backend, opacity) {
   backend.options.opacity = opacity;

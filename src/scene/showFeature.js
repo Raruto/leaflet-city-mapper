@@ -15,7 +15,13 @@ export function showFeature(backend, feature, event) {
   }
   const shared = backend._shared;
   if (shared) {
-    const visible = [...shared._layers].some(layer => layer._tooltip && !layer._tooltip.hidden);
+    let visible = false;
+    for (const layer of shared._layers) {
+      if (layer._tooltip && !layer._tooltip.hidden) {
+        visible = true;
+        break;
+      }
+    }
     if (visible) {
       if (shared._cursor === undefined) shared._cursor = backend.container.style.cursor;
       backend.container.style.cursor = 'pointer';

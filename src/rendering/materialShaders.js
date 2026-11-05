@@ -1,3 +1,5 @@
+import { textureBinding } from './textureBinding.js';
+
 /** Material WGSL and texture bindings, without a GPU device or Leaflet layer. */
 export function materialShaders(material = {}, sparkle = false, elevationWGSL = '') {
   const hasBase = Boolean(material.baseTexture);
@@ -75,20 +77,11 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
     }
   `;
   const bindings = [];
-  let binding = 3;
-  const textureBinding = (name, enabled) => {
-    if (!enabled) return '';
-    bindings.push({ name, texture: binding, sampler: binding + 1 });
-    const current = binding;
-    binding += 2;
-    return /* wgsl */ `@group(0) @binding(${current}) var ${name}: texture_2d<f32>;
-      @group(0) @binding(${current + 1}) var ${name}Sampler: sampler;`;
-  };
-  const baseBinding = textureBinding('baseTexture', hasBase);
-  const metalBinding = textureBinding('metalTexture', hasMetal);
-  const emissiveBinding = textureBinding('emissiveTexture', hasEmissive);
-  const occlusionBinding = textureBinding('occlusionTexture', hasOcclusion);
-  const roofBinding = textureBinding('roofTexture', hasRoof);
+  const baseBinding = textureBinding(bindings, 'baseTexture', hasBase);
+  const metalBinding = textureBinding(bindings, 'metalTexture', hasMetal);
+  const emissiveBinding = textureBinding(bindings, 'emissiveTexture', hasEmissive);
+  const occlusionBinding = textureBinding(bindings, 'occlusionTexture', hasOcclusion);
+  const roofBinding = textureBinding(bindings, 'roofTexture', hasRoof);
   const fragment = /* wgsl */ `
     struct Mesh {
       worldMatrix: mat4x4<f32>,

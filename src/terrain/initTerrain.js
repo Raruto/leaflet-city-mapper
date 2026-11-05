@@ -15,6 +15,6 @@ export function initTerrain(layer, options) {
   layer._terrainTiles = new Map();
   layer._rasterTiles = new Map();
   layer._terrainReady = false;
-  layer.onAdd = map => onTerrainAdd(layer, map);
-  layer.onRemove = map => onTerrainRemove(layer, map);
+  layer.onAdd = onTerrainAdd.bind(null, layer);
+  layer.onRemove = onTerrainRemove.bind(null, layer);
 }

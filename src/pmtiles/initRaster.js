@@ -1,10 +1,14 @@
+import { isLoading } from './isLoading.js';
+import { getRasterEvents } from './getRasterEvents.js';
+import { readyRaster } from './readyRaster.js';
+import { reportError } from './reportError.js';
 import { emptyNode } from '../scene/emptyNode.js';
 import { read } from './read.js';
 import { getHeader } from './getHeader.js';
 import { getZxy } from './getZxy.js';
 import { onPMTileAdd } from './onPMTileAdd.js';
 import { onPMTileRemove } from './onPMTileRemove.js';
-import { getRasterTileSize, updateRasterTiles } from './rasterTiles.js';
+import { getRasterTileSize } from './getRasterTileSize.js';
 import { setPMTileOpacity } from './setPMTileOpacity.js';
 import { setPMTileZIndex } from './setPMTileZIndex.js';
 
@@ -31,30 +35,4 @@ export function initRaster(layer, options) {
   layer.ready = Promise.resolve(layer.options.archive || layer)
     .then(readyRaster.bind(null, layer))
     .catch(reportError.bind(null, layer));
-}
-
-function isLoading(layer) {
-  return layer._loadingTiles > 0;
-}
-
-function getRasterEvents(layer) {
-  const update = updateRasterTiles.bind(null, layer);
-  return { moveend: update, zoomend: update, rotate: update, pitch: update, resize: update };
-}
-
-async function readyRaster(layer, archive) {
-  const header = await archive.getHeader();
-  layer.options.archive = archive;
-  layer.header = header;
-  if (layer.options.maxNativeZoom === undefined) {
-    layer.options.maxNativeZoom = header.maxZoom;
-  }
-  layer.options.maxZoom = Math.max(layer.options.minZoom || 0, layer.options.maxZoom);
-  layer.fire('ready');
-  return layer;
-}
-
-function reportError(layer, error) {
-  layer.fire('error', { error });
-  throw error;
 }

@@ -1,5 +1,3 @@
-import { computeBounds } from "../geometry/computeBounds.js";
-import { traverse } from "../scene/traverse.js";
 import { updateCamera } from "../scene/updateCamera.js";
 import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
 import { destroyTexture } from './destroyTexture.js';
@@ -7,10 +5,14 @@ import { drawGeometry } from './drawGeometry.js';
 import { updatePointLights } from './updatePointLights.js';
 import { renderSunlight } from '../sunlight/renderSunlight.js';
 import { sortMeshes } from "./sortMeshes.js";
-import { update } from "../scene/update.js";
-import { getRasterTileSize, pruneRasterTiles } from "../pmtiles/rasterTiles.js";
+import { cancelUpdate } from '../scene/cancelUpdate.js';
+import { update } from '../scene/update.js';
+import { getRasterTileSize } from '../pmtiles/getRasterTileSize.js';
+import { pruneRasterTiles } from '../pmtiles/pruneRasterTiles.js';
 import { getElevation } from "../terrain/getElevation.js";
 import { roofCoverage } from "../geometry/roofCoverage.js";
+import { compareRoofTiles } from './compareRoofTiles.js';
+import { collectMeshes } from './collectMeshes.js';
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
@@ -19,8 +21,7 @@ import { roofCoverage } from "../geometry/roofCoverage.js";
  */
 
 export function render(backend) {
-  cancelAnimationFrame(backend._frame);
-  backend._frame = null;
+  cancelUpdate(backend);
   if (backend._shared !== backend || !backend.renderer) return;
   const map = backend._map;
   const now = performance.now();
@@ -45,7 +46,10 @@ export function render(backend) {
     }
     if (backend._zoomView) {
       const view = backend._zoomView;
-      const proxy = [...backend._zoomTransitions.keys()].find(animation => animation.effect.target === map._proxy);
+      let proxy;
+      for (const animation of backend._zoomTransitions.keys()) {
+        if (animation.effect.target === map._proxy) { proxy = animation; break; }
+      }
       const progress = proxy?.effect.getComputedTiming().progress ?? Math.min(1, (now - view.start) / 250);
       const targetScale = map.getZoomScale(view.targetZoom, view.zoom), scale = 1 + (targetScale - 1) * progress;
       const from = map.project(view.from, view.zoom), to = map.project(view.to, view.zoom);
@@ -132,49 +136,35 @@ export function render(backend) {
   const shadowMeshes = backend._shadowMeshes ||= [];
   shadowMeshes.length = 0;
   if (sceneChanged) updateWorldMatrix(backend.scene);
-  traverse(backend.scene, mesh => {
-    if (!mesh.visible) return true;
-    if (mesh.geometry) {
-      if (sunlight?.altitude >= 3 && !mesh.tile && mesh._appearance !== 0 &&
-        !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
-      if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
-      const bounds = mesh.geometry.bounds;
-      const world = mesh.worldMatrix;
-      const center = bounds.center;
-      const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-      const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-      const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-      const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
-      const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
-      mesh._sortDepth = clipZ / clipW;
-      const radius = bounds.radius * Math.max(
-        Math.hypot(world[0], world[1], world[2]),
-        Math.hypot(world[4], world[5], world[6]),
-        Math.hypot(world[8], world[9], world[10])
-      );
-      mesh._visibleInFrame =
-        frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] &&
-        frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] &&
-        frustum[2][0] * x + frustum[2][1] * y + frustum[2][2] * z + frustum[2][3] >= -radius * frustumLengths[2] &&
-        frustum[3][0] * x + frustum[3][1] * y + frustum[3][2] * z + frustum[3][3] >= -radius * frustumLengths[3] &&
-        frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] &&
-        frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
-      if (!mesh._visibleInFrame) return;
-      candidates.push(mesh);
-    }
-  });
+  collectMeshes(backend.scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
   const renderer = backend.renderer;
   let rasters = [];
-  if ([...backend._layers].some(layer => layer.options.roofTexture)) {
-    rasters = Object.values(map._layers).filter(layer => layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0);
-    const signature = rasters.map(layer =>
-      `${L.Util.stamp(layer)}:${layer._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`).join('|');
+  let hasRoofTexture = false;
+  for (const layer of backend._layers) {
+    if (layer.options.roofTexture) { hasRoofTexture = true; break; }
+  }
+  if (hasRoofTexture) {
+    for (const layer of Object.values(map._layers)) {
+      if (layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
+    }
+    const signatures = [];
+    let loading = false;
+    for (const layer of rasters) {
+      signatures.push(`${L.Util.stamp(layer)}:${layer._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`);
+      loading ||= Boolean(layer._loadingTiles);
+    }
+    const signature = signatures.join('|');
     if (!backend._roofRaster || backend._roofRaster.signature !== signature &&
-      (!rasters.some(layer => layer._loadingTiles) || now - backend._roofRaster.updatedAt >= 50)) {
-      const tiles = rasters.flatMap(layer => [...layer._rasterTiles.values()]
-        .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
-        .map(tile => ({ tile, layer })));
-      const zoom = tiles.length ? Math.max(...tiles.map(({ tile }) => tile.coords.z)) : map.getZoom();
+      (!loading || now - backend._roofRaster.updatedAt >= 50)) {
+      const tiles = [];
+      let zoom = -Infinity;
+      for (const layer of rasters) for (const tile of layer._rasterTiles.values()) {
+        if (tile.done && !tile.request.signal.aborted && tile.image) {
+          tiles.push({ tile, layer });
+          zoom = Math.max(zoom, tile.coords.z);
+        }
+      }
+      if (!tiles.length) zoom = map.getZoom();
       const bounds = new L.Bounds();
       for (const { tile: { coords }, layer } of tiles) {
         const size = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
@@ -275,8 +265,7 @@ export function render(backend) {
         }],
       });
       atlasPass.setPipeline(renderer.roofBlit.pipeline);
-      tiles.sort((a, b) => (a.layer.options.zIndex || 0) - (b.layer.options.zIndex || 0) ||
-        a.tile.coords.z - b.tile.coords.z);
+      tiles.sort(compareRoofTiles);
       for (const [i, { tile, layer }] of tiles.entries()) {
         const { coords, image } = tile;
         const source = tile.texture;
@@ -285,6 +274,7 @@ export function render(backend) {
             [source.texture.width, source.texture.height]);
           source.uploaded = source.image;
         }
+
         opacities[i * 64] = layer.options.opacity;
         const tileSize = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
         const offset = new L.Point(coords.x, coords.y).scaleBy(tileSize).subtract(min);

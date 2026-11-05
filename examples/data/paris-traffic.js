@@ -3,7 +3,8 @@
  *
  * @example new L.Layer({ source: { type: 'traffic', url: './examples/data/paris-traffic.js', radius: 2000 } })
  */
-import { clipLine, samePoint } from '../../src/geometry/clipLine.js';
+import { clipLine } from '../../src/geometry/clipLine.js';
+import { samePoint } from '../../src/geometry/samePoint.js';
 
 const hour = 3600000, week = 7 * 24 * hour;
 const roadCache = new WeakMap();

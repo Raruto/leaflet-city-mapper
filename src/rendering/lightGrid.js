@@ -1,6 +1,10 @@
+import { visitCells } from './visitCells.js';
+
 /** Pack world-space point lights into the shader's spatial grid. */
 export function lightGrid(packed, maxBytes) {
-  const count = packed.reduce((sum, values) => sum + values.length / 8, 0), cellSize = 32;
+  let count = 0;
+  for (const values of packed) count += values.length / 8;
+  const cellSize = 32;
   let data = new Float32Array(8);
   if (count) {
     let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
@@ -12,23 +16,12 @@ export function lightGrid(packed, maxBytes) {
     }
     const columns = Math.ceil((maxX - minX) / cellSize) + 1,
              rows = Math.ceil((maxZ - minZ) / cellSize) + 1;
-    const each = callback => {
-      for (const values of packed) for (let i = 0; i < values.length; i += 8) {
-        const radius = values[i + 3],
-                   x = values[i] - minX,
-                   z = values[i + 2] - minZ;
-        for (let y = Math.floor((z - radius) / cellSize); y <= Math.floor((z + radius) / cellSize); y++) {
-          for (let c = Math.floor((x - radius) / cellSize); c <= Math.floor((x + radius) / cellSize); c++) {
-            callback(y * columns + c, values, i);
-          }
-        }
-      }
-    };
     // Counting sort: count the lights of each cell, then fill each cell's slice.
     const counts = new Uint32Array(columns * rows),
             next = new Uint32Array(columns * rows);
-    each(key => counts[key]++);
-    const entries = counts.reduce((sum, value) => sum + value, 0);
+    visitCells(packed, minX, minZ, cellSize, columns, counts);
+    let entries = 0;
+    for (const value of counts) entries += value;
     const length = (2 + columns * rows + entries * 2) * 4;
     if (length * 4 > maxBytes) {
       throw new Error('Streetlight grid exceeds GPU storage limit');
@@ -41,10 +34,8 @@ export function lightGrid(packed, maxBytes) {
       data[(2 + key) * 4 + 1] = counts[key];
       offset += counts[key] * 2;
     }
-    each((key, values, i) => {
-      for (let j = 0, o = next[key] * 4; j < 8; j++) data[o + j] = values[i + j];
-      next[key] += 2;
-    });
+    visitCells(packed, minX, minZ, cellSize, columns, next, data);
   }
+
   return { data, count };
 }

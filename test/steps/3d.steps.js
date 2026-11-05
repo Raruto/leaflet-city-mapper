@@ -116,7 +116,7 @@ export async function prepare3DChecks(page) {
         return pixels;
       },
       async terrainHeights(terrain, vertices) {
-        const { elevationWGSL } = await import('/src/rendering/elevationWGSL.js');
+        const { elevationWGSL } = await import('/src/rendering/constants/elevationWGSL.js');
         const { device } = terrain.renderer;
         const module = device.createShaderModule({ code: `
           @group(0) @binding(0) var dem: texture_2d<f32>;
@@ -273,7 +273,11 @@ const openEiffelExample = async function () {
   // Test-only shortcuts; the example keeps its layers inside the layers control.
   await this.page.evaluate(() => {
     const named = name => layers._layers.find(entry => entry.name === name).layer;
-    Object.assign(window, { sunlightOverlay: named('Shadows'), cruiseBoats: named('Bateaux-Mouches'), streetlights: named('Streetlights') });
+    Object.assign(window, {
+      sunlightOverlay: named('Shadows'),
+      cruiseBoats: named('Traffic').getLayers()[0],
+      streetlights: named('Streetlights'),
+    });
   });
   await this.page.waitForFunction(() => sunlightOverlay.control);
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>

@@ -91,6 +91,18 @@ npm run test  # build and run browser tests
 
 After that you can start developing inside the `src` folder (eg. open "http://localhost:8080/examples" in your browser to preview changes).
 
+Source-style tests enforce no arrows, nested functions or callback-based array
+methods in `src/**/*.js`, at most one exported binding and at most one function
+per file (including private helpers, object/class methods and constructors).
+Move additional functions and exports to separate modules. Run the function-count
+checks with `npm test -- --name "Function counting|Source modules define"`.
+Module-level `const` bindings must be exported from a `constants` folder;
+module-level `let` bindings from a `state` folder. Imports and function-local
+variables remain allowed. Module-level `var` is rejected. Each dedicated module
+still follows the one-export rule. Run `npm test -- --name "Module variable"`.
+These folders live beside their domain modules, for example
+`src/geometry/constants/HEIGHT.js`; shared constants live in `src/constants`.
+
 
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--alpha.1-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)

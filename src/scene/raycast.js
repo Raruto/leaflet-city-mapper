@@ -2,6 +2,7 @@ import { intersectMeshes } from '../geometry/intersectMeshes.js';
 import { traverse } from './traverse.js';
 import { updateCamera } from './updateCamera.js';
 import { updateWorldMatrix } from './updateWorldMatrix.js';
+import { collectVisibleMesh } from './collectVisibleMesh.js';
 
 /** Raycasting, hover/click highlight and tooltips. */
 /**
@@ -24,8 +25,8 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   // Unproject the mouse (-1..1) into a world-space ray from the camera.
   const inverseCamera = new DOMMatrix(backend.camera.projectionViewMatrix).inverse();
   const inverseCameraValues = inverseCamera.toFloat64Array();
-  if (![...inverseCameraValues].every(Number.isFinite)) {
-    throw new Error('Singular 3D transform');
+  for (const value of inverseCameraValues) {
+    if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
   }
   backend.raycaster.origin[0] = backend.camera.position[0];
   backend.raycaster.origin[1] = backend.camera.position[1];
@@ -50,10 +51,7 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   backend.raycaster.direction[2] /= rayLength;
   const meshes = [];
   for (const object of objects) {
-    if (recursive) traverse(object, mesh => {
-      if (!mesh.visible) return true;
-      if (mesh.geometry && mesh._appearance !== 0) meshes.push(mesh);
-    });
+    if (recursive) traverse(object, collectVisibleMesh, meshes);
     else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
   }
   return intersectMeshes(backend.raycaster, meshes, backend.renderer.uniformData?.[55]);
