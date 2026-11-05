@@ -4,7 +4,8 @@ import { cityMapper } from '../constants/cityMapper.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 
-export function attachAreaMesh(backend, area, context) {
+export function attachAreaMesh(context) {
+  const { backend, area } = context;
   if (!context.positions.length) {
     Object.assign(area, { mesh: null, buildings: 0, skipped: context.skipped, done: true });
     return;

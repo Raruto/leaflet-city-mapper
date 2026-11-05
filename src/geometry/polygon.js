@@ -2,8 +2,8 @@ import { triangle } from './nativeTriangle.js';
 import { line } from './line.js';
 import { triangulate } from '../triangulation/triangulate.js';
 
-export function polygon(context, rings, closed, map) {
-  const { options, fill, point } = context, projected = [];
+export function polygon(context, rings, closed) {
+  const { options, fill, point, map } = context, projected = [];
   for (const ring of rings) {
     const path = [];
     for (const latlng of ring) path.push(map.project(latlng));

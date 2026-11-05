@@ -1,5 +1,9 @@
 Feature: Decomposed rendering and source stages
   @unit
+  Scenario: Operation contexts keep maps and areas independent
+    Then operation contexts isolate nested geometry and source mesh attachment
+
+  @unit
   Scenario: Shared helpers preserve math, callbacks and control cleanup
     Then shared helpers preserve math, callbacks and control cleanup
 

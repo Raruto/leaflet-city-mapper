@@ -28,7 +28,7 @@ export async function buildArea(backend, area, map) {
       }
       buildAreaFeature(context, feature);
     }
-    attachAreaMesh(backend, area, context);
+    attachAreaMesh(context);
   } catch (error) {
     if (!area.request.signal.aborted) {
       area.error = error.message;

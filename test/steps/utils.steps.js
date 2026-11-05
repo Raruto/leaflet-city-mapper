@@ -151,12 +151,29 @@ const checks = {
     assert.deepEqual([[0, 0], [0, 1], [1, 1], [1, 0]].map(([x, y]) => tileId(1, x, y)), [1, 2, 3, 4]);
     assert.throws(() => tileId(1, 2, 0), /Invalid PMTiles tile coordinates/);
     const bytes = Uint8Array.from([2, 1, 3, 1, 1, 2, 3, 1, 0]);
-    assert.deepEqual(decodeDirectory(bytes.buffer), [
+    const firstDirectory = decodeDirectory(bytes.buffer);
+    assert.deepEqual(firstDirectory, [
       { tileId: 1, runLength: 1, length: 2, offset: 0 },
       { tileId: 4, runLength: 1, length: 3, offset: 2 },
     ]);
     assert.throws(() => decodeDirectory(new ArrayBuffer(0)), /Truncated PMTiles directory/);
     assert.throws(() => decodeDirectory(Uint8Array.from([...bytes, 0]).buffer), /Trailing PMTiles directory data/);
+    for (const [invalid, message] of [
+      [[1], /Invalid PMTiles directory count/],
+      [[2, 1, 0, 1, 1, 2, 3, 1, 0], /Invalid PMTiles directory tile IDs/],
+      [[1, 0, 1, 0, 1], /Invalid PMTiles directory length/],
+      [[1, 0, 1, 1, 0], /Invalid PMTiles directory offset/],
+      [[1, 0, 1, 1, 128], /Truncated PMTiles directory/],
+    ]) {
+      assert.throws(() => decodeDirectory(Uint8Array.from(invalid).buffer), message);
+      assert.deepEqual(decodeDirectory(bytes.buffer), firstDirectory);
+    }
+    assert.deepEqual(decodeDirectory(Uint8Array.of(0).buffer), []);
+    assert.deepEqual(firstDirectory, [
+      { tileId: 1, runLength: 1, length: 2, offset: 0 },
+      { tileId: 4, runLength: 1, length: 3, offset: 2 },
+    ], 'Later calls must not mutate previous directories');
+    assert.notEqual(decodeDirectory(bytes.buffer), firstDirectory);
     const data = new ArrayBuffer(127), view = new DataView(data);
     new Uint8Array(data).set(new TextEncoder().encode('PMTiles'));
     view.setUint8(7, 3);

@@ -19,7 +19,7 @@ export function nativeGeometry(source, map, point) {
   }
   if (allZero) dash.length = 0;
   if (dash.length % 2) dash.push(...dash);
-  const context = { fill, stroke, options, width, dash, point };
+  const context = { fill, stroke, options, width, dash, point, map };
   if (source instanceof L.CircleMarker) {
     const center = map.project(source.getLatLng());
     let radius = source.getRadius(), radiusY = radius;
@@ -48,7 +48,7 @@ export function nativeGeometry(source, map, point) {
     }
   } else {
     const closed = source instanceof L.Polygon;
-    visit(context, source.getLatLngs(), closed, map);
+    visit(context, source.getLatLngs(), closed);
   }
   return { fill, stroke };
 }

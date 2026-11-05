@@ -17,6 +17,56 @@ import { noOperation } from '../../src/utils/noOperation.js';
 import { notifyCameraTouchChange } from '../../src/controls/notifyCameraTouchChange.js';
 import { rotateOnRemove } from '../../src/controls/rotateOnRemove.js';
 import { cameraControlsState } from '../../src/constants/cameraControlsState.js';
+import { nativeGeometry } from '../../src/geometry/nativeGeometry.js';
+import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
+
+Then('operation contexts isolate nested geometry and source mesh attachment', function () {
+  const previous = globalThis.L;
+  class LatLng {
+    constructor(lat, lng) { Object.assign(this, { lat, lng }); }
+  }
+  class Polygon {
+    constructor() { this.options = { fill: true, stroke: false }; }
+    getLatLngs() {
+      return [[[new LatLng(0, 0), new LatLng(0, 2), new LatLng(2, 0)]]];
+    }
+  }
+  globalThis.L = { LatLng, Polygon, CircleMarker: class {} };
+  try {
+    const source = new Polygon();
+    const point = value => [value.x, 0, value.y];
+    const secondMap = { project: value => ({ x: value.lng + 1000, y: value.lat + 2000 }) };
+    let nested, entered = false;
+    const firstMap = { project(value) {
+      if (!entered) {
+        entered = true;
+        nested = nativeGeometry(source, secondMap, point);
+      }
+      return { x: value.lng, y: value.lat };
+    } };
+    const outer = nativeGeometry(source, firstMap, point);
+    assert.equal(outer.fill.length, 9);
+    assert.equal(nested.fill.length, 9);
+    for (let i = 0; i < outer.fill.length; i += 3) {
+      assert(outer.fill[i] >= 0 && outer.fill[i] <= 2);
+      assert(outer.fill[i + 2] >= 0 && outer.fill[i + 2] <= 2);
+      assert(nested.fill[i] >= 1000 && nested.fill[i] <= 1002);
+      assert(nested.fill[i + 2] >= 2000 && nested.fill[i + 2] <= 2002);
+    }
+    assert.deepEqual(nativeGeometry(source, secondMap, point), nested);
+
+    const firstArea = {}, secondArea = {};
+    const firstContext = { backend: {}, area: firstArea, positions: [], skipped: 2 };
+    const secondContext = { backend: {}, area: secondArea, positions: [], skipped: 5 };
+    attachAreaMesh(secondContext);
+    attachAreaMesh(firstContext);
+    assert.deepEqual(firstArea, { mesh: null, buildings: 0, skipped: 2, done: true });
+    assert.deepEqual(secondArea, { mesh: null, buildings: 0, skipped: 5, done: true });
+  } finally {
+    if (previous === undefined) delete globalThis.L;
+    else globalThis.L = previous;
+  }
+});
 
 Then('shared helpers preserve math, callbacks and control cleanup', async function () {
   assert.deepEqual(cross([1, 2, 3], [4, 5, 6]), [-3, 6, -3]);
