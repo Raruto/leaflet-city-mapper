@@ -38,6 +38,20 @@ Then('celestial date normalization preserves native dates and independent result
   assert.equal(instant.getTime(), savedTime);
   instant.getTime = () => { throw new Error('Date overrides must not change native normalization'); };
   assert.equal(solarTime(instant, ...eiffel), savedTime);
+  for (const input of ['2026-06-21', '2026-06-21T14:00:00+02:00', '0', '']) {
+    const expected = new Date(input).getTime();
+    if (Number.isFinite(expected)) assert.equal(solarTime(input, ...eiffel), expected);
+    else assert.throws(() => solarTime(input, ...eiffel), /Invalid solar date or location/);
+  }
+  const NativeDate = globalThis.Date;
+  try {
+    globalThis.Date = new Proxy(NativeDate, {
+      construct() { throw new Error('String normalization must not construct Date'); },
+    });
+    assert.equal(solarTime('2026-06-21T12:00:00Z', ...eiffel), savedTime);
+  } finally {
+    globalThis.Date = NativeDate;
+  }
 });
 
 When('the sun is computed for {string} at the Eiffel Tower', function (time) {

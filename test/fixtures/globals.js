@@ -3,6 +3,8 @@ export { Compass } from '../../src/globals/Compass.js';
 export { ContainerResize } from '../../src/globals/ContainerResize.js';
 export { HEIGHT } from '../../src/globals/HEIGHT.js';
 export { L } from '../../src/globals/L.js';
+export { walkByMap } from '../../src/globals/walkByMap.js';
+export { sunByMap } from '../../src/globals/sunByMap.js';
 export { cameraFov } from '../../src/globals/cameraFov.js';
 export { cosObliquity } from '../../src/globals/cosObliquity.js';
 export { degrees } from '../../src/globals/degrees.js';

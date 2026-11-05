@@ -10,6 +10,7 @@ import { reportCompilation } from '../../src/rendering/reportCompilation.js';
 import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
 import { terrainGrid } from '../../src/terrain/terrainGrid.js';
+import { terrainBuffers } from '../../src/terrain/terrainBuffers.js';
 
 Then('terrain allocation results preserve grid topology and no-data sampling', function () {
   for (const divisions of [1, 2, 4, 64]) {
@@ -63,7 +64,7 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     GPUColorWrite: { ALL: 15 },
   });
   try {
-    const layouts = [], groups = [], pipelines = [], offsets = [], failures = [];
+    const layouts = [], groups = [], pipelines = [], offsets = [], failures = [], uploads = [], writes = [], draws = [];
     const device = {
       createShaderModule({ code }) {
         return { code, getCompilationInfo: async () => ({ messages: [] }) };
@@ -88,11 +89,16 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
         return group;
       },
       createBuffer({ size, usage }) { return { size, usage }; },
-      queue: { writeBuffer() {}, copyExternalImageToTexture() {} },
+      queue: {
+        writeBuffer(...args) { writes.push(args); },
+        copyExternalImageToTexture(source, target, size) {
+          uploads.push({ image: source.source, texture: target.texture, size: Array.from(size) });
+        },
+      },
     };
     const backend = { options: {}, fire: (...event) => failures.push(event),
       renderer: { device, format: 'rgba8unorm', sunlight: { layout: {} }, uniformBuffer: {},
-        uniformData: new Float32Array(1024), uniformSlot: 1 } };
+        uniformData: new Float32Array(4096), uniformSlot: 1 } };
     globals.sceneByLayer.set(backend, backend);
     const first = createProgram(backend), second = createProgram(backend);
     assert.notEqual(first.vertexBuffers, second.vertexBuffers);
@@ -116,7 +122,8 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     geometry.attributes.position.data[0] = 5;
     assert.equal(other.attributes.position.data[0], 0);
     assert.notEqual(geometry.drawRange, other.drawRange);
-    const pass = { setPipeline() {}, setVertexBuffer() {}, setIndexBuffer() {}, drawIndexed() {},
+    const pass = { setPipeline() {}, setVertexBuffer() {}, setIndexBuffer() {},
+      drawIndexed(...args) { draws.push(['indexed', ...args]); }, draw(...args) { draws.push(['plain', ...args]); },
       setBindGroup(index, group, dynamicOffsets) { offsets.push(Array.from(dynamicOffsets)); } };
     const mesh = { program: textured, geometry, worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
     drawGeometry(backend, mesh, pass, 'back', 'ccw');
@@ -134,6 +141,38 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     assert.equal(pipelines[1].frontFace, 'cw');
     assert.notEqual(groups[0].entries[0].resource.buffer, groups[1].entries[0].resource.buffer);
     assert.deepEqual(offsets, [[256], [512], [768]]);
+    assert.equal(uploads.length, 1, 'Unchanged image uploads only once');
+    assert.deepEqual(uploads[0], { image: texture.image, texture: texture.texture, size: [256, 128] });
+    texture.image = { width: 64, height: 32 };
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(uploads.length, 2);
+    assert.equal(groups.length, 2, 'Changing image pixels does not replace bindings');
+    texture.sampler = {};
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(groups.length, 3, 'Changing sampler replaces bindings');
+    textured.depthTest = false;
+    mesh.ground = true;
+    mesh._appearance = 0.25;
+    mesh.terrain = [1, 2, 3, 4];
+    mesh.highlight = [5, 6];
+    textured.nightSparkle = true;
+    backend.renderer.uniformData[55] = 0.75;
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(pipelines.at(-1).depthCompare, 'always');
+    const base = offsets.at(-1)[0] / 4;
+    assert.equal(backend.renderer.uniformData[base + 22], 0.25);
+    assert.deepEqual(Array.from(backend.renderer.uniformData.slice(base + 28, base + 36)), [1, 2, 3, 4, 5, 6, 0.75, 1]);
+    geometry.attributes.position.needsUpdate = true;
+    geometry.bounds = {};
+    delete geometry.attributes.index;
+    geometry.attributes.instanceOffset = { buffer: {}, count: 3 };
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(geometry.attributes.position.needsUpdate, false);
+    assert.equal(geometry.bounds, null);
+    assert.deepEqual(writes.at(-1), [geometry.attributes.position.buffer, 0, geometry.attributes.position.data]);
+    assert.deepEqual(draws.at(-1), ['plain', geometry.drawRange.count, 3, geometry.drawRange.start, 0]);
+    textured.uniforms.baseTexture.value = null;
+    assert.throws(() => drawGeometry(backend, mesh, pass, 'front', 'cw'), /Missing Layer3D texture: baseTexture/);
     assert.equal(globals.drawMeshEntry.resource.buffer, null);
     assert.equal(globals.drawTextureEntries[0].resource, null);
     assert.equal(globals.drawEntries.length, 0);
@@ -147,6 +186,37 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
       if (previous[name] === undefined) delete globalThis[name];
       else globalThis[name] = previous[name];
     }
+  }
+});
+
+Then('terrain buffers are cached by subdivision and isolated by backend', function () {
+  const previous = globalThis.GPUBufferUsage;
+  globalThis.GPUBufferUsage = { VERTEX: 1, INDEX: 2, COPY_DST: 4 };
+  try {
+    const uploads = [];
+    const device = {
+      createBuffer(descriptor) { return { ...descriptor }; },
+      queue: { writeBuffer(...args) { uploads.push(args); } },
+    };
+    const first = {}, second = {};
+    globals.sceneByLayer.set(first, { renderer: { device }, _terrainGrids: new Map() });
+    globals.sceneByLayer.set(second, { renderer: { device }, _terrainGrids: new Map() });
+    const grid = terrainBuffers(first, 2);
+    assert.equal(uploads.length, 4);
+    assert.equal(terrainBuffers(first, 2), grid);
+    assert.equal(uploads.length, 4, 'Cached grid never uploads again');
+    assert.notEqual(terrainBuffers(first, 4), grid);
+    const other = terrainBuffers(second, 2);
+    for (const [name, attribute] of Object.entries(grid)) {
+      assert.equal(attribute.count, attribute.data.length / attribute.size);
+      assert.equal(attribute.buffer.size, Math.max(4, attribute.data.byteLength));
+      assert.equal(attribute.buffer.usage, name === 'index' ? 6 : 5);
+      assert.notEqual(attribute.buffer, other[name].buffer);
+      assert.notEqual(attribute.data, other[name].data);
+    }
+  } finally {
+    if (previous === undefined) delete globalThis.GPUBufferUsage;
+    else globalThis.GPUBufferUsage = previous;
   }
 });
 

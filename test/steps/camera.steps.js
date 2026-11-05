@@ -5,6 +5,56 @@ import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { angles } from '../../src/camera/angles.js';
 import { transformNativePoint } from '../../src/core/transformNativePoint.js';
+import { project } from '../../src/camera/project.js';
+import { mockLeaflet } from '../fixtures/leaflet.js';
+
+Then('camera projection preserves its formulas without intermediate point instances', function () {
+  let allocations = 0;
+  class Point {
+    constructor(x, y) { this.x = x; this.y = y; allocations++; }
+  }
+  const previous = mockLeaflet({ Point });
+  try {
+    for (const [width, height] of [[600, 400], [0, 0]]) {
+      for (const [pitch, bearing] of [[0, 0], [30, 70], [85, -145]]) {
+        const map = { getSize: () => ({ x: width, y: height }), options: { pitchMaxDistance: 3 } };
+        globals.cameraByMap.set(map, { _cameraPitch: pitch, _cameraBearing: bearing });
+        for (const input of [[30, 20], { x: 300, y: 200 }, { x: -100, y: -10000 }]) {
+          for (const inverse of [false, true]) for (const limit of [false, true]) {
+            const x = (input.x ?? input[0]) - width / 2, y = (input.y ?? input[1]) - height / 2;
+            const distance = height * 1.5, rad = Math.PI / 180;
+            const cos = Math.cos(bearing * rad), sin = Math.sin(bearing * rad);
+            const tilt = Math.cos(pitch * rad), rise = Math.sin(pitch * rad);
+            let expectedX = input.x ?? input[0], expectedY = input.y ?? input[1];
+            if (distance && inverse) {
+              const denominator = tilt * distance + rise * y, far = height * 3;
+              let v = denominator > 0 ? y * distance / denominator : -far;
+              if (limit) v = Math.max(-far, Math.min(far, v));
+              const u = x * (distance - rise * v) / distance;
+              expectedX = cos * u + sin * v + width / 2;
+              expectedY = -sin * u + cos * v + height / 2;
+            } else if (distance) {
+              const u = cos * x - sin * y, v = sin * x + cos * y;
+              const scale = distance / (distance - rise * v);
+              expectedX = u * scale + width / 2;
+              expectedY = tilt * v * scale + height / 2;
+            }
+            const saved = structuredClone(input), before = allocations;
+            const result = project(map, input, inverse, limit);
+            assert.equal(allocations - before, 1);
+            assert.ok(result instanceof Point);
+            assert.equal(result.x, expectedX);
+            assert.equal(result.y, expectedY);
+            assert.deepEqual(input, saved);
+            assert.notEqual(project(map, input, inverse, limit), result);
+          }
+        }
+      }
+    }
+  } finally {
+    mockLeaflet(previous);
+  }
+});
 
 Then('camera scratch buffers preserve independent results and matrix transforms', function () {
   const map = { _cameraPitch: 60, _cameraBearing: 45 };

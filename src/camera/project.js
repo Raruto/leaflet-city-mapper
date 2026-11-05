@@ -1,23 +1,27 @@
-import { L } from '../globals/L.js';
 import { cameraAngles } from '../globals/cameraAngles.js';
 import { pointOf } from './pointOf.js';
 import { angles } from './angles.js';
 
 
 export function project(map, point, inverse = false, limit = false) {
-  const half = map.getSize().divideBy(2), distance = map.getSize().y * 1.5;
-  if (!distance) return pointOf(point);
+  const size = map.getSize(), halfX = size.x / 2, halfY = size.y / 2, distance = size.y * 1.5;
+  const result = pointOf(point);
+  if (!distance) return result;
   const [cos, sin, tilt, rise] = angles(map, cameraAngles);
-  const p = pointOf(point).subtract(half);
+  const x = result.x - halfX, y = result.y - halfY;
   if (inverse) {
-    const far = map.getSize().y * map.options.pitchMaxDistance;
-    const denominator = tilt * distance + rise * p.y;
-    let v = denominator > 0 ? p.y * distance / denominator : -far;
+    const far = size.y * map.options.pitchMaxDistance;
+    const denominator = tilt * distance + rise * y;
+    let v = denominator > 0 ? y * distance / denominator : -far;
     if (limit) v = Math.max(-far, Math.min(far, v));
-    const u = p.x * (distance - rise * v) / distance;
-    return /* alloc */ new L.Point(cos * u + sin * v, -sin * u + cos * v).add(half);
+    const u = x * (distance - rise * v) / distance;
+    result.x = cos * u + sin * v + halfX;
+    result.y = -sin * u + cos * v + halfY;
+    return result;
   }
-  const u = cos * p.x - sin * p.y, v = sin * p.x + cos * p.y;
+  const u = cos * x - sin * y, v = sin * x + cos * y;
   const scale = distance / (distance - rise * v);
-  return /* alloc */ new L.Point(u * scale, tilt * v * scale).add(half);
+  result.x = u * scale + halfX;
+  result.y = tilt * v * scale + halfY;
+  return result;
 }

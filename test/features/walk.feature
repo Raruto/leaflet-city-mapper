@@ -8,6 +8,14 @@ Feature: Third-person walk mode
     Given a leaflet map
     Then Time and Walk controls clean up and can be added again
 
+  @unit
+  Scenario: Walk scratch is reused per map and duplicate controls are rejected
+    Then Walk scratch stays map-owned across control replacement
+
+  Scenario: Time state is reused per map and duplicate controls are rejected
+    Given a leaflet map
+    Then Time state stays map-owned across control replacement
+
   Scenario: Keyboard movement checks scene obstacles without breaking the walk loop
     Given a leaflet map
     Then keyboard walking moves toward a wall, stops at it and can move away

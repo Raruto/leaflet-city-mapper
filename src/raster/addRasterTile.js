@@ -1,20 +1,10 @@
 import { radians } from '../globals/radians.js';
-import { demTexture } from '../globals/demTexture.js';
-import { demTarget } from '../globals/demTarget.js';
-import { demLayout } from '../globals/demLayout.js';
-import { demSize } from '../globals/demSize.js';
-import { demBuffer } from '../globals/demBuffer.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 import { rasterPoint } from '../globals/rasterPoint.js';
 import { nextId } from '../globals/nextId.js';
-
-
-
-import { createProgram } from '../rendering/createProgram.js';
-import { destroyTexture } from '../rendering/destroyTexture.js';
-import { terrainAtlas } from '../terrain/terrainAtlas.js';
-import { terrainGrid } from '../terrain/terrainGrid.js';
+import { rasterProgram } from '../terrain/rasterProgram.js';
+import { terrainBuffers } from '../terrain/terrainBuffers.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 
@@ -38,66 +28,8 @@ export async function addRasterTile(backend, layer, coords, tile) {
   const opposite = crs.transformation.untransform(point, scale);
   const device = sceneByLayer.get(backend).renderer.device;
   const texture = tile.texture;
-  if (!sceneByLayer.get(backend)._rasterProgram || sceneByLayer.get(backend)._rasterProgram.device !== device) {
-    // DEM atlas over the archive's tile grid; invalid or missing samples become -1e9 (the shader's no-data).
-    // ponytail: one texture, capped by maxTextureDimension2D (32×32 DEM tiles at 8192 px); split it for larger archives.
-    const bounds = sceneByLayer.get(backend)._terrainBounds, columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
-    const { elevations, low, high } = terrainAtlas(sceneByLayer.get(backend)._terrainTiles, bounds);
-    if (sceneByLayer.get(backend)._dem) destroyTexture(backend, sceneByLayer.get(backend)._dem.texture);
-    sceneByLayer.get(backend)._dem = /* alloc */ {
-      texture: device.createTexture((
-      demTexture.size[0] = columns * 256,
-      demTexture.size[1] = rows * 256,
-      demTexture.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      demTexture
-    )),
-      low: Number.isFinite(low) ? low : sceneByLayer.get(backend)._terrainOriginElevation,
-      high: Number.isFinite(high) ? high : sceneByLayer.get(backend)._terrainOriginElevation,
-    };
-
-    device.queue.writeTexture((
-      demTarget.texture = sceneByLayer.get(backend)._dem.texture,
-      demTarget
-    ), elevations,
-      (
-      demLayout.bytesPerRow = columns * 1024,
-      demLayout
-    ), (
-      demSize[0] = columns * 256,
-      demSize[1] = rows * 256,
-      demSize
-    ));
-    demTarget.texture = null;
-
-    sceneByLayer.get(backend)._terrainGrids = /* alloc */ new Map();
-    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* alloc */ {
-      baseTexture: texture,
-      unlit: true,
-      terrain: sceneByLayer.get(backend)._dem,
-      alphaMode: 'BLEND',
-      depthWrite: true,
-    });
-  }
-  let attributes = sceneByLayer.get(backend)._terrainGrids.get(divisions);
-  let name, attribute;
-  if (!attributes) {
-    attributes = terrainGrid(divisions);
-    for ([name, attribute] of Object.entries(attributes)) {
-      attribute.size ||= 1;
-      attribute.count = attribute.data.length / attribute.size;
-      attribute.indexFormat = 'uint16';
-      attribute.buffer = device.createBuffer((
-        demBuffer.size = Math.max(4, attribute.data.byteLength),
-        demBuffer.usage = name === 'index'
-          ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-          : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        demBuffer
-      ));
-
-      device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
-    }
-    sceneByLayer.get(backend)._terrainGrids.set(divisions, attributes);
-  }
+  const program = rasterProgram(backend, texture);
+  const attributes = terrainBuffers(backend, divisions);
   const base = sceneByLayer.get(backend)._terrainOriginElevation;
   const bottom = Math.min(sceneByLayer.get(backend)._dem.low, base) - base, top = Math.max(sceneByLayer.get(backend)._dem.high, base) - base;
   const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
@@ -121,7 +53,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
     visible: true,
     device,
     geometry,
-    program: sceneByLayer.get(backend)._rasterProgram,
+    program,
     texture,
     // DEM pixel of the tile's corner, DEM pixels per tile, and the elevation at the layer origin.
     terrain: /* alloc */ [

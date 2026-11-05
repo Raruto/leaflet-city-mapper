@@ -4,6 +4,112 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { local } from '../../src/walk/local.js';
+import { onAdd as addWalk } from '../../src/walk/onAdd.js';
+import { onRemove as removeWalk } from '../../src/walk/onRemove.js';
+
+Then('Walk scratch stays map-owned across control replacement', function () {
+  const firstMap = {}, secondMap = {};
+  const makeControl = function () {
+    return {
+      _walk: {
+        container: {},
+        stop() {},
+        layer: { addTo(map) { this._map = map; }, remove() { this._map = null; } },
+      },
+    };
+  };
+  const first = makeControl(), replacement = makeControl(), other = makeControl();
+  assert.equal(addWalk.call(first, firstMap), first._walk.container);
+  const state = globals.walkByMap.get(firstMap);
+  const hitData = first._walk.hitData, local = first._walk.local;
+  assert.throws(() => addWalk.call(replacement, firstMap), /Only one Walk/);
+  assert.equal(state.control, first);
+  removeWalk.call(replacement, firstMap);
+  assert.equal(state.control, first);
+  addWalk.call(other, secondMap);
+  assert.notEqual(other._walk.hitData, hitData);
+  assert.notEqual(other._walk.local, local);
+  local[0] = 123;
+  hitData.seen.add({});
+  removeWalk.call(first, firstMap);
+  assert.equal(state.control, null);
+  assert.equal(hitData.seen.size, 0);
+  assert.equal(first._walk.hitData, null);
+  assert.equal(first._walk.local, null);
+  addWalk.call(replacement, firstMap);
+  assert.equal(globals.walkByMap.get(firstMap), state);
+  assert.equal(replacement._walk.hitData, hitData);
+  assert.equal(replacement._walk.local, local);
+  assert.deepEqual(local, [0, 0, 0]);
+  removeWalk.call(replacement, firstMap);
+  const secondHit = other._walk.hitData;
+  removeWalk.call(other, secondMap);
+  addWalk.call(replacement, secondMap);
+  assert.equal(replacement._walk.hitData, secondHit);
+  assert.notEqual(replacement._walk.hitData, hitData);
+  removeWalk.call(replacement, secondMap);
+});
+
+Then('Time state stays map-owned across control replacement', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(() => {
+    const map = test3d.map;
+    const node = document.createElement('div');
+    node.style.cssText = 'width:400px;height:300px';
+    document.body.append(node);
+    const otherMap = new L.Map(node).setView([0, 0], 5);
+    const first = new L.Control.Time().addTo(map);
+    const replacement = new L.Control.Time();
+    const other = new L.Control.Time().addTo(otherMap);
+    try {
+      const state = globals.sunByMap.get(map);
+      const otherState = globals.sunByMap.get(otherMap);
+      let rejected = false;
+      try { replacement.addTo(map); } catch (error) { rejected = /Only one Time/.test(error.message); }
+      let layerRejected = false;
+      try { replacement.layer.addTo(map); } catch (error) {
+        layerRejected = /Only one Time/.test(error.message) && !map.hasLayer(replacement.layer) && !replacement.layer._map;
+      }
+      const ownerUnchanged = globals.cameraByMap.get(map)._timeControl === first && state.control === first;
+      const isolated = state !== otherState && state.projection !== otherState.projection &&
+        state.container !== otherState.container && state.sunDisc !== otherState.sunDisc;
+      first.live = false;
+      first.time = new Date('2026-06-21T12:00:00Z');
+      state.update();
+      const snapshot = globals.cameraByMap.get(map)._sunlight;
+      first.remove();
+      const released = state.control === null && !state.container.isConnected &&
+        !globals.sunlightByControl.has(first);
+      replacement.live = false;
+      replacement.time = new Date('2026-12-21T06:00:00Z');
+      replacement.addTo(map);
+      const reused = globals.sunByMap.get(map) === state && globals.sunlightByControl.get(replacement) === state &&
+        state.control === replacement && replacement.getContainer() === state.container &&
+        state.date.value === '2026-12-21';
+      const events = [];
+      const capture = event => events.push(event);
+      map.on('simulationtimechange', capture);
+      map.fire('moveend');
+      map.off('simulationtimechange', capture);
+      const singleListener = events.length === 1 && events[0].time.getTime() === replacement.time.getTime();
+      const independent = globals.cameraByMap.get(map)._sunlight !== snapshot &&
+        globals.cameraByMap.get(otherMap)._timeControl === other && otherState.control === other;
+      replacement.remove();
+      map.getContainer().style.setProperty('--leaflet-sky-background', 'pink');
+      first.addTo(map);
+      first.remove();
+      const skyRestored = map.getContainer().style.getPropertyValue('--leaflet-sky-background') === 'pink';
+      map.getContainer().style.removeProperty('--leaflet-sky-background');
+      return { rejected, layerRejected, ownerUnchanged, isolated, released, reused, singleListener, independent, skyRestored };
+    } finally {
+      first.remove();
+      replacement.remove();
+      other.remove();
+      otherMap.remove();
+      node.remove();
+    }
+  });
+  for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
+});
 
 Then('walk coordinate conversion reuses only its caller-owned buffer', function () {
   const project = function (point) {
@@ -62,6 +168,11 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
 
     const control = new L.Control.Walk({ speed: 6 }).addTo(map);
     await nativeChecks.ready(control._walk.layer);
+    const scratch = globals.walkByMap.get(map);
+    const duplicate = new L.Control.Walk();
+    let duplicateRejected = false;
+    try { duplicate.addTo(map); } catch (error) { duplicateRejected = /Only one Walk/.test(error.message); }
+    const ownerUnchanged = scratch.control === control && map.hasLayer(control._walk.layer) && !duplicate._map;
     const before = { zoom: map.getZoom(), pitch: testOperations.getPitch(map), dragging: map.dragging.enabled() };
     control.getContainer().querySelector('button').click();
     const walking = control instanceof L.Control && !!control.walker.latlng && !map.dragging.enabled();
@@ -71,11 +182,17 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
       map.dragging.enabled() === before.dragging && !control._walk.meshes;
     control.addTo(map);
     await globals.sceneByLayer.get(control._walk.layer)._added.promise;
+    const scratchReused = globals.walkByMap.get(map) === scratch && control._walk.hitData === scratch.hitData &&
+      control._walk.local === scratch.local;
     control.getContainer().querySelector('button').click();
     const restarted = control.getContainer().querySelector('button').getAttribute('aria-pressed') === 'true';
     control.remove();
+    duplicate.addTo(map);
+    await nativeChecks.ready(duplicate._walk.layer);
+    const replacementReused = globals.walkByMap.get(map) === scratch && scratch.control === duplicate;
+    duplicate.remove();
     return { standalone, trafficTime, timeRemoved, nested, unchecked, rechecked, adapterRemoved,
-      restoredStandalone, walking, walkRemoved, restarted };
+      restoredStandalone, walking, walkRemoved, restarted, duplicateRejected, ownerUnchanged, scratchReused, replacementReused };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });

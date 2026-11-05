@@ -48,12 +48,8 @@ export function createWalk(control, {
     last: undefined,
     swing: 0,
     saved: null,
-    hitData: /* alloc */ {
-      x: 0, y: 0, z: 0, dx: 0, dz: 0, reach: 0, best: 0, found: false,
-      seen: /* alloc */ new Set(),
-      normal: /* alloc */ [0, 0],
-    },
-    local: /* alloc */ [0, 0, 0],
+    hitData: null,
+    local: null,
     state: control.walker = sceneByLayer.get(layer).walker = /* alloc */ { latlng: null, heading: 0, phase: 0 }
   }
   context.step = step.bind(context);

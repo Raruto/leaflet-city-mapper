@@ -1,5 +1,9 @@
 Feature: Standalone WebGPU camera with Leaflet as its only dependency
   @unit
+  Scenario: Camera projection allocates only its independent result point
+    Then camera projection preserves its formulas without intermediate point instances
+
+  @unit
   Scenario: Camera scratch buffers do not alias retained results
     Then camera scratch buffers preserve independent results and matrix transforms
 

@@ -1,4 +1,5 @@
 import { cameraByMap } from '../globals/cameraByMap.js';
+import { sunByMap } from '../globals/sunByMap.js';
 
 
 import { render } from './render.js';
@@ -6,6 +7,7 @@ import { updateSky } from './updateSky.js';
 
 export function removeSun(state) {
   const { map, timer, sunDisc, moonDisc } = state;
+  const shared = sunByMap.get(map);
   clearInterval(timer);
   delete cameraByMap.get(map)._timeControl;
   map.fire('simulationtimechange', /* alloc */ { time: null, live: false });
@@ -15,4 +17,5 @@ export function removeSun(state) {
   updateSky(state);
   sunDisc.remove(); moonDisc.remove();
   render(map);
+  if (shared === state) shared.control = null;
 }
