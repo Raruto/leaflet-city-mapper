@@ -97,3 +97,29 @@ Feature: Performance-oriented source style
   @unit
   Scenario: Source directories have only one level below src
     Then source directories are direct children of src
+
+  @unit
+  Scenario: Loop declarations are rejected while predeclared local variables are allowed
+    Then loop declaration checks handle these modules:
+      | source                                                                                  | violations |
+      | function f() { const value = 1; return value; }                                           | 0          |
+      | function f() { let i, value; for (i = 0; i < 2; i++) { value = i; } }                       | 0          |
+      | function f() { let value; for (value of values) {} }                                      | 0          |
+      | function f() { let key; for (key in values) {} }                                          | 0          |
+      | function f() { let a, b; while (ready) { [a, b] = values; } }                              | 0          |
+      | function f() { for (let i = 0; i < 2; i++) {} }                                           | 1          |
+      | function f() { for (const value of values) {} }                                          | 1          |
+      | function f() { for (var key in values) {} }                                              | 1          |
+      | async function f() { for await (const value of values) {} }                              | 1          |
+      | async function f() { let value; for await (value of values) {} }                         | 0          |
+      | function f() { while (ready) { const value = 1; } }                                      | 1          |
+      | function f() { do { let value; } while (ready); }                                        | 1          |
+      | function f() { for (;;) { if (ready) { var value = 1; } break; } }                        | 1          |
+      | function f() { while (ready) { const { a, b } = values; } }                              | 1          |
+      | function f() { while (ready) { for (let i = 0; i < 2; i++) { let value; } } }             | 2          |
+      | function f() { let i; for (i = 0; i < 2; i++) {} const value = 1; }                       | 0          |
+      | function f() { return 'while (ready) { let value; }'; /* for (let i = 0;;) {} */ }        | 0          |
+
+  @unit
+  Scenario: Source loops contain no variable declarations
+    Then source loops declare no variables in their headers or bodies

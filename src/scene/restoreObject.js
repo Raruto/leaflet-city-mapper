@@ -5,7 +5,7 @@ export function restoreObject(backend, shared, object) {
     const geometry = object.geometry;
     const material = object.program._layerMaterial;
     const attributes = {};
-    for (const name of ['position', 'normal', 'color', 'uv', 'index']) {
+    for (const name of ['position', 'normal', 'color', 'uv', 'index', 'instanceOffset']) {
       const attribute = geometry.attributes[name];
       if (!attribute) continue;
       const { data, size, count, normalized } = attribute;

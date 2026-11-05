@@ -25,6 +25,13 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   values[16] = 1;
   device.queue.writeBuffer(sun.buffer, 0, values);
   ensureShadowPipeline(device, sun);
+  let mesh;
+  for (mesh of meshes) {
+    if (mesh.geometry.attributes.instanceOffset) {
+      ensureShadowPipeline(device, sun, true);
+      break;
+    }
+  }
   drawShadowMeshes(backend, encoder, meshes);
   const snapshots = new Map();
   for (const mesh of meshes) {

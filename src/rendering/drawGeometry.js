@@ -110,6 +110,8 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   pass.setVertexBuffer(1, geometry.attributes.normal.buffer);
   if (geometry.attributes.color) pass.setVertexBuffer(2, geometry.attributes.color.buffer);
   if (geometry.attributes.uv) pass.setVertexBuffer(3, geometry.attributes.uv.buffer);
+  const instances = geometry.attributes.instanceOffset;
+  if (instances) pass.setVertexBuffer(4, instances.buffer);
   for (const attribute of Object.values(geometry.attributes)) {
     if (!attribute.needsUpdate) continue;
     device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
@@ -119,8 +121,8 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   const index = geometry.attributes.index;
   if (index) {
     pass.setIndexBuffer(index.buffer, index.indexFormat);
-    pass.drawIndexed(geometry.drawRange.count, 1, geometry.drawRange.start, 0, 0);
+    pass.drawIndexed(geometry.drawRange.count, instances?.count ?? 1, geometry.drawRange.start, 0, 0);
   } else {
-    pass.draw(geometry.drawRange.count, 1, geometry.drawRange.start, 0);
+    pass.draw(geometry.drawRange.count, instances?.count ?? 1, geometry.drawRange.start, 0);
   }
 }

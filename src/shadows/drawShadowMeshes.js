@@ -7,9 +7,16 @@ export function drawShadowMeshes(backend, encoder, meshes) {
       depthLoadOp: 'clear', depthStoreOp: 'store'
     },
   });
-  pass.setPipeline(sun.pipeline);
+  let pipeline = sun.pipeline;
+  pass.setPipeline(pipeline);
   pass.setBindGroup(1, sun.depthBindGroup);
   for (const mesh of meshes) {
+    const instances = mesh.geometry.attributes.instanceOffset;
+    const nextPipeline = instances ? sun.instancePipeline : sun.pipeline;
+    if (nextPipeline !== pipeline) {
+      pipeline = nextPipeline;
+      pass.setPipeline(pipeline);
+    }
     const offset = renderer.uniformSlot++ * 256;
     renderer.uniformData.set(mesh.worldMatrix, offset / 4);
     renderer.uniformData[offset / 4 + 35] = mesh._appearance ?? 1;
@@ -29,11 +36,12 @@ export function drawShadowMeshes(backend, encoder, meshes) {
     }
     pass.setBindGroup(0, mesh._shadowBindGroup, [offset]);
     pass.setVertexBuffer(0, mesh.geometry.attributes.position.buffer);
+    if (instances) pass.setVertexBuffer(1, instances.buffer);
     const index = mesh.geometry.attributes.index, range = mesh.geometry.drawRange;
     if (index) {
       pass.setIndexBuffer(index.buffer, index.indexFormat);
-      pass.drawIndexed(range.count, 1, range.start, 0, 0);
-    } else pass.draw(range.count, 1, range.start, 0);
+      pass.drawIndexed(range.count, instances?.count ?? 1, range.start, 0, 0);
+    } else pass.draw(range.count, instances?.count ?? 1, range.start, 0);
   }
   pass.end();
 }

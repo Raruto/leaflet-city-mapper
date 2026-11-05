@@ -25,3 +25,11 @@ Feature: Decomposed rendering and source stages
 
   Scenario: Frame optimizations reuse buffers and preserve transforms
     Then frame optimizations preserve buffer isolation, directions and winding
+
+  @unit
+  Scenario: Repeated source geometry compacts without precision or style changes
+    Then source instancing preserves vertex data and falls back for incompatible features
+
+  @coverage
+  Scenario: Instanced sources retain pixels, shadows, picking and GPU restoration
+    Then instanced sources preserve rendered pixels, shadows, picking and resource lifetime

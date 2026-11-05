@@ -6,10 +6,24 @@ export function computeBounds(geometry) {
     min[i % 3] = Math.min(min[i % 3], data[i]);
     max[i % 3] = Math.max(max[i % 3], data[i]);
   }
+  const instances = geometry.attributes.instanceOffset;
+  if (instances) {
+    let axis, offset, low, high;
+    for (axis = 0; axis < 3; axis++) {
+      low = Infinity;
+      high = -Infinity;
+      for (offset = axis; offset < instances.data.length; offset += instances.size) {
+        low = Math.min(low, instances.data[offset]);
+        high = Math.max(high, instances.data[offset]);
+      }
+      min[axis] = Math.fround(min[axis] + low);
+      max[axis] = Math.fround(max[axis] + high);
+    }
+  }
   const center = [];
   for (let i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
-  let radius = 0;
-  for (let i = 0; i < data.length; i += 3) {
+  let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : 0;
+  for (let i = 0; !instances && i < data.length; i += 3) {
     radius = Math.max(radius, Math.hypot(
       data[i] - center[0], data[i + 1] - center[1], data[i + 2] - center[2]
     ));

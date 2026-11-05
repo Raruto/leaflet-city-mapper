@@ -6,6 +6,7 @@ import { parse } from 'acorn';
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 const ITERATORS = new Set(['forEach', 'map', 'filter', 'reduce', 'reduceRight', 'some', 'every', 'find', 'findIndex', 'findLast', 'findLastIndex', 'flatMap']);
+const LOOPS = new Set(['ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'DoWhileStatement']);
 
 function lineOf(source, offset) {
   let line = 1;
@@ -229,4 +230,39 @@ Then('source directories are direct children of src', async function () {
     }
   }
   assert.deepEqual(errors, []);
+});
+
+function inspectLoopDeclarations(node, insideLoop, file, errors) {
+  if (!node || typeof node.type !== 'string') return;
+  insideLoop ||= LOOPS.has(node.type);
+  if (insideLoop && node.type === 'VariableDeclaration') {
+    errors.push(`${file}:${node.loc.start.line} loop ${node.kind} declaration; declare before the loop and assign inside it`);
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) inspectLoopDeclarations(child, insideLoop, file, errors);
+    } else if (value && typeof value.type === 'string') {
+      inspectLoopDeclarations(value, insideLoop, file, errors);
+    }
+  }
+}
+
+Then('loop declaration checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    const errors = [];
+    inspectLoopDeclarations(parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true }),
+      false, 'example.js', errors);
+    assert.equal(errors.length, Number(violations), source);
+  }
+});
+
+Then('source loops declare no variables in their headers or bodies', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    inspectLoopDeclarations(parse(await readFile(file, 'utf8'),
+      { ecmaVersion: 'latest', sourceType: 'module', locations: true }), false, file, errors);
+  }
+  assert.equal(errors.length, 0, `${errors.length} declarations inside source loops:\n${errors.join('\n')}`);
 });

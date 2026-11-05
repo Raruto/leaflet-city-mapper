@@ -34,6 +34,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
     struct VertexInput {
       @location(0) position: vec3<f32>,
       @location(1) normal: vec3<f32>,
+      ${material.instanced ? '@location(4) instanceOffset: vec4<f32>,' : ''}
       ${material.vertexColors ? '@location(2) color: vec3<f32>,' : ''}
       ${textured ? '@location(3) uv: vec2<f32>,' : ''}
     };
@@ -50,9 +51,10 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
     };
     @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
       var output: VertexOutput;
-      var position = input.position;
+      var position = input.position${material.instanced ? ' + input.instanceOffset.xyz' : ''};
       ${hasTerrain ? 'position.y = elevation(u.terrain.xy + input.uv * u.terrain.z, u.terrain.w) - u.terrain.w;' : ''}
-      let highlighted = f32(vertexIndex) >= u.highlight.x && f32(vertexIndex) < u.highlight.y;
+      let featureVertex = f32(vertexIndex)${material.instanced ? ' + input.instanceOffset.w' : ''};
+      let highlighted = featureVertex >= u.highlight.x && featureVertex < u.highlight.y;
       output.color = ${material.vertexColors
       ? 'select(input.color, vec3<f32>(72.0 / 255.0, 217.0 / 255.0, 1.0), highlighted)'
       : 'u.baseColor.rgb'};
@@ -64,7 +66,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       let world = u.worldMatrix * vec4<f32>(position, 1.0);
       output.shadowPosition = solar.matrix * world;
       output.worldPosition = world.xyz / world.w;
-      ${sparkle ? 'output.localPosition = input.position;' : ''}
+      ${sparkle ? `output.localPosition = input.position${material.instanced ? ' + input.instanceOffset.xyz' : ''};` : ''}
       let viewPosition = frame.viewMatrix * world;
       output.viewPosition = viewPosition.xyz;
       ${textured ? 'output.uv = input.uv;' : ''}

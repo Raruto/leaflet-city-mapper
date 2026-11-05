@@ -21,6 +21,10 @@ export function createProgram(backend, material = {}) {
     material.vertexColors ? { arrayStride: 12, attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x3' }] } : null,
     shaders.textured ? { arrayStride: 8, attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x2' }] } : null,
   ];
+  if (material.instanced) vertexBuffers.push({
+    arrayStride: 16, stepMode: 'instance',
+    attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }],
+  });
   const bindGroupEntries = [{
     binding: 0,
     visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,

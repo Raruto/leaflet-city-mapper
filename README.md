@@ -121,5 +121,71 @@ src/
   utils/             Shared colour and numeric helpers
 ```
 
+### Optimization techniques
+
+#### Rendering and GPU
+
+| Technique | Implementation and scope |
+| --- | --- |
+| Shared renderer | Layers on the same map share a WebGPU device, canvas, scene and camera ([attachment](src/scene/attach.js)). |
+| On-demand frames | Updates are coalesced through `requestAnimationFrame`; static scenes do not continuously redraw. Animation and fading request subsequent frames ([scheduling](src/scene/update.js), [rendering](src/rendering/render.js)). |
+| CPU frustum culling | World-space bounding spheres exclude off-screen meshes from the main pass. Loaded off-screen geometry can still cast shadows ([collection](src/rendering/collectMeshes.js)). |
+| Depth-aware draw ordering | Ground tiles retain their layer/LOD ordering; opaque geometry is sorted front-to-back and transparent geometry back-to-front, subject to explicit render order ([sorting](src/rendering/compareMeshes.js)). |
+| Batched source geometry | Features in a source block share vertex buffers and a mesh instead of one draw per feature ([source meshes](src/sources/attachAreaMesh.js)). |
+| Conservative GPU instancing | Blocks whose features have identical geometry, normals and colors up to translation retain one template and a per-instance offset. Every reconstructed position must match the original `float32` value exactly; incompatible blocks and night-light sources keep the original batch. Main and shadow passes use instanced draws; feature picking and highlighting retain their ranges ([compaction](src/sources/instanceAreaGeometry.js)). |
+| Reusable frame storage | Mesh lists, frustum planes and their lengths are reused per renderer, not as shared global scratch ([frame](src/rendering/render.js), [frustum](src/rendering/collectFrameMeshes.js)). |
+| Direct direction transforms | Light and sky directions are multiplied by the camera view matrix without temporary `DOMPoint`/`DOMMatrix` objects ([uniforms](src/rendering/prepareFrameUniforms.js)). |
+| Batched uniform upload | Camera and mesh uniforms use one growing buffer, dynamic offsets and one upload for the main/shadow frame ([uniform preparation](src/rendering/prepareFrameUniforms.js), [submission](src/rendering/render.js)). |
+| Cached transforms and winding | Scene transforms update when local or parent state changes; front-face orientation is cached against the world-matrix version ([transforms](src/scene/updateWorldMatrix.js), [drawing](src/rendering/drawSceneMeshes.js)). |
+| Cached pipelines, bindings and uploads | Render pipelines are cached by culling, winding and depth mode. Bind groups are reused until buffers/textures change; images and vertex data upload only when changed ([geometry drawing](src/rendering/drawGeometry.js)). |
+| Cached directional shadows | Shadow maps are redrawn when light direction, mesh transforms, geometry, draw ranges or appearance change. Resolution is capped at 2048 and device limits ([shadows](src/shadows/renderSunlight.js)). |
+| Cached bounds and roof coverage | Local geometry bounds and versioned world-space shadow bounds avoid repeated scans. Roof coverage is checked again when the raster signature changes ([bounds](src/geometry/computeBounds.js), [shadow bounds](src/shadows/shadowBounds.js), [roof visibility](src/rendering/prepareFrameMeshes.js)). |
+| GPU roof atlas | Raster tiles are composited on the GPU; unchanged images are not reuploaded. Atlas signatures avoid redundant work, with a 50 ms rebuild throttle while tiles load ([atlas update](src/rendering/updateRoofRaster.js), [composition](src/rendering/composeRoofAtlas.js)). |
+| Spatial light grids | Shaders query spatially grouped lights. Static and moving grids are cached separately; only changed grids are uploaded ([light updates](src/lighting/updatePointLights.js)). |
+| GPU terrain sampling | Terrain materials sample elevation in the vertex shader. Model terrain conformation still runs on the CPU ([materials](src/shaders/materialShaders.js), [model conformation](src/geometry/conformModelToTerrain.js)). |
+| GPU traffic placement | A compute shader updates vehicle geometry from lane and time data; CPU geometry is refreshed lazily for picking ([movement](src/traffic/moveTraffic.js), [picking preparation](src/traffic/placeTraffic.js)). |
+
+Instancing currently compacts geometry **after CPU generation**. It reduces
+retained vertex data and GPU uploads, but does not remove source-generation work
+or reduce draw calls below the existing one-batch-per-block path. Exact precision
+checks can intentionally decline instancing, including for differently styled trees.
+
+#### Loading, interaction and resource use
+
+| Technique | Implementation and scope |
+| --- | --- |
+| Bounded, prioritized source work | Nearest blocks load first, with four shared build slots and at most two per source layer. Feature processing yields after a 4 ms budget; superseded requests are cancelled ([queue](src/sources/pump.js), [building](src/sources/buildArea.js)). |
+| Bounded raster coverage | Raster loading respects archive bounds, native zoom and a capped tile radius. Parent tiles cover pending detailed tiles; obsolete tiles are pruned ([tile selection](src/raster/updateRasterTiles.js)). |
+| Partial archive reads and caching | PMTiles uses HTTP byte ranges, cached directory promises shared by concurrent reads, a bounded directory cache and binary search ([reads](src/archives/read.js), [lookup](src/archives/getZxy.js)). |
+| Picking broad phase | A local bounding-box test rejects meshes before triangle intersection. Feature metadata uses sorted face ranges and binary search ([intersection](src/collision/intersectMeshes.js), [feature lookup](src/picking/findFeature.js)). |
+| Shader highlighting | Selection changes a uniform vertex range without rewriting vertex colors ([highlight](src/picking/setHighlight.js)). |
+| Explicit GPU cleanup | Removed source buffers are destroyed; replaced textures/buffers can be retired after submitted GPU work completes. Retained CPU attribute data supports rebuilding resources on another device ([release](src/sources/releaseArea.js), [deferred destruction](src/rendering/destroyTexture.js), [restoration](src/scene/restoreObject.js)). |
+
+These are implementation techniques, not guaranteed FPS improvements. Measure CPU
+and GPU frame time, slow frames, allocations and memory on representative scenes.
+GPU frustum culling, indirect draws, GPU light-grid construction and GPU model
+conformation are **not implemented**.
+
+#### Source-style checks
+
+Structural tests prohibit arrows, nested functions and callback array iteration,
+allow at most one function and export per file, require exported module-level
+constants/state in their dedicated folders, and keep source directories flat.
+These organizational constraints are not performance measurements.
+
+The loop check rejects `const`, `let` and `var` declarations in both loop headers
+and bodies, including nested blocks and destructuring. Declare local variables
+before the loop and assign them inside; global state is **not** required:
+
+```js
+let i, value;
+for (i = 0; i < values.length; i++) {
+  value = values[i];
+}
+```
+
+The loop rule currently reports existing source violations; adding the check does
+not migrate all loops automatically.
+
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--alpha.1-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)

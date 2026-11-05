@@ -3,6 +3,7 @@ import { createProgram } from '../rendering/createProgram.js';
 import { cityMapper } from '../constants/cityMapper.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
+import { instanceAreaGeometry } from './instanceAreaGeometry.js';
 
 export function attachAreaMesh(context) {
   const { backend, area } = context;
@@ -11,11 +12,13 @@ export function attachAreaMesh(context) {
     return;
   }
   const device = backend.renderer.device;
+  const data = instanceAreaGeometry(context);
   const attributes = {
-    position: { size: 3, data: new Float32Array(context.positions) },
-    normal: { size: 3, data: new Float32Array(context.normals) },
-    color: { size: 3, data: new Float32Array(context.colors) },
+    position: { size: 3, data: new Float32Array(data.positions) },
+    normal: { size: 3, data: new Float32Array(data.normals) },
+    color: { size: 3, data: new Float32Array(data.colors) },
   };
+  if (data.instanceOffsets) attributes.instanceOffset = { size: 4, data: data.instanceOffsets };
   if (backend.options.nightLight) attributes.uv = { size: 2, data: new Float32Array(context.uvs) };
   for (const [name, attribute] of Object.entries(attributes)) {
     attribute.count = attribute.data.length / attribute.size;
@@ -36,6 +39,7 @@ export function attachAreaMesh(context) {
       device,
       geometry: meshGeometry,
       program: createProgram(backend, {
+        instanced: Boolean(data.instanceOffsets),
         vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
         ...(backend.options.nightLight ? { nightLight: true, alphaMode: 'BLEND', doubleSided: true } : {}),
       }),
