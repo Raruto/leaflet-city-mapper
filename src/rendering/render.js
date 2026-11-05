@@ -49,7 +49,7 @@ export function render(backend) {
   const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes;
   const renderer = sceneByLayer.get(backend).renderer;
   const rasters = updateRoofRaster(backend, now);
-  const meshes = renderer.frameMeshes ||= /* allocation: required -- Each renderer retains its final sorted mesh list between frames. */ [];
+  const meshes = renderer.frameMeshes ||= /* alloc */ [];
   meshes.length = 0;
   let appearing = prepareFrameMeshes(backend, rasters, now, meshes);
   const encoder = renderer.device.createCommandEncoder();

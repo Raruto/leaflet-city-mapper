@@ -6,8 +6,8 @@ export function nativeImageError(event) {
   if (!states) return;
   let state;
   for (state of states) {
-    state.source.fire('error', /* allocation: required -- Each layer receives independent error event data. */ {
-      error: /* allocation: required -- Capture the image-load failure stack for this layer. */ new Error('Unable to load native layer image'),
+    state.source.fire('error', /* alloc */ {
+      error: /* alloc */ new Error('Unable to load native layer image'),
     });
   }
 }

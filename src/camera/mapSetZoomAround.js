@@ -11,5 +11,5 @@ export function mapSetZoomAround(latlng, zoom, options) {
   const screen = latlng instanceof L.Point ? latlng : this.latLngToContainerPoint(latlng);
   const center = this.containerPointToLayerPoint(half), anchor = this.containerPointToLayerPoint(screen);
   const next = center.add(anchor.subtract(center).multiplyBy(1 - 1 / scale));
-  return this.setView(this.layerPointToLatLng(next), zoom, /* allocation: required -- Native view transitions retain their zoom options independently. */ { zoom: options });
+  return this.setView(this.layerPointToLatLng(next), zoom, /* alloc */ { zoom: options });
 }

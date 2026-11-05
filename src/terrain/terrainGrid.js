@@ -2,10 +2,10 @@
 
 export function terrainGrid(divisions) {
   const vertices = (divisions + 1) ** 2;
-  const positions = /* allocation: required -- Returned grid owns its position upload buffer. */ new Float32Array(vertices * 3);
-  const normals = /* allocation: required -- Returned grid owns its normal upload buffer. */ new Float32Array(vertices * 3);
-  const uvs = /* allocation: required -- Returned grid owns its texture-coordinate upload buffer. */ new Float32Array(vertices * 2);
-  const indices = /* allocation: required -- Returned grid owns its index upload buffer. */ new Uint16Array(divisions * divisions * 6);
+  const positions = /* alloc */ new Float32Array(vertices * 3);
+  const normals = /* alloc */ new Float32Array(vertices * 3);
+  const uvs = /* alloc */ new Float32Array(vertices * 2);
+  const indices = /* alloc */ new Uint16Array(divisions * divisions * 6);
   let row, column, a, b, c, d, vertex = 0, index = 0;
   for (row = 0; row <= divisions; row++) {
     for (column = 0; column <= divisions; column++) {
@@ -23,10 +23,10 @@ export function terrainGrid(divisions) {
       }
     }
   }
-  return /* allocation: required -- Each cached terrain grid owns its attribute table. */ {
-    position: /* allocation: required -- Position metadata retains this grid's GPU buffer. */ { size: 3, data: positions },
-    normal: /* allocation: required -- Normal metadata retains this grid's GPU buffer. */ { size: 3, data: normals },
-    uv: /* allocation: required -- UV metadata retains this grid's GPU buffer. */ { size: 2, data: uvs },
-    index: /* allocation: required -- Index metadata retains this grid's GPU buffer. */ { data: indices },
+  return /* alloc */ {
+    position: /* alloc */ { size: 3, data: positions },
+    normal: /* alloc */ { size: 3, data: normals },
+    uv: /* alloc */ { size: 2, data: uvs },
+    index: /* alloc */ { data: indices },
   };
 }

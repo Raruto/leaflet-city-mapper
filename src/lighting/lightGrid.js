@@ -18,16 +18,16 @@ export function lightGrid(packed, maxBytes) {
     const columns = Math.ceil((maxX - minX) / cellSize) + 1,
              rows = Math.ceil((maxZ - minZ) / cellSize) + 1;
     // Counting sort: count the lights of each cell, then fill each cell's slice.
-    const counts = /* allocation: required -- Cell counts belong to this independently sized grid construction. */ new Uint32Array(columns * rows),
-            next = /* allocation: required -- Cell write cursors must remain separate from counts during this grid construction. */ new Uint32Array(columns * rows);
+    const counts = /* alloc */ new Uint32Array(columns * rows),
+            next = /* alloc */ new Uint32Array(columns * rows);
     visitCells(packed, minX, minZ, cellSize, columns, counts);
     let entries = 0;
     for (value of counts) entries += value;
     const length = (2 + columns * rows + entries * 2) * 4;
     if (length * 4 > maxBytes) {
-      throw /* allocation: required -- Storage errors retain the failing grid construction stack. */ new Error('Streetlight grid exceeds GPU storage limit');
+      throw /* alloc */ new Error('Streetlight grid exceeds GPU storage limit');
     }
-    data = /* allocation: required -- Each retained grid owns its packed shader storage data. */ new Float32Array(length);
+    data = /* alloc */ new Float32Array(length);
     data[0] = minX; data[1] = minZ; data[2] = cellSize;
     data[3] = columns; data[4] = rows; data[5] = count;
     let offset = 2 + columns * rows;
@@ -37,7 +37,7 @@ export function lightGrid(packed, maxBytes) {
       offset += counts[key] * 2;
     }
     visitCells(packed, minX, minZ, cellSize, columns, next, data);
-  } else data = /* allocation: required -- Empty grids retain their own mutable upload header. */ new Float32Array(8);
+  } else data = /* alloc */ new Float32Array(8);
 
-  return /* allocation: required -- The caller retains an independent grid data and count bundle. */ { data, count };
+  return /* alloc */ { data, count };
 }

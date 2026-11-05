@@ -6,7 +6,7 @@ import { mapGetBearing } from './mapGetBearing.js';
 
 import { pointOf } from './pointOf.js';
 
-export function mapPanInside(latlng, options = /* allocation: required -- Native pan/view methods mutate and retain options across callbacks. */ {}) {
+export function mapPanInside(latlng, options = /* alloc */ {}) {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.panInside.call(this, latlng, options);
   const min = pointOf(options.paddingTopLeft || options.padding || cameraZeroPadding);
   const max = this.getSize().subtract(pointOf(options.paddingBottomRight || options.padding || cameraZeroPadding));

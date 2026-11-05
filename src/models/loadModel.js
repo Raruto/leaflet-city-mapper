@@ -17,35 +17,35 @@ import { modelNode } from './modelNode.js';
 
 export async function loadModel(backend) {
   await sceneByLayer.get(backend)._added.promise;
-  const url = /* allocation: required -- URL resolution belongs to this concurrent model load. */ new URL(sceneByLayer.get(backend).modelUrl, document.baseURI).href;
+  const url = /* alloc */ new URL(sceneByLayer.get(backend).modelUrl, document.baseURI).href;
   const response = await fetch(url);
   if (!response.ok) {
-    throw /* allocation: required -- Failed requests retain their own HTTP error and stack. */ new Error(`Unable to load model: HTTP ${response.status}`);
+    throw /* alloc */ new Error(`Unable to load model: HTTP ${response.status}`);
   }
   const data = await response.arrayBuffer();
   const description = decodeModel(data);
-  const directory = /* allocation: required -- This model load resolves relative resources against its own directory. */ new URL('.', url).href;
-  const bufferRequests = /* allocation: required -- Concurrent model loads retain independent buffer request groups across awaits. */ [];
+  const directory = /* alloc */ new URL('.', url).href;
+  const bufferRequests = /* alloc */ [];
   let buffer, image, material, index, resource, attribute, node;
   for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
   await Promise.all(bufferRequests);
   await sceneByLayer.get(backend)._added.promise;
-  const imageRequests = /* allocation: required -- Concurrent model loads retain independent image request groups across awaits. */ [];
+  const imageRequests = /* alloc */ [];
   for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
   const images = await Promise.all(imageRequests);
   await sceneByLayer.get(cameraByMap.get(backend._map)?._terrain3D)?._terrainPromise;
-  const context = /* allocation: required -- Recursive model conversion needs a load-owned resource and cycle-tracking context. */ {
+  const context = /* alloc */ {
     backend, description, images,
-    textures: /* allocation: required -- Texture caching is scoped to this model and its GPU device. */ new Map(),
-    materials: /* allocation: required -- Each model retains its converted material styles. */ [],
-    active: /* allocation: required -- Cycle detection belongs to this recursive model traversal. */ new Set(),
-    resources: /* allocation: required -- Failed model conversion destroys only resources allocated by this load. */ [],
+    textures: /* alloc */ new Map(),
+    materials: /* alloc */ [],
+    active: /* alloc */ new Set(),
+    resources: /* alloc */ [],
   };
   // Convert glTF materials directly to the shader's retained CPU styles.
   for (material of description.materials || geometryEmpty) context.materials.push(materialFor(context, material));
   const scene = description.scenes?.[description.scene || 0];
-  if (!scene) throw /* allocation: required -- Validation errors retain their own model-specific stack. */ new Error('Missing glTF scene');
-  const nodes = /* allocation: required -- This model load retains root nodes until all conversion succeeds. */ [];
+  if (!scene) throw /* alloc */ new Error('Missing glTF scene');
+  const nodes = /* alloc */ [];
   try {
     for (index of scene.nodes) nodes.push(modelNode(context, index));
   } catch (error) {
@@ -59,12 +59,12 @@ export async function loadModel(backend) {
     }
     throw error;
   }
-  const model = /* allocation: required -- The backend retains this independently attachable model root. */ {
+  const model = /* alloc */ {
     ...emptyNode(),
     id: url,
-    extras: description.extras || /* allocation: required -- Model metadata remains independently editable per root. */ {},
+    extras: description.extras || /* alloc */ {},
   };
-  if (!nodes.length) throw /* allocation: required -- Validation errors retain their own model-specific stack. */ new Error('Expected a glTF model with a non-empty scene');
+  if (!nodes.length) throw /* alloc */ new Error('Expected a glTF model with a non-empty scene');
   for (node of nodes) setParent(node, model);
   sceneByLayer.get(backend).model = model;
   if (backend.options.rotation) {

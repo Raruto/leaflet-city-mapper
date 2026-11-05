@@ -16,10 +16,10 @@ export function addBridges(backend, geojson) {
   const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
   const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
   const base = sceneByLayer.get(backend).root.position[1];
-  const position = /* allocation: required -- The bridge mesh retains its own position buffer. */ [];
-  const normal = /* allocation: required -- The bridge mesh retains its own normal buffer. */ [];
-  const color = /* allocation: required -- The bridge mesh retains its own color buffer. */ [];
-  sceneByLayer.get(backend)._bridges = /* allocation: required -- Each backend retains an independent terrain bridge index. */ new Map();
+  const position = /* alloc */ [];
+  const normal = /* alloc */ [];
+  const color = /* alloc */ [];
+  sceneByLayer.get(backend)._bridges = /* alloc */ new Map();
   let geometry, polygons, polygon, rings, ring, path, pixels, points, lng, lat, z, p, coordinate;
   let triangles, paths, start, i, contour, holes, bridgeTriangles, minX, minY, maxX, maxY, t, triangle, bridge, x, y;
   let key, a, b, c, pa, pb, pc, start2, q, length, nx, nz, corner, k, bucket, polygonIndex;
@@ -28,36 +28,36 @@ export function addBridges(backend, geojson) {
     polygons = geometry.coordinates;
     for (polygonIndex = 0; polygonIndex < (geometry.type === 'Polygon' ? 1 : polygons.length); polygonIndex++) {
       polygon = geometry.type === 'Polygon' ? polygons : polygons[polygonIndex];
-      rings = /* allocation: required -- Polygon ring topology stays private across reentrant projection callbacks. */ [];
+      rings = /* alloc */ [];
       for (ring of polygon) {
         path = ring.slice(0, -1);
         if (path.length >= 3) rings.push(path);
       }
       if (!rings.length) continue;
-      pixels = /* allocation: required -- Pixel vertices are retained by this bridge terrain index. */ [];
-      points = /* allocation: required -- World vertices stay private across reentrant projection callbacks. */ [];
+      pixels = /* alloc */ [];
+      points = /* alloc */ [];
       for (ring of rings) for ([lng, lat, z] of ring) {
-        p = map.project(/* allocation: required -- Projection receives an independent coordinate pair it may retain. */ [lat, lng], zoom);
-        pixels.push(/* allocation: required -- Bridge triangles retain each independent pixel vertex and height. */ [p.x, p.y, z]);
+        p = map.project(/* alloc */ [lat, lng], zoom);
+        pixels.push(/* alloc */ [p.x, p.y, z]);
       }
       for (ring of rings) for (coordinate of ring) points.push(local(coordinate, crs, origin, metres, base));
       triangles = void 0;
       try {
-        paths = /* allocation: required -- Triangulation paths belong to this polygon conversion. */ [];
+        paths = /* alloc */ [];
         start = 0;
         for (ring of rings) {
-          path = /* allocation: required -- Each polygon ring needs independently ordered triangulation vertices. */ [];
-          for (i = 0; i < ring.length; i++) path.push(/* allocation: required -- A triangulation path retains each pixel coordinate separately. */ { x: pixels[start + i][0], y: pixels[start + i][1] });
+          path = /* alloc */ [];
+          for (i = 0; i < ring.length; i++) path.push(/* alloc */ { x: pixels[start + i][0], y: pixels[start + i][1] });
           paths.push(path);
           start += ring.length;
         }
         [contour, ...holes] = paths;
         triangles = triangulate(contour, holes);
       } catch { continue; }
-      bridgeTriangles = /* allocation: required -- The terrain bridge index retains this polygon triangle list. */ [];
+      bridgeTriangles = /* alloc */ [];
       minX = minY = Infinity; maxX = maxY = -Infinity;
       for (t of triangles) {
-        triangle = /* allocation: required -- The terrain index retains each triangle as an independent vertex list. */ [];
+        triangle = /* alloc */ [];
         for (i of t) triangle.push(pixels[i]);
         bridgeTriangles.push(triangle);
       }
@@ -65,16 +65,16 @@ export function addBridges(backend, geojson) {
         minX = Math.min(minX, p[0]); minY = Math.min(minY, p[1]);
         maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]);
       }
-      bridge = /* allocation: required -- Spatial buckets retain this polygon bridge record. */ {
+      bridge = /* alloc */ {
         triangles: bridgeTriangles,
-        min: /* allocation: required -- The retained bridge owns its lower pixel bounds. */ [minX, minY],
-        max: /* allocation: required -- The retained bridge owns its upper pixel bounds. */ [maxX, maxY],
+        min: /* alloc */ [minX, minY],
+        max: /* alloc */ [maxX, maxY],
       };
       for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
         for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
           key = `${x}/${y}`;
           bucket = sceneByLayer.get(backend)._bridges.get(key);
-          if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* allocation: required -- This spatial cell retains its own bridge references. */ []);
+          if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* alloc */ []);
           bucket.push(bridge);
         }
       }
@@ -106,6 +106,6 @@ export function addBridges(backend, geojson) {
     }
   }
   if (position.length) {
-    sceneByLayer.get(backend)._bridgeMesh = createMesh(backend, /* allocation: required -- Mesh construction receives the bridge-owned attribute buffers. */ { position, normal, color });
+    sceneByLayer.get(backend)._bridgeMesh = createMesh(backend, /* alloc */ { position, normal, color });
   }
 }

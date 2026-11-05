@@ -55,9 +55,9 @@ export function onAddSun(control, map) {
   note.style.color = '#555';
   note.textContent = 'Indicative · loaded geometry only. Streetlight illumination is estimated, not measured lux.';
   container.append(date, slider, timeRow, status, note);
-  const state = /* allocation: required -- Each control owns its lifecycle and event state. */ {
+  const state = /* alloc */ {
     control, map, originalSky, sunDisc, moonDisc, date, slider, output, status,
-    projection: /* allocation: required -- Each control reuses its own camera projection buffer. */ { left: 0, top: 0 },
+    projection: /* alloc */ { left: 0, top: 0 },
   };
   state.update = updateSun.bind(null, state);
   state.updateSky = updateSky.bind(null, state);

@@ -2,12 +2,12 @@ import { halfRadians } from '../globals/halfRadians.js';
 /** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 
 export function updateCamera(camera) {
-  camera.x ||= /* allocation: required -- Keep a right-axis scratch buffer with this camera. */ [0, 0, 0];
-  camera.y ||= /* allocation: required -- Keep an up-axis scratch buffer with this camera. */ [0, 0, 0];
-  camera.z ||= /* allocation: required -- Keep a forward-axis scratch buffer with this camera. */ [0, 0, 0];
-  camera.viewTransform ||= /* allocation: required -- Keep an invertible transform matrix with this camera. */ new DOMMatrix();
-  camera.projectionTransform ||= /* allocation: required -- Keep a projection matrix with this camera. */ new DOMMatrix();
-  camera.projectionViewTransform ||= /* allocation: required -- Keep a combined matrix with this camera. */ new DOMMatrix();
+  camera.x ||= /* alloc */ [0, 0, 0];
+  camera.y ||= /* alloc */ [0, 0, 0];
+  camera.z ||= /* alloc */ [0, 0, 0];
+  camera.viewTransform ||= /* alloc */ new DOMMatrix();
+  camera.projectionTransform ||= /* alloc */ new DOMMatrix();
+  camera.projectionViewTransform ||= /* alloc */ new DOMMatrix();
   const { position, target, up, x, y, z, viewMatrix, projectionMatrix, projectionViewMatrix } = camera;
   let i, value;
   z[0] = position[0] - target[0], z[1] = position[1] - target[1], z[2] = position[2] - target[2];
@@ -32,7 +32,7 @@ export function updateCamera(camera) {
   viewMatrix[8] = viewTransform.m31, viewMatrix[9] = viewTransform.m32, viewMatrix[10] = viewTransform.m33, viewMatrix[11] = viewTransform.m34;
   viewMatrix[12] = viewTransform.m41, viewMatrix[13] = viewTransform.m42, viewMatrix[14] = viewTransform.m43, viewMatrix[15] = viewTransform.m44;
   for (value of viewMatrix) {
-    if (!Number.isFinite(value)) throw /* allocation: required -- Preserve the failure stack for a singular camera transform. */ new Error('Singular 3D transform');
+    if (!Number.isFinite(value)) throw /* alloc */ new Error('Singular 3D transform');
   }
   const f = 1 / Math.tan(camera.fov * halfRadians), n = camera.near, r = camera.far;
   projectionMatrix[0] = f / camera.aspect, projectionMatrix[1] = 0, projectionMatrix[2] = 0, projectionMatrix[3] = 0;

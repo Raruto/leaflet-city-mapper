@@ -7,7 +7,7 @@
  */
 
 export function setVertexColor(mesh, start, end, color) {
-  const rgb = /* allocation: required -- Color upload scratch stays private across potentially reentrant buffer setters. */ [];
+  const rgb = /* alloc */ [];
   let i;
   for (i = start; i < end; i++) {
     rgb[0] = color.r; rgb[1] = color.g; rgb[2] = color.b;

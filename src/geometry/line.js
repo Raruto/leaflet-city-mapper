@@ -25,8 +25,8 @@ export function line(context, points, closed) {
             incoming = previous.divideBy(previousLength);
             outgoing = b.subtract(a).divideBy(length);
             side = incoming.x * outgoing.y - incoming.y * outgoing.x > 0 ? -1 : 1;
-            n1 = /* allocation: required -- The incoming join normal stays private across reentrant projection callbacks. */ new L.Point(-incoming.y * side, incoming.x * side);
-            n2 = /* allocation: required -- The outgoing join normal stays private across reentrant projection callbacks. */ new L.Point(-outgoing.y * side, outgoing.x * side);
+            n1 = /* alloc */ new L.Point(-incoming.y * side, incoming.x * side);
+            n2 = /* alloc */ new L.Point(-outgoing.y * side, outgoing.x * side);
             from = a.add(n1.multiplyBy(radius)), to = a.add(n2.multiplyBy(radius));
             denominator = 1 + n1.x * n2.x + n1.y * n2.y;
             miter = denominator > 0 ? n1.add(n2).multiplyBy(radius / denominator) : null;

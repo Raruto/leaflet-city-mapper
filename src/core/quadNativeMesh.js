@@ -9,8 +9,8 @@ export function quadNativeMesh(state, key, image, corners, opacity) {
   const texture = textureFor(state, key, image);
   if (!texture) return;
   const indices = coreQuadIndices;
-  const position = /* allocation: required -- The native mesh retains these vertex coordinates. */ [];
-  const uv = /* allocation: required -- The native mesh retains these texture coordinates. */ [];
+  const position = /* alloc */ [];
+  const uv = /* alloc */ [];
   let index;
   for (index of indices) {
     position.push(...corners[index]);

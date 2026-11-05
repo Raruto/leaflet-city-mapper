@@ -4,10 +4,10 @@ import { sortHits } from './sortHits.js';
 /** Nearest triangle hit per mesh, sorted by world-space distance. */
 
 export function intersectMeshes(ray, meshes, night = 0) {
-  const hits = /* allocation: required -- The caller retains its independently sorted picking results. */ [],
-  a = /* allocation: required -- Triangle scratch stays private while mesh accessors can reenter picking. */ [0, 0, 0],
-  b = /* allocation: required -- The second triangle vertex must coexist with the first during reentrant-safe picking. */ [0, 0, 0],
-  c = /* allocation: required -- The third triangle vertex must coexist with the other vertices during reentrant-safe picking. */ [0, 0, 0];
+  const hits = /* alloc */ [],
+  a = /* alloc */ [0, 0, 0],
+  b = /* alloc */ [0, 0, 0],
+  c = /* alloc */ [0, 0, 0];
   let mesh, inverse, inverseValues, value, localOrigin, origin, localDirection, direction;
   let directionLength, near, far, i, a2, b2, position, index, instanceOffset, vertices, closest;
   let faceIndex, vertex, offset, x, y, z, ai, bi, ci, ex, ey, ez, fx, fy, fz, px, py, pz, det;
@@ -15,19 +15,19 @@ export function intersectMeshes(ray, meshes, night = 0) {
   let distance, point, worldPoint;
   for (mesh of meshes) {
     // Test in mesh-local space; compare distances only after returning to shared world space.
-    inverse = /* allocation: required -- Each tested mesh needs its own inverse transform throughout triangle testing. */ new DOMMatrix(mesh.worldMatrix).inverse();
+    inverse = /* alloc */ new DOMMatrix(mesh.worldMatrix).inverse();
     inverseValues = inverse.toFloat64Array();
     for (value of inverseValues) {
-      if (!Number.isFinite(value)) throw /* allocation: required -- Singular transform errors retain the failing picking stack. */ new Error('Singular 3D transform');
+      if (!Number.isFinite(value)) throw /* alloc */ new Error('Singular 3D transform');
     }
-    localOrigin = /* allocation: required -- This ray origin is transformed independently for the current mesh. */ new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
-    origin = /* allocation: required -- The local ray remains private across reentrant mesh access during picking. */ [
+    localOrigin = /* alloc */ new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
+    origin = /* alloc */ [
       localOrigin.x / localOrigin.w,
       localOrigin.y / localOrigin.w,
       localOrigin.z / localOrigin.w
     ];
-    localDirection = /* allocation: required -- This ray direction is transformed independently for the current mesh. */ new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
-    direction = /* allocation: required -- The normalized local direction remains private across reentrant mesh access. */ [
+    localDirection = /* alloc */ new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
+    direction = /* alloc */ [
       localDirection.x,
       localDirection.y,
       localDirection.z
@@ -116,14 +116,14 @@ export function intersectMeshes(ray, meshes, night = 0) {
       }
     }
     if (faceIndex === undefined) continue;
-    point = /* allocation: required -- The selected hit needs an independent world-space transform input. */ new DOMPoint(
+    point = /* alloc */ new DOMPoint(
       direction[0] * closest + origin[0],
       direction[1] * closest + origin[1],
       direction[2] * closest + origin[2],
       1
-    ).matrixTransform(/* allocation: required -- The selected hit is transformed with this mesh world matrix. */ new DOMMatrix(mesh.worldMatrix));
-    worldPoint = /* allocation: required -- Each returned hit retains its own world-space coordinate. */ [point.x / point.w, point.y / point.w, point.z / point.w];
-    hits.push(/* allocation: required -- Each returned hit retains independent object, distance and face metadata. */ {
+    ).matrixTransform(/* alloc */ new DOMMatrix(mesh.worldMatrix));
+    worldPoint = /* alloc */ [point.x / point.w, point.y / point.w, point.z / point.w];
+    hits.push(/* alloc */ {
       faceIndex,
       object: mesh,
       point: worldPoint,

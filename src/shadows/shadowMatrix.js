@@ -9,9 +9,9 @@ import { updateCamera } from '../scene/updateCamera.js';
 export function shadowMatrix(meshes, sunlight) {
   const { min, max } = shadowBounds(meshes, sharedShadowBounds);
   const camera = shadowCamera;
-  camera.viewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created view transform. */ new DOMMatrix();
-  camera.projectionTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created projection transform. */ new DOMMatrix();
-  camera.projectionViewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created combined transform. */ new DOMMatrix();
+  camera.viewTransform ||= /* alloc */ new DOMMatrix();
+  camera.projectionTransform ||= /* alloc */ new DOMMatrix();
+  camera.projectionViewTransform ||= /* alloc */ new DOMMatrix();
   const low = shadowLow, high = shadowHigh;
   let i, axis, x, y, z, value;
   const radius = Math.max(100, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]));
@@ -35,7 +35,7 @@ export function shadowMatrix(meshes, sunlight) {
   }
   const scaleX = 2 / (high[0] - low[0]), scaleY = 2 / (high[1] - low[1]);
   const scaleZ = -1 / (high[2] - low[2]);
-  const matrix = /* allocation: required -- Each caller owns its returned light projection matrix. */ new Float32Array(16);
+  const matrix = /* alloc */ new Float32Array(16);
   for (i = 0; i < 16; i += 4) {
     matrix[i] = view[i] * scaleX;
     matrix[i + 1] = view[i + 1] * scaleY;

@@ -70,12 +70,12 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   data[base + 34] = program.nightSparkle ? data[55] : 0;
   data[base + 35] = mesh.ground ? 1 : mesh._appearance ?? 1;
 
-  const textures = mesh._textures ||= /* allocation: required -- Mesh retains its own texture comparison list between draws. */ [];
+  const textures = mesh._textures ||= /* alloc */ [];
   textures.length = 0;
   let binding, texture, i, attribute;
   for (binding of program.bindings) {
     texture = uniforms[binding.name]?.value;
-    if (!texture) throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error(`Missing Layer3D texture: ${binding.name}`);
+    if (!texture) throw /* alloc */ new Error(`Missing Layer3D texture: ${binding.name}`);
     if (texture.uploaded !== texture.image) {
       device.queue.copyExternalImageToTexture(
         (
@@ -118,7 +118,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
       entries.push(drawTerrainEntry);
     }
     mesh.boundBuffer = renderer.uniformBuffer;
-    const boundTextures = mesh.boundTextures ||= /* allocation: required -- The mesh retains its own bound-texture snapshots between draws. */ [];
+    const boundTextures = mesh.boundTextures ||= /* alloc */ [];
     boundTextures.length = textures.length;
     for (i = 0; i < textures.length; i++) {
       binding = program.bindings[i], texture = textures[i];
@@ -127,7 +127,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
       drawSamplerEntries[i].binding = binding.sampler;
       drawSamplerEntries[i].resource = texture.sampler;
       entries.push(drawTextureEntries[i], drawSamplerEntries[i]);
-      boundTextures[i] ||= /* allocation: required -- Each mesh retains a separate texture-and-sampler comparison tuple for this binding slot. */ [];
+      boundTextures[i] ||= /* alloc */ [];
       boundTextures[i][0] = texture.texture;
       boundTextures[i][1] = texture.sampler;
     }

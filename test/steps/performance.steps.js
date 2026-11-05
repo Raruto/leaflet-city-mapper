@@ -180,9 +180,9 @@ function localAllocationErrors(source, file) {
     ecmaVersion: 'latest', sourceType: 'module', locations: true, onComment: comments,
   });
   for (const comment of comments) {
-    if (!comment.value.trim().startsWith('allocation:')) continue;
-    if (comment.type !== 'Block' || !/^allocation: required -- \S[^\r\n]*\S$/.test(comment.value.trim())) {
-      errors.push(`${file}:${comment.loc.start.line} invalid allocation exception; provide a block comment with a reason`);
+    if (!/^alloc\b/.test(comment.value.trim()) && !comment.value.trim().startsWith('allocation:')) continue;
+    if (comment.type !== 'Block' || comment.value.trim() !== 'alloc') {
+      errors.push(`${file}:${comment.loc.start.line} invalid allocation exception; use /* alloc */`);
       continue;
     }
     const next = source.slice(comment.end).search(/\S/);

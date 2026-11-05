@@ -8,7 +8,7 @@ import { uploadCanvasTexture } from './uploadCanvasTexture.js';
 
 export function textureFor(state, key, image) {
   if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
-    throw /* allocation: required -- Report this unsupported raster input with its own stack. */ new Error('WebGPU native raster layers require image or canvas tiles');
+    throw /* alloc */ new Error('WebGPU native raster layers require image or canvas tiles');
   }
   const { backend, textures, meshes } = state;
   let texture = textures.get(key);
@@ -24,10 +24,10 @@ export function textureFor(state, key, image) {
     const width = image.naturalWidth || image.width, height = image.naturalHeight || image.height;
     if (!width || !height) return;
     const { device } = sceneByLayer.get(backend).renderer;
-    texture = /* allocation: required -- Each cached image owns its GPU texture lifecycle and upload state. */ {
+    texture = /* alloc */ {
       device, image, url, format: 'rgba8unorm', uploaded: null,
-      texture: device.createTexture(/* allocation: required -- The device consumes an independent descriptor for this texture. */ {
-        size: /* allocation: required -- This texture's extent must not alias concurrent upload sizes. */ [width, height], format: 'rgba8unorm',
+      texture: device.createTexture(/* alloc */ {
+        size: /* alloc */ [width, height], format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       }),
       sampler: device.createSampler(coreSampler),
@@ -39,9 +39,9 @@ export function textureFor(state, key, image) {
     } else {
       try {
         device.queue.copyExternalImageToTexture(
-          /* allocation: required -- This upload descriptor references the image belonging to this copy operation. */ { source: image },
-          /* allocation: required -- This upload descriptor references the destination belonging to this copy operation. */ { texture: texture.texture },
-          /* allocation: required -- This copy operation owns its image dimensions across device callbacks. */ [width, height]);
+          /* alloc */ { source: image },
+          /* alloc */ { texture: texture.texture },
+          /* alloc */ [width, height]);
       } catch (error) {
         texture.texture.destroy();
         textures.delete(key);

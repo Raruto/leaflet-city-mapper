@@ -7,10 +7,10 @@ import { lampDirections } from '../globals/lampDirections.js';
 export function lampPostGeometry(point, style, addTriangle) {
   const color = parseColor(0x50565a), radius = style.poleRadius;
   if (!Number.isFinite(radius) || radius <= 0) {
-    throw /* allocation: required -- Validation errors retain their own message and stack. */ new Error('Invalid lamp pole radius');
+    throw /* alloc */ new Error('Invalid lamp pole radius');
   }
-  const center = /* allocation: required -- Triangle callbacks may retain the pole center independently of the input point. */ {
-    ...point, uv: /* allocation: required -- The retained center owns its editable pole UV coordinate. */ [3, 3],
+  const center = /* alloc */ {
+    ...point, uv: /* alloc */ [3, 3],
   };
   let r, low, high, points, i, a, b, nx, nz, section;
   for (section = 0; section < 2; section++) {

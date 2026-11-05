@@ -9,15 +9,15 @@ export function useSelectedTime(state) {
   const { control, map, date, slider, status } = state;
   control.live = false;
   if (!date.value || !date.validity.valid) {
-    control.time = /* allocation: required -- Invalid selection state belongs only to this control. */ new Date(NaN);
-    map.fire('simulationtimechange', /* allocation: required -- Listeners may retain the invalid-selection event. */ { time: null, live: false });
+    control.time = /* alloc */ new Date(NaN);
+    map.fire('simulationtimechange', /* alloc */ { time: null, live: false });
     delete cameraByMap.get(map)._sunlight;
     updateSky(state);
     render(map);
     status.textContent = 'Error: choose a valid solar date';
     return;
   }
-  control.time = /* allocation: required -- Each selection owns a date independent of prior selections and events. */ new Date(`${date.value}T00:00:00Z`);
+  control.time = /* alloc */ new Date(`${date.value}T00:00:00Z`);
   control.time.setUTCMinutes(Number(slider.value));
   updateSun(state);
 }

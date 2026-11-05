@@ -7,7 +7,7 @@ import { adjustCameraMarkerPan } from './adjustCameraMarkerPan.js';
 export function cameraMarkerDrag() {
   if (!this.dragging || dragByHandler.has(this.dragging)) return;
   const drag = this.dragging, original = drag._onDrag, adjustPan = drag._adjustPan;
-  dragByHandler.set(drag, /* allocation: required -- Preserve each native drag handler's original callbacks for delegated behavior. */ {
+  dragByHandler.set(drag, /* alloc */ {
     _cameraOriginalOnDrag: original, _cameraOriginalAdjustPan: adjustPan,
   });
   drag._onDrag = cameraMarkerOnDrag;

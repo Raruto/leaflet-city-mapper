@@ -23,7 +23,7 @@ export function stop() {
   map.off('terrainchange', this.onTerrain);
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom;
   for (name of this.saved.handlers) map[name].enable();
-  map.setView(this.state.latlng, this.saved.zoom, /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
+  map.setView(this.state.latlng, this.saved.zoom, /* alloc */ { animate: false });
   mapSetPitch(map, this.saved.pitch);
   this.saved = null;
 }

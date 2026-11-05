@@ -9,7 +9,7 @@ import { removeEntry } from './removeEntry.js';
  */
 
 export function underEntry(layer, element, onPlace) {
-  const state = /* allocation: required -- Keep placement callbacks independent per entry. */ { map: layer._map, layer, element, onPlace };
+  const state = /* alloc */ { map: layer._map, layer, element, onPlace };
   state.map.on('layeradd layerremove', replaceEntry, state);
   layer.once('remove', removeEntry, state);
   return placeUnderEntry(state);

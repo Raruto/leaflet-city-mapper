@@ -6,7 +6,7 @@ import { project } from './project.js';
 
 export function groundBounds(map, padding = cameraZeroPadding) {
   const min = pointOf(padding).divideBy(2), max = map.getSize().subtract(min);
-  const bounds = /* allocation: required -- The returned native bounds owns its independent projected corners. */ new L.Bounds();
+  const bounds = /* alloc */ new L.Bounds();
   const minX = min.x, minY = min.y;
   let i;
   for (i = 0; i < 4; i++) {

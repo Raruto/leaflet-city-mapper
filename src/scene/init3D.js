@@ -18,16 +18,16 @@ import { noOperation } from '../utils/noOperation.js';
 
 export function init3D(layer, options = sceneEmptyOptions) {
   sceneByLayer.get(layer)._3d = true;
-  L.Util.setOptions(layer, /* allocation: required -- Merge defaults and caller options for this layer. */ { ariaLabel: '3D scene', ...options });
+  L.Util.setOptions(layer, /* alloc */ { ariaLabel: '3D scene', ...options });
   sceneByLayer.get(layer).kind = '3d';
   const isModel = !sceneByLayer.get(layer)._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
   sceneByLayer.get(layer).modelUrl = isModel ? layer.options.url : null;
-  sceneByLayer.get(layer).url = layer.options.url && !isModel && !sceneByLayer.get(layer)._geojson ? /* allocation: required -- Resolve a stable absolute source URL for this layer. */ new URL(layer.options.url, document.baseURI).href : null;
-  sceneByLayer.get(layer)._directories = /* allocation: required -- Keep archive directories independent per layer. */ new Map();
+  sceneByLayer.get(layer).url = layer.options.url && !isModel && !sceneByLayer.get(layer)._geojson ? /* alloc */ new URL(layer.options.url, document.baseURI).href : null;
+  sceneByLayer.get(layer)._directories = /* alloc */ new Map();
   if (layer.options.center) {
-    sceneByLayer.get(layer).location = /* allocation: required -- Preserve each layer's independent center. */ new L.LatLng(layer.options.center[0], layer.options.center[1]);
+    sceneByLayer.get(layer).location = /* alloc */ new L.LatLng(layer.options.center[0], layer.options.center[1]);
   }
-  sceneByLayer.get(layer)._areas = /* allocation: required -- Keep area requests independent per layer. */ new Map();
+  sceneByLayer.get(layer)._areas = /* alloc */ new Map();
   sceneByLayer.get(layer)._inflight = 0;
   sceneByLayer.get(layer)._added = Promise.withResolvers();
   sceneByLayer.get(layer).ready = Promise.resolve().then(ready3D.bind(null, layer));

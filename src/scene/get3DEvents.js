@@ -5,7 +5,7 @@ import { updateArea } from '../sources/updateArea.js';
 import { onTerrainChange } from '../terrain/onTerrainChange.js';
 
 export function get3DEvents(layer) {
-  const events = /* allocation: required -- Bind event ownership to this layer alone. */ {};
+  const events = /* alloc */ {};
   if (sceneByLayer.get(layer).url) {
     events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
   }

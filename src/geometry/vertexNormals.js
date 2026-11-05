@@ -2,7 +2,7 @@
 
 export function vertexNormals(p, indices) {
   // Accumulate area-weighted face normals for shared vertices, then normalize.
-  const normals = /* allocation: required -- The caller retains independent normal data for its geometry. */ new Float32Array(p.length);
+  const normals = /* alloc */ new Float32Array(p.length);
   let i, a, b, c, ux, uy, uz, vx, vy, vz, j, nx, ny, nz, index, length;
   for (i = 0; i < (indices?.length || p.length / 3); i += 3) {
     a = indices ? indices[i] : i, b = indices ? indices[i + 1] : i + 1, c = indices ? indices[i + 2] : i + 2;

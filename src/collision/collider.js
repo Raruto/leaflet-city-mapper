@@ -8,10 +8,10 @@ export function collider(mesh) {
   const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv } = mesh.geometry.attributes;
 
   const count = index ? index.count : p.length / 3;
-  const tri = /* allocation: required -- Variable-length wall accumulation belongs to this geometry collider build. */ [];
-  const nrm = /* allocation: required -- Variable-length wall normals belong to this geometry collider build. */ [];
-  const cells = /* allocation: required -- Each geometry collider retains its own spatial cell index. */ new Map();
-  const v = /* allocation: required -- Transform scratch stays private while mesh accessors can reenter collider construction. */ [];
+  const tri = /* alloc */ [];
+  const nrm = /* alloc */ [];
+  const cells = /* alloc */ new Map();
+  const v = /* alloc */ [];
 
   let i, first, k, j, x, y, z, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t, ix, iz, key;
   for (i = 0; i < count; i += 3) {
@@ -51,16 +51,16 @@ export function collider(mesh) {
       for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
         key = ix + ',' + iz;
         if (!cells.has(key)) {
-          cells.set(key, /* allocation: required -- Each retained spatial cell owns its triangle membership list. */ []);
+          cells.set(key, /* alloc */ []);
         }
         cells.get(key).push(t);
       }
   }
-  c = /* allocation: required -- Each geometry retains an independent collider cache entry. */ {
+  c = /* alloc */ {
     tri: Float32Array.from(tri),
     nrm: Float32Array.from(nrm),
     cells,
-    origin: /* allocation: required -- Collision translation needs the original mesh origin snapshot. */ [m[12], m[13], m[14]]
+    origin: /* alloc */ [m[12], m[13], m[14]]
   };
   colliders.set(mesh.geometry, c);
   return c;

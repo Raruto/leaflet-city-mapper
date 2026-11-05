@@ -10,10 +10,10 @@ export function markerQuadCorners(state, key, image) {
   const { source, map, backend } = state;
   const position = localPosition(state, source.getLatLng());
   const options = source.options.icon.options, size = map.getSize();
-  const matrices = state.markerMatrices ||= /* allocation: required -- Each native marker owns reusable projection scratch state. */ {
-    root: /* allocation: required -- Retain one mutable world matrix per marker rather than per frame. */ new DOMMatrix(),
-    camera: /* allocation: required -- Retain one mutable camera matrix per marker rather than per frame. */ new DOMMatrix(),
-    point: /* allocation: required -- Retain one homogeneous projection scratch point per marker. */ { x: 0, y: 0, z: 0, w: 1 },
+  const matrices = state.markerMatrices ||= /* alloc */ {
+    root: /* alloc */ new DOMMatrix(),
+    camera: /* alloc */ new DOMMatrix(),
+    point: /* alloc */ { x: 0, y: 0, z: 0, w: 1 },
   };
   const root = matrices.root, camera = matrices.camera, point = matrices.point;
   const worldMatrix = sceneByLayer.get(backend).root.worldMatrix, projection = sceneByLayer.get(backend).camera.projectionViewMatrix;
@@ -36,7 +36,7 @@ export function markerQuadCorners(state, key, image) {
   const centerX = (clipX / clipW + 1) * size.x / 2, centerY = (1 - clipY / clipW) * size.y / 2;
   const left = centerX - (anchor ? anchor.x ?? anchor[0] : Math.floor(width / 2));
   const top = centerY - (anchor ? anchor.y ?? anchor[1] : Math.floor(height / 2));
-  const corners = /* allocation: required -- The quad consumer retains independent projected vertex collections. */ [];
+  const corners = /* alloc */ [];
   let pointX, pointY, offset, x, y;
   for (i = 0; i < 4; i++) {
     pointX = left + (i % 2 ? width : 0);
@@ -45,7 +45,7 @@ export function markerQuadCorners(state, key, image) {
     x = centerX + offset.x, y = centerY + offset.y;
     transformNativePoint(point, camera, x / size.x * 2 - 1, 1 - y / size.y * 2, clipZ / clipW, 1);
     transformNativePoint(point, root, point.x / point.w, point.y / point.w, point.z / point.w, 1);
-    corners.push(/* allocation: required -- Returned vertices must not alias each other or the reusable scratch point. */ [point.x, point.y, point.z]);
+    corners.push(/* alloc */ [point.x, point.y, point.z]);
   }
   return corners;
 }

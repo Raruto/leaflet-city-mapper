@@ -7,7 +7,7 @@ import { destroyTexture } from './destroyTexture.js';
 
 export function updateRoofRaster(backend, now) {
   const map = backend._map;
-  const rasters = sceneByLayer.get(backend)._roofRasters ||= /* allocation: required -- Each backend retains its own frame's raster list through mesh preparation. */ [];
+  const rasters = sceneByLayer.get(backend)._roofRasters ||= /* alloc */ [];
   rasters.length = 0;
   let hasRoofTexture = false;
   let layer;

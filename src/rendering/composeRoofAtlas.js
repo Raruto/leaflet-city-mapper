@@ -16,7 +16,7 @@ export function composeRoofAtlas(backend, tiles, zoom, min, size, width, height)
   const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, map = backend._map;
   const opacityLength = Math.max(1, tiles.length) * 64;
   if (roofOpacities.value.length < opacityLength) {
-    roofOpacities.value = /* allocation: required -- Grow the reusable roof-composition upload buffer only when capacity is exhausted. */ new Float32Array(opacityLength);
+    roofOpacities.value = /* alloc */ new Float32Array(opacityLength);
   }
   const opacities = roofOpacities.value;
   const opacityBuffer = device.createBuffer((

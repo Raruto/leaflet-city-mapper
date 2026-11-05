@@ -18,7 +18,7 @@ export function adjustCameraMarkerPan(event) {
   movement.y = (Math.max(0, screen.y - size.y + padding.y) - Math.max(0, padding.y - screen.y)) / Math.max(1, padding.y) * speed;
   if (!movement.x && !movement.y) return;
   const pane = map._getMapPanePos();
-  map.panBy(movement, /* allocation: required -- Each native pan transition may retain and mutate its options. */ { animate: false });
+  map.panBy(movement, /* alloc */ { animate: false });
   const shift = pane.subtract(map._getMapPanePos());
   this._draggable._newPos._add(shift);
   this._draggable._startPos._add(shift);

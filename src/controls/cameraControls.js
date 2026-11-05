@@ -74,7 +74,7 @@ export function cameraControls(map) {
   addCameraHandler(map, 'touchRotate', TouchMode.value);
   addCameraHandler(map, 'touchPitch', TouchMode.value);
   const container = map.getContainer();
-  const state = cameraByMap.get(map)._cameraTouchState = /* allocation: required -- Each map owns its touch lifecycle state and handlers. */ { map, container, touch: null, nativeZoom: undefined };
+  const state = cameraByMap.get(map)._cameraTouchState = /* alloc */ { map, container, touch: null, nativeZoom: undefined };
   touchByContainer.set(container, state);
   cameraTouchStates.add(state);
   container.addEventListener('touchstart', startCameraTouch, cameraListenerOptions);
@@ -84,7 +84,7 @@ export function cameraControls(map) {
   window.addEventListener('blur', endAllCameraTouches);
   map.on('cameratouchchange', changeCameraTouch, map);
   if (map.options.rotateControl) {
-    cameraByMap.get(map).rotateControl = /* allocation: required -- Each map retains and removes its own rotation control. */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions);
+    cameraByMap.get(map).rotateControl = /* alloc */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions);
     cameraByMap.get(map).rotateControl.addTo(map);
   }
   map.once('unload', cleanupCameraTouch, map);

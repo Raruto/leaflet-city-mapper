@@ -96,6 +96,16 @@ The tests also reject a `CityMapper` global, public layer readiness/data methods
 and a public map reset method. Run the attribute check on both supported
 Leaflet versions with `node build/test.js --name "The plugin does not add attributes"`.
 
+Unknown source types use an explicit missing-initializer result rather than
+exceptions for routing; they still emit an `error` event and reject readiness.
+Compass permission denial also uses an explicit failure path; only listener
+registration retains a catch for browser errors.
+Texture disposal keeps its `try/catch` to report rejected GPU submissions and
+release the texture without delaying cleanup by an extra Promise continuation.
+`try/catch` remains where synchronous external operations can fail or where it
+protects error reporting and resource cleanup; it is not replaced mechanically
+with asynchronous wrappers.
+
 The source-style tests also reject object literals, array literals and `new`
 expressions inside every function in `src`, including default parameters and
 returned values. Module-level initialization in `src/globals/` is allowed.
@@ -106,8 +116,8 @@ Invariant numeric factors, the fixed camera field of view, astronomical
 obliquity and lamp ring directions are also precomputed in dedicated global
 modules instead of recalculated per frame or vertex. Latitude-, zoom- and
 camera-dependent calculations remain dynamic.
-Necessary allocations require a separate comment immediately before the expression:
-`/* allocation: required -- Each caller owns its result. */`.
+Necessary allocations require a separate `/* alloc */` marker immediately before
+the expression; a descriptive reason is optional in an ordinary separate comment.
 The exception covers only that expression, not nested allocations or a whole
 function; malformed and unused exceptions fail the check. Each exception must be
 reviewed and covered by a behavior test (for example, independent archive headers).

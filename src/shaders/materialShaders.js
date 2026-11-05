@@ -79,7 +79,7 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       return output;
     }
   `;
-  const bindings = /* allocation: required -- Each returned shader variant retains its own texture-binding list. */ [];
+  const bindings = /* alloc */ [];
   const baseBinding = textureBinding(bindings, 'baseTexture', hasBase);
   const metalBinding = textureBinding(bindings, 'metalTexture', hasMetal);
   const emissiveBinding = textureBinding(bindings, 'emissiveTexture', hasEmissive);
@@ -243,5 +243,5 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       `}
     }
   `;
-  return /* allocation: required -- Each caller owns its shader sources and matching texture-binding metadata. */ { vertex, fragment, bindings, textured, hasTerrain };
+  return /* alloc */ { vertex, fragment, bindings, textured, hasTerrain };
 }

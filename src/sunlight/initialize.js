@@ -8,7 +8,7 @@ import { removeTimeLayer } from './removeTimeLayer.js';
 export function initialize(options) {
   L.Util.setOptions(this, options);
   this.live = true;
-  this.layer = /* allocation: required -- Each time control needs its own removable Leaflet layer. */ new L.Layer();
+  this.layer = /* alloc */ new L.Layer();
   sceneByLayer.get(this.layer).control = this;
   sceneByLayer.get(this.layer).kind = 'time';
 }

@@ -9,7 +9,7 @@ import { renderPendingZoomAnimation } from './renderPendingZoomAnimation.js';
 export function onZoomAnim(event) {
   const map = this._map;
   if (event && !sceneByLayer.get(this)._zoomView) {
-    sceneByLayer.get(this)._zoomView = /* allocation: required -- Retain this map's independent active zoom snapshot. */ { from: map.getCenter(), zoom: map.getZoom(), to: event.center,
+    sceneByLayer.get(this)._zoomView = /* alloc */ { from: map.getCenter(), zoom: map.getZoom(), to: event.center,
       targetZoom: event.zoom, start: performance.now() };
     map.getContainer().classList.add('leaflet-camera-zoom');
   }

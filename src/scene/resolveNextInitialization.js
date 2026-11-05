@@ -5,10 +5,9 @@ import { initializerFor } from './initializerFor.js';
 
 export function resolveNextInitialization() {
   const task = pendingInitializations.shift();
-  try {
-    task.initialize = initializerFor(task.type);
-  } catch (error) {
-    task.error = error;
+  task.initialize = initializerFor(task.type);
+  if (!task.initialize) {
+    task.error = /* alloc */ new Error(`Unknown layer type: ${task.type}`);
   }
   return task;
 }

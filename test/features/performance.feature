@@ -61,25 +61,26 @@ Feature: Performance-oriented source style
       | const control = { update() { return []; } };                                          | 1          |
 
   @unit
-  Scenario: Local allocation checks require a separate justified exception for each necessary allocation
+  Scenario: Local allocation checks require a separate marker for each necessary allocation
     Then local allocation checks handle these modules:
       | source                                                                                                                                    | violations |
-      | function decode() { return /* allocation: required -- Each caller owns its result. */ {}; }                                                | 0          |
-      | function decode(data) { const view = /* allocation: required -- View belongs to this input buffer. */ new DataView(data); }                 | 0          |
-      | function decode() { throw /* allocation: required -- Preserve the failure stack for this call. */ new Error('Invalid data'); }             | 0          |
-      | function decode() { return /* allocation: required -- Each caller owns its result. */ { points: [] }; }                                    | 1          |
-      | function decode() { return /* allocation: required -- Each caller owns its result. */ { points: /* allocation: required -- Caller owns these points. */ [] }; } | 0 |
-      | /* allocation: required -- Do not exempt a whole function. */ function update() { return {}; }                                             | 2          |
-      | function update() { /* allocation: required -- Do not exempt a declaration. */ const target = {}; }                                        | 2          |
-      | function update() { return /* allocation: required -- */ {}; }                                                                            | 2          |
-      | function update() { return /* allocation: unknown -- Not a supported exception. */ {}; }                                                   | 2          |
-      | function update() { return /* allocation: required -- No allocation follows this comment. */ player.position; }                            | 1          |
-      | const state = /* allocation: required -- Module allocations need no exception. */ {};                                                       | 1          |
-      | function update() { return {}; } /* allocation: required -- Nothing follows this exception. */                                              | 2          |
-      | function update() { return /* allocation: required -- Unrelated comments cannot separate the exception. */ /* unrelated */ {}; }            | 2          |
-      | function update() { const text = 'allocation: required -- Not an actual comment.'; return {}; }                                            | 1          |
+      | function decode() { return /* alloc */ {}; }                                                                                              | 0          |
+      | function decode(data) { const view = /* alloc */ new DataView(data); }                                                                     | 0          |
+      | function decode() { throw /* alloc */ new Error('Invalid data'); }                                                                        | 0          |
+      | function decode() { return /* alloc */ { points: [] }; }                                                                                  | 1          |
+      | function decode() { return /* alloc */ { points: /* alloc */ [] }; }                                                                      | 0          |
+      | /* alloc */ function update() { return {}; }                                                                                             | 2          |
+      | function update() { /* alloc */ const target = {}; }                                                                                     | 2          |
+      | function update() { return /* alloc: */ {}; }                                                                                            | 2          |
+      | function update() { return /* alloc unknown */ {}; }                                                                                     | 2          |
+      | function update() { return /* allocation: required -- Old format. */ {}; }                                                               | 2          |
+      | function update() { return /* alloc */ player.position; }                                                                                | 1          |
+      | const state = /* alloc */ {};                                                                                                            | 1          |
+      | function update() { return {}; } /* alloc */                                                                                             | 2          |
+      | function update() { return /* alloc */ /* unrelated */ {}; }                                                                             | 2          |
+      | function update() { const text = '/* alloc */'; return {}; }                                                                             | 1          |
       | function update() { return /* Ordinary comments do not authorize an allocation. */ {}; }                                                   | 1          |
-      | function update() { return /* allocation: required -- Allow exactly one result. */ {}; const other = []; }                                  | 1          |
+      | function update() { return /* alloc */ {}; const other = []; }                                                                           | 1          |
 
   @unit
   Scenario: Source functions avoid explicit local allocations

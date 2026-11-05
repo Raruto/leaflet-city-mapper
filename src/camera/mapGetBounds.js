@@ -9,7 +9,7 @@ import { animationPoint } from './animationPoint.js';
 
 export function mapGetBounds() {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.getBounds.call(this);
-  const footprint = groundBounds(this), bounds = /* allocation: required -- Each bounds query returns independent mutable native bounds. */ new L.LatLngBounds();
+  const footprint = groundBounds(this), bounds = /* alloc */ new L.LatLngBounds();
   let i, point, raw;
   for (i = 0; i < 2; i++) {
     point = i ? footprint.max : footprint.min;

@@ -5,6 +5,6 @@ export function beforeNativeRender(state) {
     synchronizeNativeLayer(state);
   } catch (error) {
     state.failed = true;
-    state.source.fire('error', /* allocation: required -- Layer listeners may retain or mutate this rendering failure event. */ { error });
+    state.source.fire('error', /* alloc */ { error });
   }
 }

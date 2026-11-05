@@ -2,10 +2,10 @@ import { minimumX } from './minimumX.js';
 
 export function sortHoles(holes) {
   if (holes.length < 2) return holes;
-  const buffer = /* allocation: required -- Stable merge-sort scratch belongs to this triangulation while coordinate getters may reenter it. */ new Array(holes.length);
-  const entries = /* allocation: required -- Hole ordering keys belong to this triangulation independently of nested calls. */ [];
+  const buffer = /* alloc */ new Array(holes.length);
+  const entries = /* alloc */ [];
   let ring, width, start, middle, end, left, right, output, previous, i;
-  for (ring of holes) entries.push(/* allocation: required -- Sorting retains each hole and its cached ordering key together. */ { ring, x: minimumX(ring) });
+  for (ring of holes) entries.push(/* alloc */ { ring, x: minimumX(ring) });
   let source = entries, target = buffer;
   for (width = 1; width < entries.length; width *= 2) {
     for (start = 0; start < entries.length; start += width * 2) {

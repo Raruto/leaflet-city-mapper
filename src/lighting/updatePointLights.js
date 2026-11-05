@@ -8,8 +8,8 @@ import { collectLightMeshes } from './collectLightMeshes.js';
 
 export function updatePointLights(backend) {
   const { device, sunlight: sun } = sceneByLayer.get(backend).renderer;
-  const fixed = /* allocation: required -- Fixed-light traversal stays private across reentrant device callbacks. */ [];
-  const moving = /* allocation: required -- Moving-light traversal stays private across reentrant device callbacks. */ [];
+  const fixed = /* alloc */ [];
+  const moving = /* alloc */ [];
   let layer;
   for (layer of sceneByLayer.get(backend)._layers) {
     if (!layer.options.nightLight || !sceneByLayer.get(layer).root.visible) continue;
@@ -20,11 +20,11 @@ export function updatePointLights(backend) {
   const dynamicGrid = cacheLightGrid(moving, sun.dynamicLightGrid, maxBytes);
   if (staticGrid === sun.staticLightGrid && dynamicGrid === sun.dynamicLightGrid) return;
   const size = staticGrid.data.byteLength + dynamicGrid.data.byteLength;
-  if (size > maxBytes) throw /* allocation: required -- Storage errors retain the failing renderer update stack. */ new Error('Streetlight grid exceeds GPU storage limit');
+  if (size > maxBytes) throw /* alloc */ new Error('Streetlight grid exceeds GPU storage limit');
   let uploadStatic = staticGrid !== sun.staticLightGrid;
   if (sun.lights.size < size) {
     destroyTexture(backend, sun.lights);
-    sun.lights = device.createBuffer(/* allocation: required -- The device receives an independent descriptor for this renderer-owned light buffer. */ { size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    sun.lights = device.createBuffer(/* alloc */ { size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     bindSunlight(backend);
     uploadStatic = true;
   }

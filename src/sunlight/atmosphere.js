@@ -7,7 +7,7 @@ import { rgb } from './rgb.js';
 
 export function atmosphere(altitude) {
   if (!Number.isFinite(altitude)) {
-    throw /* allocation: required -- Preserve the stack of this invalid altitude. */ new Error('Invalid solar altitude');
+    throw /* alloc */ new Error('Invalid solar altitude');
   }
   const stops = atmosphereStops;
   let upper = -1;
@@ -18,7 +18,7 @@ export function atmosphere(altitude) {
   const b = stops[upper < 0 ? stops.length - 1 : upper],
         a = stops[Math.max(0, upper - 1)];
   const t = a === b || upper < 0 ? 1 : (altitude - a[0]) / (b[0] - a[0]);
-  return /* allocation: required -- Each map retains an independent atmosphere result. */ {
+  return /* alloc */ {
     background: `linear-gradient(${rgb(mix(a[1], b[1], t, atmosphereColor))}, ${rgb(mix(a[2], b[2], t, atmosphereColor))})`,
     tint: mix(a[3], b[3], t),
   };

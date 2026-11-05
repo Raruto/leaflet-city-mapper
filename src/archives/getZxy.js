@@ -26,7 +26,7 @@ export async function getZxy(backend, z, x, y, signal) {
   let depth, key, pending, entries, low, high, mid, entry, data;
   for (depth = 0; depth < 4; depth++) {
     if (offset === firstOffset || offset === secondOffset || offset === thirdOffset) {
-      throw /* allocation: required -- Preserve the stack of this cyclic archive request. */ new Error('Cyclic PMTiles directory');
+      throw /* alloc */ new Error('Cyclic PMTiles directory');
     }
     if (depth === 0) firstOffset = offset;
     else if (depth === 1) secondOffset = offset;
@@ -65,17 +65,17 @@ export async function getZxy(backend, z, x, y, signal) {
         return;
       }
       if (entry.offset + entry.length > header.tileDataLength) {
-        throw /* allocation: required -- Preserve the stack of this invalid tile request. */ new Error('PMTiles tile outside data section');
+        throw /* alloc */ new Error('PMTiles tile outside data section');
       }
       data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
       signal?.throwIfAborted();
-      return /* allocation: required -- Concurrent callers own independent tile results. */ { data };
+      return /* alloc */ { data };
     }
     if (entry.offset + entry.length > header.leafDirectoryLength) {
-      throw /* allocation: required -- Preserve the stack of this invalid directory request. */ new Error('PMTiles directory outside leaf section');
+      throw /* alloc */ new Error('PMTiles directory outside leaf section');
     }
     offset = header.leafDirectoryOffset + entry.offset;
     length = entry.length;
   }
-  throw /* allocation: required -- Preserve the stack of this excessive directory traversal. */ new Error('PMTiles directory depth exceeds four levels');
+  throw /* alloc */ new Error('PMTiles directory depth exceeds four levels');
 }

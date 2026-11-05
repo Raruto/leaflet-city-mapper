@@ -8,6 +8,6 @@ export async function attachLayer(backend, map) {
     await attach.attach(backend, map);
     sceneByLayer.get(backend)._added.resolve();
   } catch (error) {
-    backend.fire('error', /* allocation: required -- Preserve an independent error event for this layer. */ { error });
+    backend.fire('error', /* alloc */ { error });
   }
 }

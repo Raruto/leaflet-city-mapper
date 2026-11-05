@@ -10,7 +10,7 @@ import { setLayerTerrain } from './setLayerTerrain.js';
 
 export function onTerrainAdd(backend, map) {
   if (cameraByMap.get(map)._terrain3D && cameraByMap.get(map)._terrain3D !== backend) {
-    throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error('Only one terrain layer can be active per map');
+    throw /* alloc */ new Error('Only one terrain layer can be active per map');
   }
   cameraByMap.get(map)._terrain3D = backend;
   onAdd3DLayer(backend, map);
@@ -18,7 +18,7 @@ export function onTerrainAdd(backend, map) {
   else {
     const pending = Promise.withResolvers();
     sceneByLayer.get(backend)._terrainPromise = pending.promise;
-    backend.once('ready', loadReadyTerrain, /* allocation: required -- The ready listener retains this layer’s promise resolvers until initialization completes. */ { backend, ...pending });
+    backend.once('ready', loadReadyTerrain, /* alloc */ { backend, ...pending });
   }
   map.eachLayer(setLayerTerrain, backend);
   map.fire('terrainchange');

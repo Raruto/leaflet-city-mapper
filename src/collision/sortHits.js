@@ -1,6 +1,6 @@
 export function sortHits(hits) {
   if (hits.length < 2) return hits;
-  const buffer = /* allocation: required -- Stable merge-sort scratch belongs to this picking result while distance getters may reenter sorting. */ new Array(hits.length);
+  const buffer = /* alloc */ new Array(hits.length);
   let source = hits, target = buffer;
   let width, start, middle, end, left, right, output, previous, i;
   for (width = 1; width < hits.length; width *= 2) {

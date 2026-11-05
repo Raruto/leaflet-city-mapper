@@ -12,8 +12,8 @@ export function nativeEvents(state) {
   const { map } = state;
   let context = nativeEventMaps.get(map);
   if (!context) {
-    context = /* allocation: required -- Each map owns its native-event dispatch and hover state. */ {
-      map, states: /* allocation: required -- A map tracks its own active GPU layers for dispatch and removal. */ new Set(), hovered: null,
+    context = /* alloc */ {
+      map, states: /* alloc */ new Set(), hovered: null,
     };
     const pointer = L.version.startsWith('2');
     context.move = pointer ? 'pointermove' : 'mousemove';

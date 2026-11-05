@@ -11,7 +11,7 @@ export function restoreObject(object, backend) {
     const material = object.program._layerMaterial;
     const device = sceneByLayer.get(shared).renderer.device;
     if (geometry.attributes.index?.data instanceof Uint8Array) {
-      geometry.attributes.index.data = /* allocation: required -- WebGPU index buffers must not use uint8 data. */ new Uint16Array(geometry.attributes.index.data);
+      geometry.attributes.index.data = /* alloc */ new Uint16Array(geometry.attributes.index.data);
     }
     for (name in geometry.attributes) {
       attribute = geometry.attributes[name];
@@ -19,7 +19,7 @@ export function restoreObject(object, backend) {
       attribute.count = attribute.data.length / attribute.size;
       attribute.indexFormat = attribute.data instanceof Uint32Array ? 'uint32' : 'uint16';
       oldBuffer = attribute.buffer;
-      attribute.buffer = device.createBuffer(/* allocation: required -- Supply a fresh GPU descriptor for the replacement buffer. */ {
+      attribute.buffer = device.createBuffer(/* alloc */ {
         size: Math.max(4, attribute.data.byteLength),
         usage: name === 'index'
           ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
@@ -32,14 +32,14 @@ export function restoreObject(object, backend) {
     geometry.drawRange.count = geometry.attributes.index?.count || geometry.attributes.position.count;
     object.bindGroup = null;
     if (object.boundTextures) object.boundTextures.length = 0;
-    else object.boundTextures = /* allocation: required -- Preserve each object's independent texture bindings. */ [];
+    else object.boundTextures = /* alloc */ [];
     for (name in material) {
       if (name !== 'baseTexture' && name !== 'metalTexture' && name !== 'emissiveTexture' && name !== 'occlusionTexture') continue;
       texture = material[name];
       if (!texture || texture.device === device) continue;
       texture.device = device;
-      texture.texture = device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for the replacement texture. */ {
-          size: /* allocation: required -- Snapshot the image dimensions for this GPU operation. */ [texture.image.width, texture.image.height],
+      texture.texture = device.createTexture(/* alloc */ {
+          size: /* alloc */ [texture.image.width, texture.image.height],
           format: texture.format,
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
         });
@@ -53,8 +53,8 @@ export function restoreObject(object, backend) {
   if (object.texture && object.texture.device !== sceneByLayer.get(shared).renderer.device) {
     texture = object.texture;
     texture.device = sceneByLayer.get(shared).renderer.device;
-    texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for this replacement texture. */ {
-        size: /* allocation: required -- Snapshot the image dimensions for this GPU operation. */ [object.texture.image.width, object.texture.image.height],
+    texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(/* alloc */ {
+        size: /* alloc */ [object.texture.image.width, object.texture.image.height],
         format: object.texture.format,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });

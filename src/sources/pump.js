@@ -24,17 +24,17 @@ import { buildArea } from './buildArea.js';
 export function pump(backend, map = backend._map) {
   const shared = map && renderers.get(map);
   if (!shared) return;
-  const layers = /* allocation: required -- Snapshot renderer ownership against reentrant progress listeners. */ [];
+  const layers = /* alloc */ [];
   let layer, area, center, areaBackend;
   for (layer of sceneByLayer.get(shared)._layers) {
     if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
   }
-  const pending = /* allocation: required -- Keep this scheduling pass independent of nested pump calls. */ [];
+  const pending = /* alloc */ [];
   for (layer of layers) {
     for (area of sceneByLayer.get(layer)._areas.values()) {
       if (area.started || area.request.signal.aborted) continue;
       center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
-      pending.push(/* allocation: required -- Snapshot each asynchronous area request before sorting. */ {
+      pending.push(/* alloc */ {
         layer, area,
         distance: center
           ? Math.hypot(area.coords.x + 0.5 - center.x, area.coords.y + 0.5 - center.y) / 2 ** area.coords.z : 0,

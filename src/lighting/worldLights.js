@@ -2,7 +2,7 @@ import { lightScale } from '../globals/lightScale.js';
 
 /** World-space [x, y, z, radius, r, g, b, intensity] for one mesh's point lights. */
 export function worldLights(lights, m) {
-  const values = /* allocation: required -- Each mesh cache retains independent transformed light data. */ new Float32Array(lights.length * 8);
+  const values = /* alloc */ new Float32Array(lights.length * 8);
   let i, x, y, z, radius, color, flux, w;
   for (i = 0; i < lights.length; i++) {
     ({

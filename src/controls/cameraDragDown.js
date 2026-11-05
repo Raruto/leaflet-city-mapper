@@ -11,7 +11,7 @@ export function cameraDragDown(event) {
   event.stopPropagation();
   state.moved = false;
   const rect = state.map.getContainer().getBoundingClientRect();
-  state.drag = /* allocation: required -- Active pointer gestures retain their starting coordinates until release. */ {
+  state.drag = /* alloc */ {
     id: event.pointerId, x: event.clientX, y: event.clientY, cursor: state.element.style.cursor,
     cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2,
     dragging: state.map.dragging?.enabled(),

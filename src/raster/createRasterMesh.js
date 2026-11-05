@@ -18,7 +18,7 @@ import { createGeometry } from './createGeometry.js';
 
 export function createRasterMesh(backend, tile) {
   const device = sceneByLayer.get(backend).renderer.device;
-  const texture = /* allocation: required -- The raster tile retains its own GPU texture, sampler and image lifetime. */ {
+  const texture = /* alloc */ {
     device,
     texture: device.createTexture((
     rasterTexture.size[0] = tile.image.width,
@@ -43,7 +43,7 @@ export function createRasterMesh(backend, tile) {
   texture.uploaded = tile.image;
 
   if (!sceneByLayer.get(backend)._rasterProgram) {
-    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* allocation: required -- The raster program retains its first tile’s material and texture options. */ {
+    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* alloc */ {
       baseTexture: texture, unlit: true, alphaMode: 'BLEND',
     });
   }
@@ -61,12 +61,12 @@ export function createRasterMesh(backend, tile) {
   const sizeX = (opposite.x - corner.x) * metres;
   const sizeZ = -(opposite.y - corner.y) * metres;
   tile.texture = texture;
-  tile.mesh = /* allocation: required -- The raster scene retains this tile mesh until the tile is released. */ {
-    position: /* allocation: required -- Each raster tile mesh owns its mutable scene position. */ [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
-    rotation: /* allocation: required -- Each raster tile mesh owns its mutable scene rotation. */ [0, 0, 0],
-    scale: /* allocation: required -- Each raster tile mesh owns its mutable scene scale. */ [sizeX, 1, sizeZ],
-    worldMatrix: /* allocation: required -- Each raster tile mesh owns its mutable world-transform matrix. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    children: /* allocation: required -- Each raster tile mesh owns its scene-child list. */ [], visible: true, device, geometry: sceneByLayer.get(backend)._rasterGeometry,
+  tile.mesh = /* alloc */ {
+    position: /* alloc */ [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
+    rotation: /* alloc */ [0, 0, 0],
+    scale: /* alloc */ [sizeX, 1, sizeZ],
+    worldMatrix: /* alloc */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    children: /* alloc */ [], visible: true, device, geometry: sceneByLayer.get(backend)._rasterGeometry,
     program: sceneByLayer.get(backend)._rasterProgram, texture,
     opacity: backend.options.opacity, id: nextId.value++,
     renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,

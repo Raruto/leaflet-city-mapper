@@ -9,7 +9,7 @@ export async function registerTerrainTile(backend, coords, tile) {
     try {
       await addRasterTile(sceneByLayer.get(backend)._terrain3D, backend, coords, tile);
     } catch (error) {
-      backend.fire('tileerror', /* allocation: required -- Listeners may retain this tileerror event’s payload after later layer operations. */ { tile, coords, error });
+      backend.fire('tileerror', /* alloc */ { tile, coords, error });
     }
   }
 }

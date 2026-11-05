@@ -44,14 +44,14 @@ import { beforeNativeRender } from './beforeNativeRender.js';
 /** Render from coordinates and detached raster sources; only accessible marker controls remain DOM. */
 export async function nativeLayer(state) {
   const { source, map } = state;
-  const backend = state.backend = createLayer(/* allocation: required -- Each renderer backend retains its independent layer options. */ {
-    source: /* allocation: required -- Source routing retains this backend's configuration. */ { type: '3d' },
+  const backend = state.backend = createLayer(/* alloc */ {
+    source: /* alloc */ { type: '3d' },
   });
-  state.meshes = /* allocation: required -- Mesh ownership and disposal are independent per native layer. */ new Map();
-  state.textures = /* allocation: required -- Texture ownership and disposal are independent per native layer. */ new Map();
-  state.methods = /* allocation: required -- Layer removal restores this layer's own method descriptors. */ new Map();
-  state.originalMethods = /* allocation: required -- Native overrides retain the original methods for this layer. */ new Map();
-  state.images = /* allocation: required -- Each layer unregisters its own image listeners on disposal. */ new Set();
+  state.meshes = /* alloc */ new Map();
+  state.textures = /* alloc */ new Map();
+  state.methods = /* alloc */ new Map();
+  state.originalMethods = /* alloc */ new Map();
+  state.images = /* alloc */ new Set();
   cameraByMap.get(map)._nativeGPUOrder ||= 0;
   cameraByMap.get(map)._nativeGPUBack ||= 0;
   state.dirty = true;
@@ -70,7 +70,7 @@ export async function nativeLayer(state) {
   for (name in nativeMethodHandlers) {
     if (typeof source[name] !== 'function') continue;
     own = Object.getOwnPropertyDescriptor(source, name), original = source[name];
-    state.methods.set(name, /* allocation: required -- Each overridden method retains its own restoration descriptor. */ { own, original });
+    state.methods.set(name, /* alloc */ { own, original });
     state.originalMethods.set(name, original);
     source[name] = nativeMethodHandlers[name];
   }

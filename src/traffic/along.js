@@ -10,7 +10,7 @@ export function along(points, lengths, s, target) {
   }
   const a = points[i - 1], b = points[i], d = lengths[i] - lengths[i - 1] || 1;
   const t = (s - lengths[i - 1]) / d;
-  target ||= /* allocation: required -- Unbuffered callers retain independent positions along different lanes. */ {};
+  target ||= /* alloc */ {};
   target.x = a[0] + (b[0] - a[0]) * t;
   target.y = (a[2] ?? 0) + ((b[2] ?? 0) - (a[2] ?? 0)) * t;
   target.z = a[1] + (b[1] - a[1]) * t;

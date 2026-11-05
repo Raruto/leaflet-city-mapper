@@ -9,12 +9,12 @@ export function putNativeMesh(state, key, position, color, opacity, texture, uv)
   let mesh = meshes.get(key);
   if (!mesh || mesh.geometry.attributes.position.data.length !== position.length ||
     mesh.program.uniforms.baseTexture?.value !== texture) {
-    const normal = /* allocation: required -- Newly created geometry retains its own vertex normals. */ [];
+    const normal = /* alloc */ [];
     let index;
     for (index = 0; index < position.length; index++) normal.push(index % 3 === 1 ? 1 : 0);
-    const data = /* allocation: required -- Mesh construction retains independent geometry attribute data. */ { position, normal };
+    const data = /* alloc */ { position, normal };
     if (uv) data.uv = uv;
-    const material = /* allocation: required -- Each native mesh retains its own material configuration. */ {
+    const material = /* alloc */ {
       vertexColors: false, color, opacity, unlit: true, alphaMode: 'BLEND',
     };
     if (texture) material.baseTexture = texture;

@@ -7,6 +7,6 @@ export async function requestAdapter(backend, map) {
   } catch (error) {
     failAttachment(error, backend, map);
   }
-  if (!adapter) failAttachment(/* allocation: required -- Preserve the failure stack for an unavailable adapter. */ new Error('Unable to acquire a WebGPU adapter'), backend, map);
+  if (!adapter) failAttachment(/* alloc */ new Error('Unable to acquire a WebGPU adapter'), backend, map);
   return adapter;
 }

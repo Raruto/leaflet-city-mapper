@@ -9,7 +9,7 @@ import { verticalGroundY } from './verticalGroundY.js';
 
 export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   bounds = bounds.getBounds ? bounds.getBounds() : bounds instanceof L.LatLngBounds ? bounds
-    : /* allocation: required -- Normalize caller coordinates without mutating their bounds. */ new L.LatLngBounds(bounds);
+    : /* alloc */ new L.LatLngBounds(bounds);
   const zoom = map.getZoom() ?? 0, half = map.getSize().divideBy(2), distance = map.getSize().y * 1.5;
   const min = pointOf(options.paddingTopLeft || options.padding || cameraZeroPadding).subtract(half);
   const max = half.subtract(pointOf(options.paddingBottomRight || options.padding || cameraZeroPadding));
@@ -41,7 +41,7 @@ export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   const snap = map.options.zoomSnap;
   if (snap) target = Math.floor(Math.round(target / (snap / 100)) / 100) * snap;
   target = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), options.maxZoom ?? Infinity, target));
-  if (!Number.isFinite(target)) return /* allocation: required -- Fit callers retain independent center and zoom results. */ { center: bounds.getCenter(), zoom: target };
+  if (!Number.isFinite(target)) return /* alloc */ { center: bounds.getCenter(), zoom: target };
   const actual = map.getZoomScale(target, zoom);
   const vMin = high * actual - bottom, vMax = low * actual - top;
   const v = Math.max(vMin, slope ? (actual * (right - left) - max.x + min.x) / slope : vMin);
@@ -49,5 +49,5 @@ export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   const centerX = (actual * (left + right) - min.x - max.x - (leftSlope + rightSlope) * centerY) / 2;
   origin.x += (cos * centerX + sin * centerY) / actual;
   origin.y += (-sin * centerX + cos * centerY) / actual;
-  return /* allocation: required -- Fit callers retain independent center and zoom results. */ { center: map.unproject(origin, zoom), zoom: target };
+  return /* alloc */ { center: map.unproject(origin, zoom), zoom: target };
 }

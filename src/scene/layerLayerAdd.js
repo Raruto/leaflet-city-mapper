@@ -39,7 +39,7 @@ export function layerLayerAdd(event) {
     }
     addSceneLayer(this, map);
     this.fire('add');
-    map.fire('layeradd', /* allocation: required -- Give listeners an independent native layer event payload. */ { layer: this });
+    map.fire('layeradd', /* alloc */ { layer: this });
   } else {
     layerProto.value._layerAdd.call(this, event);
   }

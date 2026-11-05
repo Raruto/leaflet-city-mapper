@@ -17,10 +17,10 @@ export function createWalk(control, {
   distance,
   ...options
 }) {
-  const layer = /* allocation: required -- Each walk mode owns a native layer lifecycle. */ new L.Layer();
+  const layer = /* alloc */ new L.Layer();
   sceneByLayer.get(layer)._type = 'walk';
   init3D(layer, options);
-  const keys = /* allocation: required -- Keep pressed keys independent for each control. */ new Set();
+  const keys = /* alloc */ new Set();
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
   container.style.cssText = 'display:flex;align-items:center;background:#fff;';
   const button = L.DomUtil.create('button', '', container);
@@ -35,7 +35,7 @@ export function createWalk(control, {
   hint.textContent = 'W/S: run · A/D: turn · drag: look around · Esc: exit';
   L.DomEvent.disableClickPropagation(container);
 
-  const context = /* allocation: required -- Each walk control owns its own active state. */ {
+  const context = /* alloc */ {
     layer,
     speed,
     distance,
@@ -48,13 +48,13 @@ export function createWalk(control, {
     last: undefined,
     swing: 0,
     saved: null,
-    hitData: /* allocation: required -- Each walker needs isolated reusable collision state. */ {
+    hitData: /* alloc */ {
       x: 0, y: 0, z: 0, dx: 0, dz: 0, reach: 0, best: 0, found: false,
-      seen: /* allocation: required -- Keep triangle de-duplication local to this walker. */ new Set(),
-      normal: /* allocation: required -- Each walker retains its reusable nearest-wall normal. */ [0, 0],
+      seen: /* alloc */ new Set(),
+      normal: /* alloc */ [0, 0],
     },
-    local: /* allocation: required -- Keep reusable foot coordinates local to this walker. */ [0, 0, 0],
-    state: control.walker = sceneByLayer.get(layer).walker = /* allocation: required -- Expose a distinct mutable walker position per control. */ { latlng: null, heading: 0, phase: 0 }
+    local: /* alloc */ [0, 0, 0],
+    state: control.walker = sceneByLayer.get(layer).walker = /* alloc */ { latlng: null, heading: 0, phase: 0 }
   }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);

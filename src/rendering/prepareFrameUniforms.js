@@ -26,7 +26,7 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
       frameBuffer
     ));
 
-    renderer.uniformData = /* allocation: required -- Each renderer retains a CPU upload buffer matching its GPU uniform-buffer capacity. */ new Float32Array(renderer.uniformBuffer.size / 4);
+    renderer.uniformData = /* alloc */ new Float32Array(renderer.uniformBuffer.size / 4);
   }
   const frameData = renderer.uniformData;
   frameData.set(camera.viewMatrix, 0);

@@ -11,7 +11,7 @@ export function pruneRasterTiles(backend) {
   sceneByLayer.get(backend)._pruneVersion = sceneByLayer.get(backend)._rasterVersion;
   sceneByLayer.get(backend)._pruneWanted = wanted;
   sceneByLayer.get(backend)._pruneAfter = Infinity;
-  const pending = /* allocation: required -- Tile-unload listeners can reenter pruning, so the active coverage snapshot must remain independent. */ [];
+  const pending = /* alloc */ [];
   let key, tile, parts, overlaps, coords, zoom;
   for (key of wanted) {
     tile = sceneByLayer.get(backend)._rasterTiles.get(key);
@@ -20,7 +20,7 @@ export function pruneRasterTiles(backend) {
     }
     if (!tile?.done || now - tile.loadedAt < 250) {
       parts = key.split('/');
-      pending.push(/* allocation: required -- Reentrant unload callbacks must not overwrite coordinates in the active pending-coverage snapshot. */ { z: Number(parts[0]), x: Number(parts[1]), y: Number(parts[2]) });
+      pending.push(/* alloc */ { z: Number(parts[0]), x: Number(parts[1]), y: Number(parts[2]) });
     }
   }
   for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {

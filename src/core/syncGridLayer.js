@@ -22,7 +22,7 @@ export function syncGridLayer(state) {
     } else {
       [nw, se] = source._tileCoordsToNwSe(tile.coords);
       mesh = quadNativeMesh(state, key, tile.el, boundsQuad(state,
-        /* allocation: required -- Native corner normalization belongs to this tile's mesh construction. */ new L.LatLngBounds(nw, se)), opacity);
+        /* alloc */ new L.LatLngBounds(nw, se)), opacity);
     }
     if (mesh) mesh.renderOrder += tile.coords.z / 100;
   }

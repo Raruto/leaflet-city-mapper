@@ -1,9 +1,9 @@
 /** Dashed lane outline, in layer-local metres. */
 
 export function routeGeometry(lanes) {
-  const position = /* allocation: required -- Returned route geometry retains its vertex positions. */ [];
-  const normal = /* allocation: required -- Returned route geometry retains its vertex normals. */ [];
-  const color = /* allocation: required -- Returned route geometry retains its vertex colors. */ [];
+  const position = /* alloc */ [];
+  const normal = /* alloc */ [];
+  const color = /* alloc */ [];
   let points, lengths, properties, raw, rgb, r, g, blue, i, a, b, dx, dz, length, x, z, distance, start, end;
   let px, py, pz, qx, qy, qz, vertex;
   for ({ points, lengths, properties } of lanes) {
@@ -38,5 +38,5 @@ export function routeGeometry(lanes) {
       }
     }
   }
-  return /* allocation: required -- Each route mesh owns an independent geometry result. */ { position, normal, color };
+  return /* alloc */ { position, normal, color };
 }

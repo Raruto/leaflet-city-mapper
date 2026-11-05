@@ -9,7 +9,7 @@ export function nodeMatrix(spec) {
   // glTF stores quaternions [x,y,z,w]; convert directly to a scaled column-major matrix.
   const [x, y, z, w] = spec.rotation || geometryQuaternion;
   const [sx, sy, sz] = spec.scale || geometryScale;
-  return /* allocation: required -- Each model node retains its independently editable local transform. */ [
+  return /* alloc */ [
     (1 - 2 * (y * y + z * z)) * sx,
     2 * (x * y + z * w) * sx,
     2 * (x * z - y * w) * sx,

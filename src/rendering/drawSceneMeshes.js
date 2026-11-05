@@ -30,7 +30,7 @@ export function drawSceneMeshes(backend, encoder, meshes) {
         world[4] * (world[1] * world[10] - world[2] * world[9]) +
         world[8] * (world[1] * world[6] - world[2] * world[5]);
       if (!Number.isFinite(determinant) || determinant === 0) {
-        throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error('Singular 3D transform');
+        throw /* alloc */ new Error('Singular 3D transform');
       }
       mesh._frontFace = determinant < 0 ? 'cw' : 'ccw';
       mesh._frontFaceWorldVersion = mesh._worldMatrixVersion;

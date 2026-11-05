@@ -16,8 +16,8 @@ export function clipSegment(a, b, bounds) {
     }
   }
   if (start === end || dx === 0 && dy === 0) return null;
-  return /* allocation: required -- The caller retains this segment without aliasing later clipping results. */ [
-    /* allocation: required -- The segment owns its clipped start coordinate independently of its source. */ [a[0] + start * dx, a[1] + start * dy],
-    /* allocation: required -- The segment owns its clipped end coordinate independently of its source. */ [a[0] + end * dx, a[1] + end * dy],
+  return /* alloc */ [
+    /* alloc */ [a[0] + start * dx, a[1] + start * dy],
+    /* alloc */ [a[0] + end * dx, a[1] + end * dy],
   ];
 }

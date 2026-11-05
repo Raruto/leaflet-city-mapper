@@ -15,11 +15,11 @@ import { createProgram } from '../rendering/createProgram.js';
 export function modelNode(context, index) {
   const { backend, description, materials, active, resources } = context;
   // Track only the recursion path: shared mesh references are valid, cycles are not.
-  if (active.has(index)) throw /* allocation: required -- Cycle errors retain this model traversal stack. */ new Error('Cyclic glTF nodes');
+  if (active.has(index)) throw /* alloc */ new Error('Cyclic glTF nodes');
   const spec = description.nodes[index];
-  if (!spec) throw /* allocation: required -- Validation errors retain this model traversal stack. */ new Error('Invalid glTF node');
+  if (!spec) throw /* alloc */ new Error('Invalid glTF node');
   active.add(index);
-  const group = /* allocation: required -- Each scene node owns an independently attachable group. */ {
+  const group = /* alloc */ {
     ...emptyNode(),
     name: spec.name
   };
@@ -28,35 +28,35 @@ export function modelNode(context, index) {
   let device, geometry, mesh, child;
   if (spec.mesh !== undefined) {
     for (primitive of description.meshes[spec.mesh].primitives) {
-      attributes = /* allocation: required -- Each primitive retains independent GPU attribute descriptors. */ {};
+      attributes = /* alloc */ {};
       for ([semantic, name] of geometrySemantics) {
         if (primitive.attributes[semantic] !== undefined) attributes[name] = readAccessor(description, primitive.attributes[semantic]);
       }
-      if (!attributes.position) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('glTF mesh has no positions');
+      if (!attributes.position) throw /* alloc */ new Error('glTF mesh has no positions');
       vertexCount = attributes.position.data.length / 3;
-      if (attributes.position.size !== 3 || vertexCount < 3) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Invalid glTF vertex attributes');
+      if (attributes.position.size !== 3 || vertexCount < 3) throw /* alloc */ new Error('Invalid glTF vertex attributes');
       for (attribute of Object.values(attributes)) {
-        if (attribute.data.length / attribute.size !== vertexCount) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Invalid glTF vertex attributes');
+        if (attribute.data.length / attribute.size !== vertexCount) throw /* alloc */ new Error('Invalid glTF vertex attributes');
       }
       if (primitive.indices !== undefined) {
         index2 = readAccessor(description, primitive.indices);
-        attributes.index = /* allocation: required -- This primitive retains its own index descriptor. */ { size: 1, data: index2.indices };
+        attributes.index = /* alloc */ { size: 1, data: index2.indices };
         if (!(index2.indices instanceof Uint8Array || index2.indices instanceof Uint16Array || index2.indices instanceof Uint32Array) ||
-          index2.size !== 1 || index2.indices.length % 3) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Invalid glTF triangle indices');
+          index2.size !== 1 || index2.indices.length % 3) throw /* alloc */ new Error('Invalid glTF triangle indices');
         for (i of index2.indices) {
-          if (i >= vertexCount) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Invalid glTF triangle indices');
+          if (i >= vertexCount) throw /* alloc */ new Error('Invalid glTF triangle indices');
         }
       }
-      if (!attributes.index && vertexCount % 3) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Incomplete glTF triangle');
+      if (!attributes.index && vertexCount % 3) throw /* alloc */ new Error('Incomplete glTF triangle');
       if (!attributes.normal) {
         normals = vertexNormals(attributes.position.data, attributes.index?.data);
-        attributes.normal = /* allocation: required -- This primitive retains its own generated normal descriptor. */ { size: 3, data: normals };
+        attributes.normal = /* alloc */ { size: 3, data: normals };
       }
-      style = materials[primitive.material] || /* allocation: required -- An unmaterialed primitive retains its own editable default style. */ {
-        color: /* allocation: required -- The primitive owns its editable default base color. */ [1, 1, 1], metallic: 1,
+      style = materials[primitive.material] || /* alloc */ {
+        color: /* alloc */ [1, 1, 1], metallic: 1,
       };
       if ((style.baseTexture || style.metalTexture || style.emissiveTexture || style.occlusionTexture) && !attributes.uv) {
-        throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('Textured model mesh requires UV coordinates');
+        throw /* alloc */ new Error('Textured model mesh requires UV coordinates');
       }
       program = createProgram(backend, style);
       resources.push(program);
@@ -68,7 +68,7 @@ export function modelNode(context, index) {
         attribute.size ||= 1;
         attribute.count = attribute.data.length / attribute.size;
         attribute.indexFormat = attribute.data instanceof Uint32Array ? 'uint32' : 'uint16';
-        attribute.buffer = device.createBuffer(/* allocation: required -- The device receives an independent descriptor for this primitive attribute buffer. */ {
+        attribute.buffer = device.createBuffer(/* alloc */ {
           size: Math.max(4, attribute.data.byteLength),
           usage: name === 'index'
             ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
@@ -76,13 +76,13 @@ export function modelNode(context, index) {
         });
         device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
       }
-      geometry = /* allocation: required -- Each primitive retains independently disposable GPU geometry. */ {
+      geometry = /* alloc */ {
         device,
         attributes,
-        drawRange: /* allocation: required -- Each geometry retains its independently editable draw range. */ { start: 0, count: attributes.index?.count || attributes.position.count },
+        drawRange: /* alloc */ { start: 0, count: attributes.index?.count || attributes.position.count },
       };
       resources.push(geometry);
-      mesh = /* allocation: required -- Each primitive retains its independently attachable scene mesh. */ {
+      mesh = /* alloc */ {
         ...emptyNode(),
         device,
         geometry,
@@ -92,7 +92,7 @@ export function modelNode(context, index) {
         renderOrder: 0
       };
       mesh.name = description.meshes[spec.mesh].name;
-      mesh.extras = spec.extras || /* allocation: required -- Each mesh retains independently editable metadata when the model supplies none. */ {};
+      mesh.extras = spec.extras || /* alloc */ {};
       setParent(mesh, group);
     }
   }

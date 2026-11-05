@@ -17,10 +17,10 @@ import { update } from '../scene/update.js';
  */
 
 export function createMesh(backend, data, material = defaultMaterial, usage = 0, program) {
-  const { device } = sceneByLayer.get(backend).renderer, attributes = /* allocation: required -- The returned mesh retains an independent vertex-attribute table. */ {};
+  const { device } = sceneByLayer.get(backend).renderer, attributes = /* alloc */ {};
   let name, values, array, size, buffer;
   for ([name, values] of Object.entries(data)) {
-    array = /* allocation: required -- This mesh owns its CPU vertex data for later uploads and edits. */ new Float32Array(values);
+    array = /* alloc */ new Float32Array(values);
     size = name === 'uv' ? 2 : 3;
     buffer = device.createBuffer((
       meshBuffer.size = Math.max(4, array.byteLength),
@@ -29,14 +29,14 @@ export function createMesh(backend, data, material = defaultMaterial, usage = 0,
     ));
 
     device.queue.writeBuffer(buffer, 0, array);
-    attributes[name] = /* allocation: required -- Each mesh attribute retains its own GPU buffer, CPU data and draw count. */ { size, data: array, count: array.length / size, buffer };
+    attributes[name] = /* alloc */ { size, data: array, count: array.length / size, buffer };
   }
-  const mesh = /* allocation: required -- The scene retains this mesh until its owner disposes it. */ {
+  const mesh = /* alloc */ {
     ...emptyNode(),
     device,
-    geometry: /* allocation: required -- The mesh owns its geometry metadata and GPU attribute references. */ { device, attributes, drawRange: /* allocation: required -- The mesh owns an independently mutable draw range. */ { start: 0, count: attributes.position.count } },
-    program: program || createProgram(backend, /* allocation: required -- The returned program retains these mesh-specific material options. */ { vertexColors: true, doubleSided: true, ...material }),
-    id: nextId.value++, renderOrder: 0, extras: /* allocation: required -- Each mesh owns independently mutable feature and application metadata. */ {},
+    geometry: /* alloc */ { device, attributes, drawRange: /* alloc */ { start: 0, count: attributes.position.count } },
+    program: program || createProgram(backend, /* alloc */ { vertexColors: true, doubleSided: true, ...material }),
+    id: nextId.value++, renderOrder: 0, extras: /* alloc */ {},
   };
   setParent(mesh, sceneByLayer.get(backend).root);
   update(backend);

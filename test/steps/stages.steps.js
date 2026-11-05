@@ -23,6 +23,119 @@ import { rotateOnRemove } from '../../src/controls/rotateOnRemove.js';
 
 import { nativeGeometry } from '../../src/geometry/nativeGeometry.js';
 import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
+import { initializerFor } from '../../src/scene/initializerFor.js';
+import { resolveNextInitialization } from '../../src/scene/resolveNextInitialization.js';
+import { initializeLayer } from '../../src/scene/initializeLayer.js';
+import { destroyAfterSubmission } from '../../src/rendering/destroyAfterSubmission.js';
+import { finishCompassPermission } from '../../src/controls/finishCompassPermission.js';
+
+Then('compass permission results preserve denial, stale requests and registration failures', function () {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const events = [], registered = [];
+  let disabled = 0;
+  const handler = {
+    _generation: 2, _orientation: {}, enabled: () => true,
+    disable() { disabled++; },
+    _map: { fire(type, event) { events.push([type, event.error]); } },
+  };
+  const context = { status: 'fulfilled', value: { handler, generation: 2 } };
+  try {
+    globalThis.window = {
+      DeviceOrientationEvent: {},
+      addEventListener(type, listener) { registered.push([type, listener]); },
+    };
+    finishCompassPermission([context, { status: 'fulfilled', value: 'denied' }]);
+    assert.equal(disabled, 1);
+    assert.equal(events[0][0], 'error');
+    assert.match(events[0][1].message, /unavailable or denied/);
+    assert.deepEqual(registered, []);
+    const error = new Error('Permission rejected');
+    finishCompassPermission([context, { status: 'rejected', reason: error }]);
+    assert.deepEqual(events.at(-1), ['error', error]);
+    finishCompassPermission([context, { status: 'fulfilled', value: 'granted' }]);
+    assert.deepEqual(registered, [
+      ['deviceorientation', handler._orientation], ['deviceorientationabsolute', handler._orientation],
+    ]);
+    handler._generation++;
+    finishCompassPermission([context, { status: 'fulfilled', value: 'denied' }]);
+    assert.equal(disabled, 2);
+    handler._generation = 2;
+    delete window.DeviceOrientationEvent;
+    finishCompassPermission([context, { status: 'fulfilled', value: 'granted' }]);
+    assert.equal(disabled, 3);
+    window.DeviceOrientationEvent = {};
+    window.addEventListener = () => { throw error; };
+    finishCompassPermission([context, { status: 'fulfilled', value: 'granted' }]);
+    assert.equal(disabled, 4);
+    assert.deepEqual(events.at(-1), ['error', error]);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'window', previous);
+    else delete globalThis.window;
+  }
+});
+
+Then('source lookup returns a known missing value and queued failures remain observable', async function () {
+  for (const type of ['geojson', 'pmtiles', 'terrain', 'traffic']) {
+    assert.equal(typeof initializerFor(type), 'function');
+  }
+  assert.equal(initializerFor('unknown'), null);
+  const events = [];
+  const layer = { fire(type, payload) { events.push([type, payload.error]); } };
+  const task = { type: 'unknown', layer };
+  const pending = globals.pendingInitializations.splice(0);
+  try {
+    globals.pendingInitializations.push(task);
+    assert.equal(resolveNextInitialization(), task);
+    assert.equal(task.initialize, null);
+    assert.equal(task.error.message, 'Unknown layer type: unknown');
+    const failed = initializeLayer(task);
+    assert.deepEqual(events, [['error', task.error]]);
+    await assert.rejects(failed, error => error === task.error);
+    const next = { type: 'geojson', layer };
+    globals.pendingInitializations.push(next);
+    assert.equal(resolveNextInitialization(), next);
+    assert.equal(next.initialize, initializerFor('geojson'));
+    assert.equal(next.error, undefined);
+  } finally {
+    globals.pendingInitializations.splice(0, globals.pendingInitializations.length, ...pending);
+  }
+  const initializationError = new Error('Initializer failed');
+  const failing = { layer, initialize() { throw initializationError; } };
+  globals.sceneByLayer.set(layer, {});
+  assert.throws(() => initializeLayer(failing), error => error === initializationError);
+  assert.deepEqual(events.at(-1), ['error', initializationError]);
+});
+
+Then('submitted texture cleanup reports failures before destroying resources', async function () {
+  const events = [];
+  const layer = { fire(type, payload) { events.push([type, payload.error]); } };
+  const texture = { destroy() { events.push('destroy'); } };
+  const submitted = Promise.withResolvers();
+  const pending = destroyAfterSubmission(layer, texture, submitted.promise);
+  await Promise.resolve();
+  assert.deepEqual(events, []);
+  submitted.resolve();
+  await pending;
+  assert.deepEqual(events, ['destroy']);
+  events.length = 0;
+  const error = new Error('Submission failed');
+  await destroyAfterSubmission(layer, texture, Promise.reject(error));
+  assert.deepEqual(events, [['error', error], 'destroy']);
+  events.length = 0;
+  await destroyAfterSubmission(layer, texture, {
+    then(resolve, reject) { reject(error); },
+  });
+  assert.deepEqual(events, [['error', error], 'destroy']);
+  events.length = 0;
+  const listenerError = new Error('Error listener failed');
+  await assert.rejects(destroyAfterSubmission({
+    fire() { throw listenerError; },
+  }, texture, Promise.reject(error)), failure => failure === listenerError);
+  assert.deepEqual(events, []);
+  await assert.rejects(destroyAfterSubmission(layer, {
+    destroy() { throw error; },
+  }, Promise.resolve()), failure => failure === error);
+});
 
 Then('frame optimizations preserve buffer isolation, directions and winding', { timeout: 30000 }, async function () {
   await this.page.goto(this.baseUrl);

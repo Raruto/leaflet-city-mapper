@@ -21,7 +21,7 @@ export function findFeature(backend, event) {
         object = object.parent;
       }
       if (object === sceneByLayer.get(backend).model) {
-        return /* allocation: required -- Return an independent model hit to each caller. */ {
+        return /* alloc */ {
           id: sceneByLayer.get(backend).model.id, properties: sceneByLayer.get(backend).model.extras,
           model: sceneByLayer.get(backend).model, mesh: hit.object, point: hit.point
         };
@@ -40,7 +40,7 @@ export function findFeature(backend, event) {
       } else if (hit.faceIndex >= range.faceEnd) {
         low = middle + 1;
       } else {
-        return /* allocation: required -- Preserve each feature hit as an independent result. */ {
+        return /* alloc */ {
           ...range,
           mesh: hit.object,
           point: hit.point

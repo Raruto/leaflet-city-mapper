@@ -12,5 +12,5 @@ export function onClick(layer, event) {
   sceneByLayer.get(layer).hoveredFeature = feature;
   setHighlight(layer, feature);
   showFeature(layer, feature, event);
-  layer.fire('featureclick', /* allocation: required -- Event listeners own this click payload. */ { feature, originalEvent: event });
+  layer.fire('featureclick', /* alloc */ { feature, originalEvent: event });
 }

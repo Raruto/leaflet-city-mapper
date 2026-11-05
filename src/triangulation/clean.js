@@ -13,6 +13,6 @@ export function clean(ring) {
       }
     }
   }
-  if (ring.length < 3) throw /* allocation: required -- Degenerate ring errors retain the failing triangulation stack. */ new Error('Degenerate polygon ring');
+  if (ring.length < 3) throw /* alloc */ new Error('Degenerate polygon ring');
   return ring;
 }

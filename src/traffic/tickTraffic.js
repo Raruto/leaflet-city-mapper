@@ -46,12 +46,12 @@ export function tickTraffic(state) {
   if (state.mesh) moveTraffic(state, (ms - state.rebasedAt) / 1000);
   if (state.mesh && state.lights && (!live || !(performance.now() - state.litAt < 100))) {
     state.litAt = performance.now();
-    const lights = /* allocation: required -- The mesh retains an independent light snapshot for this simulation time. */ [];
+    const lights = /* alloc */ [];
     for (trip of state.trips) {
       ({ x, y, z, dx, dz } = locateTraffic(state, trip));
       for ({ position: [lx, ly, lz], ...light } of state.lights) {
-        lights.push(/* allocation: required -- Each vehicle light retains its own transformed parameters. */ {
-          ...light, position: /* allocation: required -- Each retained light owns an independent world position. */ [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz],
+        lights.push(/* alloc */ {
+          ...light, position: /* alloc */ [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz],
         });
       }
     }

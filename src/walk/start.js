@@ -20,9 +20,9 @@ export function start() {
   const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
   const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * earthCirc * Math.cos(this.state.latlng.lat * radians) / 256));
   let name;
-  this.saved = /* allocation: required -- Preserve each active walk session's map settings. */ {
+  this.saved = /* alloc */ {
     zoom: map.getZoom(), pitch: mapGetPitch(map), scrollWheelZoom: map.options.scrollWheelZoom,
-    handlers: /* allocation: required -- Snapshot enabled handlers for this session. */ [],
+    handlers: /* alloc */ [],
   };
   for (name of sceneWalkHandlers) {
     if (map[name]?.enabled()) this.saved.handlers.push(name);
@@ -31,7 +31,7 @@ export function start() {
   // Wheel zoom moves the camera closer or farther, keeping the walker centred.
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom && 'center';
   this.state.heading = -mapGetBearing(map) * radians;
-  map.setView(this.state.latlng, zoom, /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
+  map.setView(this.state.latlng, zoom, /* alloc */ { animate: false });
   mapSetPitch(map, 75);
   L.DomEvent.on(document, 'keydown keyup', this.onKey);
   L.DomEvent.on(window, 'blur', this.onBlur);

@@ -10,5 +10,5 @@ export function onPointerLeave(layer) {
   sceneByLayer.get(layer).hoveredFeature = null;
   setHighlight(layer, null);
   showFeature(layer, null);
-  layer.fire('featurehover', /* allocation: required -- Event listeners own this leave payload. */ { feature: null });
+  layer.fire('featurehover', /* alloc */ { feature: null });
 }

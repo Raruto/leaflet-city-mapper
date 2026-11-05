@@ -33,7 +33,7 @@ import { updateTrafficTerrain } from './updateTrafficTerrain.js';
 export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = sharedSpeed, ...options } = trafficEmptyOptions) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
   side ??= defaultSide;
-  init3D(layer, /* allocation: required -- Each traffic layer retains its own source and tooltip options. */ {
+  init3D(layer, /* alloc */ {
     tooltip,
     nightLight: Boolean(lights),
     ...options,
@@ -41,15 +41,15 @@ export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed:
   const status = L.DomUtil.create('small', 'traffic-status');
   status.style.cssText = 'display:block;max-width:200px;margin:0 0 4px 20px;color:#555;';
   const template = build(model(0)), stride = template.position.length, vertices = stride / 3;
-  const params = /* allocation: required -- Each compute simulation owns its parameter buffer. */ new ArrayBuffer(16);
-  const paramFloats = /* allocation: required -- This simulation needs a float view of its own compute parameters. */ new Float32Array(params);
-  const paramInts = /* allocation: required -- This simulation needs an integer view of its own compute parameters. */ new Uint32Array(params);
-  const state = /* allocation: required -- Each traffic layer owns its asynchronous requests, clock and GPU lifecycle. */ {
+  const params = /* alloc */ new ArrayBuffer(16);
+  const paramFloats = /* alloc */ new Float32Array(params);
+  const paramInts = /* alloc */ new Uint32Array(params);
+  const state = /* alloc */ {
     layer, url, model, lights, side, outline, velocity, vehicle, status, template, stride, vertices,
     params, paramFloats, paramInts,
-    ready: false, frame: undefined, request: undefined, lanes: /* allocation: required -- Each traffic source owns its mutable lane collection. */ [], tripsKey: undefined,
+    ready: false, frame: undefined, request: undefined, lanes: /* alloc */ [], tripsKey: undefined,
     mesh: undefined, route: undefined, litAt: -Infinity,
-    trips: /* allocation: required -- Each traffic source owns its mutable active-trip collection. */ [], rebasedAt: 0, nextCheck: -Infinity, elapsed: 0, gpu: null,
+    trips: /* alloc */ [], rebasedAt: 0, nextCheck: -Infinity, elapsed: 0, gpu: null,
     lanesDirty: true, stale: false, loaded: undefined, file: undefined,
   };
   // Lane points are [x, z, ground, cumulative length]. Mirrors along() and place().

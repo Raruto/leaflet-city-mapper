@@ -10,6 +10,6 @@ export async function finishAttachment(backend, map, attached) {
     sceneByLayer.get(backend)._added.resolve();
     setRasterTerrain(backend, cameraByMap.get(map)._terrain3D);
   } catch (error) {
-    backend.fire('error', /* allocation: required -- Listeners may retain this error event’s payload after later layer operations. */ { error });
+    backend.fire('error', /* alloc */ { error });
   }
 }

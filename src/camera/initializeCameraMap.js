@@ -10,7 +10,7 @@ import { loadCameraControls } from '../controls/loadCameraControls.js';
 import { noOperation } from '../utils/noOperation.js';
 
 export function initializeCameraMap() {
-  cameraByMap.set(this, /* allocation: required -- Each map owns its camera and interaction data independently. */ {});
+  cameraByMap.set(this, /* alloc */ {});
   if (!document.getElementById('leaflet-camera-zoom-style')) {
     const style = document.createElement('style');
     style.id = 'leaflet-camera-zoom-style';

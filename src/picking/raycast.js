@@ -21,7 +21,7 @@ import { placeTraffic } from '../traffic/placeTraffic.js';
 
 export function raycast(backend, event, objects = sceneByLayer.get(backend).root.children, recursive = true) {
   if (!sceneByLayer.get(backend).renderer) {
-    return /* allocation: required -- Keep each caller's mutable hit list independent. */ [];
+    return /* alloc */ [];
   }
   const traffic = trafficByLayer.get(backend);
   if (traffic) placeTraffic(traffic);
@@ -51,7 +51,7 @@ export function raycast(backend, event, objects = sceneByLayer.get(backend).root
       !Number.isFinite(inverseCamera.m33) || !Number.isFinite(inverseCamera.m34) ||
       !Number.isFinite(inverseCamera.m41) || !Number.isFinite(inverseCamera.m42) ||
       !Number.isFinite(inverseCamera.m43) || !Number.isFinite(inverseCamera.m44)) {
-    throw /* allocation: required -- Give each singular query its own failure stack. */ new Error('Singular 3D transform');
+    throw /* alloc */ new Error('Singular 3D transform');
   }
   sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
   sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];

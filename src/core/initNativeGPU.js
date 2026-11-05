@@ -15,8 +15,8 @@ export function initNativeGPU(source, map) {
     style.textContent = '.leaflet-webgpu-target{opacity:0!important}';
     document.head.append(style);
   }
-  const state = sceneByLayer.get(source)._nativeGPU = /* allocation: required -- Each native layer owns its asynchronous renderer lifecycle. */ {
-    source, map, hidden: /* allocation: required -- Hidden DOM targets are tracked independently for each layer's cleanup. */ new Set(),
+  const state = sceneByLayer.get(source)._nativeGPU = /* alloc */ {
+    source, map, hidden: /* alloc */ new Set(),
   };
   hideTargets(state);
   source.once('remove', removeTargets.bind(null, state));

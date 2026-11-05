@@ -10,7 +10,7 @@ import { updateSky } from './updateSky.js';
 export function updateSun(state) {
   const { control, map, date, slider, output, status } = state;
   try {
-    if (control.live) control.time = /* allocation: required -- Each live update publishes an independent time snapshot. */ new Date();
+    if (control.live) control.time = /* alloc */ new Date();
     const time = control.time.toISOString();
     date.value = time.slice(0, 10);
     slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
@@ -24,8 +24,8 @@ export function updateSun(state) {
       : sun.altitude < 3
         ? 'Low sun · shadows paused'
         : `Sun altitude ${sun.altitude.toFixed(1)}°`;
-    map.fire('simulationtimechange', /* allocation: required -- Listeners may retain each simulation event independently. */ {
-      time: /* allocation: required -- Event listeners must not mutate the control's selected date. */ new Date(control.time),
+    map.fire('simulationtimechange', /* alloc */ {
+      time: /* alloc */ new Date(control.time),
       live: control.live,
     });
     updateSky(state);

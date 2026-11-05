@@ -14,7 +14,7 @@ import { initializeLayer } from './initializeLayer.js';
 
 export function layerInitialize(options = sceneEmptyOptions) {
   if (!sceneByLayer.has(this)) {
-    sceneByLayer.set(this, /* allocation: required -- Native construction owns independent scene data before init hooks run. */ {});
+    sceneByLayer.set(this, /* alloc */ {});
   }
   if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options?.source) {
     if (layerProto.value.initialize) return layerProto.value.initialize.apply(this, arguments);
@@ -30,7 +30,7 @@ export function layerInitialize(options = sceneEmptyOptions) {
     },
     ...core
   } = options;
-  const settings = /* allocation: required -- Preserve this layer's source settings across queued initialization. */ { ...source, ...core };
+  const settings = /* alloc */ { ...source, ...core };
   L.Util.setOptions(this, core);
   sceneByLayer.get(this)._type = type;
   if (type === '3d') {
@@ -38,7 +38,7 @@ export function layerInitialize(options = sceneEmptyOptions) {
     return;
   }
   sceneByLayer.get(this).kind = 'pending';
-  const task = /* allocation: required -- Keep this layer's queued initialization independent. */ { layer: this, type, settings, ready: null };
+  const task = /* alloc */ { layer: this, type, settings, ready: null };
   pendingInitializations.push(task);
   loading.value = loading.value.catch(noOperation).then(resolveNextInitialization);
   const ready = sceneByLayer.get(this).ready = loading.value.then(initializeLayer);

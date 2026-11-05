@@ -13,7 +13,7 @@ import { collectMeshes } from '../collision/collectMeshes.js';
 
 export function conformModelToTerrain(layer, terrain) {
   if (!sceneByLayer.get(layer).model) return;
-  const meshes = /* allocation: required -- Mesh traversal stays private while GPU and terrain callbacks may reenter conformity. */ [];
+  const meshes = /* alloc */ [];
   collectMeshes(sceneByLayer.get(layer).model, meshes);
   let mesh, positions, geometry, position, normals, attribute, normal, world, inverse, i, x, y, z;
   let worldY, weight, worldX, worldZ, point, elevation, offset;
@@ -46,7 +46,7 @@ export function conformModelToTerrain(layer, terrain) {
     normal = geometry.attributes.normal;
     geometry._terrainBaseNormals ||= normal.data.slice();
     attribute.data.set(geometry._terrainBasePositions);
-    world = mesh.worldMatrix, inverse = /* allocation: required -- The inverse matrix is bound to this mesh transform during terrain sampling. */ new DOMMatrix(world).inverse().toFloat64Array();
+    world = mesh.worldMatrix, inverse = /* alloc */ new DOMMatrix(world).inverse().toFloat64Array();
     for (i = 0; i < attribute.data.length; i += 3) {
       x = attribute.data[i], y = attribute.data[i + 1], z = attribute.data[i + 2];
       worldY = world[1] * x + world[5] * y + world[9] * z + world[13];
@@ -54,7 +54,7 @@ export function conformModelToTerrain(layer, terrain) {
       if (!weight) continue;
       worldX = world[0] * x + world[4] * y + world[8] * z + world[12];
       worldZ = world[2] * x + world[6] * y + world[10] * z + world[14];
-      point = crs.transformation.transform(/* allocation: required -- The CRS transformation may retain or mutate this vertex coordinate. */ new L.Point(
+      point = crs.transformation.transform(/* alloc */ new L.Point(
         origin.x + worldX / metres, origin.y - worldZ / metres), pixelScale);
       elevation = getElevation(terrain, point);
       if (!Number.isFinite(elevation)) continue;

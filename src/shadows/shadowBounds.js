@@ -1,8 +1,8 @@
 import { computeBounds } from '../geometry/computeBounds.js';
 
-export function shadowBounds(meshes, output = /* allocation: required -- Callers without an output buffer own independent world bounds. */ {
-  min: /* allocation: required -- The returned bounds own their mutable minimum vector. */ [Infinity, Infinity, Infinity],
-  max: /* allocation: required -- The returned bounds own their mutable maximum vector. */ [-Infinity, -Infinity, -Infinity],
+export function shadowBounds(meshes, output = /* alloc */ {
+  min: /* alloc */ [Infinity, Infinity, Infinity],
+  max: /* alloc */ [-Infinity, -Infinity, -Infinity],
 }) {
   const { min, max } = output;
   min.fill(Infinity); max.fill(-Infinity);
@@ -12,9 +12,9 @@ export function shadowBounds(meshes, output = /* allocation: required -- Callers
     bounds = mesh.geometry.bounds, matrix = mesh.worldMatrix;
     cached = mesh._shadowBounds;
     if (!cached || cached.version !== mesh._worldMatrixVersion || cached.bounds !== bounds) {
-      cached ||= mesh._shadowBounds = /* allocation: required -- Each mesh retains its own transformed bounds cache. */ {
-        min: /* allocation: required -- The mesh cache owns its mutable minimum vector. */ [Infinity, Infinity, Infinity],
-        max: /* allocation: required -- The mesh cache owns its mutable maximum vector. */ [-Infinity, -Infinity, -Infinity],
+      cached ||= mesh._shadowBounds = /* alloc */ {
+        min: /* alloc */ [Infinity, Infinity, Infinity],
+        max: /* alloc */ [-Infinity, -Infinity, -Infinity],
       };
       cached.version = mesh._worldMatrixVersion;
       cached.bounds = bounds;

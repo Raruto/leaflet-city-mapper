@@ -3,7 +3,7 @@ export async function loadCameraControls(map) {
     const { cameraControls } = await import('./cameraControls.js');
     if (map._container?._leaflet_id) cameraControls(map);
   } catch (error) {
-    map.fire('error', /* allocation: required -- Error listeners may retain this failed camera initialization. */ { error });
+    map.fire('error', /* alloc */ { error });
     throw error;
   }
 }

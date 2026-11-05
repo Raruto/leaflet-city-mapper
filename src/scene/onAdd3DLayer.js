@@ -15,11 +15,11 @@ import { attachLayer } from './attachLayer.js';
 export function onAdd3DLayer(backend, map) {
   if (!sceneByLayer.get(backend).location) {
     const center = map.getCenter();
-    sceneByLayer.get(backend).location = /* allocation: required -- Preserve this layer's independent map center. */ new L.LatLng(center.lat, center.lng);
+    sceneByLayer.get(backend).location = /* alloc */ new L.LatLng(center.lat, center.lng);
   }
   if (sceneByLayer.get(backend).url || sceneByLayer.get(backend)._geojson || backend.options.tooltip || sceneByLayer.get(backend).modelUrl) {
     sceneByLayer.get(backend).container = map.getContainer();
-    sceneByLayer.get(backend)._pointerEvents ||= /* allocation: required -- Retain one independent event map per source layer. */ {
+    sceneByLayer.get(backend)._pointerEvents ||= /* alloc */ {
       mousemove: pointerMove,
       click: pointerClick,
       mouseleave: pointerLeave,

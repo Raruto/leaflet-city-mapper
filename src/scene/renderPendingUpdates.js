@@ -6,7 +6,7 @@ import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { render } from '../rendering/render.js';
 
 export function renderPendingUpdates() {
-  const updates = /* allocation: required -- Snapshot updates before reentrant rendering mutates the queue. */ [...pendingUpdates];
+  const updates = /* alloc */ [...pendingUpdates];
   pendingUpdates.clear();
   let failure;
   let backend;

@@ -18,11 +18,11 @@ export function moveCameraTouch(event) {
   if (distance < 1) return;
   const zoom = touch.zooming ? Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(),
     touch.zoom + Math.log2(distance / touch.distance))) : touch.zoom;
-  map.setView(map.getCenter(), zoom, /* allocation: required -- Leaflet mutates and retains view options during nested camera events. */ { animate: false });
+  map.setView(map.getCenter(), zoom, /* alloc */ { animate: false });
   if (map.options.touchZoom !== 'center') {
     const projected = map.project(touch.anchor).subtract(map.project(map.containerPointToLatLng(middle)));
     map.setView(map.unproject(map.project(map.getCenter()).add(projected)), map.getZoom(),
-      /* allocation: required -- Leaflet mutates and retains view options independently for this anchor correction. */ { animate: false });
+      /* alloc */ { animate: false });
   }
   event.preventDefault();
   event.stopImmediatePropagation();

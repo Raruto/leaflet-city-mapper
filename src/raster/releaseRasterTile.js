@@ -16,6 +16,6 @@ export function releaseRasterTile(backend, tile) {
   if (tile.mesh) setParent(tile.mesh, null);
   if (tile.texture) destroyTexture(backend, tile.texture.texture);
   tile.image?.close();
-  backend.fire('tileunload', /* allocation: required -- Listeners may retain this tileunload event’s payload after later layer operations. */ { tile, coords: tile.coords });
+  backend.fire('tileunload', /* alloc */ { tile, coords: tile.coords });
   update(backend);
 }

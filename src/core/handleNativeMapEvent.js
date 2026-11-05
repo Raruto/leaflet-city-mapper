@@ -19,14 +19,14 @@ export function handleNativeMapEvent(event, type = event.type, targets) {
   const dom = target instanceof Element &&
     target.closest('.leaflet-marker-icon,.leaflet-popup,.leaflet-tooltip,.leaflet-control');
   if (dom && context.hovered && (type === context.move || type === context.out)) {
-    fireDOMEvent.call(map, event, context.out, /* allocation: required -- Native event dispatch can reenter and mutate hovered targets. */ [context.hovered]);
+    fireDOMEvent.call(map, event, context.out, /* alloc */ [context.hovered]);
     context.hovered = null;
     map.getContainer().style.cursor = '';
   }
   if (dom || type === context.move && (map.dragging?.moving() || map._animatingZoom)) {
     return fireDOMEvent.call(this, event, type, targets);
   }
-  const hits = /* allocation: required -- Raycasts and DOM listeners may reenter; each dispatch owns its hit ordering. */ [];
+  const hits = /* alloc */ [];
   let candidate, source2, backend;
   if (type !== context.out) {
     for (candidate of context.states) {
@@ -41,11 +41,11 @@ export function handleNativeMapEvent(event, type = event.type, targets) {
   if ((type === 'click' || type === 'preclick') && source && map._draggableMoved(source)) source = null;
   if (type === context.move || type === context.out) {
     if (context.hovered !== source) {
-      if (context.hovered) fireDOMEvent.call(map, event, context.out, /* allocation: required -- Nested mouseout dispatch must not overwrite this target list. */ [context.hovered]);
+      if (context.hovered) fireDOMEvent.call(map, event, context.out, /* alloc */ [context.hovered]);
       context.hovered = source;
-      if (source) fireDOMEvent.call(map, event, context.over, /* allocation: required -- Nested mouseover dispatch must not overwrite this target list. */ [source]);
+      if (source) fireDOMEvent.call(map, event, context.over, /* alloc */ [source]);
       map.getContainer().style.cursor = source ? 'pointer' : '';
     }
   }
-  return fireDOMEvent.call(this, event, type, source ? /* allocation: required -- Each native dispatch owns its target list across listener callbacks. */ [source] : undefined);
+  return fireDOMEvent.call(this, event, type, source ? /* alloc */ [source] : undefined);
 }

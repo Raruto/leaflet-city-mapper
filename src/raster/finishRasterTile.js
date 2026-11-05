@@ -15,15 +15,15 @@ export async function finishRasterTile(backend, tile) {
       tile.coords.z, tile.coords.x, tile.coords.y, tile.request.signal
     );
     if (tile.request.signal.aborted) return;
-    if (!result) throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error(`Tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y} is not in the offline archive`);
+    if (!result) throw /* alloc */ new Error(`Tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y} is not in the offline archive`);
     try {
       blobParts[0] = result.data;
-      const blob = /* allocation: required -- Each asynchronous image decode owns its immutable encoded tile blob. */ new Blob(blobParts);
+      const blob = /* alloc */ new Blob(blobParts);
       blobParts[0] = null;
       tile.image = await createImageBitmap(blob);
     } catch {
       blobParts[0] = null;
-      throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error(`Unable to decode tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`);
+      throw /* alloc */ new Error(`Unable to decode tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`);
     }
     if (tile.request.signal.aborted) {
       tile.image.close();
@@ -35,14 +35,14 @@ export async function finishRasterTile(backend, tile) {
     tile.done = true;
     sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
     registerTerrainTile(backend, tile.coords, tile);
-    backend.fire('tileload', /* allocation: required -- Listeners may retain this tileload event’s payload after later layer operations. */ { tile, coords: tile.coords });
+    backend.fire('tileload', /* alloc */ { tile, coords: tile.coords });
     update(backend);
   } catch (error) {
     if (tile.request.signal.aborted) return;
     tile.error = error.message;
     sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
-    backend.fire('tileerror', /* allocation: required -- Listeners may retain this tileerror event’s payload after later layer operations. */ { tile, coords: tile.coords, error });
-    backend.fire('error', /* allocation: required -- Listeners may retain this error event’s payload after later layer operations. */ { error, coords: tile.coords });
+    backend.fire('tileerror', /* alloc */ { tile, coords: tile.coords, error });
+    backend.fire('error', /* alloc */ { error, coords: tile.coords });
   } finally {
     sceneByLayer.get(backend)._loadingTiles--;
     if (backend._map) {

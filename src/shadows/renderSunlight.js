@@ -35,14 +35,14 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
     }
   }
   drawShadowMeshes(backend, encoder, meshes);
-  const snapshots = /* allocation: required -- The sunlight cache retains this caster snapshot map until the next shadow update. */ new Map();
+  const snapshots = /* alloc */ new Map();
   let mesh2;
   for (mesh2 of meshes) {
-    snapshots.set(mesh2, /* allocation: required -- The shadow cache retains each caster’s world version, geometry and draw-range snapshot independently. */ {
+    snapshots.set(mesh2, /* alloc */ {
       world: mesh2._worldMatrixVersion, geometry: mesh2.geometry,
       start: mesh2.geometry.drawRange.start, count: mesh2.geometry.drawRange.count,
       appearance: mesh2._appearance ?? 1,
     });
   }
-  sun.cache = /* allocation: required -- Each sunlight owner retains a separate direction and caster snapshot. */ { direction: /* allocation: required -- Cached light direction must not alias the mutable live sunlight direction. */ [...sunlight.direction], meshes: snapshots };
+  sun.cache = /* alloc */ { direction: /* alloc */ [...sunlight.direction], meshes: snapshots };
 }

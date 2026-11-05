@@ -38,11 +38,11 @@ export function createProgram(backend, material = defaultMaterial) {
     fragmentShader
   ));
   fragmentShader.code = null;
-  reportCompilation(backend, /* allocation: required -- Each asynchronous compilation report owns its shader-promise batch. */ [
+  reportCompilation(backend, /* alloc */ [
     vertex.getCompilationInfo(),
     fragment.getCompilationInfo()
   ]);
-  const vertexBuffers = /* allocation: required -- The returned program retains its own vertex-buffer slot list. */ [
+  const vertexBuffers = /* alloc */ [
     positionLayout,
     normalLayout,
     material.vertexColors ? colorLayout : null,
@@ -82,21 +82,21 @@ export function createProgram(backend, material = defaultMaterial) {
   ));
   sharedPipelineLayout.bindGroupLayouts[0] = null;
   sharedPipelineLayout.bindGroupLayouts[1] = null;
-  const uniforms = /* allocation: required -- Each returned program owns its mutable uniform table. */ {
-    baseColor: /* allocation: required -- Each program retains its own mutable base-color uniform. */ { value: material.color || /* allocation: required -- Each program owns its mutable default base color. */ [1, 1, 1] },
-    metallic: /* allocation: required -- Each program retains its own mutable metallic uniform. */ { value: material.metallic ?? 0 },
-    roughness: /* allocation: required -- Each program retains its own mutable roughness uniform. */ { value: material.roughness ?? 0.85 },
-    opacity: /* allocation: required -- Each program retains its own mutable opacity uniform. */ { value: material.opacity ?? 1 },
-    alphaCutoff: /* allocation: required -- Each program retains its own mutable alpha-cutoff uniform. */ { value: material.alphaCutoff ?? 0.5 },
-    occlusionStrength: /* allocation: required -- Each program retains its own mutable occlusion-strength uniform. */ { value: material.occlusionStrength ?? 1 },
-    emissive: /* allocation: required -- Each program retains its own mutable emissive uniform. */ { value: material.emissive || /* allocation: required -- Each program owns its mutable default emissive color. */ [0, 0, 0] },
+  const uniforms = /* alloc */ {
+    baseColor: /* alloc */ { value: material.color || /* alloc */ [1, 1, 1] },
+    metallic: /* alloc */ { value: material.metallic ?? 0 },
+    roughness: /* alloc */ { value: material.roughness ?? 0.85 },
+    opacity: /* alloc */ { value: material.opacity ?? 1 },
+    alphaCutoff: /* alloc */ { value: material.alphaCutoff ?? 0.5 },
+    occlusionStrength: /* alloc */ { value: material.occlusionStrength ?? 1 },
+    emissive: /* alloc */ { value: material.emissive || /* alloc */ [0, 0, 0] },
   };
-  if (material.baseTexture) uniforms.baseTexture = /* allocation: required -- The program retains its own replaceable base-texture uniform. */ { value: material.baseTexture };
-  if (material.metalTexture) uniforms.metalTexture = /* allocation: required -- The program retains its own replaceable metal-texture uniform. */ { value: material.metalTexture };
-  if (material.emissiveTexture) uniforms.emissiveTexture = /* allocation: required -- The program retains its own replaceable emissive-texture uniform. */ { value: material.emissiveTexture };
-  if (material.occlusionTexture) uniforms.occlusionTexture = /* allocation: required -- The program retains its own replaceable occlusion-texture uniform. */ { value: material.occlusionTexture };
-  if (material.roofTexture) uniforms.roofTexture = /* allocation: required -- The program retains its own replaceable roof-atlas uniform. */ { value: null };
-  return /* allocation: required -- Each caller retains a program with independent uniforms, material references and pipeline cache. */ {
+  if (material.baseTexture) uniforms.baseTexture = /* alloc */ { value: material.baseTexture };
+  if (material.metalTexture) uniforms.metalTexture = /* alloc */ { value: material.metalTexture };
+  if (material.emissiveTexture) uniforms.emissiveTexture = /* alloc */ { value: material.emissiveTexture };
+  if (material.occlusionTexture) uniforms.occlusionTexture = /* alloc */ { value: material.occlusionTexture };
+  if (material.roofTexture) uniforms.roofTexture = /* alloc */ { value: null };
+  return /* alloc */ {
     device: sceneByLayer.get(backend).renderer.device,
     vertex,
     fragment,
@@ -104,7 +104,7 @@ export function createProgram(backend, material = defaultMaterial) {
     vertexBuffers,
     bindGroupLayout,
     pipelineLayout,
-    pipelineCache: /* allocation: required -- Each program owns device-specific pipeline variants until disposal. */ new Map(),
+    pipelineCache: /* alloc */ new Map(),
     cullMode: material.doubleSided ? 'none' : 'back',
     transparent: material.alphaMode === 'BLEND',
     depthWrite: material.depthWrite ?? material.alphaMode !== 'BLEND',

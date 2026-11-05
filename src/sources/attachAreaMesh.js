@@ -17,33 +17,33 @@ export function attachAreaMesh(context) {
   }
   const device = sceneByLayer.get(backend).renderer.device;
   const data = instanceAreaGeometry(context);
-  const attributes = /* allocation: required -- Keep GPU attributes independent for this retained mesh. */ {
-    position: /* allocation: required -- Retain typed vertex positions with this mesh. */ { size: 3, data: /* allocation: required -- Keep GPU-ready position data owned by this mesh. */ new Float32Array(data.positions) },
-    normal: /* allocation: required -- Retain typed vertex normals with this mesh. */ { size: 3, data: /* allocation: required -- Keep GPU-ready normal data owned by this mesh. */ new Float32Array(data.normals) },
-    color: /* allocation: required -- Retain typed vertex colors with this mesh. */ { size: 3, data: /* allocation: required -- Keep GPU-ready color data owned by this mesh. */ new Float32Array(data.colors) },
+  const attributes = /* alloc */ {
+    position: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.positions) },
+    normal: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.normals) },
+    color: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.colors) },
   };
-  if (data.instanceOffsets) attributes.instanceOffset = /* allocation: required -- Retain this mesh's per-instance offsets. */ { size: 4, data: data.instanceOffsets };
-  if (backend.options.nightLight) attributes.uv = /* allocation: required -- Retain typed UV data with this mesh. */ { size: 2, data: /* allocation: required -- Keep GPU-ready UV data owned by this mesh. */ new Float32Array(context.uvs) };
+  if (data.instanceOffsets) attributes.instanceOffset = /* alloc */ { size: 4, data: data.instanceOffsets };
+  if (backend.options.nightLight) attributes.uv = /* alloc */ { size: 2, data: /* alloc */ new Float32Array(context.uvs) };
   let name, attribute;
   for (name in attributes) {
     attribute = attributes[name];
     attribute.count = attribute.data.length / attribute.size;
-    attribute.buffer = device.createBuffer(/* allocation: required -- Supply a fresh GPU vertex-buffer descriptor. */ {
+    attribute.buffer = device.createBuffer(/* alloc */ {
       size: Math.max(4, attribute.data.byteLength),
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
   }
-  const meshGeometry = /* allocation: required -- Retain independent geometry metadata with this mesh. */ {
+  const meshGeometry = /* alloc */ {
     device,
     attributes,
-    drawRange: /* allocation: required -- Keep this mesh's draw range independently mutable. */ { start: 0, count: attributes.position.count },
+    drawRange: /* alloc */ { start: 0, count: attributes.position.count },
   };
-  area.mesh = /* allocation: required -- Retain the distinct feature mesh for this source area. */ {
+  area.mesh = /* alloc */ {
       ...emptyNode(),
       device,
       geometry: meshGeometry,
-      program: createProgram(backend, /* allocation: required -- Configure this mesh's independent shader material. */ {
+      program: createProgram(backend, /* alloc */ {
         instanced: Boolean(data.instanceOffsets),
         vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
         nightLight: Boolean(backend.options.nightLight),
@@ -53,7 +53,7 @@ export function attachAreaMesh(context) {
       id: nextId.value++,
       renderOrder: 0,
       fadeDuration: 250,
-      extras: /* allocation: required -- Keep picking ranges and lights tied to this mesh. */ { featureFaces: context.featureFaces, lights: context.lights },
+      extras: /* alloc */ { featureFaces: context.featureFaces, lights: context.lights },
     };
   area.buildings = context.featureFaces.length;
   area.skipped = context.skipped;

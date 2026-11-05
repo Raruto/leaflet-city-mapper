@@ -27,7 +27,7 @@ export function step(now) {
   let changed = false;
   let part, key, i;
   if (!this.meshes) {
-    this.meshes = /* allocation: required -- Retain this walker's independently owned limb meshes. */ [];
+    this.meshes = /* alloc */ [];
     for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
     changed = true;
   }
@@ -47,7 +47,7 @@ export function step(now) {
       east -= into * wall[0]; north += into * wall[1];
       if (blocked.call(this, east, north, feet)) east = north = 0;
     }
-    this.state.latlng = /* allocation: required -- Preserve independently observable walker positions. */ new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
+    this.state.latlng = /* alloc */ new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
     this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
     changed = true;
   }
@@ -55,7 +55,7 @@ export function step(now) {
     // The camera (looking along -bearing) swings back behind the walker.
     const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
     if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
-    map.setView(this.state.latlng, map.getZoom(), /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
+    map.setView(this.state.latlng, map.getZoom(), /* alloc */ { animate: false });
   }
   const target = forward ? 0.9 : 0;
   if (Math.abs(this.swing - target) > 1e-3) { this.swing += (target - this.swing) * Math.min(1, dt * 10); changed = true; }

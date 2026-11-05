@@ -10,5 +10,5 @@ export function rendererDeviceError(event) {
   if (sceneByLayer.get(owner)?.renderer?.device !== event.currentTarget) return;
   if (!sceneByLayer.get(owner)._layers) return;
   let layer;
-  for (layer of sceneByLayer.get(owner)._layers) layer.fire('error', /* allocation: required -- Deliver an independently mutable error event to each layer. */ { error: event.error });
+  for (layer of sceneByLayer.get(owner)._layers) layer.fire('error', /* alloc */ { error: event.error });
 }

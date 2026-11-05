@@ -6,7 +6,7 @@ import { initializeNativeLayer } from './initializeNativeLayer.js';
 
 export function layerCallInitHooks() {
   if (!sceneByLayer.has(this)) {
-    sceneByLayer.set(this, /* allocation: required -- Each native layer owns independent scene data, never methods. */ {});
+    sceneByLayer.set(this, /* alloc */ {});
   }
   const initialized = this._initHooksCalled;
   sharedLayerCallInitHooks.value.call(this);

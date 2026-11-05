@@ -46,21 +46,21 @@ export function updateRasterTiles(backend) {
     x <= Math.min(2 ** zoom - 1, southEast.x, archiveSouthEast?.x ?? 2 ** zoom - 1, center.x + TILE_RADIUS); x++) {
     for (y = Math.max(0, northWest.y, archiveNorthWest?.y ?? 0, center.y - TILE_RADIUS);
       y <= Math.min(2 ** zoom - 1, southEast.y, archiveSouthEast?.y ?? 2 ** zoom - 1, center.y + TILE_RADIUS); y++) {
-      wanted.set(`${zoom}/${x}/${y}`, /* allocation: required -- Async tile requests retain these view-specific coordinates independently of later view updates. */ { z: zoom, x, y });
+      wanted.set(`${zoom}/${x}/${y}`, /* alloc */ { z: zoom, x, y });
     }
   }
-  sceneByLayer.get(backend)._wantedRasterTiles = /* allocation: required -- Pruning retains this view-specific wanted-key set and uses its identity to invalidate its cache. */ new Set(wanted.keys());
+  sceneByLayer.get(backend)._wantedRasterTiles = /* alloc */ new Set(wanted.keys());
   const coverage = coverageTiles;
   coverage.clear();
   const parentZoom = Math.max(sceneByLayer.get(backend).header.minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
   if (parentZoom < zoom) {
     for ([key, coords] of wanted) {
       if (sceneByLayer.get(backend)._rasterTiles.get(key)?.done) continue;
-      parent = /* allocation: required -- The coarse request retains these coordinates until its async tile load completes. */ { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
+      parent = /* alloc */ { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
       coverage.set(`${parent.z}/${parent.x}/${parent.y}`, parent);
     }
   }
-  const required = /* allocation: required -- Reentrant tile-unload listeners must not overwrite this update invocation’s required-request snapshot. */ new Map(coverage);
+  const required = /* alloc */ new Map(coverage);
   for ([key, coords] of wanted) required.set(key, coords);
   wanted.clear(); coverage.clear();
   for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {
@@ -68,7 +68,7 @@ export function updateRasterTiles(backend) {
   }
   for ([key, coords] of required) {
     if (sceneByLayer.get(backend)._rasterTiles.has(key)) continue;
-    tile = /* allocation: required -- Each async tile request retains its own coordinates, cancellation controller and completion state. */ { coords, request: /* allocation: required -- Each tile request must be cancellable independently of concurrent requests. */ new AbortController(), done: false };
+    tile = /* alloc */ { coords, request: /* alloc */ new AbortController(), done: false };
     sceneByLayer.get(backend)._rasterTiles.set(key, tile);
   }
   pumpRasterTiles(backend);

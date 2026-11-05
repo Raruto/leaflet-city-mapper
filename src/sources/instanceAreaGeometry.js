@@ -6,10 +6,10 @@ export function instanceAreaGeometry(context) {
   const length = vertices * 3;
   if (!vertices || positions.length !== length * featureFaces.length) return context;
   const originX = Math.trunc(positions[0]), originY = Math.trunc(positions[1]), originZ = Math.trunc(positions[2]);
-  const template = /* allocation: required -- Retain one reduced vertex template for the resulting mesh. */ new Float32Array(length);
+  const template = /* alloc */ new Float32Array(length);
   let i, instance, face, start;
   for (i = 0; i < length; i++) template[i] = positions[i] - (i % 3 === 0 ? originX : i % 3 === 1 ? originY : originZ);
-  const offsets = /* allocation: required -- Retain independent per-instance translations for the resulting mesh. */ new Float32Array(featureFaces.length * 4);
+  const offsets = /* alloc */ new Float32Array(featureFaces.length * 4);
   for (instance = 0; instance < featureFaces.length; instance++) {
     face = featureFaces[instance];
     start = instance * length;
@@ -24,7 +24,7 @@ export function instanceAreaGeometry(context) {
           Math.fround(colors[i]) !== Math.fround(colors[start + i])) return context;
     }
   }
-  return /* allocation: required -- Return independent mesh data without mutating the area accumulation buffers. */ {
+  return /* alloc */ {
     positions: template, normals: normals.slice(0, length), colors: colors.slice(0, length),
     instanceOffsets: offsets,
   };

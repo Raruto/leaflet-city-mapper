@@ -9,7 +9,7 @@ import { scheduleCameraAnimation } from './scheduleCameraAnimation.js';
 
 export function runCameraAnimations(now) {
   cameraAnimationFrame.value = null;
-  const pending = /* allocation: required -- Reentrant animation callbacks may queue replacements; this frame must process only its starting snapshot. */ [...cameraAnimations];
+  const pending = /* alloc */ [...cameraAnimations];
   cameraAnimations.clear();
   let failure;
   let map, animation, progress, eased;

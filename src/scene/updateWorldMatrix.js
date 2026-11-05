@@ -10,13 +10,13 @@ export function updateWorldMatrix(node) {
     node._worldMatrixMode !== matrixMode;
   let i, value, child;
   if (node.matrix) {
-    const state = node._matrixState ||= /* allocation: required -- Cache the source matrix version per scene node. */ new Float64Array(16);
+    const state = node._matrixState ||= /* alloc */ new Float64Array(16);
     for (i = 0; i < 16; i++) {
       if (state[i] !== node.matrix[i]) changed = true;
       state[i] = node.matrix[i];
     }
   } else {
-    const state = node._transformState ||= /* allocation: required -- Cache transform inputs independently per scene node. */ new Float64Array(9);
+    const state = node._transformState ||= /* alloc */ new Float64Array(9);
     for (i = 0; i < 9; i++) {
       value = i < 3 ? node.position[i] : i < 6 ? node.rotation[i - 3] : node.scale[i - 6];
       if (state[i] !== value) changed = true;
@@ -30,7 +30,7 @@ export function updateWorldMatrix(node) {
   let local, world;
   if (node.matrix) local = node.matrix;
   else {
-    const matrix = node._localTransform ||= /* allocation: required -- Retain one transform scratch matrix per node. */ new DOMMatrix();
+    const matrix = node._localTransform ||= /* alloc */ new DOMMatrix();
     matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;
     matrix.m21 = 0, matrix.m22 = 1, matrix.m23 = 0, matrix.m24 = 0;
     matrix.m31 = 0, matrix.m32 = 0, matrix.m33 = 1, matrix.m34 = 0;
@@ -43,7 +43,7 @@ export function updateWorldMatrix(node) {
     matrix.scaleSelf(node.scale[0], node.scale[1], node.scale[2]);
     local = matrix;
   }
-  world = node._worldTransform ||= /* allocation: required -- Retain one composed transform scratch matrix per node. */ new DOMMatrix();
+  world = node._worldTransform ||= /* alloc */ new DOMMatrix();
   if (local instanceof DOMMatrix) {
     world.m11 = local.m11, world.m12 = local.m12, world.m13 = local.m13, world.m14 = local.m14;
     world.m21 = local.m21, world.m22 = local.m22, world.m23 = local.m23, world.m24 = local.m24;

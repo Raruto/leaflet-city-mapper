@@ -21,7 +21,7 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   let layer, tile, coords, tileSize;
   for (layer of rasters) for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
     if (tile.done && !tile.request.signal.aborted && tile.image) {
-      tile._roofEntry ||= /* allocation: required -- Each raster tile retains its atlas-sort entry until the tile is released. */ { tile, layer };
+      tile._roofEntry ||= /* alloc */ { tile, layer };
       tiles.push(tile._roofEntry);
       zoom = Math.max(zoom, tile.coords.z);
     }
@@ -40,8 +40,8 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   const scale = Math.min(1, 4096 / Math.max(size.x, size.y));
   const width = Math.max(1, Math.ceil(size.x * scale)), height = Math.max(1, Math.ceil(size.y * scale));
   const pixels = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
-  const roof = /* allocation: required -- Observers may retain the prior atlas metadata while this backend publishes a replacement. */ {
-    matrix: /* allocation: required -- Each published atlas snapshot owns its projection matrix. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  const roof = /* alloc */ {
+    matrix: /* alloc */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     texture: sceneByLayer.get(backend)._roofRaster?.texture,
   };
   sceneByLayer.get(backend)._roofRaster = roof;
@@ -56,11 +56,11 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
     roof.texture.texture = renderer.device.createTexture(descriptor);
     roof.texture.width = width; roof.texture.height = height;
   }
-  roof.texture ||= /* allocation: required -- The backend owns this atlas GPU texture and sampler until disposal. */ {
+  roof.texture ||= /* alloc */ {
     device: renderer.device,
     texture: renderer.device.createTexture(descriptor),
     sampler: renderer.device.createSampler(roofSampler),
-    samplerOptions: /* allocation: required -- The retained atlas texture owns its sampler options for device restoration. */ { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
+    samplerOptions: /* alloc */ { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
     image: null, width, height,
     format: 'rgba8unorm', srgb: false, flipY: false, uploaded: null,
   };

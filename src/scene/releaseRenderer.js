@@ -8,7 +8,7 @@ export async function releaseRenderer(renderer, backend) {
     renderer.sunlight?.buffer?.destroy();
     renderer.sunlight?.lights?.destroy();
   } catch (error) {
-    backend.fire('error', /* allocation: required -- Preserve the renderer failure for this layer. */ { error });
+    backend.fire('error', /* alloc */ { error });
   }
   renderer.device.destroy();
 }

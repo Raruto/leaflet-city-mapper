@@ -1,5 +1,17 @@
 Feature: Decomposed rendering and source stages
   @unit
+  Scenario: Invalid source routing preserves errors without throwing during lookup
+    Then source lookup returns a known missing value and queued failures remain observable
+
+  @unit
+  Scenario: Compass denial uses an explicit failure path without losing listener errors
+    Then compass permission results preserve denial, stale requests and registration failures
+
+  @unit
+  Scenario: Submitted texture cleanup preserves rejection reporting and destruction order
+    Then submitted texture cleanup reports failures before destroying resources
+
+  @unit
   Scenario: Operation contexts keep maps and areas independent
     Then operation contexts isolate nested geometry and source mesh attachment
 

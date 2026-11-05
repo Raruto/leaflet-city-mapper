@@ -7,7 +7,7 @@ export function loadTraffic(state) {
   const { time } = trafficNow(state);
   if (!Number.isFinite(time?.getTime())) return;
   state.request?.abort();
-  const { signal } = state.request = /* allocation: required -- Each replacement lane request needs independently cancellable state. */ new AbortController();
+  const { signal } = state.request = /* alloc */ new AbortController();
   fetchTrafficLanes(state, time, signal).then(
     loadedTrafficLanes.bind(null, state, signal),
     failedTrafficLoad.bind(null, state, signal),

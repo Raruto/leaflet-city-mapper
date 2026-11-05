@@ -23,33 +23,33 @@ export function roofCoverage(mesh, backend, rasters) {
     }
     if (sceneByLayer.get(layer).header.maxLat !== undefined && sceneByLayer.get(layer).header.minLon !== undefined &&
       sceneByLayer.get(layer).header.minLat !== undefined && sceneByLayer.get(layer).header.maxLon !== undefined) {
-      nw = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [sceneByLayer.get(layer).header.maxLat, sceneByLayer.get(layer).header.minLon], zoom);
-      se = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [sceneByLayer.get(layer).header.minLat, sceneByLayer.get(layer).header.maxLon], zoom);
+      nw = map.project(/* alloc */ [sceneByLayer.get(layer).header.maxLat, sceneByLayer.get(layer).header.minLon], zoom);
+      se = map.project(/* alloc */ [sceneByLayer.get(layer).header.minLat, sceneByLayer.get(layer).header.maxLon], zoom);
       minX = Math.max(minX, nw.x); minY = Math.max(minY, nw.y);
       maxX = Math.min(maxX, se.x); maxY = Math.min(maxY, se.y);
       if (minX >= maxX || minY >= maxY) continue;
     }
     intersectsArchive = true;
-    remaining = /* allocation: required -- Rectangle subtraction needs an operation-local worklist across reentrant tile access. */ [
-      /* allocation: required -- The uncovered footprint has independently mutable rectangle coordinates. */ [minX, minY, maxX, maxY],
+    remaining = /* alloc */ [
+      /* alloc */ [minX, minY, maxX, maxY],
     ];
     for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
       // Failed imagery already reports an error; do not hide the building indefinitely.
       if (!tile.done && !tile.error) continue;
       size = 256 * 2 ** (zoom - tile.coords.z);
       left = tile.coords.x * size, top = tile.coords.y * size;
-      pieces = /* allocation: required -- Each subtraction step retains its own uncovered rectangles while consuming the previous list. */ [];
+      pieces = /* alloc */ [];
       for ([x0, y0, x1, y1] of remaining) {
         l = Math.max(x0, left), t = Math.max(y0, top);
         r = Math.min(x1, left + size), b = Math.min(y1, top + size);
         if (l >= r || t >= b) {
-          pieces.push(/* allocation: required -- This surviving rectangle retains its coordinates for the next subtraction step. */ [x0, y0, x1, y1]);
+          pieces.push(/* alloc */ [x0, y0, x1, y1]);
           continue;
         }
-        if (y0 < t) pieces.push(/* allocation: required -- The uncovered top strip needs independent coordinates in the worklist. */ [x0, y0, x1, t]);
-        if (b < y1) pieces.push(/* allocation: required -- The uncovered bottom strip needs independent coordinates in the worklist. */ [x0, b, x1, y1]);
-        if (x0 < l) pieces.push(/* allocation: required -- The uncovered left strip needs independent coordinates in the worklist. */ [x0, t, l, b]);
-        if (r < x1) pieces.push(/* allocation: required -- The uncovered right strip needs independent coordinates in the worklist. */ [r, t, x1, b]);
+        if (y0 < t) pieces.push(/* alloc */ [x0, y0, x1, t]);
+        if (b < y1) pieces.push(/* alloc */ [x0, b, x1, y1]);
+        if (x0 < l) pieces.push(/* alloc */ [x0, t, l, b]);
+        if (r < x1) pieces.push(/* alloc */ [r, t, x1, b]);
       }
       remaining = pieces;
       if (!remaining.length) return true;

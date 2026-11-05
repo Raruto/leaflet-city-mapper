@@ -12,7 +12,7 @@ export function treeGeometry(point, style, addTriangle) {
   if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) ||
     trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top ||
     crownShape !== 'round' && crownShape !== 'cone') {
-    throw /* allocation: required -- Validation errors retain their own message and stack. */ new Error('Invalid tree dimensions or crown shape');
+    throw /* alloc */ new Error('Invalid tree dimensions or crown shape');
   }
   const trunk = parseColor(style.trunkColor ?? 0x72513a);
   const crown = parseColor(style.color ?? 0x4f823b);

@@ -14,7 +14,7 @@ export function removeLayer(layer) {
   if (this._loaded) removeSceneLayer(layer, this);
   delete this._layers[id];
   if (this._loaded) {
-    this.fire('layerremove', /* allocation: required -- Native layer-removal listeners can retain or mutate event data. */ { layer });
+    this.fire('layerremove', /* alloc */ { layer });
     layer.fire('remove');
   }
   layer._map = layer._mapToAdd = null;

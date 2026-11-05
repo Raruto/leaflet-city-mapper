@@ -6,7 +6,7 @@ export function ensureRoofBlit(renderer) {
   const device = renderer.device;
   if (!renderer.roofBlit) {
     const module = device.createShaderModule(roofShader);
-    renderer.roofBlit = /* allocation: required -- Each renderer retains its own roof-blit pipeline and sampler. */ {
+    renderer.roofBlit = /* alloc */ {
       pipeline: device.createRenderPipeline((
       roofPipeline.vertex.module = module,
       roofPipeline.fragment.module = module,

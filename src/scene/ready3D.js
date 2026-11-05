@@ -10,11 +10,11 @@ import { update } from './update.js';
 export async function ready3D(layer) {
   try {
     sceneByLayer.get(layer).root = emptyNode();
-    sceneByLayer.get(layer).raycaster = /* allocation: required -- Keep this layer's ray-casting scratch independent. */ {
-      origin: /* allocation: required -- Keep each layer's ray origin independent. */ [0, 0, 0],
-      direction: /* allocation: required -- Keep each layer's ray direction independent. */ [0, 0, 0],
-      inverse: /* allocation: required -- Reuse a transform matrix owned by this layer. */ new DOMMatrix(),
-      meshes: /* allocation: required -- Keep concurrent layer hit lists independent. */ [],
+    sceneByLayer.get(layer).raycaster = /* alloc */ {
+      origin: /* alloc */ [0, 0, 0],
+      direction: /* alloc */ [0, 0, 0],
+      inverse: /* alloc */ new DOMMatrix(),
+      meshes: /* alloc */ [],
     };
     if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson) {
       sceneByLayer.get(layer).group = sceneByLayer.get(layer).root;
@@ -29,7 +29,7 @@ export async function ready3D(layer) {
     layer.fire('ready');
     return layer;
   } catch (error) {
-    layer.fire('error', /* allocation: required -- Preserve each layer's initialization error event. */ { error });
+    layer.fire('error', /* alloc */ { error });
     throw error;
   }
 }

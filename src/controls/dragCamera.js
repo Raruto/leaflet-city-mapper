@@ -11,7 +11,7 @@ import { cameraDragContextMenu } from './cameraDragContextMenu.js';
 import { endAllCameraDrags } from './endAllCameraDrags.js';
 
 export function dragCamera(map, element, accept, sensitivity = cameraDragSensitivity, orbit = false) {
-  const state = /* allocation: required -- Each draggable element retains independent pointer and lifecycle state. */ { map, element, accept, sensitivity, orbit, drag: null, moved: false };
+  const state = /* alloc */ { map, element, accept, sensitivity, orbit, drag: null, moved: false };
   dragStates.value.set(element, state);
   cameraDrags.value.add(state);
   element.addEventListener('pointerdown', cameraDragDown, true);

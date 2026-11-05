@@ -4,11 +4,11 @@ import { addTriangle } from './addTriangle.js';
 import { isClockWise } from '../triangulation/isClockWise.js';
 
 export function buildAreaPolygon(context, rings, top, bottom, baseColor) {
-  if (!rings.length) throw /* allocation: required -- Preserve the failure stack for empty polygons. */ new Error('Empty GeoJSON polygon');
-  const paths = /* allocation: required -- Keep ring paths independent during this polygon's triangulation. */ [];
+  if (!rings.length) throw /* alloc */ new Error('Empty GeoJSON polygon');
+  const paths = /* alloc */ [];
   let ring, path, point, a, b, c, index, sign, i, length, nx, nz;
   for (ring of rings) paths.push(projectRing(context, ring));
-  const points = /* allocation: required -- Keep flattened point order stable for this polygon's indices. */ [];
+  const points = /* alloc */ [];
   for (path of paths) for (point of path) points.push(point);
   for ([a, b, c] of triangulate(paths[0], paths.slice(1))) {
     addTriangle(context, points[a], top, points[b], top, points[c], top, 0, 1, 0, baseColor);

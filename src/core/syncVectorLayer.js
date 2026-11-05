@@ -24,6 +24,6 @@ export function syncVectorLayer(state) {
     opacity = i ? source.options.opacity : source.options.fillOpacity;
     if (!positions.length) continue;
     ({ r, g, b } = parseColor(color));
-    putNativeMesh(state, key, positions, /* allocation: required -- Each mesh material retains its own mutable uniform color. */ [r, g, b], opacity ?? 1);
+    putNativeMesh(state, key, positions, /* alloc */ [r, g, b], opacity ?? 1);
   }
 }

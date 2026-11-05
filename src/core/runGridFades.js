@@ -8,7 +8,7 @@ import { updateGridOpacity } from './updateGridOpacity.js';
 
 export function runGridFades() {
   gridFadeFrame.value = null;
-  const layers = /* allocation: required -- Reentrant fade callbacks may reschedule layers; process only the starting frame snapshot. */ [...pendingGridFades];
+  const layers = /* alloc */ [...pendingGridFades];
   let layer, version;
   for ([layer, version] of layers) {
     if (pendingGridFades.get(layer) !== version) continue;

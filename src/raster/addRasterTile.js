@@ -44,7 +44,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
     const bounds = sceneByLayer.get(backend)._terrainBounds, columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
     const { elevations, low, high } = terrainAtlas(sceneByLayer.get(backend)._terrainTiles, bounds);
     if (sceneByLayer.get(backend)._dem) destroyTexture(backend, sceneByLayer.get(backend)._dem.texture);
-    sceneByLayer.get(backend)._dem = /* allocation: required -- The terrain backend retains its own DEM GPU texture and elevation range. */ {
+    sceneByLayer.get(backend)._dem = /* alloc */ {
       texture: device.createTexture((
       demTexture.size[0] = columns * 256,
       demTexture.size[1] = rows * 256,
@@ -69,8 +69,8 @@ export async function addRasterTile(backend, layer, coords, tile) {
     ));
     demTarget.texture = null;
 
-    sceneByLayer.get(backend)._terrainGrids = /* allocation: required -- The terrain backend owns its device-specific cached grid buffers. */ new Map();
-    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* allocation: required -- The terrain program retains these device-specific DEM and raster material options. */ {
+    sceneByLayer.get(backend)._terrainGrids = /* alloc */ new Map();
+    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* alloc */ {
       baseTexture: texture,
       unlit: true,
       terrain: sceneByLayer.get(backend)._dem,
@@ -102,29 +102,29 @@ export async function addRasterTile(backend, layer, coords, tile) {
   const bottom = Math.min(sceneByLayer.get(backend)._dem.low, base) - base, top = Math.max(sceneByLayer.get(backend)._dem.high, base) - base;
   const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
   // ponytail: ray picking sees the flat unit grid; read the DEM back if terrain must be pickable.
-  const geometry = /* allocation: required -- Each displaced tile mesh retains independent geometry and culling metadata. */ {
+  const geometry = /* alloc */ {
     device,
     attributes,
-    drawRange: /* allocation: required -- Each displaced tile retains its independently mutable draw range. */ { start: 0, count: attributes.index.count },
+    drawRange: /* alloc */ { start: 0, count: attributes.index.count },
     // Local bounds whose radius, scaled by the largest axis, still covers the displaced tile.
-    bounds: /* allocation: required -- Each displaced tile retains its own elevation-aware culling bounds. */ {
-      min: /* allocation: required -- The displaced tile bounds own their minimum coordinate vector. */ [0, bottom, 0], max: /* allocation: required -- The displaced tile bounds own their maximum coordinate vector. */ [1, top, 1], center: /* allocation: required -- The displaced tile bounds own their center coordinate vector. */ [0.5, (bottom + top) / 2, 0.5],
+    bounds: /* alloc */ {
+      min: /* alloc */ [0, bottom, 0], max: /* alloc */ [1, top, 1], center: /* alloc */ [0.5, (bottom + top) / 2, 0.5],
       radius: Math.hypot(sizeX, top - bottom, sizeZ) / 2 / Math.max(sizeX, 1, sizeZ),
     },
   };
-  const mesh = /* allocation: required -- The terrain scene retains this displaced tile mesh until tile removal. */ {
-    position: /* allocation: required -- Each displaced tile owns its mutable scene position. */ [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
-    rotation: /* allocation: required -- Each displaced tile owns its mutable scene rotation. */ [0, 0, 0],
-    scale: /* allocation: required -- Each displaced tile owns its mutable scene scale. */ [sizeX, 1, sizeZ],
-    worldMatrix: /* allocation: required -- Each displaced tile owns its mutable world-transform matrix. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    children: /* allocation: required -- Each displaced tile owns its scene-child list. */ [],
+  const mesh = /* alloc */ {
+    position: /* alloc */ [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
+    rotation: /* alloc */ [0, 0, 0],
+    scale: /* alloc */ [sizeX, 1, sizeZ],
+    worldMatrix: /* alloc */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    children: /* alloc */ [],
     visible: true,
     device,
     geometry,
     program: sceneByLayer.get(backend)._rasterProgram,
     texture,
     // DEM pixel of the tile's corner, DEM pixels per tile, and the elevation at the layer origin.
-    terrain: /* allocation: required -- Each displaced tile retains its own DEM origin, scale and elevation uniform. */ [
+    terrain: /* alloc */ [
       coords.x * 256 * terrainScale - sceneByLayer.get(backend)._terrainBounds.min.x * 256,
       coords.y * 256 * terrainScale - sceneByLayer.get(backend)._terrainBounds.min.y * 256,
       256 * terrainScale,

@@ -11,12 +11,12 @@ import { init3D } from '../scene/init3D.js';
  */
 export function initTerrain(layer, options) {
   const terrainSource = options.url;
-  const layerOptions = /* allocation: required -- Layer initialization retains its own options without mutating the caller’s terrain-source options. */ { ...options };
+  const layerOptions = /* alloc */ { ...options };
   delete layerOptions.url;
   init3D(layer, layerOptions);
   sceneByLayer.get(layer).terrainSource = terrainSource;
-  sceneByLayer.get(layer)._terrainTiles = /* allocation: required -- Each terrain layer retains its own decoded DEM tiles. */ new Map();
-  sceneByLayer.get(layer)._rasterTiles = /* allocation: required -- Each terrain layer owns its independently removable displaced raster meshes. */ new Map();
+  sceneByLayer.get(layer)._terrainTiles = /* alloc */ new Map();
+  sceneByLayer.get(layer)._rasterTiles = /* alloc */ new Map();
   sceneByLayer.get(layer)._terrainReady = false;
   sceneByLayer.get(layer).kind = 'terrain';
 }
