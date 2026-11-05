@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { After, AfterAll, Before, BeforeAll, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium, firefox } from 'playwright';
 import { build } from 'esbuild';
@@ -9,13 +10,13 @@ setDefaultTimeout(10000);
 // Shared by the 3D scenarios when COVERAGE_3D is enabled.
 const coveredFunctions = new Map();
 
-Before({ tags: '@coverage' }, async function () {
+Before({ tags: '@coverage and not @unit' }, async function () {
   if (process.env.COVERAGE_3D) {
     await this.page.coverage.startJSCoverage({ resetOnNavigation: false });
   }
 });
 
-After({ tags: '@coverage' }, async function () {
+After({ tags: '@coverage and not @unit' }, async function () {
   if (!process.env.COVERAGE_3D) return;
   const entries = await this.page.coverage.stopJSCoverage();
   for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
@@ -87,19 +88,27 @@ async function getBrowser() {
   }
 }
 
-AfterAll({ timeout: 30000 }, async () => {
-  await browser?.close();
-  await new Promise((resolve, reject) => {
-    server.close(error => error ? reject(error) : resolve());
-    server.closeAllConnections();
-  });
+// GPU-process shutdown on Windows can take about a minute even after all pages close.
+AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => {
+  try {
+    await browser?.close();
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve());
+      server.closeAllConnections();
+    });
+  }
 });
 
 // @unit scenarios run in Node only and need no browser page.
-Before({ tags: 'not @unit', timeout: 60000 }, async function () {
+Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 60000 }, async function () {
   await getBrowser();
   this.baseUrl = baseUrl;
   this.context = await browser.newContext();
+  await this.context.route(/^https:\/\/unpkg\.com\/leaflet@1\.9(?:\.4)?\/dist\/(?:leaflet-src\.js|leaflet\.css|images\/[\w-]+\.png)$/, route => {
+    const file = new URL(route.request().url()).pathname.split('/dist/')[1];
+    return route.fulfill({ path: fileURLToPath(new URL(`../../node_modules/leaflet/dist/${file}`, import.meta.url)) });
+  });
   await this.context.route(/\.html(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
@@ -122,9 +131,9 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `const initialize = L.Layer.prototype.initialize;
+  const pmtilesMock = `const initialize = CityMapper.layer;
     if (initialize && !initialize._testArchive) {
-      L.Layer.prototype.initialize = Object.assign(function (options = {}) {
+      CityMapper.layer = Object.assign(function (options = {}) {
         const source = options.source;
         if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' &&
           !/\\.(glb|gltf)(?:[?#]|$)/i.test(source.url) && !source.archive) {
@@ -148,10 +157,13 @@ Before({ tags: 'not @unit', timeout: 60000 }, async function () {
   };
   this.pluginBundle = pluginBundle;
   // Source-level checks and the instrumented bundle must share the same private state.
-  await this.context.route('**/src/constants/cityMapper.js', route => route.fulfill({
-    contentType: 'text/javascript',
-    body: 'export const cityMapper = globalThis.cityMapperTestState;',
-  }));
+  await this.context.route('**/src/state.js', async route => {
+    if (!await this.page.evaluate(() => Boolean(globalThis.cityMapperTestState))) return route.continue();
+    await route.fulfill({
+      contentType: 'text/javascript',
+      body: 'export const state = globalThis.cityMapperTestState;',
+    });
+  });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
   this.page = await this.context.newPage();
 });
@@ -161,7 +173,7 @@ After({ tags: 'not @unit' }, async function () {
 });
 
 // Firefox may take several seconds to create its first WebGPU adapter.
-Before({ tags: '@coverage', timeout: 30000 }, async function () {
+Before({ tags: '@coverage and not @unit', timeout: 30000 }, async function () {
   await this.page.goto(baseUrl);
   const supported = await this.page.evaluate(async () =>
     Boolean(navigator.gpu && await navigator.gpu.requestAdapter()));

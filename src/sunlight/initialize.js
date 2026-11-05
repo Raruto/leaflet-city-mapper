@@ -1,11 +1,12 @@
+import { pluginState } from '../core/pluginState.js';
 import { addTimeLayer } from './addTimeLayer.js';
 import { removeTimeLayer } from './removeTimeLayer.js';
 
 export function initialize(options) {
   L.Util.setOptions(this, options);
   this.live = true;
-  this.layer = new L.Layer();
-  this.layer.control = this;
-  this.layer.onAdd = addTimeLayer;
-  this.layer.onRemove = removeTimeLayer;
+  this.layer = /* allocation: required -- Each time control needs its own removable Leaflet layer. */ new L.Layer();
+  pluginState(this.layer).control = this;
+  pluginState(this.layer).onAdd = addTimeLayer;
+  pluginState(this.layer).onRemove = removeTimeLayer;
 }

@@ -1,6 +1,6 @@
 import { cancelCameraAnimation } from './cancelCameraAnimation.js';
 
-export function mapStopPitchBearingAnimation() {
-  cancelCameraAnimation(this);
-  return this;
+export function mapStopPitchBearingAnimation(map) {
+  cancelCameraAnimation(map);
+  return map;
 }

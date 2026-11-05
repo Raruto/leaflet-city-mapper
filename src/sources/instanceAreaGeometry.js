@@ -5,16 +5,18 @@ export function instanceAreaGeometry(context) {
   const vertices = featureFaces[0].vertexEnd;
   const length = vertices * 3;
   if (!vertices || positions.length !== length * featureFaces.length) return context;
-  const origin = [Math.trunc(positions[0]), Math.trunc(positions[1]), Math.trunc(positions[2])];
-  const template = new Float32Array(length);
-  let i, instance, axis, face, start;
-  for (i = 0; i < length; i++) template[i] = positions[i] - origin[i % 3];
-  const offsets = new Float32Array(featureFaces.length * 4);
+  const originX = Math.trunc(positions[0]), originY = Math.trunc(positions[1]), originZ = Math.trunc(positions[2]);
+  const template = /* allocation: required -- Retain one reduced vertex template for the resulting mesh. */ new Float32Array(length);
+  let i, instance, face, start;
+  for (i = 0; i < length; i++) template[i] = positions[i] - (i % 3 === 0 ? originX : i % 3 === 1 ? originY : originZ);
+  const offsets = /* allocation: required -- Retain independent per-instance translations for the resulting mesh. */ new Float32Array(featureFaces.length * 4);
   for (instance = 0; instance < featureFaces.length; instance++) {
     face = featureFaces[instance];
     start = instance * length;
     if (face.vertexStart !== instance * vertices || face.vertexEnd !== (instance + 1) * vertices) return context;
-    for (axis = 0; axis < 3; axis++) offsets[instance * 4 + axis] = origin[axis] + positions[start + axis] - positions[axis];
+    offsets[instance * 4] = originX + positions[start] - positions[0];
+    offsets[instance * 4 + 1] = originY + positions[start + 1] - positions[1];
+    offsets[instance * 4 + 2] = originZ + positions[start + 2] - positions[2];
     offsets[instance * 4 + 3] = instance * vertices;
     for (i = 0; i < length; i++) {
       if (Math.fround(template[i] + offsets[instance * 4 + i % 3]) !== Math.fround(positions[start + i]) ||
@@ -22,7 +24,7 @@ export function instanceAreaGeometry(context) {
           Math.fround(colors[i]) !== Math.fround(colors[start + i])) return context;
     }
   }
-  return {
+  return /* allocation: required -- Return independent mesh data without mutating the area accumulation buffers. */ {
     positions: template, normals: normals.slice(0, length), colors: colors.slice(0, length),
     instanceOffsets: offsets,
   };

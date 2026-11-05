@@ -1,3 +1,4 @@
+import { mapSetPitch } from '../camera/mapSetPitch.js';
 import * as disposeMesh from '../rendering/disposeMesh.js';
 import { onKey } from './onKey.js';
 import { onBlur } from './onBlur.js';
@@ -7,11 +8,11 @@ import { onTerrain } from './onTerrain.js';
 export function stop() {
   const map = this.layer._map;
   cancelAnimationFrame(this.frame);
-  this.keys.clear(); this.drag = null;
+  this.keys.clear(); this.dragging = false;
   L.DomEvent.off(document, 'keydown keyup', this.onKey);
   L.DomEvent.off(window, 'blur', this.onBlur);
   let mesh, name;
-  for (mesh of this.meshes || []) disposeMesh.disposeMesh(this.layer, mesh);
+  if (this.meshes) for (mesh of this.meshes) disposeMesh.disposeMesh(this.layer, mesh);
   this.meshes = null;
   this.button.setAttribute('aria-pressed', 'false');
   this.button.style.background = '#fff';
@@ -21,7 +22,7 @@ export function stop() {
   map.off('terrainchange', this.onTerrain);
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom;
   for (name of this.saved.handlers) map[name].enable();
-  map.setView(this.state.latlng, this.saved.zoom, { animate: false });
-  map.setPitch(this.saved.pitch);
+  map.setView(this.state.latlng, this.saved.zoom, /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
+  mapSetPitch(map, this.saved.pitch);
   this.saved = null;
 }

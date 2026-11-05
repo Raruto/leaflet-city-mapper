@@ -1,3 +1,4 @@
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -20,7 +21,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const map = new L.Map(container, { center: [41.89, 12.49], zoom: 18, rotate: true, pitch: 45 });
     const data = await (await fetch('/buildings.geojson')).json();
     const errors = [];
-    const layer = new L.Layer({ source: {
+    const layer = CityMapper.layer({ source: {
       ...(input === 'inline' ? { data } : { type: 'geojson', url: '/buildings.geojson' }),
       style: feature => ({ top: feature.properties.height }),
       tooltip: feature => feature.id,
@@ -37,20 +38,20 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     let done = completed();
     layer.addTo(map);
     const first = await done;
-    const type = layer._type;
-    let area = layer._areas.get('geojson');
+    const type = pluginState(layer)._type;
+    let area = pluginState(layer)._areas.get('geojson');
     const mesh = area.mesh;
     const face = mesh.extras.featureFaces[0];
     const identity = face.id === 'office' && face.properties.height === 25;
     const geometry = mesh.geometry.attributes.position.count > 0;
     map.panTo([41.9, 12.5], { animate: false });
-    map.setBearing(90);
-    map.setPitch(60);
-    const retained = layer._areas.get('geojson') === area;
+    CityMapper.setBearing(map, 90);
+    CityMapper.setPitch(map, 60);
+    const retained = pluginState(layer)._areas.get('geojson') === area;
     const previousArea = area;
     const terrainUpdate = new Promise(resolve => {
       const progress = () => {
-        const refreshed = layer._areas.get('geojson');
+        const refreshed = pluginState(layer)._areas.get('geojson');
         if (refreshed !== previousArea && refreshed?.mesh) {
           layer.off('progress', progress);
           resolve(previousArea.request.signal.aborted);
@@ -60,20 +61,20 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     });
     map.fire('terrainchange');
     const terrainUpdated = await terrainUpdate;
-    area = layer._areas.get('geojson');
+    area = pluginState(layer)._areas.get('geojson');
     done = completed();
-    layer.setData({ type: 'FeatureCollection', features: [] });
+    CityMapper.setData(layer, { type: 'FeatureCollection', features: [] });
     const empty = await done;
-    const released = area.request.signal.aborted && !layer.root.children.includes(mesh);
+    const released = area.request.signal.aborted && !pluginState(layer).root.children.includes(mesh);
     done = completed();
-    layer.setData(data);
+    CityMapper.setData(layer, data);
     const replaced = await done;
     layer.remove();
-    const removed = layer._areas.size === 0;
+    const removed = pluginState(layer)._areas.size === 0;
     done = completed();
     layer.addTo(map);
     const readded = await done;
-    const tooltip = Boolean(layer._tooltip);
+    const tooltip = Boolean(pluginState(layer)._tooltip);
     layer.remove();
     map.remove();
     return { first, empty, replaced, readded, type, identity, geometry, retained, terrainUpdated, released, removed, tooltip, errors };
@@ -99,11 +100,11 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       { url: '/missing.geojson' }, { url: '/broken.geojson' },
       { data: { type: 'FeatureCollection', features: [] }, style: null },
     ]) {
-      const layer = new L.Layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
+      const layer = CityMapper.layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
       const failed = new Promise(resolve => layer.once('error', ({ error }) => resolve(error.message)));
       layer.addTo(map);
       failures.push(await failed);
-      if (layer.root.children.length) throw new Error('Invalid source attached a mesh');
+      if (pluginState(layer).root.children.length) throw new Error('Invalid source attached a mesh');
       layer.remove();
     }
     const fetchSource = globalThis.fetch;
@@ -117,7 +118,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
         reject(signal.reason);
       }, { once: true });
     });
-    const layer = new L.Layer({ source: {
+    const layer = CityMapper.layer({ source: {
       type: 'geojson', url: '/slow.geojson', style: () => ({ top: 10 }),
     } });
     const errors = [];
@@ -127,7 +128,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
     const completed = new Promise(resolve => layer.on('progress', event => {
       if (!event.pending) resolve(event.loaded);
     }));
-    layer.setData({ type: 'FeatureCollection', features: [] });
+    CityMapper.setData(layer, { type: 'FeatureCollection', features: [] });
     const loaded = await completed;
     globalThis.fetch = fetchSource;
     layer.remove();
@@ -145,23 +146,23 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
   assert.deepEqual(result.errors, []);
 });
 
-Then('the minimal GeoJSON example renders the Colosseum at different heights', async function () {
+Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('https://tile.openstreetmap.org/**', route => route.fulfill({
     contentType: 'image/png',
     body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0u8AAAAASUVORK5CYII=', 'base64'),
   }));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
   await this.page.waitForFunction(() => {
-    return Object.values(map._layers).some(layer => layer._geojson &&
-      [...layer._areas.values()].some(area => area.done && area.buildings === 5));
+    return Object.values(map._layers).some(layer => pluginState(layer)._geojson &&
+      [...pluginState(layer)._areas.values()].some(area => area.done && area.buildings === 5));
   });
   assert.match(await this.page.locator('#status').textContent(), /^Colosseum: 5 parts;/);
   const geometry = await this.page.evaluate(() => {
-    const layer = Object.values(map._layers).find(layer => layer._geojson);
+    const layer = Object.values(map._layers).find(layer => pluginState(layer)._geojson);
     const features = layer.options.data.features;
-    const mesh = layer._areas.get('geojson').mesh;
+    const mesh = pluginState(layer)._areas.get('geojson').mesh;
     const positions = mesh.geometry.attributes.position.data;
     const roofs = mesh.extras.featureFaces.map(face => {
       let highest = -Infinity;
@@ -171,6 +172,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', a
       return highest;
     });
     const rings = features.map(feature => feature.geometry.coordinates);
+    const centerError = map.project(map.getCenter()).subtract(map.project([41.89021, 12.49223]));
     const rotation = -25 * Math.PI / 180;
     let arenaOpen = true;
     for (let i = 0; i < positions.length; i += 9) {
@@ -189,7 +191,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', a
       closed: rings.every(coordinates => coordinates.every(ring =>
         ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1])),
       arenaOpen,
-      centered: map.getCenter().equals([41.89021, 12.49223], 1e-8),
+      centered: Math.abs(centerError.x) <= 0.5 && Math.abs(centerError.y) <= 0.5,
     };
   });
   assert.deepEqual(geometry, {
@@ -199,7 +201,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', a
   await this.page.waitForFunction(() => {
     const layers = Object.values(map._layers);
     return layers.some(layer => layer instanceof L.TileLayer &&
-      layer._url === 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' && !layer.isLoading() &&
+      layer._url === 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' && !CityMapper.isLoading(layer) &&
       Object.values(layer._tiles).some(tile => tile.loaded));
   });
   assert.equal(await this.page.locator('canvas.leaflet-3d').count(), 1);

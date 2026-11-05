@@ -1,39 +1,45 @@
+import { state as sharedState } from '../state.js';
 import { shadowBounds } from './shadowBounds.js';
 import { updateCamera } from '../scene/updateCamera.js';
 
 export function shadowMatrix(meshes, sunlight) {
-  const { min, max } = shadowBounds(meshes);
-  const span = [], center = [], position = [];
-  let i, corner, axis, point, coordinates, value;
+  const { min, max } = shadowBounds(meshes, sharedState.allocationRenderShadowBounds);
+  const camera = sharedState.allocationRenderShadowCamera;
+  camera.viewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created view transform. */ new DOMMatrix();
+  camera.projectionTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created projection transform. */ new DOMMatrix();
+  camera.projectionViewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created combined transform. */ new DOMMatrix();
+  const low = sharedState.allocationRenderShadowLow, high = sharedState.allocationRenderShadowHigh;
+  let i, axis, x, y, z, value;
+  const radius = Math.max(100, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]));
   for (i = 0; i < 3; i++) {
-    span[i] = max[i] - min[i];
-    center[i] = (min[i] + max[i]) / 2;
+    camera.target[i] = (min[i] + max[i]) / 2;
+    camera.position[i] = camera.target[i] + sunlight.direction[i] * radius * 2;
   }
-  const radius = Math.max(100, Math.hypot(...span));
-  for (i = 0; i < 3; i++) position[i] = center[i] + sunlight.direction[i] * radius * 2;
-  const lightCamera = {
-    position,
-    target: center, up: [0, 0, -1], fov: 45, aspect: 1, near: 1, far: radius * 5,
-    viewMatrix: [], projectionMatrix: [], projectionViewMatrix: [],
-  };
-  updateCamera(lightCamera);
-  const view = new DOMMatrix(lightCamera.viewMatrix);
-  const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
+  camera.far = radius * 5;
+  updateCamera(camera);
+  const view = camera.viewMatrix;
+  low.fill(Infinity); high.fill(-Infinity);
   for (i = 0; i < 8; i++) {
-    corner = [];
-    for (axis = 0; axis < 3; axis++) corner[axis] = i & (1 << axis) ? max[axis] : min[axis];
-    point = new DOMPoint(...corner, 1).matrixTransform(view);
-    coordinates = [point.x, point.y, point.z];
+    x = i & 1 ? max[0] : min[0];
+    y = i & 2 ? max[1] : min[1];
+    z = i & 4 ? max[2] : min[2];
     for (axis = 0; axis < 3; axis++) {
-      value = coordinates[axis];
+      value = view[axis] * x + view[axis + 4] * y + view[axis + 8] * z + view[axis + 12];
       low[axis] = Math.min(low[axis], value - 20);
       high[axis] = Math.max(high[axis], value + 20);
     }
   }
-  for (i = 0; i < 3; i++) span[i] = high[i] - low[i];
-  const projection = new DOMMatrix([
-    2 / span[0], 0, 0, 0, 0, 2 / span[1], 0, 0, 0, 0, -1 / span[2], 0,
-    -(high[0] + low[0]) / span[0], -(high[1] + low[1]) / span[1], high[2] / span[2], 1,
-  ]);
-  return projection.multiply(view).toFloat32Array();
+  const scaleX = 2 / (high[0] - low[0]), scaleY = 2 / (high[1] - low[1]);
+  const scaleZ = -1 / (high[2] - low[2]);
+  const matrix = /* allocation: required -- Each caller owns its returned light projection matrix. */ new Float32Array(16);
+  for (i = 0; i < 16; i += 4) {
+    matrix[i] = view[i] * scaleX;
+    matrix[i + 1] = view[i + 1] * scaleY;
+    matrix[i + 2] = view[i + 2] * scaleZ;
+    matrix[i + 3] = view[i + 3];
+  }
+  matrix[12] -= (high[0] + low[0]) / (high[0] - low[0]);
+  matrix[13] -= (high[1] + low[1]) / (high[1] - low[1]);
+  matrix[14] += high[2] / (high[2] - low[2]);
+  return matrix;
 }

@@ -1,1 +1,0 @@
-export const white = [0.92, 0.93, 0.92];

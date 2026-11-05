@@ -1,13 +1,15 @@
-import { CELL } from '../constants/CELL.js';
-import { colliders } from '../constants/colliders.js';
-
+import { state as sharedState } from '../state.js';
 
 export function collider(mesh) {
-  let c = colliders.get(mesh.geometry);
+  let c = sharedState.colliders.get(mesh.geometry);
   if (c) return c;
   const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv } = mesh.geometry.attributes;
 
-  const count = index ? index.count : p.length / 3, tri = [], nrm = [], cells = new Map(), v = [];
+  const count = index ? index.count : p.length / 3;
+  const tri = /* allocation: required -- Variable-length wall accumulation belongs to this geometry collider build. */ [];
+  const nrm = /* allocation: required -- Variable-length wall normals belong to this geometry collider build. */ [];
+  const cells = /* allocation: required -- Each geometry collider retains its own spatial cell index. */ new Map();
+  const v = /* allocation: required -- Transform scratch stays private while mesh accessors can reenter collider construction. */ [];
 
   let i, first, k, j, x, y, z, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t, ix, iz, key;
   for (i = 0; i < count; i += 3) {
@@ -43,21 +45,21 @@ export function collider(mesh) {
     tri.push(...v);
     nrm.push(nx / h, nz / h);
 
-    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
-      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
+    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / sharedState.CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / sharedState.CELL); ix++)
+      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / sharedState.CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / sharedState.CELL); iz++) {
         key = ix + ',' + iz;
         if (!cells.has(key)) {
-          cells.set(key, []);
+          cells.set(key, /* allocation: required -- Each retained spatial cell owns its triangle membership list. */ []);
         }
         cells.get(key).push(t);
       }
   }
-  c = {
+  c = /* allocation: required -- Each geometry retains an independent collider cache entry. */ {
     tri: Float32Array.from(tri),
     nrm: Float32Array.from(nrm),
     cells,
-    origin: [m[12], m[13], m[14]]
+    origin: /* allocation: required -- Collision translation needs the original mesh origin snapshot. */ [m[12], m[13], m[14]]
   };
-  colliders.set(mesh.geometry, c);
+  sharedState.colliders.set(mesh.geometry, c);
   return c;
 }

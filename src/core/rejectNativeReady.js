@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 export function rejectNativeReady({ error }) {
-  this.ready.reject(error);
+  pluginState(this).ready.reject(error);
 }

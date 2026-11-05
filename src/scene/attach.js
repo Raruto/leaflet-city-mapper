@@ -1,4 +1,6 @@
-import { cityMapper } from '../constants/cityMapper.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { emptyNode } from './emptyNode.js';
 import { setParent } from './setParent.js';
 import { createProgram } from '../rendering/createProgram.js';
@@ -11,7 +13,7 @@ import { update } from './update.js';
 import { updateArea } from '../sources/updateArea.js';
 import { setTerrainHeight } from '../terrain/setTerrainHeight.js';
 import { resizeSunlight } from '../shadows/resizeSunlight.js';
-import { attachState } from '../constants/attachState.js';
+
 import { noOperation } from '../utils/noOperation.js';
 import { failAttachment } from './failAttachment.js';
 import { requestAdapter } from './requestAdapter.js';
@@ -19,8 +21,7 @@ import { requestDevice } from './requestDevice.js';
 import { rendererDeviceError } from './rendererDeviceError.js';
 import { rendererDeviceLost } from './rendererDeviceLost.js';
 import { restoreObject } from './restoreObject.js';
-
-attachState.rendererDevices = new WeakMap();
+import { traverse } from './traverse.js';
 
 /** WebGPU device attachment, materials/pipelines and draw calls. */
 /**
@@ -30,88 +31,92 @@ attachState.rendererDevices = new WeakMap();
  */
 
 export async function attach(backend, map) {
-  let shared = cityMapper.renderers.get(map);
-  if (shared?._rendererReady) {
-    await shared._rendererReady.promise;
+  let shared = sharedState.renderers.get(map);
+  if (pluginState(shared)?._rendererReady) {
+    await pluginState(shared)._rendererReady.promise;
   }
   if (!shared) {
     shared = backend;
-    backend._rendererReady = Promise.withResolvers();
-    backend._rendererReady.promise.catch(noOperation);
-    cityMapper.renderers.set(map, shared);
+    pluginState(backend)._rendererReady = Promise.withResolvers();
+    pluginState(backend)._rendererReady.promise.catch(noOperation);
+    sharedState.renderers.set(map, shared);
     const canvas = document.createElement('canvas');
     if (!navigator.gpu) {
-      failAttachment(new Error('Layer3D requires WebGPU'), backend, map);
+      failAttachment(/* allocation: required -- Preserve the cause and stack for this attachment failure. */ new Error('Layer3D requires WebGPU'), backend, map);
     }
     const adapter = await requestAdapter(backend, map);
     const device = await requestDevice(adapter, backend, map);
-    attachState.rendererDevices.set(device, map);
+    sharedState.rendererDevices.set(device, map);
     device.addEventListener('uncapturederror', rendererDeviceError);
-    Promise.all([device.lost, Promise.resolve(device)]).then(rendererDeviceLost);
+    Promise.all(/* allocation: required -- Correlate this device's loss with its owning map. */ [device.lost, Promise.resolve(device)]).then(rendererDeviceLost);
     const context = canvas.getContext('webgpu');
     if (!context) {
       device.destroy();
-      failAttachment(new Error('Unable to create a WebGPU canvas context'), backend, map);
+      failAttachment(/* allocation: required -- Preserve the cause and stack for this attachment failure. */ new Error('Unable to create a WebGPU canvas context'), backend, map);
     }
     const format = navigator.gpu.getPreferredCanvasFormat();
-    context.configure({ device, format, alphaMode: 'premultiplied' });
+    context.configure(/* allocation: required -- Provide the WebGPU configuration snapshot. */ { device, format, alphaMode: 'premultiplied' });
     map.getContainer().querySelector('.leaflet-webgpu-warning')?.remove();
-    backend._shared = backend;
-    backend._layers = new Set();
-    backend._sceneOrigin = backend.location;
-    backend.scene = emptyNode();
+    pluginState(backend)._shared = backend;
+    pluginState(backend)._layers = /* allocation: required -- Track source ownership independently for this renderer. */ new Set();
+    pluginState(backend)._sceneOrigin = pluginState(backend).location;
+    pluginState(backend).scene = emptyNode();
     // Perspective camera state: fov in degrees, near/far in scene metres.
-    backend.camera = {
-      position: [0, 0, 0],
-      up: [0, 1, 0],
-      target: [0, 0, 0],
-      viewMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-      projectionMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-      projectionViewMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    pluginState(backend).camera = /* allocation: required -- Camera state is independently owned by each map renderer. */ {
+      position: /* allocation: required -- Keep camera coordinates independent. */ [0, 0, 0],
+      up: /* allocation: required -- Keep camera coordinates independent. */ [0, 1, 0],
+      target: /* allocation: required -- Keep camera coordinates independent. */ [0, 0, 0],
+      x: /* allocation: required -- Reuse the camera's right-axis buffer. */ [0, 0, 0],
+      y: /* allocation: required -- Reuse the camera's up-axis buffer. */ [0, 0, 0],
+      z: /* allocation: required -- Reuse the camera's forward-axis buffer. */ [0, 0, 0],
+      viewMatrix: /* allocation: required -- Keep each map's view matrix independent. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      projectionMatrix: /* allocation: required -- Keep each map's projection matrix independent. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      projectionViewMatrix: /* allocation: required -- Keep each map's combined matrix independent. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      viewTransform: /* allocation: required -- Reuse a transform matrix owned by this camera. */ new DOMMatrix(),
+      projectionTransform: /* allocation: required -- Reuse a transform matrix owned by this camera. */ new DOMMatrix(),
+      projectionViewTransform: /* allocation: required -- Reuse a transform matrix owned by this camera. */ new DOMMatrix(),
       fov: 45,
       aspect: 1,
       near: 0.1,
       far: 10000,
     };
-    backend.renderer = {
+    pluginState(backend).renderer = /* allocation: required -- Keep renderer resources scoped to this map. */ {
       device,
       context,
       format,
       canvas,
       dpr: Math.min(window.devicePixelRatio, 2)
     };
-    const layout = device.createBindGroupLayout({
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+    const layout = device.createBindGroupLayout(/* allocation: required -- WebGPU consumes a fresh bind layout descriptor. */ {
+      entries: /* allocation: required -- Keep the four binding descriptions ordered for this layout. */ [
+        /* allocation: required -- Describe this layout's uniform binding. */ { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: /* allocation: required -- Specify this binding's uniform buffer type. */ { type: 'uniform' } },
+        /* allocation: required -- Describe this layout's depth binding. */ { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: /* allocation: required -- Specify this binding's depth texture type. */ { sampleType: 'depth' } },
+        /* allocation: required -- Describe this layout's comparison sampler. */ { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: /* allocation: required -- Specify this binding's comparison sampler type. */ { type: 'comparison' } },
+        /* allocation: required -- Describe this layout's storage binding. */ { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: /* allocation: required -- Specify this binding's read-only storage type. */ { type: 'read-only-storage' } },
       ]
     });
-    const buffer = backend.renderer.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const sampler = backend.renderer.device.createSampler({ compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
-    const lights = backend.renderer.device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    backend.renderer.sunlight = { layout, buffer, sampler, lights, size: 0 };
-    const values = new Float32Array(20);
-    values.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-    backend.renderer.device.queue.writeBuffer(buffer, 0, values);
+    const buffer = pluginState(backend).renderer.device.createBuffer(/* allocation: required -- Configure the renderer's uniform storage. */ { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const sampler = pluginState(backend).renderer.device.createSampler(/* allocation: required -- Configure the renderer's comparison sampler. */ { compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
+    const lights = pluginState(backend).renderer.device.createBuffer(/* allocation: required -- Configure this renderer's light storage. */ { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    pluginState(backend).renderer.sunlight = /* allocation: required -- Retain sunlight resources for this renderer. */ { layout, buffer, sampler, lights, size: 0 };
+    pluginState(backend).renderer.device.queue.writeBuffer(buffer, 0, sharedState.allocationSceneSunlightUniforms);
     resizeSunlight(backend, 1);
     const emptyImage = document.createElement('canvas');
     emptyImage.width = 1;
     emptyImage.height = 1;
-    backend.renderer.roofFallbackTexture = {
+    pluginState(backend).renderer.roofFallbackTexture = /* allocation: required -- Retain fallback resources for this renderer. */ {
       device,
-      texture: device.createTexture({
-        size: [1, 1],
+      texture: device.createTexture(/* allocation: required -- Supply a fresh fallback texture descriptor. */ {
+        size: /* allocation: required -- Provide the fallback image dimensions. */ [1, 1],
         format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       }),
-      sampler: device.createSampler({
+      sampler: device.createSampler(/* allocation: required -- Supply a fresh fallback sampler descriptor. */ {
         addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
       }),
       image: emptyImage, format: 'rgba8unorm', srgb: false, uploaded: null,
     };
-    shared._size = null;
+    pluginState(shared)._size = null;
     canvas.className = 'leaflet-3d';
     canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none';
     canvas.setAttribute('role', 'img');
@@ -128,34 +133,28 @@ export async function attach(backend, map) {
     map.on('zoomstart', startZoom, shared);
     map.on('zoomanim', onZoomAnim, shared);
     map.on('zoomend', endZoom, shared);
-    backend._rendererReady.resolve();
-    delete shared._rendererReady;
+    pluginState(backend)._rendererReady.resolve();
+    delete pluginState(shared)._rendererReady;
     render(shared);
-    cityMapper.renderers.set(map, shared);
+    sharedState.renderers.set(map, shared);
   }
-  const origin = map.options.crs.project(shared._sceneOrigin);
-  const point = map.options.crs.project(backend.location);
-  const metres = Math.cos(shared._sceneOrigin.lat * Math.PI / 180);
-  backend._terrainBaseY ??= backend.root.position[1];
-  backend.root.position[0] = (point.x - origin.x) * metres;
-  backend.root.position[1] = backend._terrainBaseY;
-  backend.root.position[2] = -(point.y - origin.y) * metres;
+  const origin = map.options.crs.project(pluginState(shared)._sceneOrigin);
+  const point = map.options.crs.project(pluginState(backend).location);
+  const metres = Math.cos(pluginState(shared)._sceneOrigin.lat * Math.PI / 180);
+  pluginState(backend)._terrainBaseY ??= pluginState(backend).root.position[1];
+  pluginState(backend).root.position[0] = (point.x - origin.x) * metres;
+  pluginState(backend).root.position[1] = pluginState(backend)._terrainBaseY;
+  pluginState(backend).root.position[2] = -(point.y - origin.y) * metres;
   setTerrainHeight(backend);
   // Each group's metres are measured at its own latitude, not the shared camera origin.
-  backend.root.scale.fill(metres / Math.cos(backend.location.lat * Math.PI / 180));
-  backend._shared = shared;
-  backend.renderer = shared.renderer;
-  backend.scene = shared.scene;
-  backend.camera = shared.camera;
-  shared._layers.add(backend);
-  setParent(backend.root, shared.scene);
-  const pendingObjects = [backend.root];
-  let object, i;
-  while (pendingObjects.length) {
-    object = pendingObjects.pop();
-    restoreObject(backend, shared, object);
-    for (i = object.children.length - 1; i >= 0; i--) pendingObjects.push(object.children[i]);
-  }
+  pluginState(backend).root.scale.fill(metres / Math.cos(pluginState(backend).location.lat * Math.PI / 180));
+  pluginState(backend)._shared = shared;
+  pluginState(backend).renderer = pluginState(shared).renderer;
+  pluginState(backend).scene = pluginState(shared).scene;
+  pluginState(backend).camera = pluginState(shared).camera;
+  pluginState(shared)._layers.add(backend);
+  setParent(pluginState(backend).root, pluginState(shared).scene);
+  traverse(pluginState(backend).root, restoreObject, backend);
   update(shared);
-  if ((backend.header && backend._type !== 'pmtiles') || backend._geojson) updateArea(backend);
+  if ((pluginState(backend).header && pluginState(backend)._type !== 'pmtiles') || pluginState(backend)._geojson) updateArea(backend);
 }

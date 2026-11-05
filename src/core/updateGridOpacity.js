@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 import { cancelGridFade } from './cancelGridFade.js';
 import { scheduleGridFade } from './scheduleGridFade.js';
 
@@ -5,8 +6,10 @@ export function updateGridOpacity() {
   if (!this._map) return;
   const layer = this, now = Date.now();
   let fading = false, prune = false;
-  let tile;
-  for (tile of Object.values(this._tiles || {})) {
+  let key, tile;
+  for (key in this._tiles) {
+    if (!Object.hasOwn(this._tiles, key)) continue;
+    tile = this._tiles[key];
     if (!tile.current || !tile.loaded) continue;
     tile._gpuOpacity = this._map._fadeAnimated ? Math.min(1, (now - tile.loaded) / 200) : 1;
     if (tile._gpuOpacity < 1) fading = true;
@@ -17,7 +20,7 @@ export function updateGridOpacity() {
     }
   }
   if (prune && !this._noPrune) this._pruneTiles();
-  this._nativeGPU?.refresh?.();
+  pluginState(this)._nativeGPU?.refresh?.();
   cancelGridFade(layer);
   if (fading) scheduleGridFade(layer);
 }

@@ -3,7 +3,7 @@ import { clipSegment } from './clipSegment.js';
 
 /** Clip a geographic line to [west, south, east, north] without joining disjoint pieces. */
 export function clipLine(line, bounds) {
-  const pieces = [];
+  const pieces = /* allocation: required -- The caller retains independent clipped line pieces. */ [];
   let current;
   let i, segment;
   for (i = 1; i < line.length; i++) {

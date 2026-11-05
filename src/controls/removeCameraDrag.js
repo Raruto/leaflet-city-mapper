@@ -1,10 +1,11 @@
+import { state as sharedState } from '../state.js';
 import { finishCameraDrag } from './finishCameraDrag.js';
 import { cameraDragDown } from './cameraDragDown.js';
 import { cameraDragMove } from './cameraDragMove.js';
 import { cameraDragEnd } from './cameraDragEnd.js';
 import { cameraDragClick } from './cameraDragClick.js';
 import { cameraDragContextMenu } from './cameraDragContextMenu.js';
-import { cameraControlsState } from '../constants/cameraControlsState.js';
+
 import { endAllCameraDrags } from './endAllCameraDrags.js';
 
 export function removeCameraDrag(state) {
@@ -17,7 +18,7 @@ export function removeCameraDrag(state) {
   element.removeEventListener('lostpointercapture', cameraDragEnd);
   element.removeEventListener('click', cameraDragClick, true);
   element.removeEventListener('contextmenu', cameraDragContextMenu);
-  cameraControlsState.dragStates.delete(element);
-  cameraControlsState.cameraDrags.delete(state);
-  if (!cameraControlsState.cameraDrags.size) window.removeEventListener('blur', endAllCameraDrags);
+  sharedState.dragStates.delete(element);
+  sharedState.cameraDrags.delete(state);
+  if (!sharedState.cameraDrags.size) window.removeEventListener('blur', endAllCameraDrags);
 }

@@ -1,5 +1,5 @@
-import { TILE_SIZE } from '../constants/TILE_SIZE.js';
+import { state as sharedState } from '../state.js';
 
 export function getRasterTileSize() {
-  return new L.Point(TILE_SIZE, TILE_SIZE);
+  return /* allocation: required -- Leaflet callers own the returned mutable point and may scale or modify it. */ new L.Point(sharedState.TILE_SIZE, sharedState.TILE_SIZE);
 }

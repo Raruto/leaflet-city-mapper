@@ -1,4 +1,6 @@
-import { cityMapper } from '../constants/cityMapper.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { update as updateScene } from '../scene/update.js';
 import { atmosphere } from './atmosphere.js';
 import { moonPosition } from './moonPosition.js';
@@ -13,7 +15,7 @@ import { tickSun } from './tickSun.js';
 import { removeSun } from './removeSun.js';
 
 export function onAddSun(control, map) {
-  map._timeControl = control;
+  pluginState(map)._timeControl = control;
   const originalSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
   const disc = 'position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;';
   const sunDisc = L.DomUtil.create('div', 'sunlight-sun');
@@ -50,7 +52,10 @@ export function onAddSun(control, map) {
   note.style.color = '#555';
   note.textContent = 'Indicative · loaded geometry only. Streetlight illumination is estimated, not measured lux.';
   container.append(date, slider, timeRow, status, note);
-  const state = { control, map, originalSky, sunDisc, moonDisc, date, slider, output, status };
+  const state = /* allocation: required -- Each control owns its lifecycle and event state. */ {
+    control, map, originalSky, sunDisc, moonDisc, date, slider, output, status,
+    projection: /* allocation: required -- Each control reuses its own camera projection buffer. */ { left: 0, top: 0 },
+  };
   state.update = updateSun.bind(null, state);
   state.updateSky = updateSky.bind(null, state);
   now.onclick = useLiveTime.bind(null, state);
@@ -61,6 +66,6 @@ export function onAddSun(control, map) {
   state.timer = setInterval(tickSun, 60000, state);
   map.on('moveend', state.update);
   map.on('move rotate pitch resize', state.updateSky);
-  control.onRemove = removeSun.bind(null, state);
+  pluginState(control).onRemove = removeSun.bind(null, state);
   return container;
 }

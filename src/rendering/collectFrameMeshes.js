@@ -1,15 +1,20 @@
+import { pluginState } from '../core/pluginState.js';
 import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
 import { collectMeshes } from './collectMeshes.js';
 
 export function collectFrameMeshes(backend, sunlight, sceneChanged) {
-  const camera = backend.camera;
+  const camera = pluginState(backend).camera;
   const projection = camera.projectionViewMatrix;
-  const renderer = backend.renderer;
-  const frustum = renderer.frustum ||= [
-    new Float64Array(4), new Float64Array(4), new Float64Array(4),
-    new Float64Array(4), new Float64Array(4), new Float64Array(4),
+  const renderer = pluginState(backend).renderer;
+  const frustum = renderer.frustum ||= /* allocation: required -- Each renderer retains its own mutable frustum planes between frames. */ [
+    /* allocation: required -- Renderer retains its left frustum plane coefficients. */ new Float64Array(4),
+    /* allocation: required -- Renderer retains its right frustum plane coefficients. */ new Float64Array(4),
+    /* allocation: required -- Renderer retains its bottom frustum plane coefficients. */ new Float64Array(4),
+    /* allocation: required -- Renderer retains its top frustum plane coefficients. */ new Float64Array(4),
+    /* allocation: required -- Renderer retains its near frustum plane coefficients. */ new Float64Array(4),
+    /* allocation: required -- Renderer retains its far frustum plane coefficients. */ new Float64Array(4),
   ];
-  const frustumLengths = renderer.frustumLengths ||= new Float64Array(6);
+  const frustumLengths = renderer.frustumLengths ||= /* allocation: required -- Each renderer retains its own mutable plane-length buffer. */ new Float64Array(6);
   let i, axis, plane, j, offset;
   for (i = 0; i < 6; i++) {
     axis = Math.floor(i / 2);
@@ -22,10 +27,10 @@ export function collectFrameMeshes(backend, sunlight, sceneChanged) {
     }
     frustumLengths[i] = Math.hypot(plane[0], plane[1], plane[2]);
   }
-  const candidates = backend._visibleMeshes ||= [];
+  const candidates = pluginState(backend)._visibleMeshes ||= /* allocation: required -- Backend retains its visible-mesh list through frame preparation. */ [];
   candidates.length = 0;
-  const shadowMeshes = backend._shadowMeshes ||= [];
+  const shadowMeshes = pluginState(backend)._shadowMeshes ||= /* allocation: required -- Backend retains its caster list through the shadow pass. */ [];
   shadowMeshes.length = 0;
-  if (sceneChanged) updateWorldMatrix(backend.scene);
-  collectMeshes(backend.scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
+  if (sceneChanged) updateWorldMatrix(pluginState(backend).scene);
+  collectMeshes(pluginState(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
 }

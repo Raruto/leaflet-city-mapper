@@ -1,8 +1,10 @@
 /** Height inside a bridge deck, or null outside its triangles. */
 export function bridgeElevation(point, bridges) {
   // Bridges bucketed by 64 DEM pixels.
+  const bucket = bridges?.get(`${Math.floor(point.x / 64)}/${Math.floor(point.y / 64)}`);
+  if (!bucket) return null;
   let bridge, a, b, c, d, u, v;
-  for (bridge of bridges?.get(`${Math.floor(point.x / 64)}/${Math.floor(point.y / 64)}`) || []) {
+  for (bridge of bucket) {
     if (point.x < bridge.min[0] || point.x > bridge.max[0] || point.y < bridge.min[1] || point.y > bridge.max[1]) {
       continue;
     }

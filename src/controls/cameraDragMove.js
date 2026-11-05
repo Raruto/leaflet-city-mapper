@@ -1,11 +1,15 @@
-import { cameraControlsState } from '../constants/cameraControlsState.js';
+import { state as sharedState } from '../state.js';
+import { mapStopPitchBearingAnimation } from '../camera/mapStopPitchBearingAnimation.js';
+import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
+import { mapGetPitch } from '../camera/mapGetPitch.js';
+import { mapGetBearing } from '../camera/mapGetBearing.js';
 
 export function cameraDragMove(event) {
-  const state = cameraControlsState.dragStates.get(this);
+  const state = sharedState.dragStates.get(this);
   if (!state.drag || state.drag.id !== event.pointerId) return;
   const x = event.clientX - state.drag.x, y = event.clientY - state.drag.y;
   if (Math.hypot(x, y) < 3 && !state.moved) return;
-  state.map._stopPitchBearingAnimation();
+  mapStopPitchBearingAnimation(state.map);
   state.moved = true;
   event.preventDefault();
   let bearing = x * state.sensitivity[0];
@@ -16,8 +20,7 @@ export function cameraDragMove(event) {
       bearing = Math.atan2(Math.sin(angle), Math.cos(angle)) * 180 / Math.PI;
     } else bearing *= event.clientY < state.drag.cy ? 1 : -1;
   }
-  state.map._setPitchAndBearing(state.map.getPitch() - y * state.sensitivity[1],
-    state.map.getBearing() + bearing);
+  mapSetPitchAndBearing(state.map, mapGetPitch(state.map) - y * state.sensitivity[1], mapGetBearing(state.map) + bearing);
   state.drag.x = event.clientX;
   state.drag.y = event.clientY;
 }

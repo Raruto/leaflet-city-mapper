@@ -1,5 +1,6 @@
+import { pluginState } from './pluginState.js';
 export function removeTargets(state) {
-  if (state.source._nativeGPU === state) state.source._nativeGPU = null;
+  if (pluginState(state.source)._nativeGPU === state) pluginState(state.source)._nativeGPU = null;
   state.dispose?.();
   let element;
   for (element of state.hidden) {

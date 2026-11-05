@@ -1,7 +1,7 @@
 /**
  * Paris traffic, active mobility and public transport for the 'traffic' layer type.
  *
- * @example new L.Layer({ source: { type: 'traffic', url: './examples/data/paris-traffic.js', radius: 2000 } })
+ * @example CityMapper.layer({ source: { type: 'traffic', url: './examples/data/paris-traffic.js', radius: 2000 } })
  */
 import { clipLine } from '../../src/geometry/clipLine.js';
 import { samePoint } from '../../src/geometry/samePoint.js';
@@ -35,7 +35,7 @@ export function trafficHour(date, latest) {
 
 /** Counts of the hour of `time` within `radius` metres of the layer; the same object is returned while the hour is unchanged. */
 export async function parisRoadTraffic(time, layer, signal) {
-  const { location, options: { radius = 2000 } } = layer;
+  const location = CityMapper.getLocation(layer), { radius = 2000 } = layer.options;
   const where = `within_distance(geo_point_2d, geom'POINT(${location.lng} ${location.lat})', ${radius}m) and q > 0`;
   const requested = trafficHour(time, Infinity).toISOString();
   const previous = roadCache.get(layer);
@@ -77,7 +77,7 @@ export async function parisMobility(time, layer, signal) {
     state.paths.note = 'pedestrians: no measured counts available in this source; assumed flow on HTTP-fetched shared paths';
     return state.paths;
   }
-  const { location, options: { radius = 2000 } } = layer;
+  const location = CityMapper.getLocation(layer), { radius = 2000 } = layer.options;
   const where = `within_distance(coordinates,geom'POINT(${location.lng} ${location.lat})',${radius}m)`;
   const requested = trafficHour(time, Infinity).toISOString();
   if (state.requested === requested) return state.data;

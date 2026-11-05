@@ -1,6 +1,6 @@
 /** Point and unit direction at distance `s` along `points` ([x, z, y?]) with cumulative `lengths`. */
 
-export function along(points, lengths, s) {
+export function along(points, lengths, s, target) {
   let i = 1, end = lengths.length - 1;
   let middle;
   while (i < end) {
@@ -10,5 +10,11 @@ export function along(points, lengths, s) {
   }
   const a = points[i - 1], b = points[i], d = lengths[i] - lengths[i - 1] || 1;
   const t = (s - lengths[i - 1]) / d;
-  return { x: a[0] + (b[0] - a[0]) * t, y: (a[2] ?? 0) + ((b[2] ?? 0) - (a[2] ?? 0)) * t, z: a[1] + (b[1] - a[1]) * t, dx: (b[0] - a[0]) / d, dz: (b[1] - a[1]) / d };
+  target ||= /* allocation: required -- Unbuffered callers retain independent positions along different lanes. */ {};
+  target.x = a[0] + (b[0] - a[0]) * t;
+  target.y = (a[2] ?? 0) + ((b[2] ?? 0) - (a[2] ?? 0)) * t;
+  target.z = a[1] + (b[1] - a[1]) * t;
+  target.dx = (b[0] - a[0]) / d;
+  target.dz = (b[1] - a[1]) / d;
+  return target;
 }

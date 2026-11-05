@@ -1,8 +1,9 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+
 import { displayPoint } from '../camera/displayPoint.js';
 
 export function popupUpdatePosition() {
-  mapCameraState.popupPosition.call(this);
+  sharedState.popupPosition.call(this);
   if (!this._map) return;
   const point = this._map.latLngToLayerPoint(this._latlng), delta = displayPoint(this._map, point).subtract(point);
   if (this._zoomAnimated) {

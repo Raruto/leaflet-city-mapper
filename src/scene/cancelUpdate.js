@@ -1,10 +1,11 @@
-import { pendingUpdates } from '../constants/pendingUpdates.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
 
 export function cancelUpdate(backend) {
-  const frame = backend._frame;
-  pendingUpdates.delete(backend);
-  backend._frame = null;
-  if (!pendingUpdates.size && frame != null) {
+  const frame = pluginState(backend)._frame;
+  sharedState.pendingUpdates.delete(backend);
+  pluginState(backend)._frame = null;
+  if (!sharedState.pendingUpdates.size && frame != null) {
     cancelAnimationFrame(frame);
   }
 }

@@ -1,14 +1,15 @@
+import { state as sharedState } from '../state.js';
 import { update } from '../scene/update.js';
-import { limbs } from '../constants/limbs.js';
+
 import { local } from './local.js';
 
 export function place() {
-  const [x, y, z] = local.call(this);
+  const [x, y, z] = local.call(this, this.local);
   // Model forward is -z; a yaw of -heading turns it to the compass heading (x east, -z north).
   const yaw = -this.state.heading, cos = Math.cos(yaw), sin = Math.sin(yaw);
   let i, px, py, sign, mesh;
-  for (i = 0; i < limbs.length; i++) {
-    [, px, py, sign] = limbs[i];
+  for (i = 0; i < sharedState.limbs.length; i++) {
+    [, px, py, sign] = sharedState.limbs[i];
     mesh = this.meshes[i];
     mesh.position[0] = x + px * cos; mesh.position[1] = y + py; mesh.position[2] = z - px * sin;
     mesh.rotation[0] = sign * this.swing * Math.sin(this.state.phase);

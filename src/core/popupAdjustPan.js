@@ -1,9 +1,12 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+import { mapGetPitch } from '../camera/mapGetPitch.js';
+import { mapGetBearing } from '../camera/mapGetBearing.js';
+
 import { pointOf } from '../camera/pointOf.js';
 
 export function popupAdjustPan() {
   const map = this._map;
-  if (!map.getPitch() && !map.getBearing()) return mapCameraState.popupPan.call(this);
+  if (!mapGetPitch(map) && !mapGetBearing(map)) return sharedState.popupPan.call(this);
   if (!this.options.autoPan) return;
   if (map._panAnim) map._panAnim.stop();
   if (this._autopanning) { this._autopanning = false; return; }
@@ -16,7 +19,9 @@ export function popupAdjustPan() {
   const dy = Math.min(0, top - min.y) || Math.max(0, bottom - max.y);
   if (!dx && !dy) return;
   if (this.options.keepInView) this._autopanning = true;
-  const screen = map.latLngToContainerPoint(this._latlng).subtract(new L.Point(dx, dy));
+  const screen = map.latLngToContainerPoint(this._latlng);
+  screen.x -= dx;
+  screen.y -= dy;
   const delta = map.latLngToLayerPoint(this._latlng).subtract(map.containerPointToLayerPoint(screen));
   map.fire('autopanstart');
   map.panTo(map.unproject(map.project(map.getCenter()).add(delta)));

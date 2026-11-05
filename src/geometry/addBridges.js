@@ -1,8 +1,7 @@
+import { pluginState } from '../core/pluginState.js';
 import { createMesh } from '../rendering/createMesh.js';
 import { triangulate } from '../triangulation/triangulate.js';
 import { local } from './bridgeLocal.js';
-import { push } from './push.js';
-import { below } from './below.js';
 
 /**
  * Bare-earth DEMs drop bridges: `getElevation` returns the deck height inside these polygons (GeoJSON
@@ -11,78 +10,99 @@ import { below } from './below.js';
  */
 
 export function addBridges(backend, geojson) {
-  const map = backend._map, crs = map.options.crs, zoom = backend._terrainZoom;
-  const origin = crs.project(backend.location), metres = Math.cos(backend.location.lat * Math.PI / 180);
-  const base = backend.root.position[1], position = [], normal = [], color = [];
-  backend._bridges = new Map();
+  const map = backend._map, crs = map.options.crs, zoom = pluginState(backend)._terrainZoom;
+  const origin = crs.project(pluginState(backend).location), metres = Math.cos(pluginState(backend).location.lat * Math.PI / 180);
+  const base = pluginState(backend).root.position[1];
+  const position = /* allocation: required -- The bridge mesh retains its own position buffer. */ [];
+  const normal = /* allocation: required -- The bridge mesh retains its own normal buffer. */ [];
+  const color = /* allocation: required -- The bridge mesh retains its own color buffer. */ [];
+  pluginState(backend)._bridges = /* allocation: required -- Each backend retains an independent terrain bridge index. */ new Map();
   let geometry, polygons, polygon, rings, ring, path, pixels, points, lng, lat, z, p, coordinate;
-  let triangles, paths, start, i, contour, holes, bridgeTriangles, xs, ys, t, triangle, bridge, x, y;
-  let key, a, b, c, pa, pb, pc, start2, q, length, n, corner;
+  let triangles, paths, start, i, contour, holes, bridgeTriangles, minX, minY, maxX, maxY, t, triangle, bridge, x, y;
+  let key, a, b, c, pa, pb, pc, start2, q, length, nx, nz, corner, k, bucket, polygonIndex;
   for ({ geometry } of geojson.features) {
-    polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
-    for (polygon of polygons) {
-      rings = [];
+    if (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon') continue;
+    polygons = geometry.coordinates;
+    for (polygonIndex = 0; polygonIndex < (geometry.type === 'Polygon' ? 1 : polygons.length); polygonIndex++) {
+      polygon = geometry.type === 'Polygon' ? polygons : polygons[polygonIndex];
+      rings = /* allocation: required -- Polygon ring topology stays private across reentrant projection callbacks. */ [];
       for (ring of polygon) {
         path = ring.slice(0, -1);
         if (path.length >= 3) rings.push(path);
       }
       if (!rings.length) continue;
-      pixels = [], points = [];
+      pixels = /* allocation: required -- Pixel vertices are retained by this bridge terrain index. */ [];
+      points = /* allocation: required -- World vertices stay private across reentrant projection callbacks. */ [];
       for (ring of rings) for ([lng, lat, z] of ring) {
-        p = map.project([lat, lng], zoom);
-        pixels.push([p.x, p.y, z]);
+        p = map.project(/* allocation: required -- Projection receives an independent coordinate pair it may retain. */ [lat, lng], zoom);
+        pixels.push(/* allocation: required -- Bridge triangles retain each independent pixel vertex and height. */ [p.x, p.y, z]);
       }
       for (ring of rings) for (coordinate of ring) points.push(local(coordinate, crs, origin, metres, base));
       triangles = void 0;
       try {
-        paths = [];
+        paths = /* allocation: required -- Triangulation paths belong to this polygon conversion. */ [];
         start = 0;
         for (ring of rings) {
-          path = [];
-          for (i = 0; i < ring.length; i++) path.push({ x: pixels[start + i][0], y: pixels[start + i][1] });
+          path = /* allocation: required -- Each polygon ring needs independently ordered triangulation vertices. */ [];
+          for (i = 0; i < ring.length; i++) path.push(/* allocation: required -- A triangulation path retains each pixel coordinate separately. */ { x: pixels[start + i][0], y: pixels[start + i][1] });
           paths.push(path);
           start += ring.length;
         }
         [contour, ...holes] = paths;
         triangles = triangulate(contour, holes);
       } catch { continue; }
-      bridgeTriangles = [], xs = [], ys = [];
+      bridgeTriangles = /* allocation: required -- The terrain bridge index retains this polygon triangle list. */ [];
+      minX = minY = Infinity; maxX = maxY = -Infinity;
       for (t of triangles) {
-        triangle = [];
+        triangle = /* allocation: required -- The terrain index retains each triangle as an independent vertex list. */ [];
         for (i of t) triangle.push(pixels[i]);
         bridgeTriangles.push(triangle);
       }
-      for (p of pixels) { xs.push(p[0]); ys.push(p[1]); }
-      bridge = {
+      for (p of pixels) {
+        minX = Math.min(minX, p[0]); minY = Math.min(minY, p[1]);
+        maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]);
+      }
+      bridge = /* allocation: required -- Spatial buckets retain this polygon bridge record. */ {
         triangles: bridgeTriangles,
-        min: [Math.min(...xs), Math.min(...ys)],
-        max: [Math.max(...xs), Math.max(...ys)],
+        min: /* allocation: required -- The retained bridge owns its lower pixel bounds. */ [minX, minY],
+        max: /* allocation: required -- The retained bridge owns its upper pixel bounds. */ [maxX, maxY],
       };
       for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
         for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
           key = `${x}/${y}`;
-          backend._bridges.set(key, [...backend._bridges.get(key) || [], bridge]);
+          bucket = pluginState(backend)._bridges.get(key);
+          if (!bucket) pluginState(backend)._bridges.set(key, bucket = /* allocation: required -- This spatial cell retains its own bridge references. */ []);
+          bucket.push(bridge);
         }
       }
       for ([a, b, c] of triangles) {
         // Counter-clockwise seen from above, so double-sided shading keeps the top lit.
-        [pa, pb, pc] = [points[a], points[b], points[c]];
-        if ((pb[2] - pa[2]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[2] - pa[2]) < 0) [b, c] = [c, b];
-        for (i of [a, b, c]) push(position, normal, color, points[i], [0, 1, 0]);
-        for (i of [a, c, b]) push(position, normal, color, below(points[i]), [0, -1, 0]);
+        pa = points[a]; pb = points[b]; pc = points[c];
+        if ((pb[2] - pa[2]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[2] - pa[2]) < 0) { i = b; b = c; c = i; }
+        for (k = 0; k < 6; k++) {
+          i = k === 0 || k === 3 ? a : k === 1 || k === 5 ? b : c;
+          p = points[i];
+          position.push(p[0], p[1] - (k >= 3 ? 1.2 : 0), p[2]);
+          normal.push(0, k >= 3 ? -1 : 1, 0); color.push(0.6, 0.58, 0.54);
+        }
       }
       start2 = 0;
       for (ring of rings) {
         for (i = 0; i < ring.length; i++) {
           p = points[start2 + i], q = points[start2 + (i + 1) % ring.length];
-          length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1, n = [(q[2] - p[2]) / length, 0, -(q[0] - p[0]) / length];
-          for (corner of [p, q, below(q), p, below(q), below(p)]) push(position, normal, color, corner, n);
+          length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1;
+          nx = (q[2] - p[2]) / length; nz = -(q[0] - p[0]) / length;
+          for (k = 0; k < 6; k++) {
+            corner = k === 0 || k === 3 || k === 5 ? p : q;
+            position.push(corner[0], corner[1] - (k === 2 || k >= 4 ? 1.2 : 0), corner[2]);
+            normal.push(nx, 0, nz); color.push(0.6, 0.58, 0.54);
+          }
         }
         start2 += ring.length;
       }
     }
   }
   if (position.length) {
-    backend._bridgeMesh = createMesh(backend, { position, normal, color });
+    pluginState(backend)._bridgeMesh = createMesh(backend, /* allocation: required -- Mesh construction receives the bridge-owned attribute buffers. */ { position, normal, color });
   }
 }

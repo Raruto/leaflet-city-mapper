@@ -1,15 +1,18 @@
-import { cityMapper } from '../constants/cityMapper.js';
+import { state as sharedState } from '../state.js';
+
 import { raycast } from '../picking/raycast.js';
-import { nativeEventMaps } from '../constants/nativeEventMaps.js';
+
 import { restoreNativeEvents } from './restoreNativeEvents.js';
 import { handleNativeMapEvent } from './handleNativeMapEvent.js';
 
 /** One GPU hit test per map event, rather than one invisible SVG path per feature. */
 export function nativeEvents(state) {
   const { map } = state;
-  let context = nativeEventMaps.get(map);
+  let context = sharedState.nativeEventMaps.get(map);
   if (!context) {
-    context = { map, states: new Set(), hovered: null };
+    context = /* allocation: required -- Each map owns its native-event dispatch and hover state. */ {
+      map, states: /* allocation: required -- A map tracks its own active GPU layers for dispatch and removal. */ new Set(), hovered: null,
+    };
     const pointer = L.version.startsWith('2');
     context.move = pointer ? 'pointermove' : 'mousemove';
     context.out = pointer ? 'pointerout' : 'mouseout';
@@ -18,7 +21,7 @@ export function nativeEvents(state) {
     context.fireDOMEvent = map._fireDOMEvent;
     context.handle = handleNativeMapEvent;
     context.restore = restoreNativeEvents;
-    nativeEventMaps.set(map, context);
+    sharedState.nativeEventMaps.set(map, context);
     map._fireDOMEvent = handleNativeMapEvent;
   }
   context.states.add(state);

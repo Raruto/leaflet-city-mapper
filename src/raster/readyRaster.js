@@ -1,9 +1,10 @@
+import { pluginState } from '../core/pluginState.js';
 import { getHeader } from "../archives/getHeader.js";
 
 export async function readyRaster(layer, archive) {
-  const header = await archive.getHeader();
+  const header = await pluginState(archive).getHeader();
   layer.options.archive = archive;
-  layer.header = header;
+  pluginState(layer).header = header;
   if (layer.options.maxNativeZoom === undefined) {
     layer.options.maxNativeZoom = header.maxZoom;
   }

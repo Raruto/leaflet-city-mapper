@@ -1,3 +1,5 @@
+import { mapSetBearing } from '../camera/mapSetBearing.js';
+import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { editable } from './editable.js';
 
 export function shiftRotateWheel(event) {
@@ -5,5 +7,5 @@ export function shiftRotateWheel(event) {
   if (!event.shiftKey || editable(event.target) || event.target.closest('.leaflet-control')) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  handler._map.setBearing(handler._map.getBearing() + Math.sign(event.deltaY) * 5);
+  mapSetBearing(handler._map, mapGetBearing(handler._map) + Math.sign(event.deltaY) * 5);
 }

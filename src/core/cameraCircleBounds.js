@@ -1,6 +1,6 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
 
 export function cameraCircleBounds() {
   this._project();
-  return indexState.boundsMethods.get(this).call(this);
+  return sharedState.boundsMethods.get(this).call(this);
 }

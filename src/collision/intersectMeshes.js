@@ -1,35 +1,33 @@
 import { computeBounds } from "../geometry/computeBounds.js";
-import { sub } from '../geometry/sub.js';
-import { cross } from '../geometry/cross.js';
-import { dot } from '../geometry/dot.js';
 import { sortHits } from './sortHits.js';
 
 /** Nearest triangle hit per mesh, sorted by world-space distance. */
 
 export function intersectMeshes(ray, meshes, night = 0) {
-  const hits = [],
-  a = [0, 0, 0],
-  b = [0, 0, 0],
-  c = [0, 0, 0];
+  const hits = /* allocation: required -- The caller retains its independently sorted picking results. */ [],
+  a = /* allocation: required -- Triangle scratch stays private while mesh accessors can reenter picking. */ [0, 0, 0],
+  b = /* allocation: required -- The second triangle vertex must coexist with the first during reentrant-safe picking. */ [0, 0, 0],
+  c = /* allocation: required -- The third triangle vertex must coexist with the other vertices during reentrant-safe picking. */ [0, 0, 0];
   let mesh, inverse, inverseValues, value, localOrigin, origin, localDirection, direction;
   let directionLength, near, far, i, a2, b2, position, index, instanceOffset, vertices, closest;
-  let faceIndex, vertex, offset, x, y, z, ai, bi, ci, e, f, p, det, t, u, q, v, uv, ids, x2, y2;
+  let faceIndex, vertex, offset, x, y, z, ai, bi, ci, ex, ey, ez, fx, fy, fz, px, py, pz, det;
+  let tx, ty, tz, u, qx, qy, qz, v, uv, idA, idB, idC, x2, y2;
   let distance, point, worldPoint;
   for (mesh of meshes) {
     // Test in mesh-local space; compare distances only after returning to shared world space.
-    inverse = new DOMMatrix(mesh.worldMatrix).inverse();
+    inverse = /* allocation: required -- Each tested mesh needs its own inverse transform throughout triangle testing. */ new DOMMatrix(mesh.worldMatrix).inverse();
     inverseValues = inverse.toFloat64Array();
     for (value of inverseValues) {
-      if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
+      if (!Number.isFinite(value)) throw /* allocation: required -- Singular transform errors retain the failing picking stack. */ new Error('Singular 3D transform');
     }
-    localOrigin = new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
-    origin = [
+    localOrigin = /* allocation: required -- This ray origin is transformed independently for the current mesh. */ new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
+    origin = /* allocation: required -- The local ray remains private across reentrant mesh access during picking. */ [
       localOrigin.x / localOrigin.w,
       localOrigin.y / localOrigin.w,
       localOrigin.z / localOrigin.w
     ];
-    localDirection = new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
-    direction = [
+    localDirection = /* allocation: required -- This ray direction is transformed independently for the current mesh. */ new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
+    direction = /* allocation: required -- The normalized local direction remains private across reentrant mesh access. */ [
       localDirection.x,
       localDirection.y,
       localDirection.z
@@ -85,40 +83,47 @@ export function intersectMeshes(ray, meshes, night = 0) {
         c[0] = Math.fround(c[0] + x); c[1] = Math.fround(c[1] + y); c[2] = Math.fround(c[2] + z);
       }
       // Moller-Trumbore: barycentric triangle coordinates and local ray distance.
-      e = sub(b, a), f = sub(c, a), p = cross(direction, f), det = dot(e, p);
+      ex = b[0] - a[0]; ey = b[1] - a[1]; ez = b[2] - a[2];
+      fx = c[0] - a[0]; fy = c[1] - a[1]; fz = c[2] - a[2];
+      px = direction[1] * fz - direction[2] * fy;
+      py = direction[2] * fx - direction[0] * fz;
+      pz = direction[0] * fy - direction[1] * fx;
+      det = ex * px + ey * py + ez * pz;
       if (mesh.program.cullMode === 'none' || mesh.program.cullFace === null
         ? Math.abs(det) < 1e-9 : det < 1e-9) {
         continue;
       }
-      t = sub(origin, a), u = dot(t, p) / det;
+      tx = origin[0] - a[0]; ty = origin[1] - a[1]; tz = origin[2] - a[2];
+      u = (tx * px + ty * py + tz * pz) / det;
       if (u < 0 || u > 1) {
         continue;
       }
-      q = cross(t, e), v = dot(direction, q) / det;
+      qx = ty * ez - tz * ey; qy = tz * ex - tx * ez; qz = tx * ey - ty * ex;
+      v = (direction[0] * qx + direction[1] * qy + direction[2] * qz) / det;
       if (v < 0 || u + v > 1) {
         continue;
       }
       if (mesh.program.nightLight) {
         uv = mesh.geometry.attributes.uv.data;
-        ids = index ? [index.data[i], index.data[i + 1], index.data[i + 2]] : [i, i + 1, i + 2];
-        x2 = uv[ids[0] * 2] * (1 - u - v) + uv[ids[1] * 2] * u + uv[ids[2] * 2] * v;
-        y2 = uv[ids[0] * 2 + 1] * (1 - u - v) + uv[ids[1] * 2 + 1] * u + uv[ids[2] * 2 + 1] * v;
+        idA = index ? index.data[i] : i; idB = index ? index.data[i + 1] : i + 1; idC = index ? index.data[i + 2] : i + 2;
+        x2 = uv[idA * 2] * (1 - u - v) + uv[idB * 2] * u + uv[idC * 2] * v;
+        y2 = uv[idA * 2 + 1] * (1 - u - v) + uv[idB * 2 + 1] * u + uv[idC * 2 + 1] * v;
         if (x2 <= 2 && (!night || x2 * x2 + y2 * y2 > 0.9)) continue;
       }
-      distance = dot(f, q) / det;
+      distance = (fx * qx + fy * qy + fz * qz) / det;
       if (distance > 0 && distance < closest) {
         closest = distance; faceIndex = i / 3;
       }
     }
     if (faceIndex === undefined) continue;
-    point = new DOMPoint(
+    point = /* allocation: required -- The selected hit needs an independent world-space transform input. */ new DOMPoint(
       direction[0] * closest + origin[0],
       direction[1] * closest + origin[1],
       direction[2] * closest + origin[2],
       1
-    ).matrixTransform(new DOMMatrix(mesh.worldMatrix));
-    worldPoint = [point.x / point.w, point.y / point.w, point.z / point.w];
-    hits.push({
+    ).matrixTransform(/* allocation: required -- The selected hit is transformed with this mesh world matrix. */ new DOMMatrix(mesh.worldMatrix));
+    worldPoint = /* allocation: required -- Each returned hit retains its own world-space coordinate. */ [point.x / point.w, point.y / point.w, point.z / point.w];
+    hits.push(/* allocation: required -- Each returned hit retains independent object, distance and face metadata. */ {
       faceIndex,
       object: mesh,
       point: worldPoint,

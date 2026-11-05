@@ -1,21 +1,17 @@
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
 import { drawGeometry } from './drawGeometry.js';
 
 export function drawSceneMeshes(backend, encoder, meshes) {
-  const renderer = backend.renderer;
-  const pass = encoder.beginRenderPass({
-    colorAttachments: [{
-      view: renderer.context.getCurrentTexture().createView(),
-      clearValue: { r: 0, g: 0, b: 0, a: 0 },
-      loadOp: 'clear',
-      storeOp: 'store',
-    }],
-    depthStencilAttachment: {
-      view: renderer.depthTexture.createView(),
-      depthClearValue: 1,
-      depthLoadOp: 'clear',
-      depthStoreOp: 'store',
-    },
-  });
+  const gpuBeginRenderPass1 = sharedState.allocationRenderDrawSceneMeshesBeginRenderPass1;
+  const renderer = pluginState(backend).renderer;
+  const pass = encoder.beginRenderPass((
+    gpuBeginRenderPass1.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(),
+    gpuBeginRenderPass1.depthStencilAttachment.view = renderer.depthTexture.createView(),
+    gpuBeginRenderPass1
+  ));
+  gpuBeginRenderPass1.colorAttachments[0].view = null;
+  gpuBeginRenderPass1.depthStencilAttachment.view = null;
   pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
   pass.setBindGroup(1, renderer.sunlight.bindGroup);
   let mesh, world, uniforms, determinant, frontFace, program;
@@ -26,14 +22,14 @@ export function drawSceneMeshes(backend, encoder, meshes) {
       mesh.program.uniforms.opacity.value = mesh.opacity;
     }
     uniforms = mesh.program.uniforms;
-    if (uniforms.roofTexture) uniforms.roofTexture.value = backend._roofRaster?.texture || renderer.roofFallbackTexture;
+    if (uniforms.roofTexture) uniforms.roofTexture.value = pluginState(backend)._roofRaster?.texture || renderer.roofFallbackTexture;
     if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion ||
         mesh._worldMatrixVersion === undefined) {
       determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
         world[4] * (world[1] * world[10] - world[2] * world[9]) +
         world[8] * (world[1] * world[6] - world[2] * world[5]);
       if (!Number.isFinite(determinant) || determinant === 0) {
-        throw new Error('Singular 3D transform');
+        throw /* allocation: required -- Each reported failure needs its own message and stack for the receiving caller or event listener. */ new Error('Singular 3D transform');
       }
       mesh._frontFace = determinant < 0 ? 'cw' : 'ccw';
       mesh._frontFaceWorldVersion = mesh._worldMatrixVersion;

@@ -1,24 +1,25 @@
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
 Then('the offline Paris trees render and recover after toggling', { timeout: 180000 }, async function () {
   const loaded = () => this.page.waitForFunction(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
-    const error = [...tree._areas.values()].find(area => area.error);
+    const error = [...pluginState(tree)._areas.values()].find(area => area.error);
     if (error) throw new Error(error.error);
-    return tree._inflight === 0 && [...tree._areas.values()].some(area => area.buildings > 0);
+    return pluginState(tree)._inflight === 0 && [...pluginState(tree)._areas.values()].some(area => area.buildings > 0);
   }, null, { timeout: 90000 });
   await loaded();
   const result = await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
-    const features = tree.root.children.flatMap(mesh => mesh.extras.featureFaces);
+    const features = pluginState(tree).root.children.flatMap(mesh => mesh.extras.featureFaces);
     const result = {
       count: features.length, inventory: features.every(f => f.id === f.properties.idbase),
-      vertices: tree.root.children.every(mesh => [...mesh.geometry.attributes.position.data].every(Number.isFinite)),
-      shared: tree.renderer === layers._layers.find(entry => entry.name === 'Buildings').layer.renderer,
+      vertices: pluginState(tree).root.children.every(mesh => [...mesh.geometry.attributes.position.data].every(Number.isFinite)),
+      shared: pluginState(tree).renderer === pluginState(layers._layers.find(entry => entry.name === 'Buildings').layer).renderer,
     };
-    window.treeRendererBefore = tree.renderer;
-    window.treeMeshesBefore = [...tree.root.children];
+    window.treeRendererBefore = pluginState(tree).renderer;
+    window.treeMeshesBefore = [...pluginState(tree).root.children];
     return result;
   });
   assert.ok(result.count > 0);
@@ -29,21 +30,21 @@ Then('the offline Paris trees render and recover after toggling', { timeout: 180
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
-    return !tree._map && tree._areas.size === 0 && window.treeRendererBefore.canvas.isConnected;
+    return !tree._map && pluginState(tree)._areas.size === 0 && window.treeRendererBefore.canvas.isConnected;
   }), true);
   await control.check();
   await loaded();
   assert.equal(await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
-    return tree.renderer === window.treeRendererBefore &&
-      tree.root.children.every(mesh => !window.treeMeshesBefore.includes(mesh));
+    return pluginState(tree).renderer === window.treeRendererBefore &&
+      pluginState(tree).root.children.every(mesh => !window.treeMeshesBefore.includes(mesh));
   }), true);
 });
 
 Then('tree points preserve dimensions, terrain elevation, picking and validation', async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(map);
+    const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(map);
     await nativeChecks.ready(layer);
     const center = map.getCenter(), zoom = 16;
     const tile = map.project(center, zoom).divideBy(256).floor();
@@ -57,14 +58,14 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
       areas.push(block);
       return nativeChecks.loadBlock(layer, block, features);
     };
-    const previousTerrain = map._terrain3D;
+    const previousTerrain = pluginState(map)._terrain3D;
     const terrainTiles = new Map();
     for (let x = tile.x - 1; x <= tile.x + 1; x++) {
       for (let y = tile.y - 1; y <= tile.y + 1; y++) {
         terrainTiles.set(`${x}/${y}`, new Float32Array(256 * 256).fill(50));
       }
     }
-    map._terrain3D = { _map: map, _terrainReady: true, _terrainZoom: zoom, _terrainTiles: terrainTiles };
+    pluginState(map)._terrain3D = { _map: map, _terrainReady: true, _terrainZoom: zoom, _terrainTiles: terrainTiles };
     const errors = [];
     layer.on('error', ({ error }) => errors.push(error.message));
     try {
@@ -82,7 +83,7 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
         Math.max(...zs) - Math.min(...zs), Math.max(...trunkXs) - Math.min(...trunkXs)];
       const normalLengths = [];
       for (let i = 0; i < normals.length; i += 3) normalLengths.push(Math.hypot(...normals.slice(i, i + 3)));
-      nativeChecks.graph.updateWorldMatrix(layer.root, true);
+      nativeChecks.graph.updateWorldMatrix(pluginState(layer).root, true);
       const intersections = nativeChecks.intersections(mesh, [0, 100, 0], [0, -1, 0], layer);
       const face = mesh.extras.featureFaces[0];
       const before = [...colors];
@@ -103,7 +104,7 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
         invalid: !invalid.mesh && !!invalid.error, errors,
       };
     } finally {
-      map._terrain3D = previousTerrain;
+      pluginState(map)._terrain3D = previousTerrain;
       for (const block of areas) nativeChecks.sources.releaseArea(layer, block);
       layer.remove();
     }

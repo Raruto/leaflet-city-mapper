@@ -1,3 +1,5 @@
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
 import { synchronizeZoomView } from './synchronizeZoomView.js';
 import { resizeRenderer } from './resizeRenderer.js';
 import { updateMapCamera } from './updateMapCamera.js';
@@ -19,8 +21,9 @@ import { pruneRasterTiles } from '../raster/pruneRasterTiles.js';
  */
 
 export function render(backend) {
+  const gpuSubmit1 = sharedState.allocationRenderRenderSubmit1;
   cancelUpdate(backend);
-  if (backend._shared !== backend || !backend.renderer) return;
+  if (pluginState(backend)._shared !== backend || !pluginState(backend).renderer) return;
   const map = backend._map;
   const now = performance.now();
   const size = map.getSize();
@@ -28,20 +31,20 @@ export function render(backend) {
   synchronizeZoomView(backend, now);
   resizeRenderer(backend, size);
   updateMapCamera(backend, size);
-  updateWorldMatrix(backend.scene);
+  updateWorldMatrix(pluginState(backend).scene);
   let sceneChanged = false;
   let layer;
-  for (layer of backend._layers) {
-    if (!layer._beforeRender) continue;
-    layer._beforeRender();
+  for (layer of pluginState(backend)._layers) {
+    if (!pluginState(layer)._beforeRender) continue;
+    pluginState(layer)._beforeRender();
     sceneChanged = true;
   }
-  const sunlight = map._sunlight;
+  const sunlight = pluginState(map)._sunlight;
   collectFrameMeshes(backend, sunlight, sceneChanged);
-  const shadowMeshes = backend._shadowMeshes;
-  const renderer = backend.renderer;
+  const shadowMeshes = pluginState(backend)._shadowMeshes;
+  const renderer = pluginState(backend).renderer;
   const rasters = updateRoofRaster(backend, now);
-  const meshes = renderer.frameMeshes ||= [];
+  const meshes = renderer.frameMeshes ||= /* allocation: required -- Each renderer retains its final sorted mesh list between frames. */ [];
   meshes.length = 0;
   let appearing = prepareFrameMeshes(backend, rasters, now, meshes);
   const encoder = renderer.device.createCommandEncoder();
@@ -49,9 +52,13 @@ export function render(backend) {
   renderSunlight(backend, encoder, shadowMeshes, sunlight);
   drawSceneMeshes(backend, encoder, meshes);
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
-  renderer.device.queue.submit([encoder.finish()]);
-  for (layer of backend._layers) {
-    if (layer._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
+  renderer.device.queue.submit((
+    gpuSubmit1[0] = encoder.finish(),
+    gpuSubmit1
+  ));
+  gpuSubmit1[0] = null;
+  for (layer of pluginState(backend)._layers) {
+    if (pluginState(layer)._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
   }
   if (map._animatingZoom || appearing) update(backend);
 }

@@ -1,6 +1,7 @@
+import { state as sharedState } from '../state.js';
 import { computeBounds } from '../geometry/computeBounds.js';
 import { collider } from '../collision/collider.js';
-import { CELL } from '../constants/CELL.js';
+
 import { horizontalRay } from '../collision/horizontalRay.js';
 
 export function hitMesh(mesh, data) {
@@ -12,19 +13,25 @@ export function hitMesh(mesh, data) {
   if (Math.hypot(m[0] * k[0] + m[4] * k[1] + m[8] * k[2] + m[12] - x, m[2] * k[0] + m[6] * k[1] + m[10] * k[2] + m[14] - z) >
     radius * Math.hypot(m[0], m[1], m[2]) + reach) return;
   const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
-  const seen = new Set();
-  let ix, iz, t, height, d;
-  for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
-    for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++)
-      for (t of c.cells.get(ix + ',' + iz) || []) {
+  const seen = data.seen;
+  seen.clear();
+  let ix, iz, t, height, d, cell;
+  for (ix = Math.floor(Math.min(ox, ox + dx * reach) / sharedState.CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / sharedState.CELL); ix++)
+    for (iz = Math.floor(Math.min(oz, oz + dz * reach) / sharedState.CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / sharedState.CELL); iz++) {
+      cell = c.cells.get(ix + ',' + iz);
+      if (!cell) continue;
+      for (t of cell) {
         if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
         seen.add(t);
-        for (height of [0.4, 1.5]) {
+        for (height = 0.4; height < 2; height += 1.1) {
           d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
           if (d >= 0 && d < data.best) {
             data.best = d;
-            data.found = [c.nrm[t * 2], c.nrm[t * 2 + 1]];
+            data.found = true;
+            data.normal[0] = c.nrm[t * 2];
+            data.normal[1] = c.nrm[t * 2 + 1];
           }
         }
       }
+    }
 }

@@ -1,8 +1,11 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { initNativeGPU } from '../core/initNativeGPU.js';
+import { removeLayerEvents } from './removeLayerEvents.js';
 
 export function layerLayerAdd(event) {
-  const native = !this._3d && (
+  const native = !pluginState(this)._3d && (
     this instanceof L.GridLayer ||
     this instanceof L.Polyline ||
     this instanceof L.CircleMarker ||
@@ -15,7 +18,23 @@ export function layerLayerAdd(event) {
     }
     if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
   }
-  indexState.layerProto._layerAdd.call(this, event);
+  const map = event.target, state = pluginState(this);
+  if (!map.hasLayer(this)) return;
+  if (state.onAdd) {
+    this._map = map;
+    this._zoomAnimated = map._zoomAnimated;
+    if (state.getEvents) {
+      state.events = state.getEvents.call(this);
+      state.eventMap = map;
+      map.on(state.events, this);
+      this.once('remove', removeLayerEvents, this);
+    }
+    state.onAdd.call(this, map);
+    this.fire('add');
+    map.fire('layeradd', /* allocation: required -- Give listeners an independent native layer event payload. */ { layer: this });
+  } else {
+    sharedState.layerProto._layerAdd.call(this, event);
+  }
   if (!native || !event.target.hasLayer(this)) return;
   initNativeGPU(this, event.target);
 }

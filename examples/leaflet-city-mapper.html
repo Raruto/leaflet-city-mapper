@@ -35,7 +35,7 @@
 			const layers = new L.Control.Layers({
 				'Empty': new L.LayerGroup(),
 				// Offline archive built by `node build/pmtiles.js`.
-				'Plan IGN': new L.Layer({
+				'Plan IGN': CityMapper.layer({
 					source: {
 						url: 'data/paris-plan-ign.pmtiles',
 						maxZoom: 24,
@@ -43,7 +43,7 @@
 					attribution: '<a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_PLAN-IGN">Plan IGN</a> &copy; IGN &mdash; <a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Licence Ouverte Etalab 2.0</a>',
 				}),
 				// Offline archive built by `node build/pmtiles.js`.
-				'Orthophoto IGN': new L.Layer({
+				'Orthophoto IGN': CityMapper.layer({
 					source: {
 						url: 'data/paris-orthophotos.pmtiles',
 						maxZoom: 24,
@@ -52,7 +52,7 @@
 				}).addTo(map),
 			}, {
 				// Offline terrain tiles built from IGN's RGE ALTI WMTS (Float32 BIL).
-				'Terrain (3D)': new L.Layer({
+				'Terrain (3D)': CityMapper.layer({
 					source: {
 						type: 'terrain',
 						url: 'data/paris-terrain.pmtiles',
@@ -64,7 +64,7 @@
 					attribution: '<a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_RGE-ALTI">RGE ALTI</a>, <a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-TOPO">BD TOPO</a> &copy; IGN &mdash; <a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Licence Ouverte Etalab 2.0</a>',
 				}).addTo(map),
 				// Offline archive built by `node build/pmtiles.js`.
-				'Buildings': new L.Layer({
+				'Buildings': CityMapper.layer({
 					source: {
 						type: '3d',
 						url: 'data/paris-buildings.pmtiles',
@@ -91,7 +91,7 @@
 					attribution: '<a href="https://opendata.paris.fr/explore/dataset/volumesbatisparis/">Building volumes: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
 				// Offline tree inventory; measurements are retained in the PMTiles GeoJSON.
-				'Trees': new L.Layer({
+				'Trees': CityMapper.layer({
 					source: {
 						type: '3d',
 						url: 'data/paris-trees.pmtiles',
@@ -132,7 +132,7 @@
 				// OSM way 5013364 links to 3dmr=4; revision 3 is a CC0, metre-scale GLB.
 				// Register the four ground corners to OSM pillars 69034127/135/179/180.
 				// The GLB is axis-aligned, not north-aligned; its horizontal footprint is slightly undersized.
-				'Eiffel Tower': new L.Layer({
+				'Eiffel Tower': CityMapper.layer({
 					source: {
 						url: 'data/eiffel-tower.glb',
 						tooltip() {
@@ -149,7 +149,7 @@
 					},
 					attribution: '<a href="https://3dmr.eu/model/4">CC0 model: n42k / Blend Swap</a>',
 				}).addTo(map),
-				'Streetlights': new L.Layer({
+				'Streetlights': CityMapper.layer({
 					source: {
 						type: '3d',
 						url: 'data/paris-streetlights.pmtiles',
@@ -212,7 +212,7 @@
 					attribution: '<a href="https://opendata.paris.fr/explore/dataset/eclairage-public/">Streetlights: Ville de Paris / Cielis</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
 				'Traffic': new L.LayerGroup([
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/seine-cruises.geojson',
@@ -221,14 +221,14 @@
 						},
 						attribution: '<a href="https://www.bateaux-mouches.fr/fr/croisiere/informations">Cruise timetable: Bateaux-Mouches</a>',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
 						},
 						attribution: '<a href="https://opendata.paris.fr/explore/dataset/comptages-routiers-permanents/">Traffic counts: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
@@ -238,7 +238,7 @@
 						},
 						attribution: '<a href="https://opendata.paris.fr/explore/dataset/comptage-velo-donnees-compteurs/">Cycling counts: Ville de Paris</a>; <a href="https://opendata.paris.fr/explore/dataset/amenagements-cyclables/">paths: Ville de Paris / OpenStreetMap contributors</a> (ODbL)',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
@@ -248,7 +248,7 @@
 						},
 						attribution: '<a href="https://opendata.paris.fr/explore/dataset/amenagements-cyclables/">Pedestrian/shared paths: Ville de Paris / OpenStreetMap contributors</a> (ODbL)',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
@@ -258,7 +258,7 @@
 						},
 						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Bus routes: IDFM</a> (ODbL)',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
@@ -268,7 +268,7 @@
 						},
 						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Tram routes: IDFM</a> (ODbL)',
 					}),
-					new L.Layer({
+					CityMapper.layer({
 						source: {
 							type: 'traffic',
 							url: 'data/paris-traffic.js',

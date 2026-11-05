@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { releaseArea } from '../sources/releaseArea.js';
 import { updateArea } from "../sources/updateArea.js";
 
@@ -6,9 +7,9 @@ import { updateArea } from "../sources/updateArea.js";
 export function onTerrainChange(layer) {
   if (!layer._map) return;
   let area;
-  for (area of layer._areas.values()) {
+  for (area of pluginState(layer)._areas.values()) {
     releaseArea(layer, area);
   }
-  layer._areas.clear();
+  pluginState(layer)._areas.clear();
   updateArea(layer);
 }

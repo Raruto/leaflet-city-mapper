@@ -1,18 +1,9 @@
+import { state as sharedState } from '../state.js';
 import { initNativeGPU } from '../core/initNativeGPU.js';
-import { mapCameraState } from '../constants/mapCameraState.js';
-import { mapGetBearing } from './mapGetBearing.js';
-import { mapGetPitch } from './mapGetPitch.js';
-import { mapStopPitchBearingAnimation } from './mapStopPitchBearingAnimation.js';
-import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
-import { mapAnimateCamera } from './mapAnimateCamera.js';
-import { mapSetBearing } from './mapSetBearing.js';
-import { mapSetPitch } from './mapSetPitch.js';
-import { mapResetNorth } from './mapResetNorth.js';
-import { mapResetNorthPitch } from './mapResetNorthPitch.js';
+
 import { mapLayerPointToContainerPoint } from './mapLayerPointToContainerPoint.js';
 import { mapContainerPointToLayerPoint } from './mapContainerPointToLayerPoint.js';
 import { mapGetCenterLayerPoint } from './mapGetCenterLayerPoint.js';
-import { mapUpdateCameraOverlays } from './mapUpdateCameraOverlays.js';
 import { mapPanBy } from './mapPanBy.js';
 import { mapSetZoomAround } from './mapSetZoomAround.js';
 import { mapPanInside } from './mapPanInside.js';
@@ -24,8 +15,6 @@ import { mapTryAnimatedPan } from './mapTryAnimatedPan.js';
 import { mapGetBounds } from './mapGetBounds.js';
 import { initializeCameraMap } from './initializeCameraMap.js';
 import { markerSetIcon } from '../core/markerSetIcon.js';
-import { markerSetRotation } from '../core/markerSetRotation.js';
-import { markerCameraIconPoint } from '../core/markerCameraIconPoint.js';
 import { markerGetEvents } from '../core/markerGetEvents.js';
 import { markerSetPos } from '../core/markerSetPos.js';
 import { markerUpdateZIndex } from '../core/markerUpdateZIndex.js';
@@ -38,11 +27,7 @@ import { tooltipSetPosition } from '../core/tooltipSetPosition.js';
 import { gridlayerGetEvents } from '../core/gridlayerGetEvents.js';
 import { gridlayerGetTiledPixelBounds } from '../core/gridlayerGetTiledPixelBounds.js';
 
-mapCameraState.mapMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
-mapCameraState.radians = Math.PI / 180;
-
-mapCameraState.cameraAnimations = new Map();
-mapCameraState.cameraAnimationFrame = null;
+sharedState.mapMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
 
 L.Map.mergeOptions({
   rotate: true, bearing: 0, pitch: 0, pitchMaxDistance: 3,
@@ -53,19 +38,9 @@ L.Map.mergeOptions({
 // Ground coordinates only: the GPU camera handles elevated geometry, never CSS transforms.
 
 L.Map.include({
-  getBearing: mapGetBearing,
-  getPitch: mapGetPitch,
-  _stopPitchBearingAnimation: mapStopPitchBearingAnimation,
-  _setPitchAndBearing: mapSetPitchAndBearing,
-  _animateCamera: mapAnimateCamera,
-  setBearing: mapSetBearing,
-  setPitch: mapSetPitch,
-  resetNorth: mapResetNorth,
-  resetNorthPitch: mapResetNorthPitch,
   layerPointToContainerPoint: mapLayerPointToContainerPoint,
   containerPointToLayerPoint: mapContainerPointToLayerPoint,
   _getCenterLayerPoint: mapGetCenterLayerPoint,
-  _updateCameraOverlays: mapUpdateCameraOverlays,
   panBy: mapPanBy,
   setZoomAround: mapSetZoomAround,
   panInside: mapPanInside,
@@ -79,12 +54,10 @@ L.Map.include({
 
 L.Map.addInitHook(initializeCameraMap);
 
-mapCameraState.markerMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
+sharedState.markerMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
 L.Marker.mergeOptions({ rotation: 0, rotateWithView: false, keepUpright: false, scale: 1 });
 L.Marker.include({
   setIcon: markerSetIcon,
-  setRotation: markerSetRotation,
-  _cameraIconPoint: markerCameraIconPoint,
   getEvents: markerGetEvents,
   _setPos: markerSetPos,
   _updateZIndex: markerUpdateZIndex,
@@ -93,30 +66,27 @@ L.Marker.include({
 
 // Keep Leaflet's focusable marker and its drag events; only translate its screen position back to ground.
 
-mapCameraState.pendingMarkerPan = new Map();
-mapCameraState.markerPanFrame = null;
-
-mapCameraState.popupEvents = L.Popup.prototype.getEvents;
+sharedState.popupEvents = L.Popup.prototype.getEvents;
 L.Popup.include({
   getEvents: popupGetEvents,
 });
-mapCameraState.tooltipEvents = L.Tooltip.prototype.getEvents;
+sharedState.tooltipEvents = L.Tooltip.prototype.getEvents;
 L.Tooltip.include({
   getEvents: tooltipGetEvents,
 });
-mapCameraState.popupPosition = L.Popup.prototype._updatePosition;
-mapCameraState.popupPan = L.Popup.prototype._adjustPan;
+sharedState.popupPosition = L.Popup.prototype._updatePosition;
+sharedState.popupPan = L.Popup.prototype._adjustPan;
 L.Popup.include({
   _adjustPan: popupAdjustPan,
   _updatePosition: popupUpdatePosition,
 });
-mapCameraState.tooltipPosition = L.Tooltip.prototype._setPosition;
+sharedState.tooltipPosition = L.Tooltip.prototype._setPosition;
 L.Tooltip.include({
   _setPosition: tooltipSetPosition,
 });
 
-mapCameraState.tiledBounds = L.GridLayer.prototype._getTiledPixelBounds;
-mapCameraState.gridEvents = L.GridLayer.prototype.getEvents;
+sharedState.tiledBounds = L.GridLayer.prototype._getTiledPixelBounds;
+sharedState.gridEvents = L.GridLayer.prototype.getEvents;
 L.GridLayer.include({
   getEvents: gridlayerGetEvents,
   _getTiledPixelBounds: gridlayerGetTiledPixelBounds,

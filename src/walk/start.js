@@ -1,8 +1,12 @@
+import { mapGetPitch } from '../camera/mapGetPitch.js';
+import { mapGetBearing } from '../camera/mapGetBearing.js';
+import { mapSetPitch } from '../camera/mapSetPitch.js';
 import { step } from './step.js';
 import { onKey } from './onKey.js';
 import { onBlur } from './onBlur.js';
 import { onPointer } from './onPointer.js';
 import { onTerrain } from './onTerrain.js';
+import { state as sharedState } from '../state.js';
 
 export function start() {
   const map = this.layer._map;
@@ -11,20 +15,20 @@ export function start() {
   // Zoom whose camera distance (1.5 viewport heights, as in scene/render.js) is about `distance` metres behind the walker.
   const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
   const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * 40075016.68557849 * Math.cos(this.state.latlng.lat * Math.PI / 180) / 256));
-  const handlers = [];
   let name;
-  for (name of ['dragging', 'keyboard', 'doubleClickZoom', 'boxZoom']) {
-    if (map[name]?.enabled()) handlers.push(name);
-  }
-  this.saved = {
-    zoom: map.getZoom(), pitch: map.getPitch(), scrollWheelZoom: map.options.scrollWheelZoom, handlers
+  this.saved = /* allocation: required -- Preserve each active walk session's map settings. */ {
+    zoom: map.getZoom(), pitch: mapGetPitch(map), scrollWheelZoom: map.options.scrollWheelZoom,
+    handlers: /* allocation: required -- Snapshot enabled handlers for this session. */ [],
   };
+  for (name of sharedState.allocationSceneWalkHandlers) {
+    if (map[name]?.enabled()) this.saved.handlers.push(name);
+  }
   for (name of this.saved.handlers) map[name].disable();
   // Wheel zoom moves the camera closer or farther, keeping the walker centred.
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom && 'center';
-  this.state.heading = -map.getBearing() * Math.PI / 180;
-  map.setView(this.state.latlng, zoom, { animate: false });
-  map.setPitch(75);
+  this.state.heading = -mapGetBearing(map) * Math.PI / 180;
+  map.setView(this.state.latlng, zoom, /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
+  mapSetPitch(map, 75);
   L.DomEvent.on(document, 'keydown keyup', this.onKey);
   L.DomEvent.on(window, 'blur', this.onBlur);
   L.DomEvent.on(map.getContainer(), 'pointerdown pointermove pointerup pointercancel', this.onPointer);

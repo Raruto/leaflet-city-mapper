@@ -1,8 +1,9 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
+
 import { initializerFor } from './initializerFor.js';
 
 export function resolveNextInitialization() {
-  const task = indexState.pendingInitializations.shift();
+  const task = sharedState.pendingInitializations.shift();
   try {
     task.initialize = initializerFor(task.type);
   } catch (error) {

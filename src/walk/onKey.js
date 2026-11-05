@@ -1,4 +1,5 @@
-import { moves } from '../constants/moves.js';
+import { state as sharedState } from '../state.js';
+
 import { stop } from './stop.js';
 
 export function onKey(event) {
@@ -6,7 +7,7 @@ export function onKey(event) {
   if (event.target.closest?.('input:not([type=checkbox], [type=radio]), select, textarea, [contenteditable]') ||
     event.ctrlKey || event.altKey || event.metaKey) return;
   if (event.type === 'keydown' && event.code === 'Escape') { this.stop(); return; }
-  if (!moves[event.code]) return;
+  if (!sharedState.moves[event.code]) return;
   event.preventDefault();
   if (event.type === 'keydown') this.keys.add(event.code); else this.keys.delete(event.code);
 }

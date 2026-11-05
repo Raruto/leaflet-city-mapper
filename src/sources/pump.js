@@ -1,4 +1,6 @@
-import { cityMapper } from '../constants/cityMapper.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { emptyNode } from "../scene/emptyNode.js";
 import { isClockWise } from "../triangulation/isClockWise.js";
 import { lampPostGeometry } from "../geometry/lampPostGeometry.js";
@@ -12,27 +14,25 @@ import { loadSource } from '../archives/loadSource.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 import { getElevation } from "../terrain/getElevation.js";
-import { pumpState } from '../constants/pumpState.js';
+
 import { compareDistance } from '../utils/compareDistance.js';
 import { buildArea } from './buildArea.js';
 
-pumpState.triangleContexts = [];
-
 /** Share four load/build slots across source layers, nearest ground blocks first. */
 export function pump(backend, map = backend._map) {
-  const shared = map && cityMapper.renderers.get(map);
+  const shared = map && sharedState.renderers.get(map);
   if (!shared) return;
-  const layers = [];
+  const layers = /* allocation: required -- Snapshot renderer ownership against reentrant progress listeners. */ [];
   let layer, area, center, areaBackend;
-  for (layer of shared._layers) {
-    if (Number.isFinite(layer._inflight) && layer._areas && (layer.url || layer._geojson)) layers.push(layer);
+  for (layer of pluginState(shared)._layers) {
+    if (Number.isFinite(pluginState(layer)._inflight) && pluginState(layer)._areas && (pluginState(layer).url || pluginState(layer)._geojson)) layers.push(layer);
   }
-  const pending = [];
+  const pending = /* allocation: required -- Keep this scheduling pass independent of nested pump calls. */ [];
   for (layer of layers) {
-    for (area of layer._areas.values()) {
+    for (area of pluginState(layer)._areas.values()) {
       if (area.started || area.request.signal.aborted) continue;
       center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
-      pending.push({
+      pending.push(/* allocation: required -- Snapshot each asynchronous area request before sorting. */ {
         layer, area,
         distance: center
           ? Math.hypot(area.coords.x + 0.5 - center.x, area.coords.y + 0.5 - center.y) / 2 ** area.coords.z : 0,
@@ -41,12 +41,12 @@ export function pump(backend, map = backend._map) {
   }
   pending.sort(compareDistance);
   let inflight = 0;
-  for (layer of layers) inflight += layer._inflight;
+  for (layer of layers) inflight += pluginState(layer)._inflight;
   for ({ layer: areaBackend, area } of pending) {
     if (inflight >= 4) break;
-    if (areaBackend._inflight >= 2) continue;
+    if (pluginState(areaBackend)._inflight >= 2) continue;
     area.started = true;
-    areaBackend._inflight++;
+    pluginState(areaBackend)._inflight++;
     inflight++;
     buildArea(areaBackend, area, map);
   }

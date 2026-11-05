@@ -1,3 +1,5 @@
+import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
+import { pluginState } from '../core/pluginState.js';
 import { updateSky } from './updateSky.js';
 import { constrainCameraToBounds } from './constrainCameraToBounds.js';
 import { cleanupCameraMap } from './cleanupCameraMap.js';
@@ -13,13 +15,13 @@ export function initializeCameraMap() {
       '.leaflet-camera-zoom .leaflet-popup,.leaflet-camera-zoom .leaflet-tooltip{transition:none!important}';
     document.head.append(style);
   }
-  this._setPitchAndBearing(this.options.pitch, this.options.bearing);
+  mapSetPitchAndBearing(this, this.options.pitch, this.options.bearing);
   this.on('load resize pitch', updateSky);
   this.on('rotate pitch', constrainCameraToBounds, this);
   this.once('unload', cleanupCameraMap, this);
   this.whenReady(cameraMapReady, this);
   if (this.options.rotate || this.options.trackContainerMutation) {
-    this.cameraReady = loadCameraControls(this);
-    this.cameraReady.catch(noOperation);
+    pluginState(this).cameraReady = loadCameraControls(this);
+    pluginState(this).cameraReady.catch(noOperation);
   }
 }

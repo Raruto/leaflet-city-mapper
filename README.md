@@ -25,15 +25,15 @@ Load Leaflet (the only runtime dependency), then this plugin:
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
 ```
-And then set an approriate `source` param to layer constructor:
+Create a native `L.Layer` through the plugin's factory:
 
 ```js
-new L.Layer({ source: .. })
+CityMapper.layer({ source: { /* source options */ } })
 ```
 For example, here you can use a `geojson` object, like this:
 
 ```js
-const buildings = new L.Layer({
+const buildings = CityMapper.layer({
   source: {
     type: 'geojson',
     url: GeoJSON,
@@ -43,7 +43,31 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
-The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`.
+Plugin operations are standalone functions; native Leaflet instances and
+prototypes receive no additional attributes. Internal state lives in `WeakMap`s.
+This replaces the previous `new L.Layer({ source: ... })`, `layer.ready`,
+`layer.setData(...)` and `map.setPitch(...)` API:
+
+```js
+await CityMapper.ready(buildings);
+CityMapper.setData(buildings, featureCollection);
+CityMapper.setPitch(map, 45);
+CityMapper.setBearing(map, 90, { animate: true });
+CityMapper.getPitch(map);
+CityMapper.getBearing(map);
+CityMapper.resetNorthPitch(map);
+CityMapper.setRotation(marker, Math.PI / 2);
+```
+
+`CityMapper.ready(map)` waits for camera controls. PMTiles layers also expose
+`CityMapper.getHeader(layer)`, `getZxy(layer, z, x, y, signal)`,
+`getTileSize(layer)`, `isLoading(layer)`, `setOpacity(layer, opacity)` and
+`setZIndex(layer, zIndex)`. Mutating operations return the native layer or map;
+chain Leaflet methods normally, but call subsequent plugin operations separately.
+Existing native methods are still overridden where needed for GPU integration.
+`CityMapper.getLocation(layer)` returns the source origin for application data loaders.
+
+The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`. Shared constants and module-level state live in the single exported `state` object in [`src/state.js`](./src/state.js); per-instance state stays in its `WeakMap`.
 
 Raster imagery blends coarse-to-fine on the terrain, retaining depth occlusion for 3D objects.
 
@@ -91,12 +115,51 @@ npm run test  # build and run browser tests
 
 After that you can start developing inside the `src` folder (eg. open "http://localhost:8080/examples" in your browser to preview changes).
 
+The plugin integration tests compare native Leaflet prototypes and freshly constructed
+instances (including source layers after initialization and native event dispatch) before and after loading the
+bundle. Added methods or properties fail the check, including non-enumerable and symbol
+keys; overriding existing attributes is allowed. Run this check on both supported
+Leaflet versions with `node build/test.js --name "The plugin does not add attributes"`.
+
+The source-style tests also reject object literals, array literals and `new`
+expressions inside every function in `src`, including default parameters and
+returned values. Module-level initialization in `src/state.js` is allowed.
+Necessary allocations require a separate comment immediately before the expression:
+`/* allocation: required -- Each caller owns its result. */`.
+The exception covers only that expression, not nested allocations or a whole
+function; malformed and unused exceptions fail the check. Each exception must be
+reviewed and covered by a behavior test (for example, independent archive headers).
+Camera sky updates reuse a projection buffer owned by each time control.
+`projectCelestialBody` and `mix` accept an optional final output buffer; omitting
+it still returns an independent result. Atmosphere color stops live in `state`,
+while returned tints remain independent.
+Sun and Moon share date/location validation; lunar calculations do not build a
+discarded solar result. Simulation events retain their own date snapshots.
+Rendering and shadow passes reuse synchronous WebGPU descriptor scratch in
+`state`; GPU-resource references are cleared after submission to the API.
+Programs retain independent uniforms and vertex-buffer slot lists, with frozen
+shared vertex-attribute layouts. Raster request queues and emitted event payloads
+remain independent where listeners can reenter loading or retain a snapshot.
+`shadowBounds(meshes, output)` optionally writes into caller-owned bounds;
+omitting `output` and calling `shadowMatrix` still produce independent results.
+Camera fitting uses scalar corner bounds; touch gestures and native marker
+projection reuse scratch buffers owned by each gesture or layer. Options passed
+to Leaflet view transitions remain independent because Leaflet mutates them.
+This is a syntactic check, not allocation profiling: allocations hidden inside
+function calls are not detected. Run it with
+`node build/test.js --name "Local allocation checks|Source functions avoid explicit local allocations"`.
+On Windows, browser setup and teardown allow extra time for the GPU process to
+start or exit; scenario assertions and rendering thresholds are unchanged.
+Set `TEST_BROWSER=msedge` to use installed Edge instead of bundled Chromium.
+Leaflet 1.9 scripts, styles and marker images are served from the installed
+Leaflet package during tests; Leaflet 2 still loads from the CDN.
+
 ### Source layout
 
 ```text
 src/
   index.js           Public entry point and source registration
-  constants/         Exported module-level const bindings
+  state.js           Single shared state object and constants
   camera/            Camera API, projection and animation
   controls/          Compass, dragging, touch and resizing
   core/              Leaflet layer integration, events, mutations and overlays

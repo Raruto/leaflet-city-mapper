@@ -1,7 +1,7 @@
 import { textureBinding } from '../rendering/textureBinding.js';
 
 /** Material WGSL and texture bindings, without a GPU device or Leaflet layer. */
-export function materialShaders(material = {}, sparkle = false, elevationWGSL = '') {
+export function materialShaders(material = sharedState.allocationRenderDefaultMaterial, sparkle = false, elevationWGSL = '') {
   const hasBase = Boolean(material.baseTexture);
   const hasMetal = Boolean(material.metalTexture);
   const hasEmissive = Boolean(material.emissiveTexture);
@@ -78,7 +78,7 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       return output;
     }
   `;
-  const bindings = [];
+  const bindings = /* allocation: required -- Each returned shader variant retains its own texture-binding list. */ [];
   const baseBinding = textureBinding(bindings, 'baseTexture', hasBase);
   const metalBinding = textureBinding(bindings, 'metalTexture', hasMetal);
   const emissiveBinding = textureBinding(bindings, 'emissiveTexture', hasEmissive);
@@ -242,5 +242,6 @@ export function materialShaders(material = {}, sparkle = false, elevationWGSL = 
       `}
     }
   `;
-  return { vertex, fragment, bindings, textured, hasTerrain };
+  return /* allocation: required -- Each caller owns its shader sources and matching texture-binding metadata. */ { vertex, fragment, bindings, textured, hasTerrain };
 }
+import { state as sharedState } from '../state.js';

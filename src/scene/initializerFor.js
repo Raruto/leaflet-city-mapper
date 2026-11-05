@@ -9,6 +9,6 @@ export function initializerFor(type) {
     case 'pmtiles': return initRaster;
     case 'terrain': return initTerrain;
     case 'traffic': return initTraffic;
-    default: throw new Error(`Unknown layer type: ${type}`);
+    default: throw /* allocation: required -- Preserve the failure stack for invalid source types. */ new Error(`Unknown layer type: ${type}`);
   }
 }

@@ -1,10 +1,15 @@
+import { state as sharedState } from '../../src/state.js';
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Given, Then } from '@cucumber/cucumber';
 import { along } from '../../src/traffic/along.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
-import { speed } from '../../src/constants/speed.js';
+import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { toLanes } from '../../src/traffic/toLanes.js';
+
 import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
+import { getLocation } from '../../src/scene/getLocation.js';
 import { cyclingCounts, mobilityLanes, trafficHour, parisMobility, parisTransit } from '../../examples/data/paris-traffic.js';
 import parisTraffic from '../../examples/data/paris-traffic.js';
 import { trafficResponse, fulfillTrafficRoute } from '../fixtures/traffic-data.js';
@@ -13,8 +18,46 @@ const [cruise] = JSON.parse(readFileSync(new URL('../../examples/data/seine-crui
 const cruises = date => scheduledTrips(date, cruise.properties.timetable);
 const route = cruise.geometry.coordinates;
 
+Then('traffic scratch preserves route vertices and independent lane and pose results', function () {
+  const points = [[0, 0, 10], [60, 0, 16]], lengths = [0, 60];
+  const first = along(points, lengths, 15), second = along(points, lengths, 45), target = {};
+  assert.notEqual(first, second);
+  assert.equal(along(points, lengths, 30, target), target);
+  assert.deepEqual(first, { x: 15, y: 11.5, z: 0, dx: 1, dz: 0 });
+  assert.deepEqual(target, { x: 30, y: 13, z: 0, dx: 1, dz: 0 });
+  const lanes = [{ points, lengths, properties: { route_color: 'FF8000' } }];
+  const geometry = routeGeometry(lanes), next = routeGeometry(lanes);
+  assert.deepEqual(geometry.position.slice(0, 18), [
+    0, 10.4, -2.5, 0, 10.4, 2.5, 18, 12.200000000000001, 2.5,
+    0, 10.4, -2.5, 18, 12.200000000000001, 2.5, 18, 12.200000000000001, -2.5,
+  ]);
+  assert.equal(geometry.position.length, 36);
+  assert.deepEqual(geometry.normal.slice(0, 3), [0, 1, 0]);
+  assert.deepEqual(geometry.color.slice(0, 3), [1, 128 / 255, 0]);
+  for (const name of ['position', 'normal', 'color']) {
+    assert.notEqual(geometry[name], next[name]);
+    geometry[name][0] = 999;
+    assert.notEqual(next[name][0], 999);
+  }
+  const source = { features: [
+    { geometry: { type: 'LineString', coordinates: [[2, 48], [3, 49]] } },
+    { geometry: { type: 'MultiLineString', coordinates: [[[4, 50], [5, 51]], [[6, 52], [7, 53]]] } },
+    { geometry: { type: 'Point', coordinates: [0, 0] } },
+  ] };
+  const converted = toLanes(source);
+  assert.deepEqual(converted.map(lane => lane.latlngs), [
+    [[48, 2], [49, 3]], [[50, 4], [51, 5]], [[52, 6], [53, 7]],
+  ]);
+  converted[0].latlngs[0][0] = 0;
+  converted[0].properties.name = 'first';
+  assert.equal(source.features[0].geometry.coordinates[0][1], 48);
+  assert.equal(converted[1].properties.name, undefined);
+  assert.deepEqual(toLanes({}), []);
+});
+
 Then('HTTP traffic loaders refresh per map and distinguish measured from assumed flows', async function () {
-  const original = globalThis.fetch, requests = [];
+  const original = globalThis.fetch, originalAPI = globalThis.CityMapper, requests = [];
+  globalThis.CityMapper = { getLocation };
   globalThis.fetch = mockTrafficFetch.bind(null, requests);
   const signal = new AbortController().signal;
   const time = new Date('2026-11-04T12:00:00Z');
@@ -42,6 +85,8 @@ Then('HTTP traffic loaders refresh per map and distinguish measured from assumed
     await assert.rejects(parisTransit(time, { options: { transitMode: 'bus' } }, aborted), /abort/i);
   } finally {
     globalThis.fetch = original;
+    if (originalAPI === undefined) delete globalThis.CityMapper;
+    else globalThis.CityMapper = originalAPI;
   }
 });
 
@@ -77,17 +122,17 @@ Then('cycling counts are only assigned to nearby paths and preserve zero or miss
 
 Then('all traffic models match CPU poses on GPU workgroup boundaries', { timeout: 60000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
-    await layer.ready;
-    await layer._added.promise;
+    const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
+    await pluginState(layer).ready;
+    await pluginState(layer)._added.promise;
     try {
       const { checkTrafficCompute } = await import('/test/fixtures/traffic-compute.js');
-      return await checkTrafficCompute(layer.renderer.device);
+      return await checkTrafficCompute(pluginState(layer).renderer.device);
     } finally {
       layer.remove();
     }
   });
-  assert.equal(result.length, Object.keys(vehicles).length);
+  assert.equal(result.length, Object.keys(sharedState.vehicles).length);
 });
 Then('mobility paths are clipped, deduplicated and validated without inventing pedestrian roads', function () {
   const path = { type: 'Feature', properties: { osm_id: 1, date_export: '2026-01-01', amenagement: 'voie verte' },
@@ -121,13 +166,14 @@ Given('the cycling and pedestrian example layers are open', { timeout: 60000 }, 
   await this.page.waitForFunction(() => typeof layers !== 'undefined');
   await this.page.evaluate(async () => {
     const initialized = [];
-    map.eachLayer(layer => { if (layer.ready) initialized.push(layer.ready); });
+    map.eachLayer(layer => { if (pluginState(layer).ready) initialized.push(pluginState(layer).ready); });
     await Promise.all(initialized);
     const attached = [];
-    map.eachLayer(layer => { if (layer._added) attached.push(layer._added.promise); });
+    map.eachLayer(layer => { if (pluginState(layer)._added) attached.push(pluginState(layer)._added.promise); });
     await Promise.all(attached);
     for (const { name, overlay, layer } of layers._layers) {
       if ((!overlay || !['Traffic', 'Shadows'].includes(name)) && map.hasLayer(layer)) layer.remove();
+      if (name === 'Traffic') layer.removeLayer(layer.getLayers()[0]);
     }
   });
 });
@@ -136,19 +182,19 @@ Then('bicycles and pedestrians move with the clock and can be disabled and resto
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.waitForFunction(() => layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers()
-    .every(layer => layer.root?.children.some(mesh => mesh.extras.featureFaces.length)), null, { timeout: 120000 });
+    .every(layer => pluginState(layer).root?.children.some(mesh => mesh.extras.featureFaces.length)), null, { timeout: 120000 });
   const result = await this.page.evaluate(async () => {
     const out = [];
     const sunlightOverlay = layers._layers.find(entry => entry.name === 'Shadows').layer;
-    sunlightOverlay.control.live = false;
-    sunlightOverlay.control.time = new Date('2026-11-04T12:00:00Z');
+    pluginState(sunlightOverlay).control.live = false;
+    pluginState(sunlightOverlay).control.time = new Date('2026-11-04T12:00:00Z');
     map.fire('simulationtimechange');
     await new Promise(resolve => setTimeout(resolve, 200));
     const group = layers._layers.find(entry => entry.name === 'Traffic').layer;
     for (const layer of group.getLayers()) {
       const name = layer.options.mobilityMode || layer.options.transitMode || 'car';
-      const mesh = layer.root.children[0], count = mesh.extras.featureFaces.length;
-      const { device } = layer.renderer;
+      const mesh = pluginState(layer).root.children[0], count = mesh.extras.featureFaces.length;
+      const { device } = pluginState(layer).renderer;
       const read = device.createBuffer({ size: 48, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
       const encoder = device.createCommandEncoder();
       encoder.copyBufferToBuffer(mesh.geometry.attributes.position.buffer, 0, read, 0, 48);
@@ -156,10 +202,10 @@ Then('bicycles and pedestrians move with the clock and can be disabled and resto
       await read.mapAsync(GPUMapMode.READ);
       const first = new Float32Array(read.getMappedRange()).slice();
       read.unmap();
-      layer._beforeRaycast();
+      pluginState(layer)._beforeRaycast();
       let error = 0;
       for (let i = 0; i < first.length; i++) error = Math.max(error, Math.abs(first[i] - mesh.geometry.attributes.position.data[i]));
-      sunlightOverlay.control.time = new Date(sunlightOverlay.control.time.getTime() + 1000);
+      pluginState(sunlightOverlay).control.time = new Date(pluginState(sunlightOverlay).control.time.getTime() + 1000);
       map.fire('simulationtimechange');
       const next = device.createCommandEncoder();
       next.copyBufferToBuffer(mesh.geometry.attributes.position.buffer, 0, read, 0, 48);
@@ -180,32 +226,23 @@ Then('bicycles and pedestrians move with the clock and can be disabled and resto
   assert.equal(result.length, 6);
   const status = await this.page.locator('.traffic-status').allTextContents();
   assert.equal(status.length, 6);
-  assert.ok(status.some(containsMeasuredCounts));
-  assert.ok(status.some(containsAssumedCounts));
+  assert.deepEqual(status.sort(), result.map(({ count, name }) => `${count} ${name}`).sort());
   const control = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers()
-    .every(layer => !map.hasLayer(layer) && !layer.root.children.length && !layer._beforeRaycast)), true);
+    .every(layer => !map.hasLayer(layer) && !pluginState(layer).root.children.length && !pluginState(layer)._beforeRaycast)), true);
   assert.equal(await this.page.locator('.traffic-status').count(), 0);
   await control.check();
   await this.page.waitForFunction(() => layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers()
-    .every(layer => map.hasLayer(layer) && layer.root.children.some(mesh => mesh.extras.featureFaces.length)));
+    .every(layer => map.hasLayer(layer) && pluginState(layer).root.children.some(mesh => mesh.extras.featureFaces.length)));
   assert.equal(await this.page.locator('.traffic-status').count(), 6);
   await this.page.evaluate(() => map.remove());
   assert.deepEqual(errors, []);
 });
 
-function containsMeasuredCounts(text) {
-  return text.includes('measured counts');
-}
-
-function containsAssumedCounts(text) {
-  return text.includes('no live counts') || text.includes('no measured counts');
-}
-
 Then('a 300 m lane with {int} vehicles per hour at {int} m\\/s holds {int} vehicles', function (flow, velocity, count) {
   assert.equal(vehicleOffsets(300, flow, velocity).length, count);
-  if (velocity === speed) assert.equal(vehicleOffsets(300, flow).length, count);
+  if (velocity === sharedState.speed) assert.equal(vehicleOffsets(300, flow).length, count);
 });
 
 Then('a 300 m lane holds more than 3 times the vehicles at {int} than at {int} vehicles per hour', function (busy, quiet) {
@@ -291,10 +328,13 @@ Then('the cruise route stays between latitudes {float} and {float} and longitude
 Then('cruise boats move along the river on scheduled trips and clean up when disabled', { timeout: 180000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
-  await this.page.waitForFunction(() => cruiseBoats?.renderer && map._terrain3D?._terrainReady);
+  await this.page.waitForFunction(() => pluginState(cruiseBoats)?.renderer && pluginState(pluginState(map)._terrain3D)?._terrainReady);
   await this.page.evaluate(() => {
     for (const { name, overlay, layer } of layers._layers) {
-      if (overlay && !['Terrain (3D)', 'Bateaux-Mouches', 'Shadows'].includes(name)) layer.remove();
+      if (overlay && !['Terrain (3D)', 'Traffic', 'Shadows'].includes(name)) layer.remove();
+      if (name === 'Traffic') {
+        for (const child of layer.getLayers()) if (child !== cruiseBoats) layer.removeLayer(child);
+      }
     }
   });
   const result = await this.page.evaluate(async () => {
@@ -310,12 +350,12 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const cruiseDistance = cruiseLengths.at(-1);
     const cruisePosition = progress => { const { x, z } = along(cruiseRoute, cruiseLengths, progress * cruiseDistance); return [x, z]; };
     // One batched mesh holds every boat; each boat owns a featureFaces vertex range.
-    const boats = () => layer.root.children.find(mesh => mesh.extras.featureFaces.length);
+    const boats = () => pluginState(layer).root.children.find(mesh => mesh.extras.featureFaces.length);
     const boatCount = () => boats()?.extras.featureFaces.length ?? 0;
     const stride = () => boats().extras.featureFaces[0].vertexEnd * 3;
     // Boats are placed by a compute pass: read the positions back from the GPU.
     const gpuPositions = async () => {
-      const { buffer } = boats().geometry.attributes.position, { device } = owner.renderer;
+      const { buffer } = boats().geometry.attributes.position, { device } = pluginState(owner).renderer;
       const read = device.createBuffer({ size: buffer.size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
       const encoder = device.createCommandEncoder();
       encoder.copyBufferToBuffer(buffer, 0, read, 0, buffer.size);
@@ -327,9 +367,9 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     };
     const firstBoat = async () => [...(await gpuPositions()).slice(0, stride())];
     const gpuErrors = [];
-    owner.renderer.device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
+    pluginState(owner).renderer.device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
     const select = (day, minute) => {
-      const container = sunlightOverlay.control.getContainer();
+      const container = pluginState(sunlightOverlay).control.getContainer();
       container.querySelector('input[type=date]').value = day;
       const slider = container.querySelector('input[type=range]');
       slider.value = String(minute); slider.dispatchEvent(new Event('input', { bubbles: true }));
@@ -337,7 +377,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     };
     select('2026-11-02', 120);
     const nightCount = boatCount();
-    const route = layer.root.children[0];
+    const route = pluginState(layer).root.children[0];
     const routeAtNight = route.geometry.drawRange.count > 100 && route.visible && route.extras.featureFaces.length === 0 &&
       route.program.depthTest && route.program.depthWrite && !route.program.transparent;
     select('2026-11-02', 555); // 09:15 UTC = first winter departure 10:15 Paris.
@@ -352,14 +392,14 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const properties = boats().extras.featureFaces.map(face => face.properties);
     // The hull's first vertex sits on the water surface.
     const positions = await gpuPositions();
-    const heights = boats().extras.featureFaces.map(face => positions[face.vertexStart * 3 + 1] + layer.root.position[1]);
+    const heights = boats().extras.featureFaces.map(face => positions[face.vertexStart * 3 + 1] + pluginState(layer).root.position[1]);
     // The CPU copy used for picking must match the compute pass.
     nativeChecks.picking.raycast(layer, { clientX: 0, clientY: 0 });
     const cpuMatchesGpu = boats().geometry.attributes.position.data.every((value, i) => Math.abs(value - positions[i]) < 1e-3);
-    const finite = positions.every(Number.isFinite) && layer.root.children.every(mesh =>
+    const finite = positions.every(Number.isFinite) && pluginState(layer).root.children.every(mesh =>
       Object.values(mesh.geometry.attributes).every(attribute => [...attribute.data].every(Number.isFinite)));
     const tooltip = layer.options.tooltip({ properties: properties[0] }).textContent;
-    const shared = layer.renderer === map._terrain3D.renderer;
+    const shared = pluginState(layer).renderer === pluginState(pluginState(map)._terrain3D).renderer;
     const noDuplicateNodes = new Set(boats().extras.featureFaces.map(face => face.id)).size === twoTrips;
     select('2026-06-21', 600);
     // Exercise live ticking with a deterministic clock in an operating interval.
@@ -370,24 +410,24 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     };
     let liveMoved;
     try {
-      sunlightOverlay.control.getContainer().querySelector('button').click();
+      pluginState(sunlightOverlay).control.getContainer().querySelector('button').click();
       await new Promise(resolve => setTimeout(resolve, 350));
       const before = await firstBoat();
       await new Promise(resolve => setTimeout(resolve, 600));
       liveMoved = (await firstBoat()).some((value, i) => value !== before[i]);
-    } finally { window.Date = OriginalDate; sunlightOverlay.control.live = false; }
+    } finally { window.Date = OriginalDate; pluginState(sunlightOverlay).control.live = false; }
     select('2026-11-02', 1290);
-    const closed = boatCount() === 0 && layer.root.children.length === 1 && layer.root.children[0] === route;
+    const closed = boatCount() === 0 && pluginState(layer).root.children.length === 1 && pluginState(layer).root.children[0] === route;
     select('2026-11-02', 600);
     nativeChecks.picking.setHighlight(layer, { ...boats().extras.featureFaces[0], mesh: boats() });
     select('2026-11-02', 660);
-    const clearedHighlight = !layer.highlightedFeature;
-    const date = sunlightOverlay.control.getContainer().querySelector('input[type=date]');
+    const clearedHighlight = !pluginState(layer).highlightedFeature;
+    const date = pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
     date.value = ''; date.dispatchEvent(new Event('change'));
     const invalidClears = boatCount() === 0;
     select('2026-11-02', 600);
     const recovered = boatCount() === 2 && boats().visible;
-    const renderer = owner.renderer, { device } = renderer;
+    const renderer = pluginState(owner).renderer, { device } = renderer;
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const capture = async () => {
@@ -405,15 +445,15 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     };
     let covered = 0;
     // DEM-only occlusion: the boat legitimately passes under bridge decks.
-    const bridges = map._terrain3D._bridges;
-    map._terrain3D._bridges = null;
+    const bridges = pluginState(pluginState(map)._terrain3D)._bridges;
+    pluginState(pluginState(map)._terrain3D)._bridges = null;
     for (let distance = 0; distance < cruiseDistance; distance += 10) {
       const position = cruisePosition(distance / cruiseDistance);
-      if (nativeChecks.getElevation(map._terrain3D, position) > 27.18) covered += 10;
+      if (nativeChecks.getElevation(pluginState(map)._terrain3D, position) > 27.18) covered += 10;
     }
-    map._terrain3D._bridges = bridges;
+    pluginState(pluginState(map)._terrain3D)._bridges = bridges;
     const riverCoverage = covered / cruiseDistance;
-    map.setPitch(0); map.setBearing(0); map.fitBounds(cruiseRoute, { animate: false });
+    CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0); map.fitBounds(cruiseRoute, { animate: false });
     const overview = await capture();
     route.visible = false;
     const overviewNoRoute = await capture();
@@ -423,7 +463,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
         Math.abs(overview[i + 2] - overviewNoRoute[i + 2]) > 15) overviewRoutePixels++;
     }
     route.visible = true;
-    map.setPitch(45); map.setBearing(25); map.setView(cruisePosition(scheduledTrips('2026-11-02T10:00:00Z', cruise.properties.timetable)[0].progress), 19, { animate: false });
+    CityMapper.setPitch(map, 45); CityMapper.setBearing(map, 25); map.setView(cruisePosition(scheduledTrips('2026-11-02T10:00:00Z', cruise.properties.timetable)[0].progress), 19, { animate: false });
     const visible = await capture();
     boats().visible = false;
     const noBoats = await capture();
@@ -436,9 +476,9 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
       if (Math.abs(noRoute[i] - noBoats[i]) + Math.abs(noRoute[i + 1] - noBoats[i + 1]) +
         Math.abs(noRoute[i + 2] - noBoats[i + 2]) > 15) routePixels++;
     }
-    for (const mesh of layer.root.children) mesh.visible = true;
-    window.previousBoatBuffers = layer.root.children.flatMap(mesh => Object.values(mesh.geometry.attributes).map(a => a.buffer));
-    await owner.renderer.device.queue.onSubmittedWorkDone();
+    for (const mesh of pluginState(layer).root.children) mesh.visible = true;
+    window.previousBoatBuffers = pluginState(layer).root.children.flatMap(mesh => Object.values(mesh.geometry.attributes).map(a => a.buffer));
+    await pluginState(owner).renderer.device.queue.onSubmittedWorkDone();
     return { nightCount, moved, frozen, twoTrips, properties, heights, finite, cpuMatchesGpu, tooltip, shared,
       noDuplicateNodes, liveMoved, closed, gpuErrors, routeAtNight,
       invalidClears, recovered, clearedHighlight, boatPixels, routePixels, riverCoverage, overviewRoutePixels };
@@ -457,13 +497,13 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   assert.ok(result.routePixels > 50, `Visible route pixels: ${result.routePixels}`);
   assert.ok(result.overviewRoutePixels > 100, `Visible route in overview: ${result.overviewRoutePixels}`);
   assert.ok(result.riverCoverage < 0.01, `Less than 1% terrain occlusion (e.g. bridge decks): ${result.riverCoverage}`);
-  const control = this.page.getByRole('checkbox', { name: 'Bateaux-Mouches', exact: true });
+  const control = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
   await control.uncheck();
-  assert.equal(await this.page.evaluate(() => !cruiseBoats._map && !cruiseBoats.root.children.length &&
+  assert.equal(await this.page.evaluate(() => !cruiseBoats._map && !pluginState(cruiseBoats).root.children.length &&
     ![...document.querySelectorAll('.traffic-status')].some(status => status.textContent.includes('estimated, not live GPS'))), true);
   await control.check();
-  await this.page.waitForFunction(() => cruiseBoats.root.children.length === 2);
-  assert.equal(await this.page.evaluate(() => cruiseBoats.root.children.every(mesh =>
+  await this.page.waitForFunction(() => pluginState(cruiseBoats).root.children.length === 2);
+  assert.equal(await this.page.evaluate(() => pluginState(cruiseBoats).root.children.every(mesh =>
     Object.values(mesh.geometry.attributes).every(a => !previousBoatBuffers.includes(a.buffer)))), true);
   // Without a clock the boats run live on the current timetable.
   await this.page.evaluate(() => map.removeLayer(sunlightOverlay));
@@ -471,7 +511,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     const { scheduledTrips } = await import(new URL('../src/traffic/scheduledTrips.js', location.href));
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;
     await new Promise(requestAnimationFrame);
-    const boats = cruiseBoats.root.children.find(mesh => mesh.extras.featureFaces.length);
+    const boats = pluginState(cruiseBoats).root.children.find(mesh => mesh.extras.featureFaces.length);
     return (boats?.extras.featureFaces.length ?? 0) === scheduledTrips(new Date(), cruise.properties.timetable).length;
   }), true);
   assert.deepEqual(errors, []);

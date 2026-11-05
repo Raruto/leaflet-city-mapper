@@ -1,5 +1,9 @@
 @coverage
 Feature: Third-person walk mode
+  @unit
+  Scenario: Walk coordinate buffers stay owned by each walker
+    Then walk coordinate conversion reuses only its caller-owned buffer
+
   Scenario: Time and Walk controls support standalone use, removal and reuse
     Given a leaflet map
     Then Time and Walk controls clean up and can be added again

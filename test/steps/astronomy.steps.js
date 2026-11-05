@@ -3,9 +3,42 @@ import { Then, When } from '@cucumber/cucumber';
 import { atmosphere } from '../../src/sunlight/atmosphere.js';
 import { moonPosition } from '../../src/sunlight/moonPosition.js';
 import { solarPosition } from '../../src/sunlight/solarPosition.js';
+import { solarTime } from '../../src/sunlight/solarTime.js';
 
 const eiffel = [48.858, 2.2945];
 const unit = direction => Math.abs(Math.hypot(...direction) - 1) < 1e-12;
+
+Then('celestial date normalization preserves native dates and independent results', function () {
+  const instant = new Date('2026-06-21T12:00:00Z');
+  for (const input of [instant, instant.toISOString(), instant.getTime(), null, true, 1.9,
+    { valueOf: () => instant.getTime() }]) {
+    const expected = new Date(input).getTime();
+    assert.equal(solarTime(input, ...eiffel), expected);
+    for (const compute of [solarPosition, moonPosition]) {
+      assert.deepEqual(compute(input, ...eiffel), compute(new Date(expected), ...eiffel));
+    }
+  }
+  const savedTime = instant.getTime();
+  for (const compute of [solarPosition, moonPosition]) {
+    const first = compute(instant, ...eiffel);
+    const saved = structuredClone(first);
+    const second = compute(instant, ...eiffel);
+    assert.notEqual(first, second);
+    assert.notEqual(first.direction, second.direction);
+    second.direction[0] = 99;
+    compute('2026-12-21T00:00:00Z', -48, 2);
+    assert.deepEqual(first, saved);
+    for (const invalidDate of ['', 'invalid', NaN, Infinity, 8640000000000001, new Date(NaN)]) {
+      assert.throws(() => compute(invalidDate, ...eiffel), /Invalid solar date or location/);
+    }
+    for (const [lat, lng] of [[91, 2], [-91, 2], [48, 181], [48, -181], [NaN, 2], [48, Infinity]]) {
+      assert.throws(() => compute(instant, lat, lng), /Invalid solar date or location/);
+    }
+  }
+  assert.equal(instant.getTime(), savedTime);
+  instant.getTime = () => { throw new Error('Date overrides must not change native normalization'); };
+  assert.equal(solarTime(instant, ...eiffel), savedTime);
+});
 
 When('the sun is computed for {string} at the Eiffel Tower', function (time) {
   this.body = solarPosition(time, ...eiffel);

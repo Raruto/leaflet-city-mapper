@@ -1,14 +1,16 @@
-import { pendingUpdates } from '../constants/pendingUpdates.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { render } from '../rendering/render.js';
 
 export function renderPendingUpdates() {
-  const updates = [...pendingUpdates];
-  pendingUpdates.clear();
+  const updates = /* allocation: required -- Snapshot updates before reentrant rendering mutates the queue. */ [...sharedState.pendingUpdates];
+  sharedState.pendingUpdates.clear();
   let failure;
   let backend;
   for (backend of updates) {
-    backend._frame = null;
-    if (backend._shared !== backend || !backend.renderer) continue;
+    pluginState(backend)._frame = null;
+    if (pluginState(backend)._shared !== backend || !pluginState(backend).renderer) continue;
     try {
       render(backend);
     } catch (error) {

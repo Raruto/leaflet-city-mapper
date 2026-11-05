@@ -1,5 +1,7 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
 
 export function tooltipGetEvents() {
-  return { ...mapCameraState.tooltipEvents.call(this), rotate: this._updatePosition, pitch: this._updatePosition, move: this._updatePosition };
+  const events = sharedState.tooltipEvents.call(this);
+  events.rotate = events.pitch = events.move = this._updatePosition;
+  return events;
 }

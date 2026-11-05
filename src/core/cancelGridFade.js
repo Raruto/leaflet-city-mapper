@@ -1,10 +1,11 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from './pluginState.js';
 
 export function cancelGridFade(layer) {
-  indexState.pendingGridFades.delete(layer);
-  layer._fadeFrame = null;
-  if (!indexState.pendingGridFades.size && indexState.gridFadeFrame !== null) {
-    cancelAnimationFrame(indexState.gridFadeFrame);
-    indexState.gridFadeFrame = null;
+  sharedState.pendingGridFades.delete(layer);
+  pluginState(layer)._fadeFrame = null;
+  if (!sharedState.pendingGridFades.size && sharedState.gridFadeFrame !== null) {
+    cancelAnimationFrame(sharedState.gridFadeFrame);
+    sharedState.gridFadeFrame = null;
   }
 }

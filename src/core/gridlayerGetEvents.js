@@ -1,7 +1,9 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from './pluginState.js';
 
 export function gridlayerGetEvents() {
-  const events = mapCameraState.gridEvents.call(this);
-  this._cameraGridUpdate ||= L.Util.throttle(this._onMoveEnd, this.options.updateInterval, this);
-  return { ...events, rotate: this._cameraGridUpdate, pitch: this._cameraGridUpdate };
+  const events = sharedState.gridEvents.call(this);
+  pluginState(this)._cameraGridUpdate ||= L.Util.throttle(this._onMoveEnd, this.options.updateInterval, this);
+  events.rotate = events.pitch = pluginState(this)._cameraGridUpdate;
+  return events;
 }

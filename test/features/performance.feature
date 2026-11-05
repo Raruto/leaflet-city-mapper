@@ -1,5 +1,104 @@
 Feature: Performance-oriented source style
   @unit
+  Scenario: Local allocation checks distinguish explicit allocations from primitive calculations
+    Then local allocation checks handle these modules:
+      | source                                                                               | violations |
+      | function update(player) { const deltaX = player.speed * clock.getDelta(); }            | 0          |
+      | function update(player) { const targetPosition = { x: 100, y: 200 }; }                 | 1          |
+      | function update() { const target = [100, 200]; }                                       | 1          |
+      | function update() { const point = new L.Point(100, 200); }                              | 1          |
+      | function update() { return { x: 100 }; }                                              | 1          |
+      | function update() { consume({ x: 100 }); }                                            | 1          |
+      | function update() { target = { x: 100 }; }                                            | 1          |
+      | function update(options = {}) {}                                                     | 1          |
+      | const update = () => [];                                                             | 1          |
+      | const update = function () { return new Map(); };                                     | 1          |
+      | class Player { update() { return {}; } }                                              | 1          |
+      | function update() { if (ready) { for (;;) { consume({}); break; } } }                   | 1          |
+      | function update() { return { points: [new L.Point(0, 0)] }; }                          | 3          |
+      | function update() { const { x, y } = player; const [first] = points; }                  | 0          |
+      | function update() { return player.position; }                                        | 0          |
+      | function update() { const text = 'new Map() and {} and []'; /* return {}; */ }         | 0          |
+      | export const state = { points: [], cache: new Map() };                                | 0          |
+      | const control = { update() { return []; } };                                          | 1          |
+
+  @unit
+  Scenario: Local allocation checks require a separate justified exception for each necessary allocation
+    Then local allocation checks handle these modules:
+      | source                                                                                                                                    | violations |
+      | function decode() { return /* allocation: required -- Each caller owns its result. */ {}; }                                                | 0          |
+      | function decode(data) { const view = /* allocation: required -- View belongs to this input buffer. */ new DataView(data); }                 | 0          |
+      | function decode() { throw /* allocation: required -- Preserve the failure stack for this call. */ new Error('Invalid data'); }             | 0          |
+      | function decode() { return /* allocation: required -- Each caller owns its result. */ { points: [] }; }                                    | 1          |
+      | function decode() { return /* allocation: required -- Each caller owns its result. */ { points: /* allocation: required -- Caller owns these points. */ [] }; } | 0 |
+      | /* allocation: required -- Do not exempt a whole function. */ function update() { return {}; }                                             | 2          |
+      | function update() { /* allocation: required -- Do not exempt a declaration. */ const target = {}; }                                        | 2          |
+      | function update() { return /* allocation: required -- */ {}; }                                                                            | 2          |
+      | function update() { return /* allocation: unknown -- Not a supported exception. */ {}; }                                                   | 2          |
+      | function update() { return /* allocation: required -- No allocation follows this comment. */ player.position; }                            | 1          |
+      | const state = /* allocation: required -- Module allocations need no exception. */ {};                                                       | 1          |
+      | function update() { return {}; } /* allocation: required -- Nothing follows this exception. */                                              | 2          |
+      | function update() { return /* allocation: required -- Unrelated comments cannot separate the exception. */ /* unrelated */ {}; }            | 2          |
+      | function update() { const text = 'allocation: required -- Not an actual comment.'; return {}; }                                            | 1          |
+      | function update() { return /* Ordinary comments do not authorize an allocation. */ {}; }                                                   | 1          |
+      | function update() { return /* allocation: required -- Allow exactly one result. */ {}; const other = []; }                                  | 1          |
+
+  @unit
+  Scenario: Source functions avoid explicit local allocations
+    Then source functions allocate no object literals, array literals or constructed instances
+
+  @unit
+  Scenario: Header decoding allocates only its owned result, input view and errors
+    Then local allocation checks accept source file "src/archives/decodeHeader.js"
+
+  @unit
+  Scenario Outline: Sky projection and atmosphere justify every necessary local allocation
+    Then local allocation checks accept source file "<file>"
+
+    Examples:
+      | file                                  |
+      | src/sunlight/projectCelestialBody.js   |
+      | src/sunlight/updateSky.js              |
+      | src/sunlight/onAddSun.js               |
+      | src/sunlight/atmosphere.js             |
+      | src/sunlight/mix.js                    |
+      | src/sunlight/rgb.js                    |
+      | src/sunlight/solarTime.js              |
+      | src/sunlight/solarPosition.js          |
+      | src/sunlight/moonPosition.js           |
+      | src/sunlight/horizontalPosition.js     |
+      | src/sunlight/initialize.js             |
+      | src/sunlight/updateSun.js              |
+      | src/sunlight/useSelectedTime.js        |
+      | src/sunlight/removeSun.js              |
+      | src/sunlight/addTimeLayer.js           |
+      | src/sunlight/addTo.js                  |
+      | src/sunlight/initSunlight.js           |
+      | src/sunlight/onAdd.js                  |
+      | src/sunlight/remove.js                 |
+      | src/sunlight/removeTimeLayer.js        |
+      | src/sunlight/render.js                 |
+      | src/sunlight/styleTimeControl.js       |
+      | src/sunlight/tickSun.js                |
+      | src/sunlight/useLiveTime.js            |
+
+  @unit
+  Scenario Outline: Archive modules justify every necessary local allocation
+    Then local allocation checks accept source file "<file>"
+
+    Examples:
+      | file                            |
+      | src/archives/decodeDirectory.js  |
+      | src/archives/varint.js           |
+      | src/archives/tileId.js           |
+      | src/archives/decompress.js       |
+      | src/archives/getZxy.js           |
+      | src/archives/getHeader.js        |
+      | src/archives/read.js             |
+      | src/archives/loadDirectory.js    |
+      | src/archives/loadSource.js       |
+
+  @unit
   Scenario: Sources avoid closures and functional iteration
     Then no source file defines arrows, nested functions or callback array methods
 
@@ -56,27 +155,28 @@ Feature: Performance-oriented source style
     Then each source file defines at most one function
 
   @unit
-  Scenario: Module variable checks enforce exported constants and state
+  Scenario: Module variable checks enforce the single exported state object
     Then module variable checks handle these files:
       | file                         | source                                                    | violations |
       | src/geometry/example.js      | const HEIGHT = 8;                                         | 1          |
       | src/geometry/example.js      | export const HEIGHT = 8;                                  | 1          |
-      | src/constants/HEIGHT.js      | export const HEIGHT = 8;                                  | 0          |
-      | src/constants/HEIGHT.js      | const HEIGHT = 8; export { HEIGHT };                       | 0          |
-      | src/constants/HEIGHT.js      | const HEIGHT = 8;                                         | 1          |
-      | src/state/count.js           | export let count = 0;                                     | 0          |
-      | src/state/count.js           | let count = 0;                                            | 1          |
-      | src/constants/count.js       | export let count = 0;                                     | 1          |
-      | src/state/HEIGHT.js          | export const HEIGHT = 8;                                  | 1          |
-      | src/constants/HEIGHT.js      | export var HEIGHT = 8;                                    | 1          |
-      | src/constants/HEIGHT.js      | export const { height: HEIGHT = 8 } = {};                  | 0          |
+      | src/state.js                 | export const state = {};                                  | 0          |
+      | src/state.js                 | const state = {}; export { state };                       | 0          |
+      | src\state.js                 | export const state = {};                                  | 0          |
+      | src/state.js                 | const state = {};                                         | 1          |
+      | src/state.js                 | export let state = {};                                    | 1          |
+      | src/state.js                 | export const other = {};                                  | 1          |
+      | src/state.js                 | export const state = {}, other = {};                      | 1          |
+      | src/state.js                 | export const { state } = {};                              | 1          |
+      | src/constants/HEIGHT.js      | export const HEIGHT = 8;                                  | 1          |
+      | src/state/count.js           | export let count = 0;                                     | 1          |
       | src/geometry/example.js      | function example() { const HEIGHT = 8; let count = 0; }    | 0          |
-      | src/geometry/example.js      | import { HEIGHT } from '../constants/HEIGHT.js';           | 0          |
+      | src/geometry/example.js      | import { state } from '../state.js';                       | 0          |
       | src/geometry/example.js      | if (true) { const HEIGHT = 8; }                           | 1          |
 
   @unit
-  Scenario: Module variables live in dedicated constants and state folders
-    Then module constants and state are exported from their dedicated folders
+  Scenario: Module variables live in one shared state object
+    Then module constants and state use the single state object
 
   @unit
   Scenario: Directory depth checks reject all nested source folders

@@ -1,7 +1,5 @@
-import { CELL } from '../constants/CELL.js';
-import { collider } from '../collision/collider.js';
-import { computeBounds } from '../geometry/computeBounds.js';
-import { horizontalRay } from '../collision/horizontalRay.js';
+import { pluginState } from '../core/pluginState.js';
+
 import { traverse } from '../scene/traverse.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
 import { shouldSkipOther } from './shouldSkipOther.js';
@@ -11,13 +9,14 @@ import { hitMesh } from './hitMesh.js';
 // the unit (dx, dz); knee and chest rays, so arches and tree crowns above the head let the walker through.
 // ponytail: traffic vehicles and boats move on the GPU and are not obstacles.
 
-export function hit(layer, x, y, z, dx, dz, reach) {
-  updateWorldMatrix(layer.scene);
-  const data = { x, y, z, dx, dz, reach, best: reach, found: null };
+export function hit(layer, x, y, z, dx, dz, reach, data) {
+  updateWorldMatrix(pluginState(layer).scene);
+  data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
+  data.best = reach, data.found = false;
   let other;
-  for (other of layer._shared._layers) {
+  for (other of pluginState(pluginState(layer)._shared)._layers) {
     if (shouldSkipOther(other, layer)) continue;
-    traverse(other.root, hitMesh, data);
+    traverse(pluginState(other).root, hitMesh, data);
   }
-  return data.found;
+  return data.found ? data.normal : null;
 }

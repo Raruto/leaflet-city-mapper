@@ -1,6 +1,6 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
 
 export function initializeGridContainer() {
-  indexState.gridInitializers.get(this).call(this);
+  sharedState.gridInitializers.get(this).call(this);
   this._container.remove();
 }

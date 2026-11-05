@@ -1,6 +1,6 @@
+import { state as sharedState } from '../state.js';
 import { localPixel } from './localPixel.js';
-import { nativeLayerState } from '../constants/nativeLayerState.js';
 
 export function localPixelForGeometry(point) {
-  return localPixel(nativeLayerState.geometryPixelStates[nativeLayerState.geometryPixelStates.length - 1], point);
+  return localPixel(sharedState.geometryPixelStates[sharedState.geometryPixelStates.length - 1], point);
 }

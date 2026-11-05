@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 export function resolveNativeReady() {
-  this.ready.resolve();
+  pluginState(this).ready.resolve();
 }

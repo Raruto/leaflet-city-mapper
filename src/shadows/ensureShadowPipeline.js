@@ -1,24 +1,35 @@
+import { state as sharedState } from '../state.js';
 export function ensureShadowPipeline(device, sun, instanced = false) {
+  const gpuCreateBindGroupLayout1 = sharedState.allocationRenderEnsureShadowPipelineCreateBindGroupLayout1;
+  const gpuCreateBindGroupLayout2 = sharedState.allocationRenderEnsureShadowPipelineCreateBindGroupLayout2;
+  const gpuCreateBindGroup3 = sharedState.allocationRenderEnsureShadowPipelineCreateBindGroup3;
+  const gpuCreateShaderModule4 = sharedState.allocationRenderEnsureShadowPipelineCreateShaderModule4;
+  const gpuCreateRenderPipeline5 = sharedState.allocationRenderEnsureShadowPipelineCreateRenderPipeline5;
+  const gpuCreatePipelineLayout1 = sharedState.allocationRenderEnsureShadowPipelineCreatePipelineLayout1;
   const key = instanced ? 'instancePipeline' : 'pipeline';
   if (!sun[key]) {
     if (!sun.meshLayout) {
-      sun.meshLayout = device.createBindGroupLayout({
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', hasDynamicOffset: true } },
-        ]
-      });
+      sun.meshLayout = device.createBindGroupLayout((
+        gpuCreateBindGroupLayout1.entries[0].visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        gpuCreateBindGroupLayout1
+      ));
+
       // Do not bind the sampled depth texture while it is a render attachment.
-      sun.depthLayout = device.createBindGroupLayout({
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-        ]
-      });
-      sun.depthBindGroup = device.createBindGroup({
-        layout: sun.depthLayout, entries: [{ binding: 0, resource: { buffer: sun.buffer } }],
-      });
+      sun.depthLayout = device.createBindGroupLayout((
+        gpuCreateBindGroupLayout2.entries[0].visibility = GPUShaderStage.VERTEX,
+        gpuCreateBindGroupLayout2
+      ));
+
+      sun.depthBindGroup = device.createBindGroup((
+        gpuCreateBindGroup3.layout = sun.depthLayout,
+        gpuCreateBindGroup3.entries[0].resource.buffer = sun.buffer,
+        gpuCreateBindGroup3
+      ));
+      gpuCreateBindGroup3.layout = null;
+      gpuCreateBindGroup3.entries[0].resource.buffer = null;
     }
-    const shader = device.createShaderModule({
-      code: /* wgsl */ `
+    const shader = device.createShaderModule((
+      gpuCreateShaderModule4.code = `
       struct Mesh { world: mat4x4<f32>, padding: array<vec4<f32>, 4>, highlight: vec4<f32> };
       @group(0) @binding(0) var<uniform> mesh: Mesh;
       @group(1) @binding(0) var<uniform> matrix: mat4x4<f32>;
@@ -29,25 +40,23 @@ export function ensureShadowPipeline(device, sun, instanced = false) {
         let noise = fract(52.9829189 * fract(dot(floor(position.xy), vec2<f32>(0.06711056, 0.00583715))));
         if (mesh.highlight.w < 1.0 && noise >= mesh.highlight.w) { discard; }
       }
-    ` });
-    const buffers = [
-      { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },
-    ];
-    if (instanced) buffers.push({
-      arrayStride: 16, stepMode: 'instance',
-      attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }],
-    });
-    sun[key] = device.createRenderPipeline({
-      layout: device.createPipelineLayout({ bindGroupLayouts: [sun.meshLayout, sun.depthLayout] }),
-      vertex: {
-        module: shader, entryPoint: 'main', buffers
-      },
-      fragment: { module: shader, entryPoint: 'fragmentMain', targets: [] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil: {
-        format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less',
-        depthBias: 2, depthBiasSlopeScale: 2
-      },
-    });
+    `,
+      gpuCreateShaderModule4
+    ));
+    gpuCreateShaderModule4.code = null;
+    const buffers = instanced ? sharedState.allocationRenderShadowInstanceLayouts : sharedState.allocationRenderShadowLayouts;
+    sun[key] = device.createRenderPipeline((
+      gpuCreateRenderPipeline5.layout = device.createPipelineLayout((gpuCreatePipelineLayout1.bindGroupLayouts[0] = sun.meshLayout, gpuCreatePipelineLayout1.bindGroupLayouts[1] = sun.depthLayout, gpuCreatePipelineLayout1)),
+      gpuCreateRenderPipeline5.vertex.module = shader,
+      gpuCreateRenderPipeline5.vertex.buffers = buffers,
+      gpuCreateRenderPipeline5.fragment.module = shader,
+      gpuCreateRenderPipeline5
+    ));
+    gpuCreatePipelineLayout1.bindGroupLayouts[0] = null;
+    gpuCreatePipelineLayout1.bindGroupLayouts[1] = null;
+    gpuCreateRenderPipeline5.layout = null;
+    gpuCreateRenderPipeline5.vertex.module = null;
+    gpuCreateRenderPipeline5.vertex.buffers = null;
+    gpuCreateRenderPipeline5.fragment.module = null;
   }
 }

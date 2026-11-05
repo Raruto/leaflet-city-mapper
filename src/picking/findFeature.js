@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { raycast } from './raycast.js';
 
 /**
@@ -7,20 +8,20 @@ import { raycast } from './raycast.js';
  */
 
 export function findFeature(backend, event) {
-  if (!backend.root || !backend.camera) {
+  if (!pluginState(backend).root || !pluginState(backend).camera) {
     return null;
   }
   let hit, object, ranges, low, high, middle, range;
-  for (hit of raycast(backend, event, backend.root.children, Boolean(backend.model))) {
-    if (backend.model) {
+  for (hit of raycast(backend, event, pluginState(backend).root.children, Boolean(pluginState(backend).model))) {
+    if (pluginState(backend).model) {
       object = hit.object;
-      while (object && object !== backend.model) {
+      while (object && object !== pluginState(backend).model) {
         object = object.parent;
       }
-      if (object === backend.model) {
-        return {
-          id: backend.model.id, properties: backend.model.extras,
-          model: backend.model, mesh: hit.object, point: hit.point
+      if (object === pluginState(backend).model) {
+        return /* allocation: required -- Return an independent model hit to each caller. */ {
+          id: pluginState(backend).model.id, properties: pluginState(backend).model.extras,
+          model: pluginState(backend).model, mesh: hit.object, point: hit.point
         };
       }
     }
@@ -37,7 +38,7 @@ export function findFeature(backend, event) {
       } else if (hit.faceIndex >= range.faceEnd) {
         low = middle + 1;
       } else {
-        return {
+        return /* allocation: required -- Preserve each feature hit as an independent result. */ {
           ...range,
           mesh: hit.object,
           point: hit.point

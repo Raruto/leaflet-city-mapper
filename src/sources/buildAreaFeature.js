@@ -7,14 +7,14 @@ export function buildAreaFeature(context, feature) {
   const coords = area.coords;
   const geometry = feature?.geometry;
   const isTree = geometry?.type === 'Point';
-  if (backend.options.nightLight && !isTree) throw new Error('Night lights require Point geometry');
-  const polygons = geometry?.type === 'Polygon' ? [geometry.coordinates] :
-    geometry?.type === 'MultiPolygon' ? geometry.coordinates : null;
-  if (!polygons && !isTree) throw new Error('Unsupported GeoJSON geometry');
-  const [lon, lat] = (isTree ? geometry.coordinates : polygons[0]?.[0]?.[0]) ?? [];
-  if (!Number.isFinite(lon) || !Number.isFinite(lat)) throw new Error('Invalid GeoJSON coordinates');
+  if (backend.options.nightLight && !isTree) throw /* allocation: required -- Preserve the failure stack for invalid night-light geometry. */ new Error('Night lights require Point geometry');
+  if (geometry?.type !== 'Polygon' && geometry?.type !== 'MultiPolygon' && !isTree) throw /* allocation: required -- Preserve the failure stack for unsupported geometry. */ new Error('Unsupported GeoJSON geometry');
+  const coordinates = isTree ? geometry.coordinates :
+    geometry.type === 'Polygon' ? geometry.coordinates[0]?.[0] : geometry.coordinates[0]?.[0]?.[0];
+  if (!Number.isFinite(coordinates?.[0]) || !Number.isFinite(coordinates?.[1])) throw /* allocation: required -- Preserve the failure stack for invalid coordinates. */ new Error('Invalid GeoJSON coordinates');
+  const lon = coordinates[0], lat = coordinates[1];
   if (coords) {
-    const anchor = map.project(new L.LatLng(lat, lon), coords.z);
+    const anchor = map.project(/* allocation: required -- Keep the projected feature anchor independent of the source coordinates. */ new L.LatLng(lat, lon), coords.z);
     if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
   }
   const style = backend.options.style(feature);
@@ -22,18 +22,19 @@ export function buildAreaFeature(context, feature) {
     context.skipped++;
     return;
   }
-  if (!style || typeof style !== 'object') throw new Error('style must return an extrusion style or null');
+  if (!style || typeof style !== 'object') throw /* allocation: required -- Preserve the failure stack for invalid style results. */ new Error('style must return an extrusion style or null');
   const { top, bottom = 0, color = 0xd9b38c } = style;
   if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
-    throw new Error('Invalid extrusion heights: expected top > bottom >= 0');
+    throw /* allocation: required -- Preserve the failure stack for invalid extrusion heights. */ new Error('Invalid extrusion heights: expected top > bottom >= 0');
   }
   const baseColor = parseColor(color);
   const vertexStart = context.positions.length / 3;
   if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
-  let rings;
-  for (rings of polygons || []) buildAreaPolygon(context, rings, top, bottom, baseColor);
+  let polygon;
+  if (geometry.type === 'Polygon') buildAreaPolygon(context, geometry.coordinates, top, bottom, baseColor);
+  else if (geometry.type === 'MultiPolygon') for (polygon of geometry.coordinates) buildAreaPolygon(context, polygon, top, bottom, baseColor);
   const vertexEnd = context.positions.length / 3;
-  context.featureFaces.push({
+  context.featureFaces.push(/* allocation: required -- Preserve independent feature identity and face ranges for picking. */ {
     id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
     properties: feature.properties, baseColor,
     faceStart: vertexStart / 3, faceEnd: vertexEnd / 3, vertexStart, vertexEnd,

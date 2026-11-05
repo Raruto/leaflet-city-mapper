@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { findFeature } from './findFeature.js';
 import { setHighlight } from './setHighlight.js';
 import { showFeature } from './showFeature.js';
@@ -6,8 +7,8 @@ import { showFeature } from './showFeature.js';
 
 export function onClick(layer, event) {
   const feature = findFeature(layer, event);
-  layer.hoveredFeature = feature;
+  pluginState(layer).hoveredFeature = feature;
   setHighlight(layer, feature);
   showFeature(layer, feature, event);
-  layer.fire('featureclick', { feature, originalEvent: event });
+  layer.fire('featureclick', /* allocation: required -- Event listeners own this click payload. */ { feature, originalEvent: event });
 }

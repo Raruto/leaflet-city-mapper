@@ -1,7 +1,9 @@
 /** Cache local AABB and center for ray picking and transparent mesh sorting. */
 
 export function computeBounds(geometry) {
-  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], data = geometry.attributes.position.data;
+  const min = /* allocation: required -- Each bounds snapshot retains its independent minimum coordinates. */ [Infinity, Infinity, Infinity];
+  const max = /* allocation: required -- Each bounds snapshot retains its independent maximum coordinates. */ [-Infinity, -Infinity, -Infinity];
+  const data = geometry.attributes.position.data;
   let i;
   for (i = 0; i < data.length; i++) {
     min[i % 3] = Math.min(min[i % 3], data[i]);
@@ -21,7 +23,7 @@ export function computeBounds(geometry) {
       max[axis] = Math.fround(max[axis] + high);
     }
   }
-  const center = [];
+  const center = /* allocation: required -- Each bounds snapshot retains its independent center coordinates. */ [];
   for (i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
   let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : 0;
   for (i = 0; !instances && i < data.length; i += 3) {
@@ -29,5 +31,5 @@ export function computeBounds(geometry) {
       data[i] - center[0], data[i + 1] - center[1], data[i + 2] - center[2]
     ));
   }
-  geometry.bounds = { min, max, center, radius };
+  geometry.bounds = /* allocation: required -- Recomputing a geometry must not mutate previously retained bounds snapshots. */ { min, max, center, radius };
 }

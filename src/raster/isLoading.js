@@ -1,5 +1,5 @@
-
+import { pluginState } from '../core/pluginState.js';
 
 export function isLoading(layer) {
-  return layer._loadingTiles > 0;
+  return pluginState(layer)._loadingTiles > 0;
 }

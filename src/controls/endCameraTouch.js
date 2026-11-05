@@ -5,7 +5,8 @@ export function endCameraTouch(state, event) {
   if (touch.dragging && container._leaflet_id) map.dragging.enable();
   map.options.zoomSnap = touch.snap;
   if (touch.zooming && touch.snap && container._leaflet_id) {
-    map.setZoom(Math.round(map.getZoom() / touch.snap) * touch.snap, { animate: false });
+    map.setZoom(Math.round(map.getZoom() / touch.snap) * touch.snap,
+      /* allocation: required -- Native zoom transitions mutate and retain their view options. */ { animate: false });
   }
   state.touch = null;
 }

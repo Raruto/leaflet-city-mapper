@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 export function bringNativeLayerToFront(layer = this) {
-  layer?._nativeGPU?.reorder?.(true);
+  pluginState(layer)?._nativeGPU?.reorder?.(true);
 }

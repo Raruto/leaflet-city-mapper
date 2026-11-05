@@ -1,5 +1,5 @@
+import { state as sharedState } from '../state.js';
 import { ring } from './treeRing.js';
-import { ringDirections } from '../constants/ringDirections.js';
 
 export function surface(point, addTriangle, lowRadius, low, highRadius, high, color) {
   const lower = ring(point, lowRadius), upper = ring(point, highRadius);
@@ -8,7 +8,7 @@ export function surface(point, addTriangle, lowRadius, low, highRadius, high, co
     next = (i + 1) % 8;
     slope = (lowRadius - highRadius) / (high - low);
     length = Math.hypot(1, slope);
-    ({ nx, nz } = ringDirections[i]);
+    ({ nx, nz } = sharedState.ringDirections[i]);
     ny = slope / length;
     normalX = nx / length, normalZ = nz / length;
     if (lowRadius) addTriangle(lower[i], low, lower[next], low, upper[next], high, normalX, ny, normalZ, color);

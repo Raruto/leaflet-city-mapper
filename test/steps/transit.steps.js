@@ -1,7 +1,9 @@
+import { state as sharedState } from '../../src/state.js';
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { transitLanes, transitSettings } from '../../examples/data/paris-traffic.js';
-import { vehicles } from '../../src/constants/vehicles.js';
+
 import { build } from '../../src/geometry/build.js';
 import { tripsAt } from '../../src/traffic/tripsAt.js';
 import { routeGeometry } from '../../src/traffic/routeGeometry.js';
@@ -58,7 +60,7 @@ Then('Paris transit routes produce moving bus, tram and metro simulations', func
       active += tripsAt(100000, [{ length, properties: feature.properties }], settings.speed).length;
     }
     assert.ok(active > 0, `${mode} must actually emit vehicles on the routes`);
-    const model = vehicles[mode].model;
+    const model = pluginState(sharedState.vehicles[mode]).model;
     const red = build(model(0, { route_color: 'FF0000' }));
     const blue = build(model(0, { route_color: '0000FF' }));
     assert.equal(red.position.length, blue.position.length);

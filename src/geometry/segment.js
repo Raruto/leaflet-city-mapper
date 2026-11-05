@@ -7,7 +7,7 @@ export function segment(context, a, b, startCap, endCap) {
   const length = a.distanceTo(b);
   if (!length) return;
   const direction = b.subtract(a).divideBy(length);
-  const normal = new L.Point(-direction.y * radius, direction.x * radius);
+  const normal = /* allocation: required -- Projection callbacks may reenter while this segment normal is still in use. */ new L.Point(-direction.y * radius, direction.x * radius);
   if (options.lineCap === 'square') {
     if (startCap) a = a.subtract(direction.multiplyBy(radius));
     if (endCap) b = b.add(direction.multiplyBy(radius));

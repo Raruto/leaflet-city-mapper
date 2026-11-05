@@ -1,4 +1,5 @@
-import { roundProfile } from '../constants/roundProfile.js';
+import { state as sharedState } from '../state.js';
+
 import { parseColor } from "../utils/parseColor.js";
 import { ring } from './treeRing.js';
 import { surface } from './surface.js';
@@ -9,8 +10,8 @@ export function treeGeometry(point, style, addTriangle) {
   const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = 'round' } = style;
   if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) ||
     trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top ||
-    !['round', 'cone'].includes(crownShape)) {
-    throw new Error('Invalid tree dimensions or crown shape');
+    crownShape !== 'round' && crownShape !== 'cone') {
+    throw /* allocation: required -- Validation errors retain their own message and stack. */ new Error('Invalid tree dimensions or crown shape');
   }
   const trunk = parseColor(style.trunkColor ?? 0x72513a);
   const crown = parseColor(style.color ?? 0x4f823b);
@@ -22,8 +23,8 @@ export function treeGeometry(point, style, addTriangle) {
       base[(i + 1) % 8], crownBottom, 0, -1, 0, crown);
     surface(point, addTriangle, crownRadius, crownBottom, 0, top, crown);
   } else {
-    for (i = 1; i < roundProfile.length; i++) {
-      [low, lr] = roundProfile[i - 1], [high, hr] = roundProfile[i];
+    for (i = 1; i < sharedState.roundProfile.length; i++) {
+      [low, lr] = sharedState.roundProfile[i - 1], [high, hr] = sharedState.roundProfile[i];
       surface(point, addTriangle, lr * crownRadius, crownBottom + low * (top - crownBottom),
         hr * crownRadius, crownBottom + high * (top - crownBottom), crown);
     }

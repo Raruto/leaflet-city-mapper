@@ -1,11 +1,12 @@
+import { pluginState } from './pluginState.js';
 import { cameraMarkerOnDrag } from './cameraMarkerOnDrag.js';
 import { adjustCameraMarkerPan } from './adjustCameraMarkerPan.js';
 
 export function cameraMarkerDrag() {
-  if (!this.dragging || this.dragging._cameraDrag) return;
+  if (!this.dragging || pluginState(this.dragging)._cameraDrag) return;
   const drag = this.dragging, original = drag._onDrag, adjustPan = drag._adjustPan;
-  drag._cameraOriginalOnDrag = original;
-  drag._cameraOriginalAdjustPan = adjustPan;
+  pluginState(drag)._cameraOriginalOnDrag = original;
+  pluginState(drag)._cameraOriginalAdjustPan = adjustPan;
   drag._onDrag = cameraMarkerOnDrag;
   drag._adjustPan = adjustCameraMarkerPan;
   // The handler may already be enabled and listening with its original method.
@@ -14,5 +15,5 @@ export function cameraMarkerDrag() {
     drag._draggable.off('drag', original, drag);
     drag._draggable.on('drag', drag._onDrag, drag);
   }
-  drag._cameraDrag = true;
+  pluginState(drag)._cameraDrag = true;
 }

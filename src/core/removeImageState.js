@@ -1,8 +1,8 @@
-import { nativeLayerState } from '../constants/nativeLayerState.js';
+import { state as sharedState } from '../state.js';
 
 export function removeImageState(image, state) {
-  const states = nativeLayerState.imageStates.get(image);
+  const states = sharedState.imageStates.get(image);
   if (!states) return;
   states.delete(state);
-  if (!states.size) nativeLayerState.imageStates.delete(image);
+  if (!states.size) sharedState.imageStates.delete(image);
 }

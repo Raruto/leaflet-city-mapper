@@ -7,9 +7,11 @@
  */
 
 export function setVertexColor(mesh, start, end, color) {
+  const rgb = /* allocation: required -- Color upload scratch stays private across potentially reentrant buffer setters. */ [];
   let i;
   for (i = start; i < end; i++) {
-    mesh.geometry.attributes.color.data.set([color.r, color.g, color.b], i * 3);
+    rgb[0] = color.r; rgb[1] = color.g; rgb[2] = color.b;
+    mesh.geometry.attributes.color.data.set(rgb, i * 3);
   }
   mesh.geometry.attributes.color.needsUpdate = true;
 }

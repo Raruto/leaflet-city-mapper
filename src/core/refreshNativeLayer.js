@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 import { nativeImageRefresh } from './nativeImageRefresh.js';
 import { nativeImageError } from './nativeImageError.js';
 import { removeImageState } from './removeImageState.js';
@@ -9,21 +10,22 @@ export function refreshNativeLayer(state = this) {
   state.viewDirty = true;
   state.failed = false;
   state.hide();
-  const activeImages = [state.source._icon, state.source._shadow, state.source._image];
-  let image;
+  const source = state.source;
+  let i, image;
   for (image of state.images) {
-    if (activeImages.includes(image)) continue;
+    if (image === source._icon || image === source._shadow || image === source._image) continue;
     image.removeEventListener('load', nativeImageRefresh);
     image.removeEventListener('error', nativeImageError);
     removeImageState(image, state);
     state.images.delete(image);
   }
-  for (image of activeImages) {
+  for (i = 0; i < 3; i++) {
+    image = i === 0 ? source._icon : i === 1 ? source._shadow : source._image;
     if (!(image instanceof HTMLImageElement) || state.images.has(image)) continue;
     state.images.add(image);
     addImageState(image, state);
     image.addEventListener('load', nativeImageRefresh);
     image.addEventListener('error', nativeImageError);
   }
-  if (state.backend._shared) update(state.backend);
+  if (pluginState(state.backend)._shared) update(state.backend);
 }

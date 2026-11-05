@@ -1,5 +1,8 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+import { pluginState } from './pluginState.js';
 
 export function markerGetEvents() {
-  return { ...mapCameraState.markerMethods.getEvents.call(this), rotate: this.update, pitch: this.update, move: this.update };
+  const events = pluginState(sharedState.markerMethods).getEvents.call(this);
+  events.rotate = events.pitch = events.move = this.update;
+  return events;
 }

@@ -1,5 +1,5 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
 
 export function mapGetCenterLayerPoint() {
-  return mapCameraState.mapMethods.containerPointToLayerPoint.call(this, this.getSize().divideBy(2));
+  return sharedState.mapMethods.containerPointToLayerPoint.call(this, this.getSize().divideBy(2));
 }

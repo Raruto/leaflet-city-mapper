@@ -1,8 +1,10 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+import { mapGetBearing } from '../camera/mapGetBearing.js';
+import { mapGetPitch } from '../camera/mapGetPitch.js';
 
 export function gridlayerGetTiledPixelBounds(center) {
-  if (!this._map.getBearing() && !this._map.getPitch()) return mapCameraState.tiledBounds.call(this, center);
+  if (!mapGetBearing(this._map) && !mapGetPitch(this._map)) return sharedState.tiledBounds.call(this, center);
   const bounds = this._map.getBounds();
-  return new L.Bounds(this._map.project(bounds.getNorthWest(), this._tileZoom),
+  return /* allocation: required -- Native tile selection retains the bounds of this independent viewport query. */ new L.Bounds(this._map.project(bounds.getNorthWest(), this._tileZoom),
     this._map.project(bounds.getSouthEast(), this._tileZoom));
 }

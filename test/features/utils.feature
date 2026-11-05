@@ -8,6 +8,7 @@ Feature: Standalone 3D utilities
       | geometry |
       | graph    |
       | archives |
+      | archive-requests |
       | models   |
       | lighting |
       | terrain  |
@@ -15,6 +16,7 @@ Feature: Standalone 3D utilities
       | walking  |
       | shaders  |
       | sky      |
+      | simulation-clock |
       | dev-server |
       | roof-coverage |
 

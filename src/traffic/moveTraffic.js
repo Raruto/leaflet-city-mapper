@@ -10,6 +10,6 @@ export function moveTraffic(state, seconds) {
   pass.setBindGroup(0, state.gpu.bindGroup);
   pass.dispatchWorkgroups(state.trips.length);
   pass.end();
-  device.queue.submit([encoder.finish()]);
+  device.queue.submit(/* allocation: required -- This submission owns its completed compute command buffer. */ [encoder.finish()]);
   state.stale = true;
 }

@@ -2,7 +2,7 @@
 
 export function terrainAtlas(tiles, bounds) {
   const columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
-  const elevations = new Float32Array(columns * rows * 65536).fill(-1e9);
+  const elevations = /* allocation: required -- Each returned atlas owns its DEM upload buffer independently of later atlas builds. */ new Float32Array(columns * rows * 65536).fill(-1e9);
   let low = Infinity, high = -Infinity;
   let key, values, coordinates, x, y, start, row, column, value;
   for ([key, values] of tiles) {
@@ -19,5 +19,5 @@ export function terrainAtlas(tiles, bounds) {
       }
     }
   }
-  return { elevations, low, high };
+  return /* allocation: required -- Each caller owns its returned DEM buffer and elevation-range result. */ { elevations, low, high };
 }

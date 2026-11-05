@@ -1,6 +1,6 @@
 export function minimumX(ring) {
-  const values = [];
+  let minimum = Infinity;
   let point;
-  for (point of ring) values.push(point.x);
-  return Math.min(...values);
+  for (point of ring) minimum = Math.min(minimum, point.x);
+  return minimum;
 }

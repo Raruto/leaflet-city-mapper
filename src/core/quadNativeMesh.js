@@ -1,15 +1,17 @@
 import { textureFor } from './textureFor.js';
 import { putNativeMesh } from './putNativeMesh.js';
+import { state as sharedState } from '../state.js';
 
 export function quadNativeMesh(state, key, image, corners, opacity) {
   const texture = textureFor(state, key, image);
   if (!texture) return;
-  const indices = [0, 2, 1, 1, 2, 3];
-  const position = [], uv = [], textureCoords = [[0, 0], [1, 0], [0, 1], [1, 1]];
+  const indices = sharedState.allocationCoreQuadIndices;
+  const position = /* allocation: required -- The native mesh retains these vertex coordinates. */ [];
+  const uv = /* allocation: required -- The native mesh retains these texture coordinates. */ [];
   let index;
   for (index of indices) {
     position.push(...corners[index]);
-    uv.push(...textureCoords[index]);
+    uv.push(sharedState.allocationCoreQuadUV[index * 2], sharedState.allocationCoreQuadUV[index * 2 + 1]);
   }
-  return putNativeMesh(state, key, position, [1, 1, 1], opacity, texture, uv);
+  return putNativeMesh(state, key, position, sharedState.allocationCoreWhite, opacity, texture, uv);
 }

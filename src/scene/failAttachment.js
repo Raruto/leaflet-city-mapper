@@ -1,9 +1,10 @@
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
 import { showWebGPUWarning } from './showWebGPUWarning.js';
-import { cityMapper } from '../constants/cityMapper.js';
 
 export function failAttachment(error, backend, map) {
   showWebGPUWarning(map);
-  backend._rendererReady.reject(error);
-  cityMapper.renderers.delete(map);
+  pluginState(backend)._rendererReady.reject(error);
+  sharedState.renderers.delete(map);
   throw error;
 }

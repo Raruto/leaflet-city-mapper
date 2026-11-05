@@ -1,7 +1,10 @@
-import { nativeLayerState } from '../constants/nativeLayerState.js';
+import { state as sharedState } from '../state.js';
+
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function nativeImageRefresh(event) {
+  const states = sharedState.imageStates.get(event.currentTarget);
+  if (!states) return;
   let state;
-  for (state of nativeLayerState.imageStates.get(event.currentTarget) || []) refreshNativeLayer(state);
+  for (state of states) refreshNativeLayer(state);
 }

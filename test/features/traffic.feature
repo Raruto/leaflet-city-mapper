@@ -1,6 +1,10 @@
 Feature: Traffic lanes, flows and timetables
 
   @unit
+  Scenario: Traffic allocation cleanup preserves route geometry and result ownership
+    Then traffic scratch preserves route vertices and independent lane and pose results
+
+  @unit
   Scenario: Traffic is fetched over HTTP per map, with honest count provenance
     Then HTTP traffic loaders refresh per map and distinguish measured from assumed flows
     And cycling counts are only assigned to nearby paths and preserve zero or missing coverage

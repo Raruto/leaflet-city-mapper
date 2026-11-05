@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 import { current } from './current.js';
 import { syncGridLayer } from './syncGridLayer.js';
 import { syncImageOverlay } from './syncImageOverlay.js';
@@ -8,7 +9,7 @@ import { destroyTexture } from '../rendering/destroyTexture.js';
 
 export function synchronizeNativeLayer(state) {
   const { source, meshes, textures } = state;
-  if (!current(state) || !state.backend.renderer || state.failed) return;
+  if (!current(state) || !pluginState(state.backend).renderer || state.failed) return;
   if (!state.dirty && (!state.marker || !state.viewDirty)) return;
   state.dirty = false;
   state.viewDirty = false;

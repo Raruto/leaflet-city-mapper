@@ -1,6 +1,9 @@
 @unit
 Feature: Sun, moon and sky colours for the simulation clock
 
+  Scenario: Date normalization preserves input semantics and celestial result ownership
+    Then celestial date normalization preserves native dates and independent results
+
   Scenario Outline: The sun follows seasons and the time of day in Paris
     When the sun is computed for "<time>" at the Eiffel Tower
     Then its altitude is between <low> and <high> degrees

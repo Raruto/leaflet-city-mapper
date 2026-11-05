@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { update as updateScene } from '../scene/update.js';
 import { tripsAt } from './tripsAt.js';
 import { trafficNow } from './trafficNow.js';
@@ -11,7 +12,7 @@ import { locateTraffic } from './locateTraffic.js';
 export function tickTraffic(state) {
   state.frame = undefined;
   if (!state.ready || !state.layer._map) return;
-  if (!state.layer.renderer) { state.frame = requestAnimationFrame(state.tick); return; }
+  if (!pluginState(state.layer).renderer) { state.frame = requestAnimationFrame(state.tick); return; }
   if (state.mesh && !(state.mesh.geometry.attributes.position.buffer.usage & GPUBufferUsage.STORAGE)) {
     state.tripsKey = null;
     state.nextCheck = -Infinity;
@@ -22,15 +23,15 @@ export function tickTraffic(state) {
   if (!live || !valid || !(ms >= state.rebasedAt && ms < state.nextCheck)) {
     let text;
     try {
-      state.trips = valid ? tripsAt(time, state.lanes, state.velocity) : [];
+      if (valid) state.trips = tripsAt(time, state.lanes, state.velocity);
+      else state.trips.length = 0;
       text = !valid ? 'Select a valid simulation date' : !state.loaded ? 'Loading…' :
         `${state.trips.length} ${state.vehicle === 'boat' ? 'boats' : state.vehicle}`;
     } catch (error) { return failTraffic(state, error); }
     state.rebasedAt = ms;
     state.nextCheck = ms + 1000;
-    const ids = [];
-    for (trip of state.trips) ids.push(trip.id);
-    const key = ids.join();
+    let key = '';
+    for (trip of state.trips) key += `${key ? ',' : ''}${trip.id}`;
     changed = key !== state.tripsKey || (state.outline && !state.route && state.lanes.length);
     if (state.outline && !state.route && state.lanes.length) drawTrafficRoute(state);
     if (key !== state.tripsKey) { rebuildTrafficMesh(state); state.tripsKey = key; }
@@ -43,11 +44,13 @@ export function tickTraffic(state) {
   if (state.mesh) moveTraffic(state, (ms - state.rebasedAt) / 1000);
   if (state.mesh && state.lights && (!live || !(performance.now() - state.litAt < 100))) {
     state.litAt = performance.now();
-    const lights = [];
+    const lights = /* allocation: required -- The mesh retains an independent light snapshot for this simulation time. */ [];
     for (trip of state.trips) {
       ({ x, y, z, dx, dz } = locateTraffic(state, trip));
       for ({ position: [lx, ly, lz], ...light } of state.lights) {
-        lights.push({ ...light, position: [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz] });
+        lights.push(/* allocation: required -- Each vehicle light retains its own transformed parameters. */ {
+          ...light, position: /* allocation: required -- Each retained light owns an independent world position. */ [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz],
+        });
       }
     }
     state.mesh.extras.lights = lights;

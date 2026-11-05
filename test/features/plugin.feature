@@ -1,4 +1,8 @@
 Feature: Separate plugin integration
+  Scenario: The plugin does not add attributes to native Leaflet instances
+    Given native Leaflet attributes are recorded before loading the plugin
+    Then the plugin adds no methods or properties to native Leaflet instances
+
   Scenario: The plugin routes source layers without changing Leaflet subclasses
     Given the city mapper plugin is loaded after Leaflet alone
     Then source layers load lazily and Leaflet subclasses keep their behavior

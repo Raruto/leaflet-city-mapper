@@ -1,17 +1,18 @@
-import { trafficShader } from '../../src/constants/trafficShader.js';
-import { vehicles } from '../../src/constants/vehicles.js';
+import { state as sharedState } from '../../src/state.js';
+
+
 import { build } from '../../src/geometry/build.js';
 import { along } from '../../src/traffic/along.js';
 
 /** Exercise the real GPU shader independently of map loading and animation-frame throttling. */
 export async function checkTrafficCompute(device) {
-  const module = device.createShaderModule({ code: trafficShader });
+  const module = device.createShaderModule({ code: sharedState.trafficShader });
   const info = await module.getCompilationInfo();
   const errors = info.messages.filter(isShaderError);
   if (errors.length) throw new Error(errors.map(shaderMessage).join('\n'));
   const pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } });
   const results = [];
-  for (const mode of Object.keys(vehicles)) results.push(await checkModel(device, pipeline, mode));
+  for (const mode of Object.keys(sharedState.vehicles)) results.push(await checkModel(device, pipeline, mode));
   return results;
 }
 
@@ -24,9 +25,9 @@ function shaderMessage(message) {
 }
 
 async function checkModel(device, pipeline, mode) {
-  const model = build(vehicles[mode].model(0)), vertices = model.position.length / 3;
+  const model = build(sharedState.vehicles[mode].model(0)), vertices = model.position.length / 3;
   const points = [[0, 0, 10], [50, 0, 20], [50, 0, 20], [50, 50, 30]];
-  const lengths = [0, 50, 50, 100], side = vehicles[mode].side;
+  const lengths = [0, 50, 50, 100], side = sharedState.vehicles[mode].side;
   const distances = [0, 49, 50, 75, 99], count = distances.length;
   const buffers = [];
   try {

@@ -1,18 +1,19 @@
+import { state as sharedState } from '../state.js';
+import { pluginState } from '../core/pluginState.js';
 import { computeBounds } from './computeBounds.js';
 import { getElevation } from '../terrain/getElevation.js';
 import { update } from '../scene/update.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
 import { vertexNormals } from './vertexNormals.js';
 import { collectMeshes } from '../collision/collectMeshes.js';
-import { HEIGHT } from '../constants/HEIGHT.js';
 
 export function conformModelToTerrain(layer, terrain) {
-  if (!layer.model) return;
-  const meshes = [];
-  collectMeshes(layer.model, meshes);
+  if (!pluginState(layer).model) return;
+  const meshes = /* allocation: required -- Mesh traversal stays private while GPU and terrain callbacks may reenter conformity. */ [];
+  collectMeshes(pluginState(layer).model, meshes);
   let mesh, positions, geometry, position, normals, attribute, normal, world, inverse, i, x, y, z;
   let worldY, weight, worldX, worldZ, point, elevation, offset;
-  if (!terrain?._terrainReady || !layer.options.terrainConform) {
+  if (!pluginState(terrain)?._terrainReady || !layer.options.terrainConform) {
     for (mesh of meshes) {
       positions = mesh.geometry._terrainBasePositions;
       if (!positions) continue;
@@ -29,11 +30,11 @@ export function conformModelToTerrain(layer, terrain) {
     return;
   }
 
-  updateWorldMatrix(layer.root);
+  updateWorldMatrix(pluginState(layer).root);
   const map = layer._map, crs = map.options.crs;
-  const origin = crs.project(layer._shared._sceneOrigin);
-  const metres = Math.cos(layer._shared._sceneOrigin.lat * Math.PI / 180);
-  const pixelScale = crs.scale(terrain._terrainZoom);
+  const origin = crs.project(pluginState(pluginState(layer)._shared)._sceneOrigin);
+  const metres = Math.cos(pluginState(pluginState(layer)._shared)._sceneOrigin.lat * Math.PI / 180);
+  const pixelScale = crs.scale(pluginState(terrain)._terrainZoom);
 
   for (mesh of meshes) {
     geometry = mesh.geometry, attribute = geometry.attributes.position;
@@ -41,15 +42,15 @@ export function conformModelToTerrain(layer, terrain) {
     normal = geometry.attributes.normal;
     geometry._terrainBaseNormals ||= normal.data.slice();
     attribute.data.set(geometry._terrainBasePositions);
-    world = mesh.worldMatrix, inverse = new DOMMatrix(world).inverse().toFloat64Array();
+    world = mesh.worldMatrix, inverse = /* allocation: required -- The inverse matrix is bound to this mesh transform during terrain sampling. */ new DOMMatrix(world).inverse().toFloat64Array();
     for (i = 0; i < attribute.data.length; i += 3) {
       x = attribute.data[i], y = attribute.data[i + 1], z = attribute.data[i + 2];
       worldY = world[1] * x + world[5] * y + world[9] * z + world[13];
-      weight = Math.max(0, Math.min(1, 1 - (worldY - layer.root.position[1]) / HEIGHT));
+      weight = Math.max(0, Math.min(1, 1 - (worldY - pluginState(layer).root.position[1]) / sharedState.HEIGHT));
       if (!weight) continue;
       worldX = world[0] * x + world[4] * y + world[8] * z + world[12];
       worldZ = world[2] * x + world[6] * y + world[10] * z + world[14];
-      point = crs.transformation.transform(new L.Point(
+      point = crs.transformation.transform(/* allocation: required -- The CRS transformation may retain or mutate this vertex coordinate. */ new L.Point(
         origin.x + worldX / metres, origin.y - worldZ / metres), pixelScale);
       elevation = getElevation(terrain, point);
       if (!Number.isFinite(elevation)) continue;

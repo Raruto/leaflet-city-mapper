@@ -1,8 +1,12 @@
-import { nativeLayerState } from '../constants/nativeLayerState.js';
+import { state as sharedState } from '../state.js';
 
 export function nativeImageError(event) {
+  const states = sharedState.imageStates.get(event.currentTarget);
+  if (!states) return;
   let state;
-  for (state of nativeLayerState.imageStates.get(event.currentTarget) || []) {
-    state.source.fire('error', { error: new Error('Unable to load native layer image') });
+  for (state of states) {
+    state.source.fire('error', /* allocation: required -- Each layer receives independent error event data. */ {
+      error: /* allocation: required -- Capture the image-load failure stack for this layer. */ new Error('Unable to load native layer image'),
+    });
   }
 }

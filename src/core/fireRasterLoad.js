@@ -1,5 +1,5 @@
-import { indexState } from '../constants/indexState.js';
+import { state as sharedState } from '../state.js';
 
 export function fireRasterLoad() {
-  indexState.pendingRasterLoads.shift()?.fire('load');
+  sharedState.pendingRasterLoads.shift()?.fire('load');
 }

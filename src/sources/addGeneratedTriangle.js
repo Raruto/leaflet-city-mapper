@@ -1,6 +1,6 @@
+import { state as sharedState } from '../state.js';
 import { addTriangle } from './addTriangle.js';
-import { pumpState } from '../constants/pumpState.js';
 
 export function addGeneratedTriangle(...args) {
-  addTriangle(pumpState.triangleContexts[pumpState.triangleContexts.length - 1], ...args);
+  addTriangle(sharedState.triangleContexts[sharedState.triangleContexts.length - 1], ...args);
 }

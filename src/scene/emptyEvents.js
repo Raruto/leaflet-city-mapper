@@ -1,3 +1,3 @@
 export function emptyEvents() {
-  return {};
+  return /* allocation: required -- Return independent event storage for each caller. */ {};
 }

@@ -1,14 +1,17 @@
 /** Dashed lane outline, in layer-local metres. */
 
 export function routeGeometry(lanes) {
-  const position = [], normal = [], color = [];
-  let points, lengths, properties, raw, rgb, tint, i, a, b, dx, dz, length, x, z, distance, start, end;
-  let p, q, point;
+  const position = /* allocation: required -- Returned route geometry retains its vertex positions. */ [];
+  const normal = /* allocation: required -- Returned route geometry retains its vertex normals. */ [];
+  const color = /* allocation: required -- Returned route geometry retains its vertex colors. */ [];
+  let points, lengths, properties, raw, rgb, r, g, blue, i, a, b, dx, dz, length, x, z, distance, start, end;
+  let px, py, pz, qx, qy, qz, vertex;
   for ({ points, lengths, properties } of lanes) {
     raw = properties?.route_color;
     rgb = /^[\da-f]{6}$/i.test(raw) ? Number.parseInt(raw, 16) : null;
-    tint = rgb === null ? [0.08, 0.7, 0.85]
-      : [(rgb >> 16 & 255) / 255, (rgb >> 8 & 255) / 255, (rgb & 255) / 255];
+    r = rgb === null ? 0.08 : (rgb >> 16 & 255) / 255;
+    g = rgb === null ? 0.7 : (rgb >> 8 & 255) / 255;
+    blue = rgb === null ? 0.85 : (rgb & 255) / 255;
     for (i = 1; i < points.length; i++) {
       a = points[i - 1], b = points[i];
       dx = b[0] - a[0], dz = b[1] - a[1], length = lengths[i] - lengths[i - 1];
@@ -18,14 +21,22 @@ export function routeGeometry(lanes) {
         start = Math.max(0, (distance - lengths[i - 1]) / length);
         end = Math.min(1, (distance + 18 - lengths[i - 1]) / length);
         if (end <= start) continue;
-        p = [a[0] + dx * start, a[1] + dz * start, a[2] + (b[2] - a[2]) * start + 0.4];
-        q = [a[0] + dx * end, a[1] + dz * end, a[2] + (b[2] - a[2]) * end + 0.4];
-        for (point of [[p[0] - x, p[2], p[1] - z], [p[0] + x, p[2], p[1] + z], [q[0] + x, q[2], q[1] + z],
-        [p[0] - x, p[2], p[1] - z], [q[0] + x, q[2], q[1] + z], [q[0] - x, q[2], q[1] - z]]) {
-          position.push(...point); normal.push(0, 1, 0); color.push(...tint);
+        px = a[0] + dx * start;
+        pz = a[1] + dz * start;
+        py = a[2] + (b[2] - a[2]) * start + 0.4;
+        qx = a[0] + dx * end;
+        qz = a[1] + dz * end;
+        qy = a[2] + (b[2] - a[2]) * end + 0.4;
+        for (vertex = 0; vertex < 6; vertex++) {
+          if (vertex === 0 || vertex === 3) position.push(px - x, py, pz - z);
+          else if (vertex === 1) position.push(px + x, py, pz + z);
+          else if (vertex === 5) position.push(qx - x, qy, qz - z);
+          else position.push(qx + x, qy, qz + z);
+          normal.push(0, 1, 0);
+          color.push(r, g, blue);
         }
       }
     }
   }
-  return { position, normal, color };
+  return /* allocation: required -- Each route mesh owns an independent geometry result. */ { position, normal, color };
 }

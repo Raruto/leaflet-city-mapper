@@ -1,3 +1,5 @@
+import { mapUpdateCameraOverlays } from '../camera/mapUpdateCameraOverlays.js';
+import { pluginState } from '../core/pluginState.js';
 import { update } from './update.js';
 
 /** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */
@@ -5,12 +7,14 @@ import { update } from './update.js';
 export function endZoom() {
   const backend = this;
   let animation;
-  for (animation of backend._zoomTransitions?.keys() || []) animation.finish();
-  backend._zoomTransitions = null;
-  backend._zoomView = null;
-  delete backend._map._cameraView;
+  if (pluginState(backend)._zoomTransitions) {
+    for (animation of pluginState(backend)._zoomTransitions.keys()) animation.finish();
+  }
+  pluginState(backend)._zoomTransitions = null;
+  pluginState(backend)._zoomView = null;
+  delete pluginState(backend._map)._cameraView;
   backend._map.getContainer().classList.remove('leaflet-camera-zoom');
-  backend._map._updateCameraOverlays();
-  backend._zoomLevel = null;
+  mapUpdateCameraOverlays(backend._map);
+  pluginState(backend)._zoomLevel = null;
   update(backend);
 }

@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { loadDirectory } from './loadDirectory.js';
 import { decompress } from './decompress.js';
 import { tileId } from './tileId.js';
@@ -7,8 +8,8 @@ import { getHeader } from './getHeader.js';
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 
 export async function getZxy(backend, z, x, y, signal) {
-  if (backend.options.archive && backend.options.archive !== backend && backend.options.archive.getZxy) {
-    return backend.options.archive.getZxy(z, x, y, signal);
+  if (backend.options.archive && backend.options.archive !== backend && pluginState(backend.options.archive).getZxy) {
+    return pluginState(backend.options.archive).getZxy(z, x, y, signal);
   }
   const id = tileId(z, x, y);
   signal?.throwIfAborted();
@@ -18,26 +19,28 @@ export async function getZxy(backend, z, x, y, signal) {
     return;
   }
   let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
-  const visited = new Set();
+  let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
   let depth, key, pending, entries, low, high, mid, entry, data;
   for (depth = 0; depth < 4; depth++) {
-    if (visited.has(offset)) {
-      throw new Error('Cyclic PMTiles directory');
+    if (offset === firstOffset || offset === secondOffset || offset === thirdOffset) {
+      throw /* allocation: required -- Preserve the stack of this cyclic archive request. */ new Error('Cyclic PMTiles directory');
     }
-    visited.add(offset);
+    if (depth === 0) firstOffset = offset;
+    else if (depth === 1) secondOffset = offset;
+    else if (depth === 2) thirdOffset = offset;
     key = `${offset}:${length}`;
-    if (!backend._directories.has(key)) {
-      if (backend._directories.size >= 32) {
-        backend._directories.delete(backend._directories.keys().next().value);
+    if (!pluginState(backend)._directories.has(key)) {
+      if (pluginState(backend)._directories.size >= 32) {
+        pluginState(backend)._directories.delete(pluginState(backend)._directories.keys().next().value);
       }
-      backend._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
+      pluginState(backend)._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
     }
-    pending = backend._directories.get(key);
+    pending = pluginState(backend)._directories.get(key);
     entries = void 0;
     try {
       entries = await pending;
     } catch (error) {
-      if (backend._directories.get(key) === pending) backend._directories.delete(key);
+      if (pluginState(backend)._directories.get(key) === pending) pluginState(backend)._directories.delete(key);
       throw error;
     }
     signal?.throwIfAborted();
@@ -59,17 +62,17 @@ export async function getZxy(backend, z, x, y, signal) {
         return;
       }
       if (entry.offset + entry.length > header.tileDataLength) {
-        throw new Error('PMTiles tile outside data section');
+        throw /* allocation: required -- Preserve the stack of this invalid tile request. */ new Error('PMTiles tile outside data section');
       }
       data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
       signal?.throwIfAborted();
-      return { data };
+      return /* allocation: required -- Concurrent callers own independent tile results. */ { data };
     }
     if (entry.offset + entry.length > header.leafDirectoryLength) {
-      throw new Error('PMTiles directory outside leaf section');
+      throw /* allocation: required -- Preserve the stack of this invalid directory request. */ new Error('PMTiles directory outside leaf section');
     }
     offset = header.leafDirectoryOffset + entry.offset;
     length = entry.length;
   }
-  throw new Error('PMTiles directory depth exceeds four levels');
+  throw /* allocation: required -- Preserve the stack of this excessive directory traversal. */ new Error('PMTiles directory depth exceeds four levels');
 }

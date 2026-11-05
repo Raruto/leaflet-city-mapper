@@ -1,6 +1,8 @@
 export function rgb(values) {
-  const rounded = [];
-  let value;
-  for (value of values) rounded.push(Math.round(value));
-  return `rgb(${rounded.join(', ')})`;
+  let rounded = '', i;
+  for (i = 0; i < values.length; i++) {
+    if (i) rounded += ', ';
+    rounded += Math.round(values[i]);
+  }
+  return `rgb(${rounded})`;
 }

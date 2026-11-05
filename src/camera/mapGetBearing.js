@@ -1,1 +1,2 @@
-export function mapGetBearing() { return this._cameraBearing ?? 0; }
+import { pluginState } from '../core/pluginState.js';
+export function mapGetBearing(map) { return pluginState(map)._cameraBearing ?? 0; }

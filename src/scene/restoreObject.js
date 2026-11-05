@@ -1,71 +1,62 @@
+import { pluginState } from '../core/pluginState.js';
 import { createProgram } from '../rendering/createProgram.js';
 
-export function restoreObject(backend, shared, object) {
-  let name, attribute, data, size, count, normalized, key, texture;
-  if (object.geometry && object.geometry.device !== shared.renderer.device) {
+export function restoreObject(object, backend) {
+  const shared = pluginState(backend)._shared;
+  let name, attribute, oldBuffer, texture;
+  if (object.geometry && object.geometry.device !== pluginState(shared).renderer.device) {
     const geometry = object.geometry;
     const material = object.program._layerMaterial;
-    const attributes = {};
-    for (name of ['position', 'normal', 'color', 'uv', 'index', 'instanceOffset']) {
+    const device = pluginState(shared).renderer.device;
+    if (geometry.attributes.index?.data instanceof Uint8Array) {
+      geometry.attributes.index.data = /* allocation: required -- WebGPU index buffers must not use uint8 data. */ new Uint16Array(geometry.attributes.index.data);
+    }
+    for (name in geometry.attributes) {
       attribute = geometry.attributes[name];
-      if (!attribute) continue;
-      ({ data, size, count, normalized } = attribute);
-      attributes[name] = { data: data.slice(0, count * size), size, normalized };
-    }
-    const device = shared.renderer.device;
-    if (attributes.index?.data instanceof Uint8Array) {
-      attributes.index.data = Uint16Array.from(attributes.index.data);
-    }
-    for ([name, attribute] of Object.entries(attributes)) {
       attribute.size ||= 1;
       attribute.count = attribute.data.length / attribute.size;
       attribute.indexFormat = attribute.data instanceof Uint32Array ? 'uint32' : 'uint16';
-      attribute.buffer = device.createBuffer({
+      oldBuffer = attribute.buffer;
+      attribute.buffer = device.createBuffer(/* allocation: required -- Supply a fresh GPU descriptor for the replacement buffer. */ {
         size: Math.max(4, attribute.data.byteLength),
         usage: name === 'index'
           ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
           : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       });
       device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
+      oldBuffer?.destroy();
     }
-    object.geometry = {
-      device,
-      attributes,
-      drawRange: { start: 0, count: attributes.index?.count || attributes.position.count },
-    };
-    for (attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
+    geometry.device = device;
+    geometry.drawRange.count = geometry.attributes.index?.count || geometry.attributes.position.count;
     object.bindGroup = null;
-    object.boundTextures = [];
-    for (key of ['baseTexture', 'metalTexture', 'emissiveTexture', 'occlusionTexture']) {
-      texture = material[key];
+    if (object.boundTextures) object.boundTextures.length = 0;
+    else object.boundTextures = /* allocation: required -- Preserve each object's independent texture bindings. */ [];
+    for (name in material) {
+      if (name !== 'baseTexture' && name !== 'metalTexture' && name !== 'emissiveTexture' && name !== 'occlusionTexture') continue;
+      texture = material[name];
       if (!texture || texture.device === device) continue;
-      material[key] = {
-        ...texture,
-        device,
-        texture: device.createTexture({
-          size: [texture.image.width, texture.image.height],
+      texture.device = device;
+      texture.texture = device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for the replacement texture. */ {
+          size: /* allocation: required -- Snapshot the image dimensions for this GPU operation. */ [texture.image.width, texture.image.height],
           format: texture.format,
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-        }),
-        sampler: device.createSampler(texture.samplerOptions),
-        uploaded: null,
-      };
+        });
+      texture.sampler = device.createSampler(texture.samplerOptions);
+      texture.uploaded = null;
     }
     object.program.pipelineCache.clear();
     object.program = createProgram(backend, material);
     object.device = device;
   }
-  if (object.texture && object.texture.device !== shared.renderer.device) {
-    object.texture = {
-      ...object.texture,
-      device: shared.renderer.device,
-      texture: shared.renderer.device.createTexture({
-        size: [object.texture.image.width, object.texture.image.height],
+  if (object.texture && object.texture.device !== pluginState(shared).renderer.device) {
+    texture = object.texture;
+    texture.device = pluginState(shared).renderer.device;
+    texture.texture = pluginState(shared).renderer.device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for this replacement texture. */ {
+        size: /* allocation: required -- Snapshot the image dimensions for this GPU operation. */ [object.texture.image.width, object.texture.image.height],
         format: object.texture.format,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-      }),
-      sampler: shared.renderer.device.createSampler(object.texture.samplerOptions),
-      uploaded: null,
-    };
+      });
+    texture.sampler = pluginState(shared).renderer.device.createSampler(texture.samplerOptions);
+    texture.uploaded = null;
   }
 }

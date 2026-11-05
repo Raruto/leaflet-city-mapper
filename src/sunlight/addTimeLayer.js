@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 export function addTimeLayer(map) {
-  return this.control.addTo(map);
+  return pluginState(this).control.addTo(map);
 }

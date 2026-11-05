@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { setHighlight } from '../picking/setHighlight.js';
 import { showFeature } from '../picking/showFeature.js';
 import { setParent } from '../scene/setParent.js';
@@ -8,9 +9,9 @@ export function releaseArea(backend, area) {
   area.request.abort();
   let attribute;
   if (area.mesh) {
-    if (backend.highlightedFeature?.mesh === area.mesh) {
+    if (pluginState(backend).highlightedFeature?.mesh === area.mesh) {
       setHighlight(backend, null);
-      backend.hoveredFeature = null;
+      pluginState(backend).hoveredFeature = null;
       showFeature(backend, null);
     }
     setParent(area.mesh, null);

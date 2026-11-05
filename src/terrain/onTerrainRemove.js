@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
@@ -8,34 +9,35 @@ import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {
-  layer._terrainController?.abort();
-  layer._terrainLoading = false;
-  layer._terrainReady = false;
+  pluginState(layer)._terrainController?.abort();
+  pluginState(layer)._terrainLoading = false;
+  pluginState(layer)._terrainReady = false;
   map.eachLayer(clearLayerTerrain);
   let tile, l, grid, attribute;
-  for (tile of layer._rasterTiles.keys()) removeRasterTile(layer, tile);
-  if (map._terrain3D === layer) delete map._terrain3D;
+  for (tile of pluginState(layer)._rasterTiles.keys()) removeRasterTile(layer, tile);
+  if (pluginState(map)._terrain3D === layer) delete pluginState(map)._terrain3D;
   for (l of Object.values(map._layers)) {
     conformModelToTerrain(l, null);
     setTerrainHeight(l);
   }
 
   map.fire('terrainchange');
-  layer._terrainTiles.clear();
-  layer._terrainOriginElevation = 0;
-  layer._terrainPromise = null;
-  if (layer._rasterProgram) {
-    layer._rasterProgram.pipelineCache.clear();
+  pluginState(layer)._terrainTiles.clear();
+  pluginState(layer)._terrainOriginElevation = 0;
+  pluginState(layer)._terrainPromise = null;
+  if (pluginState(layer)._rasterProgram) {
+    pluginState(layer)._rasterProgram.pipelineCache.clear();
   }
-  layer._rasterProgram = null;
-  if (layer._dem) destroyTexture(layer, layer._dem.texture);
-  layer._dem = null;
-  for (grid of layer._terrainGrids?.values() || []) {
+  pluginState(layer)._rasterProgram = null;
+  if (pluginState(layer)._dem) destroyTexture(layer, pluginState(layer)._dem.texture);
+  pluginState(layer)._dem = null;
+  for (grid of pluginState(layer)._terrainGrids?.values() || sharedState.allocationRenderEmpty) {
     for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
-  layer._terrainGrids = null;
-  layer._bridges = null;
-  disposeMesh(layer, layer._bridgeMesh);
-  layer._bridgeMesh = null;
+  pluginState(layer)._terrainGrids = null;
+  pluginState(layer)._bridges = null;
+  disposeMesh(layer, pluginState(layer)._bridgeMesh);
+  pluginState(layer)._bridgeMesh = null;
   onRemove3DLayer(layer, map);
 }
+import { state as sharedState } from '../state.js';

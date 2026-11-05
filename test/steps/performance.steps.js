@@ -52,6 +52,64 @@ Then('source function checks handle these modules:', function (table) {
   }
 });
 
+function inspectLocalAllocations(node, depth, file, errors, exceptions) {
+  if (!node || typeof node.type !== 'string') return;
+  if (FUNCTIONS.has(node.type)) depth++;
+  if (depth && ['ObjectExpression', 'ArrayExpression', 'NewExpression'].includes(node.type)) {
+    const exception = exceptions.get(node.start);
+    if (exception) exception.used = true;
+    else errors.push(`${file}:${node.loc.start.line}:${node.loc.start.column + 1} local ${node.type}`);
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) inspectLocalAllocations(child, depth, file, errors, exceptions);
+    } else if (value && typeof value.type === 'string') {
+      inspectLocalAllocations(value, depth, file, errors, exceptions);
+    }
+  }
+}
+
+function localAllocationErrors(source, file) {
+  const comments = [], errors = [], exceptions = new Map();
+  const ast = parse(source, {
+    ecmaVersion: 'latest', sourceType: 'module', locations: true, onComment: comments,
+  });
+  for (const comment of comments) {
+    if (!comment.value.trim().startsWith('allocation:')) continue;
+    if (comment.type !== 'Block' || !/^allocation: required -- \S[^\r\n]*\S$/.test(comment.value.trim())) {
+      errors.push(`${file}:${comment.loc.start.line} invalid allocation exception; provide a block comment with a reason`);
+      continue;
+    }
+    const next = source.slice(comment.end).search(/\S/);
+    exceptions.set(comment.end + next, { comment, used: false });
+  }
+  inspectLocalAllocations(ast, 0, file, errors, exceptions);
+  for (const { comment, used } of exceptions.values()) {
+    if (!used) errors.push(`${file}:${comment.loc.start.line} unused allocation exception; place it immediately before one local allocation`);
+  }
+  return errors;
+}
+
+Then('local allocation checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    assert.equal(localAllocationErrors(source, 'example.js').length, Number(violations), source);
+  }
+});
+
+Then('source functions allocate no object literals, array literals or constructed instances', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    errors.push(...localAllocationErrors(await readFile(file, 'utf8'), file));
+  }
+  assert.equal(errors.length, 0, `Local allocations are forbidden in source functions:\n${errors.join('\n')}`);
+});
+
+Then('local allocation checks accept source file {string}', async function (file) {
+  assert.deepEqual(localAllocationErrors(await readFile(file, 'utf8'), file), []);
+});
+
 function bindingCount(pattern) {
   if (!pattern) return 0;
   switch (pattern.type) {
@@ -167,23 +225,18 @@ function moduleVariableErrors(source, file) {
     }
   }
   const errors = [];
-  inspectModuleVariables(ast, file.split('/'), exported, errors);
+  inspectModuleVariables(ast, file.replaceAll('\\', '/').split('/'), exported, errors);
   return errors;
 }
 
 function inspectModuleVariables(node, path, exported, errors) {
   if (!node || typeof node.type !== 'string' || FUNCTIONS.has(node.type)) return;
   if (node.type === 'VariableDeclaration') {
-    const folder = node.kind === 'const' ? 'constants' : node.kind === 'let' ? 'state' : null;
     const file = path.join('/');
-    if (!folder || !path.slice(0, -1).includes(folder)) {
-      errors.push(`${file}:${node.loc.start.line} module ${node.kind}; move to ${folder || 'constants or state'}`);
-    } else {
-      for (const declaration of node.declarations) {
-        for (const name of bindingNames(declaration.id)) {
-          if (!exported.has(name)) errors.push(`${file}:${node.loc.start.line} module binding ${name} must be exported`);
-        }
-      }
+    if (file !== 'src/state.js' || node.kind !== 'const' || node.declarations.length !== 1 ||
+        node.declarations[0].id.type !== 'Identifier' || node.declarations[0].id.name !== 'state' ||
+        !exported.has('state')) {
+      errors.push(`${file}:${node.loc.start.line} module variables must use the single exported const state in src/state.js`);
     }
   }
   for (const value of Object.values(node)) {
@@ -199,7 +252,7 @@ Then('module variable checks handle these files:', function (table) {
   }
 });
 
-Then('module constants and state are exported from their dedicated folders', async function () {
+Then('module constants and state use the single state object', async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -208,6 +261,11 @@ Then('module constants and state are exported from their dedicated folders', asy
     errors.push(...moduleVariableErrors(await readFile(file, 'utf8'), sourcePath));
   }
   assert.deepEqual(errors, []);
+  assert.ok(!(await readdir('src')).includes('constants'), 'src/constants must not be reintroduced');
+  const module = await import('../../src/state.js');
+  assert.deepEqual(Object.keys(module), ['state']);
+  assert.equal(typeof module.state, 'object');
+  assert.notEqual(module.state, null);
 });
 
 function isNestedSourceDirectory(directory) {

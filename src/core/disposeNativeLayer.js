@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 import { refreshNativeEvent } from './refreshNativeEvent.js';
 import { updateNativeLayerView } from './updateNativeLayerView.js';
 import { removeNativeEvents } from './removeNativeEvents.js';
@@ -30,6 +31,6 @@ export function disposeNativeLayer() {
     image.removeEventListener('error', nativeImageError);
     removeImageState(image, state);
   }
-  backend._beforeRender = null;
+  pluginState(backend)._beforeRender = null;
   backend.remove();
 }

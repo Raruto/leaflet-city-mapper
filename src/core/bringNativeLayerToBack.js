@@ -1,3 +1,4 @@
+import { pluginState } from './pluginState.js';
 export function bringNativeLayerToBack(layer = this) {
-  layer?._nativeGPU?.reorder?.(false);
+  pluginState(layer)?._nativeGPU?.reorder?.(false);
 }

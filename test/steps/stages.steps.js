@@ -1,3 +1,5 @@
+import { state as sharedState } from '../../src/state.js';
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { buildArea } from '../../src/sources/buildArea.js';
@@ -16,13 +18,15 @@ import { compareDistance } from '../../src/utils/compareDistance.js';
 import { noOperation } from '../../src/utils/noOperation.js';
 import { notifyCameraTouchChange } from '../../src/controls/notifyCameraTouchChange.js';
 import { rotateOnRemove } from '../../src/controls/rotateOnRemove.js';
-import { cameraControlsState } from '../../src/constants/cameraControlsState.js';
+
 import { nativeGeometry } from '../../src/geometry/nativeGeometry.js';
 import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
 
 Then('frame optimizations preserve buffer isolation, directions and winding', { timeout: 30000 }, async function () {
   await this.page.goto(this.baseUrl);
   const result = await this.page.evaluate(async () => {
+    const { state } = await import('/src/state.js');
+    const { pluginState } = await import('/src/core/pluginState.js');
     const { render } = await import('/src/rendering/render.js');
     const { collectFrameMeshes } = await import('/src/rendering/collectFrameMeshes.js');
     const { prepareFrameUniforms } = await import('/src/rendering/prepareFrameUniforms.js');
@@ -30,6 +34,7 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
     const { updateWorldMatrix } = await import('/src/scene/updateWorldMatrix.js');
     const { emptyNode } = await import('/src/scene/emptyNode.js');
     const identity = new DOMMatrix().toFloat64Array();
+    state.mapMethods = { layerPointToContainerPoint(point) { return point; } };
     const createBackend = () => {
       const size = { x: 320, y: 240, equals(other) { return this.x === other.x && this.y === other.y; } };
       const pass = {
@@ -40,7 +45,8 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
         _size: size, _sceneOrigin: { lat: 0 }, _layers: new Set(), scene: emptyNode(),
         _map: { getSize: () => size, getZoom: () => 10, getCenter: () => ({ lat: 0, lng: 0 }),
           getPitch: () => 30, getBearing: () => 20, options: { crs: { scale: () => 40075016.68557849 } },
-          project: () => ({ subtract: () => ({ x: 0, y: 0 }) }) },
+          getPixelOrigin: () => ({ x: 0, y: 0 }),
+          project: () => ({ subtract: () => ({ x: size.x / 2, y: size.y / 2 }) }) },
         camera: { position: [0, 0, 0], target: [0, 0, 0], up: [0, 1, 0],
           viewMatrix: [...identity], projectionMatrix: [...identity], projectionViewMatrix: [...identity] },
         renderer: {
@@ -53,23 +59,23 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
           },
         },
       };
-      backend._shared = backend;
+      pluginState(backend)._shared = backend;
       return backend;
     };
     const first = createBackend(), second = createBackend();
     render(first);
-    const meshes = first.renderer.frameMeshes, frustum = first.renderer.frustum;
-    const planes = [...frustum], lengths = first.renderer.frustumLengths;
+    const meshes = pluginState(first).renderer.frameMeshes, frustum = pluginState(first).renderer.frustum;
+    const planes = [...frustum], lengths = pluginState(first).renderer.frustumLengths;
     meshes.push({ stale: true });
     render(first);
     render(second);
-    const reuse = first.renderer.frameMeshes === meshes && meshes.length === 0 &&
-      first.renderer.frustum === frustum && first.renderer.frustumLengths === lengths &&
+    const reuse = pluginState(first).renderer.frameMeshes === meshes && meshes.length === 0 &&
+      pluginState(first).renderer.frustum === frustum && pluginState(first).renderer.frustumLengths === lengths &&
       frustum.every((plane, i) => plane === planes[i]);
-    const isolation = second.renderer.frameMeshes !== meshes && second.renderer.frustum !== frustum &&
-      second.renderer.frustumLengths !== lengths && second.renderer.frustum[0] !== planes[0];
+    const isolation = pluginState(second).renderer.frameMeshes !== meshes && pluginState(second).renderer.frustum !== frustum &&
+      pluginState(second).renderer.frustumLengths !== lengths && pluginState(second).renderer.frustum[0] !== planes[0];
     const projection = new DOMMatrix().rotate(12, 31, 7).scale(2, 3, 4).translate(5, 6, 7).toFloat64Array();
-    first.camera.projectionViewMatrix = projection;
+    pluginState(first).camera.projectionViewMatrix = projection;
     const visible = { ...emptyNode(), program: {}, worldMatrix: [...identity], geometry: {
       bounds: { center: [0, 0, 0], radius: 1 },
     } };
@@ -78,7 +84,7 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
     outside.worldMatrix[5] = 0.001;
     outside.worldMatrix[10] = 0.001;
     outside.worldMatrix[12] = 1e6;
-    first.scene.children = [visible, outside];
+    pluginState(first).scene.children = [visible, outside];
     collectFrameMeshes(first);
     const expectedPlanes = [
       [projection[3] + projection[0], projection[7] + projection[4], projection[11] + projection[8], projection[15] + projection[12]],
@@ -91,13 +97,13 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
     const frustumMatches = frustum.every((plane, i) =>
       plane.every((value, j) => value === expectedPlanes[i][j]) &&
       lengths[i] === Math.hypot(...expectedPlanes[i].slice(0, 3)));
-    first.camera.projectionViewMatrix = [...identity];
+    pluginState(first).camera.projectionViewMatrix = [...identity];
     collectFrameMeshes(first);
-    const visibility = first._visibleMeshes.length === 1 && first._visibleMeshes[0] === visible;
+    const visibility = pluginState(first)._visibleMeshes.length === 1 && pluginState(first)._visibleMeshes[0] === visible;
     const directions = [];
     for (const view of [identity, new DOMMatrix().rotate(15, 70, 25).translate(40, 50, 60).toFloat64Array(),
       new DOMMatrix().scale(2, 3, 4).toFloat64Array(), new Float64Array(16)]) {
-      first.camera.viewMatrix = view;
+      pluginState(first).camera.viewMatrix = view;
       for (const direction of [[3, -4, 5], [0, 0, 0], undefined]) {
         prepareFrameUniforms(first, [], [], direction ? { direction, altitude: 20 } : undefined);
         const matrix = new DOMMatrix(view);
@@ -106,7 +112,7 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
         const lightLength = Math.hypot(light.x, light.y, light.z) || 1;
         const skyLength = Math.hypot(sky.x, sky.y, sky.z) || 1;
         directions.push({
-          actual: Array.from(first.renderer.uniformData.slice(48, 55)),
+          actual: Array.from(pluginState(first).renderer.uniformData.slice(48, 55)),
           expected: [light.x / lightLength, light.y / lightLength, light.z / lightLength,
             1, sky.x / skyLength, sky.y / skyLength, sky.z / skyLength].map(Math.fround),
         });
@@ -124,8 +130,8 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
       get(target, key) { if (key === '0') reads++; return Reflect.get(target, key); },
     });
     const draw = () => {
-      first.renderer.uniformSlot = 1;
-      drawSceneMeshes(first, first.renderer.device.createCommandEncoder(), [mesh]);
+      pluginState(first).renderer.uniformSlot = 1;
+      drawSceneMeshes(first, pluginState(first).renderer.device.createCommandEncoder(), [mesh]);
     };
     draw();
     const firstReads = reads;
@@ -223,28 +229,28 @@ Then('shared helpers preserve math, callbacks and control cleanup', async functi
   assert.deepEqual(events, [[map, 'cameratouchchange']]);
 
   const previousWindow = globalThis.window;
-  const previousState = { ...cameraControlsState };
+  const previousState = { ...sharedState };
   try {
     const removed = [], blur = [], detached = [];
     globalThis.window = { removeEventListener: (...args) => blur.push(args) };
     const element = { removeEventListener: (...args) => removed.push(args) };
     const dragState = { element, drag: null };
-    cameraControlsState.cameraDrags = new Set([dragState]);
-    cameraControlsState.dragStates = new WeakMap([[element, dragState]]);
+    sharedState.cameraDrags = new Set([dragState]);
+    sharedState.dragStates = new WeakMap([[element, dragState]]);
     const control = { _dragState: dragState, _refresh: noOperation };
     rotateOnRemove.call(control, { off: (...args) => detached.push(args) });
     assert.deepEqual(detached, [['rotate pitch', noOperation, control]]);
     assert.deepEqual(removed.map(args => args[0]), [
       'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'lostpointercapture', 'click', 'contextmenu',
     ]);
-    assert.equal(cameraControlsState.cameraDrags.size, 0);
-    assert.equal(cameraControlsState.dragStates.has(element), false);
+    assert.equal(sharedState.cameraDrags.size, 0);
+    assert.equal(sharedState.dragStates.has(element), false);
     assert.equal(blur[0][0], 'blur');
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
-    for (const key of Object.keys(cameraControlsState)) delete cameraControlsState[key];
-    Object.assign(cameraControlsState, previousState);
+    for (const key of Object.keys(sharedState)) delete sharedState[key];
+    Object.assign(sharedState, previousState);
   }
 });
 
@@ -322,7 +328,7 @@ Then('source stages preserve features, errors and load completion', async functi
     assert.throws(() => buildAreaFeature(lights, feature), /Night lights require Point geometry/);
 
     const uploads = [];
-    backend.renderer = { sunlight: { layout: {} }, device: {
+    pluginState(backend).renderer = { sunlight: { layout: {} }, device: {
       createBuffer: descriptor => ({ ...descriptor }),
       queue: { writeBuffer: (buffer, offset, data) => uploads.push(Array.from(data)) },
       createShaderModule: () => ({ getCompilationInfo: async () => ({ messages: [] }) }),
@@ -335,29 +341,29 @@ Then('source stages preserve features, errors and load completion', async functi
     await buildArea(backend, area, map);
     assert.equal(area.done, true);
     assert.equal(area.buildings, 1);
-    assert.equal(area.mesh.parent, backend.root);
+    assert.equal(area.mesh.parent, pluginState(backend).root);
     assert.equal(area.mesh.program._layerMaterial.roofTexture, true);
     assert.deepEqual(uploads, [context.positions, context.normals, context.colors]);
     assert.deepEqual(area.mesh.extras.featureFaces, context.featureFaces);
-    assert.equal(backend._inflight, 0);
+    assert.equal(pluginState(backend)._inflight, 0);
 
-    backend._inflight++;
+    pluginState(backend)._inflight++;
     backend.options.data = { type: 'FeatureCollection', features: [] };
     await buildArea(backend, area, map);
     assert.equal(area.done, true);
     assert.equal(area.mesh, null);
-    assert.equal(backend._inflight, 0);
+    assert.equal(pluginState(backend)._inflight, 0);
     assert.deepEqual(errors, []);
     backend.options.data = { type: 'invalid' };
-    backend._inflight++;
+    pluginState(backend)._inflight++;
     await buildArea(backend, area, map);
     assert.equal(area.error, 'Invalid GeoJSON response');
-    assert.equal(backend._inflight, 0);
+    assert.equal(pluginState(backend)._inflight, 0);
     assert.deepEqual(errors, [['error', 'Invalid GeoJSON response']]);
     area.request.abort();
-    backend._inflight++;
+    pluginState(backend)._inflight++;
     await buildArea(backend, area, map);
-    assert.equal(backend._inflight, 0);
+    assert.equal(pluginState(backend)._inflight, 0);
     assert.equal(errors.length, 1, 'Cancelled loads must not emit errors');
   } finally {
     for (const [name, value] of Object.entries(previous)) {
@@ -388,7 +394,7 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
     resizeRenderer(backend, size);
     assert.equal(created.length, 1);
     assert.deepEqual(created[0].descriptor.size, [640, 480]);
-    assert.equal(backend.renderer.canvas.style.width, '320px');
+    assert.equal(pluginState(backend).renderer.canvas.style.width, '320px');
     resizeRenderer(backend, { ...size, x: 640 });
     await Promise.resolve();
     assert.equal(created.length, 2);
@@ -402,10 +408,10 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
       geometry: { bounds: { min: [0, 0, 0], max: [1, 1, 1] } }, worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
     const parent = { id: 5, ground: true, visible: true, tile: { coords: { z: 1 } }, program: opaque.program };
     const child = { id: 6, ground: true, visible: true, tile: { coords: { z: 2 } }, program: opaque.program };
-    backend._visibleMeshes = [fading, opaque, roof, child, parent];
-    backend._shadowMeshes = [opaque, fading, roof, hidden];
-    backend._roofRaster = { signature: 'pending' };
-    backend._sceneOrigin = { lat: 0, x: 0, y: 0 };
+    pluginState(backend)._visibleMeshes = [fading, opaque, roof, child, parent];
+    pluginState(backend)._shadowMeshes = [opaque, fading, roof, hidden];
+    pluginState(backend)._roofRaster = { signature: 'pending' };
+    pluginState(backend)._sceneOrigin = { lat: 0, x: 0, y: 0 };
     backend._map = { options: { crs: { scale: () => 40075016.68557849 } }, project: point => point };
     const raster = { _tileZoom: 1, header: {}, _rasterTiles: new Map() };
     const meshes = [];
@@ -413,10 +419,10 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
     assert.deepEqual(meshes, [parent, child, opaque, fading]);
     assert.equal(fading._appearance, 0.5);
     assert.equal(roof._appearance, 0);
-    assert.equal(backend.renderer.groundOverlap, true);
-    assert.deepEqual(backend._shadowMeshes, [opaque, fading]);
-    assert.equal(backend._visibleMeshes.length, 0);
-    backend._visibleMeshes.push(fading, roof);
+    assert.equal(pluginState(backend).renderer.groundOverlap, true);
+    assert.deepEqual(pluginState(backend)._shadowMeshes, [opaque, fading]);
+    assert.equal(pluginState(backend)._visibleMeshes.length, 0);
+    pluginState(backend)._visibleMeshes.push(fading, roof);
     meshes.length = 0;
     assert.equal(prepareFrameMeshes(backend, [], 100, meshes), false);
     assert.equal(fading._appearance, 1);
@@ -506,33 +512,33 @@ Then('roof and uniform stages preserve GPU uploads and resource reuse', async fu
     assert.equal(copies.length, 1);
     assert.equal(uploads[0][0], 0.5);
     assert.deepEqual(viewports[0], [0, 0, 256, 256, 0, 1]);
-    const atlas = backend._roofRaster;
+    const atlas = pluginState(backend)._roofRaster;
     updateRoofRaster(backend, 10);
-    assert.equal(backend._roofRaster, atlas);
-    raster._rasterVersion++;
-    raster._loadingTiles = 1;
+    assert.equal(pluginState(backend)._roofRaster, atlas);
+    pluginState(raster)._rasterVersion++;
+    pluginState(raster)._loadingTiles = 1;
     updateRoofRaster(backend, 25);
-    assert.equal(backend._roofRaster, atlas, 'Throttle rebuilding while tiles are loading');
+    assert.equal(pluginState(backend)._roofRaster, atlas, 'Throttle rebuilding while tiles are loading');
     updateRoofRaster(backend, 50);
-    assert.notEqual(backend._roofRaster, atlas);
-    assert.equal(backend._roofRaster.texture, atlas.texture);
+    assert.notEqual(pluginState(backend)._roofRaster, atlas);
+    assert.equal(pluginState(backend)._roofRaster.texture, atlas.texture);
     assert.equal(copies.length, 1, 'Retained images must not be uploaded again');
     assert.equal(pipelines.length, 1);
 
     prepareFrameUniforms(backend, [], [], { direction: [0, 1, 0], altitude: 20, tint: [1, 0.5, 0.25] });
-    const buffer = backend.renderer.uniformBuffer, data = backend.renderer.uniformData;
+    const buffer = pluginState(backend).renderer.uniformBuffer, data = pluginState(backend).renderer.uniformData;
     assert.deepEqual(Array.from(data.slice(0, 16)), identity);
-    assert.deepEqual(Array.from(data.slice(32, 48)), backend._roofRaster.matrix);
+    assert.deepEqual(Array.from(data.slice(32, 48)), pluginState(backend)._roofRaster.matrix);
     assert.deepEqual(Array.from(data.slice(48, 52)), [0, 1, 0, 1]);
     assert.deepEqual(Array.from(data.slice(52, 56)), [0, 1, 0, 0]);
     assert.deepEqual(Array.from(data.slice(56, 60)), [1, 0.5, 0.25, 0]);
     prepareFrameUniforms(backend, [], [], undefined);
-    assert.equal(backend.renderer.uniformBuffer, buffer);
-    assert.equal(backend.renderer.uniformData, data);
-    assert.equal(backend.renderer.uniformSlot, 1);
-    backend._layers.clear();
+    assert.equal(pluginState(backend).renderer.uniformBuffer, buffer);
+    assert.equal(pluginState(backend).renderer.uniformData, data);
+    assert.equal(pluginState(backend).renderer.uniformSlot, 1);
+    pluginState(backend)._layers.clear();
     assert.deepEqual(updateRoofRaster(backend, 100), []);
-    assert.equal(backend._roofRaster, null);
+    assert.equal(pluginState(backend)._roofRaster, null);
     await Promise.resolve();
     assert.equal(destroyed.length, 1);
   } finally {

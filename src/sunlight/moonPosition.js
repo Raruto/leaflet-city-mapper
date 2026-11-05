@@ -1,11 +1,10 @@
-import { solarPosition } from "./solarPosition.js";
+import { solarTime } from './solarTime.js';
 import { horizontalPosition } from "./horizontalPosition.js";
 
 // Low-precision geocentric lunar orbit; no parallax or atmospheric refraction.
 
 export function moonPosition(date, lat, lng) {
-  solarPosition(date, lat, lng);
-  const rad = Math.PI / 180, d = new Date(date).getTime() / 86400000 - 10957.5;
+  const rad = Math.PI / 180, d = solarTime(date, lat, lng) / 86400000 - 10957.5;
   const anomaly = (134.963 + 13.064993 * d) * rad;
   const longitude = (218.316 + 13.176396 * d + 6.289 * Math.sin(anomaly)) * rad;
   const latitude = 5.128 * Math.sin((93.272 + 13.229350 * d) * rad) * rad;

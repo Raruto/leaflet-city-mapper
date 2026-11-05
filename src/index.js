@@ -1,3 +1,4 @@
+import { state as sharedState } from './state.js';
 import './camera/mapCamera.js';
 import { init3D } from './scene/init3D.js';
 import { initNativeGPU } from './core/initNativeGPU.js';
@@ -7,20 +8,33 @@ import { initTerrain } from './terrain/initTerrain.js';
 import './sunlight/initSunlight.js';
 import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
-import { indexState } from './constants/indexState.js';
+
 import { initializeNativeLayer } from './core/initializeNativeLayer.js';
 import { layerLayerAdd } from './scene/layerLayerAdd.js';
 import { layerInitialize } from './scene/layerInitialize.js';
+import { removeLayer } from './core/removeLayer.js';
+import { createLayer } from './scene/createLayer.js';
+import { ready } from './scene/ready.js';
+import { callLayer } from './scene/callLayer.js';
+import { mapGetPitch } from './camera/mapGetPitch.js';
+import { mapGetBearing } from './camera/mapGetBearing.js';
+import { mapSetPitch } from './camera/mapSetPitch.js';
+import { mapSetBearing } from './camera/mapSetBearing.js';
+import { mapResetNorth } from './camera/mapResetNorth.js';
+import { mapResetNorthPitch } from './camera/mapResetNorthPitch.js';
+import { markerSetRotation } from './core/markerSetRotation.js';
+import { layerCallInitHooks } from './core/layerCallInitHooks.js';
+import { getLocation } from './scene/getLocation.js';
 
 /**
- * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
+ * `CityMapper.layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
  * initialize their specialized behavior on first use. Native map layers also join the WebGPU scene.
  */
 
 /**
- * Router for `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`.
- * It initializes the existing instance from the bundled source modules;
- * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
+ * Router for `CityMapper.layer({ source: { type, url, ...settings }, pane, attribution })`.
+ * It initializes a native instance from the bundled source modules;
+ * types receive flat options (`{ ...source, pane, attribution }`); plugin state remains external.
  *
  * Folder layout:
  * - scene/: source routing, lifecycle and graph; initializers live in their domain folders.
@@ -29,7 +43,7 @@ import { layerInitialize } from './scene/layerInitialize.js';
  * - rendering/, shaders/, shadows/ and lighting/: WebGPU drawing and illumination.
  * - geometry/, triangulation/ and collision/: mesh operations and spatial queries.
  * - models/, archives/ and raster/: glTF loading, archive access and raster tiles.
- * - constants/ and state/: exported module-level const and let bindings.
+ * - state.js: the single shared object for constants and module-level state.
  * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
@@ -38,21 +52,8 @@ import { layerInitialize } from './scene/layerInitialize.js';
  * 'pmtiles' and other sources use '3d'.
  */
 
-indexState.layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
-
-// One chain for every pending layer: they become real layers in creation order.
-indexState.loading = Promise.resolve();
-
-indexState.pendingInitializations = [];
-
-indexState.closestMethods = new WeakMap();
-indexState.boundsMethods = new WeakMap();
-indexState.gridInitializers = new WeakMap();
-
-indexState.pendingGridFades = new Map();
-indexState.gridFadeFrame = null;
-
-indexState.pendingRasterLoads = [];
+sharedState.layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
+sharedState.layerCallInitHooks = L.Layer.prototype.callInitHooks;
 
 /**
  * The '3d' layer type: native WebGPU scene synchronized with the map camera.
@@ -109,7 +110,28 @@ indexState.pendingRasterLoads = [];
 
 L.Layer.include({
   _layerAdd: layerLayerAdd,
-  initialize: layerInitialize,
+  callInitHooks: layerCallInitHooks,
 });
 
-L.Layer.addInitHook(initializeNativeLayer);
+sharedState.removeLayer = L.Map.prototype.removeLayer;
+L.Map.include({ removeLayer });
+
+globalThis.CityMapper = {
+  layer: createLayer,
+  ready,
+  getLocation,
+  getPitch: mapGetPitch,
+  getBearing: mapGetBearing,
+  setPitch: mapSetPitch,
+  setBearing: mapSetBearing,
+  resetNorth: mapResetNorth,
+  resetNorthPitch: mapResetNorthPitch,
+  setRotation: markerSetRotation,
+  setData: callLayer.bind(null, 'setData'),
+  getHeader: callLayer.bind(null, 'getHeader'),
+  getZxy: callLayer.bind(null, 'getZxy'),
+  getTileSize: callLayer.bind(null, 'getTileSize'),
+  isLoading: callLayer.bind(null, 'isLoading'),
+  setOpacity: callLayer.bind(null, 'setOpacity'),
+  setZIndex: callLayer.bind(null, 'setZIndex'),
+};

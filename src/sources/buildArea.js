@@ -1,3 +1,4 @@
+import { pluginState } from '../core/pluginState.js';
 import { buildAreaFeature } from './buildAreaFeature.js';
 import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
@@ -7,23 +8,23 @@ import { pump } from './pump.js';
 export async function buildArea(backend, area, map) {
   let feature;
   try {
-    await new Promise(requestAnimationFrame);
-    await map._terrain3D?._terrainPromise;
+    await /* allocation: required -- Give this area build an independent frame-yield promise. */ new Promise(requestAnimationFrame);
+    await pluginState(pluginState(map)._terrain3D)?._terrainPromise;
     if (area.request.signal.aborted) return;
     const data = await loadSource(backend, area);
     if (area.request.signal.aborted) return;
     if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
-      throw new Error('Invalid GeoJSON response');
+      throw /* allocation: required -- Preserve the failure stack for an invalid response. */ new Error('Invalid GeoJSON response');
     }
-    if (backend._geojson && typeof backend.options.style !== 'function') {
-      throw new Error('style must be a function');
+    if (pluginState(backend)._geojson && typeof backend.options.style !== 'function') {
+      throw /* allocation: required -- Preserve the failure stack for an invalid style callback. */ new Error('style must be a function');
     }
     const context = sourceAreaContext(backend, area, map);
     let deadline = performance.now() + 4;
     for (feature of data.features) {
       if (area.request.signal.aborted) return;
       if (performance.now() >= deadline) {
-        await new Promise(requestAnimationFrame);
+        await /* allocation: required -- Give each budget yield its own completion promise. */ new Promise(requestAnimationFrame);
         if (area.request.signal.aborted) return;
         deadline = performance.now() + 4;
       }
@@ -33,10 +34,10 @@ export async function buildArea(backend, area, map) {
   } catch (error) {
     if (!area.request.signal.aborted) {
       area.error = error.message;
-      backend.fire('error', { error });
+      backend.fire('error', /* allocation: required -- Preserve each area failure as an independent event. */ { error });
     }
   } finally {
-    backend._inflight--;
+    pluginState(backend)._inflight--;
     pump(backend, map);
   }
 }

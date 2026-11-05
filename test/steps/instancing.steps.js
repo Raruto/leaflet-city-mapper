@@ -1,3 +1,4 @@
+import { pluginState } from '../../src/core/pluginState.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { instanceAreaGeometry } from '../../src/sources/instanceAreaGeometry.js';
@@ -72,7 +73,7 @@ Then('source instancing preserves vertex data and falls back for incompatible fe
 Then('instanced sources preserve rendered pixels, shadows, picking and resource lifetime', { timeout: 60000 }, async function () {
   await this.page.goto(this.baseUrl);
   const result = await this.page.evaluate(async () => {
-    globalThis.cityMapperTestState = { nextId: 0 };
+    const { pluginState } = await import('/src/core/pluginState.js');
     const { attachAreaMesh } = await import('/src/sources/attachAreaMesh.js');
     const { emptyNode } = await import('/src/scene/emptyNode.js');
     const { updateWorldMatrix } = await import('/src/scene/updateWorldMatrix.js');
@@ -118,6 +119,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
           context: { getCurrentTexture: () => color },
           depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT }) },
       };
+      backend._shared = backend;
       bindSunlight(backend);
       return backend;
     };
@@ -147,17 +149,17 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
     const capture = async (owner, mesh, shadow = false) => {
       const meshes = Array.isArray(mesh) ? mesh : [mesh];
       prepareFrameUniforms(owner, meshes, shadow ? meshes : [], undefined);
-      const gpu = owner.renderer.device;
+      const gpu = pluginState(owner).renderer.device;
       const encoder = gpu.createCommandEncoder();
       if (shadow) {
-        ensureShadowPipeline(gpu, owner.renderer.sunlight);
-        ensureShadowPipeline(gpu, owner.renderer.sunlight, true);
+        ensureShadowPipeline(gpu, pluginState(owner).renderer.sunlight);
+        ensureShadowPipeline(gpu, pluginState(owner).renderer.sunlight, true);
         drawShadowMeshes(owner, encoder, meshes);
       } else drawSceneMeshes(owner, encoder, meshes);
-      gpu.queue.writeBuffer(owner.renderer.uniformBuffer, 0, owner.renderer.uniformData);
+      gpu.queue.writeBuffer(pluginState(owner).renderer.uniformBuffer, 0, pluginState(owner).renderer.uniformData);
       const readback = gpu.createBuffer({ size: 64 * 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
       encoder.copyTextureToBuffer({
-        texture: shadow ? owner.renderer.sunlight.texture : owner.renderer.context.getCurrentTexture(),
+        texture: shadow ? pluginState(owner).renderer.sunlight.texture : pluginState(owner).renderer.context.getCurrentTexture(),
         ...(shadow ? { aspect: 'depth-only' } : {}),
       }, { buffer: readback, bytesPerRow: 256 }, [64, 64]);
       gpu.queue.submit([encoder.finish()]);
@@ -190,7 +192,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
         const destroy = buffer.destroy.bind(buffer);
         buffer.destroy = () => { destroyed.add(buffer); destroy(); };
       }
-      restoreObject(other, other, compact);
+      restoreObject(compact, other);
       const restored = await capture(other, compact);
       const restoredCount = compact.geometry.attributes.instanceOffset.count;
       const releasedBuffers = Object.values(compact.geometry.attributes).map(attribute => attribute.buffer);
@@ -203,7 +205,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
       return {
         original, instanced, originalShadow, instancedShadow, mixed, mixedShadow, highlight, referenceHighlight, restored,
         hitFaces, bounds, transformedFace: transformedHit?.faceIndex, transformedPoint: transformedHit?.point,
-        restoredCount, detached: compact.parent === null, highlightCleared: backend.highlightedFeature === null,
+        restoredCount, detached: compact.parent === null, highlightCleared: pluginState(backend).highlightedFeature === null,
         oldDestroyed: oldBuffers.every(buffer => destroyed.has(buffer)),
         releasedDestroyed: releasedBuffers.every(buffer => destroyed.has(buffer)), errors,
       };

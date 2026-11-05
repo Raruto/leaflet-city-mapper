@@ -1,8 +1,9 @@
-import { mapCameraState } from '../constants/mapCameraState.js';
+import { state as sharedState } from '../state.js';
+
 import { runMarkerPanFrame } from './runMarkerPanFrame.js';
 
 export function scheduleMarkerPan(drag, event) {
-  mapCameraState.pendingMarkerPan.set(drag, event);
-  if (mapCameraState.markerPanFrame === null) mapCameraState.markerPanFrame = requestAnimationFrame(runMarkerPanFrame);
-  drag._panRequest = mapCameraState.markerPanFrame;
+  sharedState.pendingMarkerPan.set(drag, event);
+  if (sharedState.markerPanFrame === null) sharedState.markerPanFrame = requestAnimationFrame(runMarkerPanFrame);
+  drag._panRequest = sharedState.markerPanFrame;
 }

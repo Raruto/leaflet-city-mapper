@@ -1,4 +1,5 @@
-import { cameraControlsState } from '../constants/cameraControlsState.js';
+import { state as sharedState } from '../state.js';
+
 import { cameraDragDown } from './cameraDragDown.js';
 import { cameraDragMove } from './cameraDragMove.js';
 import { cameraDragEnd } from './cameraDragEnd.js';
@@ -6,10 +7,10 @@ import { cameraDragClick } from './cameraDragClick.js';
 import { cameraDragContextMenu } from './cameraDragContextMenu.js';
 import { endAllCameraDrags } from './endAllCameraDrags.js';
 
-export function dragCamera(map, element, accept, sensitivity = [0.8, 0.5], orbit = false) {
-  const state = { map, element, accept, sensitivity, orbit, drag: null, moved: false };
-  cameraControlsState.dragStates.set(element, state);
-  cameraControlsState.cameraDrags.add(state);
+export function dragCamera(map, element, accept, sensitivity = sharedState.allocationCameraDragSensitivity, orbit = false) {
+  const state = /* allocation: required -- Each draggable element retains independent pointer and lifecycle state. */ { map, element, accept, sensitivity, orbit, drag: null, moved: false };
+  sharedState.dragStates.set(element, state);
+  sharedState.cameraDrags.add(state);
   element.addEventListener('pointerdown', cameraDragDown, true);
   element.addEventListener('pointermove', cameraDragMove);
   element.addEventListener('pointerup', cameraDragEnd);

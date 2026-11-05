@@ -1,3 +1,5 @@
+import { pluginState } from '../../src/core/pluginState.js';
+import { state as sharedState } from '../../src/state.js';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
@@ -15,9 +17,12 @@ import { setParent } from '../../src/scene/setParent.js';
 import { traverse } from '../../src/scene/traverse.js';
 import { decodeDirectory } from '../../src/archives/decodeDirectory.js';
 import { getZxy } from '../../src/archives/getZxy.js';
+import { loadSource } from '../../src/archives/loadSource.js';
+import { read as readArchive } from '../../src/archives/read.js';
 import { decodeHeader } from '../../src/archives/decodeHeader.js';
 import { decompress } from '../../src/archives/decompress.js';
 import { tileId } from '../../src/archives/tileId.js';
+import { varint } from '../../src/archives/varint.js';
 import { decodeModel } from '../../src/models/decodeModel.js';
 import { loadModel } from '../../src/models/loadModel.js';
 import { readAccessor } from '../../src/models/readAccessor.js';
@@ -40,7 +45,36 @@ import { horizontalRay } from '../../src/collision/horizontalRay.js';
 import { materialShaders } from '../../src/shaders/materialShaders.js';
 import { sortMeshes } from '../../src/rendering/sortMeshes.js';
 import { projectCelestialBody } from '../../src/sunlight/projectCelestialBody.js';
+import { atmosphere } from '../../src/sunlight/atmosphere.js';
+import { mix } from '../../src/sunlight/mix.js';
+import { rgb } from '../../src/sunlight/rgb.js';
+import { updateSky } from '../../src/sunlight/updateSky.js';
+import { updateSun } from '../../src/sunlight/updateSun.js';
+import { useSelectedTime } from '../../src/sunlight/useSelectedTime.js';
+import { useLiveTime } from '../../src/sunlight/useLiveTime.js';
+import { removeSun } from '../../src/sunlight/removeSun.js';
+import { styleTimeControl } from '../../src/sunlight/styleTimeControl.js';
 import { roofCoverage } from '../../src/geometry/roofCoverage.js';
+import { box } from '../../src/geometry/box.js';
+import { build } from '../../src/geometry/build.js';
+import { clipLine } from '../../src/geometry/clipLine.js';
+import { clipSegment } from '../../src/geometry/clipSegment.js';
+import { cross } from '../../src/geometry/cross.js';
+import { sub } from '../../src/geometry/sub.js';
+import { below } from '../../src/geometry/below.js';
+import { materialFor } from '../../src/models/materialFor.js';
+import { loadBuffer } from '../../src/models/loadBuffer.js';
+import { loadImage } from '../../src/models/loadImage.js';
+import { carModel } from '../../src/vehicles/carModel.js';
+import { boatModel } from '../../src/vehicles/boatModel.js';
+import { bicycleModel } from '../../src/vehicles/bicycleModel.js';
+import { pedestrianModel } from '../../src/vehicles/pedestrianModel.js';
+import { busModel } from '../../src/vehicles/busModel.js';
+import { tramModel } from '../../src/vehicles/tramModel.js';
+import { metroModel } from '../../src/vehicles/metroModel.js';
+import { sortHits } from '../../src/collision/sortHits.js';
+import { addBridges } from '../../src/geometry/addBridges.js';
+import { quad } from '../../src/geometry/quad.js';
 
 const checks = {
   'roof-coverage'() {
@@ -54,18 +88,18 @@ const checks = {
     const layer = { _tileZoom: 1, header: {}, _rasterTiles: new Map() };
     assert.equal(roofCoverage(mesh, backend, [layer]), false);
     for (const [x, y] of [[0, 0], [1, 0], [0, 1]]) {
-      layer._rasterTiles.set(`${x}/${y}`, { coords: { x, y, z: 1 }, done: true });
+      pluginState(layer)._rasterTiles.set(`${x}/${y}`, { coords: { x, y, z: 1 }, done: true });
     }
     assert.equal(roofCoverage(mesh, backend, [layer]), false);
-    layer._rasterTiles.set('1/1', { coords: { x: 1, y: 1, z: 1 }, done: true });
+    pluginState(layer)._rasterTiles.set('1/1', { coords: { x: 1, y: 1, z: 1 }, done: true });
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    layer._rasterTiles = new Map([['parent', { coords: { x: 0, y: 0, z: 0 }, done: true }]]);
+    pluginState(layer)._rasterTiles = new Map([['parent', { coords: { x: 0, y: 0, z: 0 }, done: true }]]);
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    layer._rasterTiles.clear();
-    layer.header = { minLon: 400, maxLon: 500, maxLat: 400, minLat: 500 };
+    pluginState(layer)._rasterTiles.clear();
+    pluginState(layer).header = { minLon: 400, maxLon: 500, maxLat: 400, minLat: 500 };
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    layer.header = { minLon: 0, maxLon: 100, maxLat: 0, minLat: 100 };
-    layer._rasterTiles.set('error', { coords: { x: 0, y: 0, z: 1 }, error: 'Reported tile error' });
+    pluginState(layer).header = { minLon: 0, maxLon: 100, maxLat: 0, minLat: 100 };
+    pluginState(layer)._rasterTiles.set('error', { coords: { x: 0, y: 0, z: 1 }, error: 'Reported tile error' });
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
   },
 
@@ -122,6 +156,15 @@ const checks = {
     setVertexColor(mesh, 1, 2, parseColor(0xff0000));
     assert.deepEqual([...geometry.attributes.color.data], [0, 0, 0, 1, 0, 0]);
     assert.equal(geometry.attributes.color.needsUpdate, true);
+    const uploads = [], innerUploads = [];
+    const innerMesh = { geometry: { attributes: { color: { data: { set: rgb => innerUploads.push([...rgb]) } } } } };
+    const outerMesh = { geometry: { attributes: { color: { data: { set(rgb) {
+      setVertexColor(innerMesh, 0, 1, { r: 0, g: 1, b: 0 });
+      uploads.push([...rgb]);
+    } } } } } };
+    setVertexColor(outerMesh, 0, 2, { r: 1, g: 0, b: 0 });
+    assert.deepEqual(uploads, [[1, 0, 0], [1, 0, 0]], 'Reentrant color uploads cannot overwrite outer scratch');
+    assert.deepEqual(innerUploads, [[0, 1, 0], [0, 1, 0]]);
     const point = { x: 0, y: 0, ground: 0 }, emitted = [];
     const add = (...triangle) => emitted.push(triangle);
     treeGeometry(point, { top: 10, trunkRadius: 0.2, crownRadius: 2, crownBottom: 3 }, add);
@@ -129,6 +172,112 @@ const checks = {
     lampPostGeometry(point, { top: 5, poleRadius: 0.1 }, add);
     assert.ok(emitted.length > 100);
     assert.ok(emitted.every(triangle => Object.values(triangle.at(-1)).every(Number.isFinite)));
+    const savedTriangles = structuredClone(triangles);
+    triangulate(outer);
+    assert.deepEqual(triangles, savedTriangles, 'Later triangulations cannot mutate retained topology');
+    const bounds = structuredClone(geometry.bounds), savedBounds = geometry.bounds;
+    geometry.attributes.position.data[0] = -10;
+    computeBounds(geometry);
+    assert.deepEqual(savedBounds, bounds, 'Recomputed bounds cannot overwrite retained snapshots');
+
+    const footprint = box(-1, 1, -2, 2), otherFootprint = box(-1, 1, -2, 2);
+    otherFootprint[0][0] = 100;
+    assert.deepEqual(footprint[0], [-1, -2]);
+    const parts = [[footprint, 0, 3, [0.2, 0.4, 0.6]]];
+    const built = build(parts), savedBuild = structuredClone(built);
+    build([[otherFootprint, 1, 4, [1, 0, 0]]]);
+    assert.deepEqual(built, savedBuild);
+    assert.equal(built.position.length, 108);
+    assert.ok(built.normal.every(Number.isFinite));
+    for (const helper of [cross, sub]) {
+      const first = helper([1, 2, 3], [3, 2, 1]), before = [...first];
+      helper([0, 1, 0], [1, 0, 0])[0] = 99;
+      assert.deepEqual(first, before, 'Vector helpers return independently owned results');
+    }
+    assert.deepEqual(below([1, 4, 3]), [1, 2.8, 3]);
+    const vectorQuad = [], scalarQuad = [];
+    quad((...triangle) => vectorQuad.push(triangle), {}, point, point, point, point, 5, [0, 1, 0]);
+    quad((...triangle) => scalarQuad.push(triangle), {}, point, point, point, point, 5, 0, 1, 0);
+    assert.deepEqual(scalarQuad, vectorQuad, 'Scalar emitter normals preserve the existing vector-normal quad API');
+    const bounds2D = [0, 0, 10, 10], a = [-1, 5], b = [11, 5];
+    const clipped = clipSegment(a, b, bounds2D);
+    assert.deepEqual(clipped, [[0, 5], [10, 5]]);
+    clipSegment(a, b, bounds2D)[0][0] = 99;
+    assert.deepEqual(clipped, [[0, 5], [10, 5]]);
+    assert.deepEqual([a, b], [[-1, 5], [11, 5]]);
+    assert.equal(clipSegment([-1, 0], [-1, 10], bounds2D), null);
+    assert.equal(clipSegment([0, 0], [0, 0], bounds2D), null);
+    assert.deepEqual(clipLine([[-1, 5], [5, 5], [11, 5], [11, 20], [5, 5]], bounds2D),
+      [[[0, 5], [5, 5], [10, 5]], [[7, 10], [5, 5]]]);
+
+    for (const [emit, style] of [
+      [treeGeometry, { top: 10, trunkRadius: 0.2, crownRadius: 2, crownBottom: 3 }],
+      [lightGeometry, { top: 5, lightRadius: 10, color: 0xffffff }],
+      [lampPostGeometry, { top: 5, poleRadius: 0.1 }],
+    ]) {
+      const baseline = [], reentrant = [], nested = [];
+      emit(point, style, (...triangle) => baseline.push(triangle));
+      emit(point, style, (...triangle) => {
+        if (!reentrant.length) emit({ x: 100, y: 200, ground: 50 }, style, (...inner) => nested.push(inner));
+        reentrant.push(triangle);
+      });
+      assert.deepEqual(reentrant, baseline, 'Nested geometry callbacks cannot overwrite outer vertices');
+      const snapshot = structuredClone(reentrant);
+      emit({ x: -100, y: -200, ground: -50 }, style, (...inner) => nested.push(inner));
+      assert.deepEqual(reentrant, snapshot, 'Retained triangle vertices and UVs survive later geometry calls');
+    }
+    for (const make of [carModel, boatModel, bicycleModel, pedestrianModel, busModel, tramModel, metroModel]) {
+      const first = make(0, {}), snapshot = structuredClone(first), other = make(1, {});
+      other[make === pedestrianModel ? 1 : 0][1] = -999;
+      assert.deepEqual(first, snapshot, 'Vehicle part descriptors must not alias later models');
+      const firstMesh = build(first), before = structuredClone(firstMesh);
+      build(other);
+      assert.deepEqual(firstMesh, before, 'Built vehicle buffers remain independent');
+      assert.ok(firstMesh.position.every(Number.isFinite));
+      assert.ok(firstMesh.normal.every(Number.isFinite));
+    }
+    const globals = new Map(['L', 'GPUBufferUsage', 'GPUShaderStage'].map(name =>
+      [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+    try {
+      globalThis.L = { LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } };
+      globalThis.GPUBufferUsage = { VERTEX: 1, COPY_DST: 2 };
+      globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
+      const makeBackend = () => ({
+        options: {}, location: { lat: 0, lng: 0 }, root: { ...emptyNode(), position: [0, 5, 0] }, _terrainZoom: 0,
+        _map: { options: { crs: { project: point => ({ x: point.lng, y: point.lat }) } },
+          project: ([lat, lng]) => ({ x: lng, y: lat }) },
+        renderer: { sunlight: { layout: {} }, device: {
+          createBuffer: descriptor => ({ ...descriptor }), queue: { writeBuffer() {} },
+          createShaderModule: () => ({ getCompilationInfo: async () => ({ messages: [] }) }),
+          createBindGroupLayout: () => ({}), createPipelineLayout: () => ({}),
+        } },
+      });
+      const bridgeBackend = makeBackend(), secondBackend = makeBackend();
+      const bridgeSource = { features: [{ geometry: { type: 'Polygon', coordinates: [
+        [[0, 0, 20], [10, 0, 20], [10, 10, 20], [0, 10, 20], [0, 0, 20]],
+      ] } }] };
+      addBridges(bridgeBackend, bridgeSource);
+      const bridgeState = pluginState(bridgeBackend), attributes = bridgeState._bridgeMesh.geometry.attributes;
+      assert.equal(attributes.position.data.length, 108);
+      assert.equal(bridgeElevation({ x: 5, y: 5 }, bridgeState._bridges), 20);
+      const savedPositions = attributes.position.data.slice(), savedBridge = structuredClone(bridgeState._bridges);
+      addBridges(secondBackend, bridgeSource);
+      assert.deepEqual(attributes.position.data, savedPositions, 'Other backends cannot overwrite bridge mesh buffers');
+      assert.deepEqual(bridgeState._bridges, savedBridge, 'Other backends cannot overwrite bridge terrain records');
+      assert.notEqual(pluginState(secondBackend)._bridges.get('0/0')[0], bridgeState._bridges.get('0/0')[0]);
+      for (let i = 0; i < attributes.position.data.length; i += 9) {
+        const p = attributes.position.data.slice(i, i + 3), q = attributes.position.data.slice(i + 3, i + 6);
+        const r = attributes.position.data.slice(i + 6, i + 9), n = cross(sub(q, p), sub(r, p));
+        const normal = attributes.normal.data.slice(i, i + 3);
+        assert.ok(n.reduce((dot, value, axis) => dot + value * normal[axis], 0) > 0,
+          'Bridge top, underside and walls retain winding consistent with their normals');
+      }
+    } finally {
+      for (const [name, descriptor] of globals) {
+        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+        else delete globalThis[name];
+      }
+    }
   },
 
   graph() {
@@ -150,8 +299,19 @@ const checks = {
   async archives() {
     assert.deepEqual([[0, 0], [0, 1], [1, 1], [1, 0]].map(([x, y]) => tileId(1, x, y)), [1, 2, 3, 4]);
     assert.throws(() => tileId(1, 2, 0), /Invalid PMTiles tile coordinates/);
+    for (const [encoded, expected] of [[[0], 0], [[127], 127], [[128, 1], 128], [[255, 255, 255, 255, 255, 255, 255, 15], Number.MAX_SAFE_INTEGER]]) {
+      const reader = { bytes: Uint8Array.from(encoded), cursor: 0 };
+      assert.equal(varint(reader), expected);
+      assert.equal(reader.cursor, encoded.length);
+    }
+    for (const encoded of [[128], [255, 255, 255, 255, 255, 255, 255, 16], [128, 128, 128, 128, 128, 128, 128, 128]]) {
+      assert.throws(() => varint({ bytes: Uint8Array.from(encoded), cursor: 0 }), /Truncated PMTiles directory|Invalid PMTiles directory integer/);
+    }
     const bytes = Uint8Array.from([2, 1, 3, 1, 1, 2, 3, 1, 0]);
     const firstDirectory = decodeDirectory(bytes.buffer);
+    const reusedReader = sharedState.directoryReader;
+    assert.equal(reusedReader.bytes, null, 'Shared reader must release successful inputs');
+    assert.equal(reusedReader.cursor, 0);
     assert.deepEqual(firstDirectory, [
       { tileId: 1, runLength: 1, length: 2, offset: 0 },
       { tileId: 4, runLength: 1, length: 3, offset: 2 },
@@ -166,6 +326,8 @@ const checks = {
       [[1, 0, 1, 1, 128], /Truncated PMTiles directory/],
     ]) {
       assert.throws(() => decodeDirectory(Uint8Array.from(invalid).buffer), message);
+      assert.equal(reusedReader.bytes, null, 'Shared reader must release malformed inputs');
+      assert.equal(reusedReader.cursor, 0);
       assert.deepEqual(decodeDirectory(bytes.buffer), firstDirectory);
     }
     assert.deepEqual(decodeDirectory(Uint8Array.of(0).buffer), []);
@@ -174,6 +336,13 @@ const checks = {
       { tileId: 4, runLength: 1, length: 3, offset: 2 },
     ], 'Later calls must not mutate previous directories');
     assert.notEqual(decodeDirectory(bytes.buffer), firstDirectory);
+    const secondDirectory = decodeDirectory(bytes.buffer);
+    assert.equal(sharedState.directoryReader, reusedReader, 'Synchronous decodes must reuse the reader');
+    assert.notEqual(secondDirectory[0], secondDirectory[1]);
+    assert.notEqual(secondDirectory[0], firstDirectory[0]);
+    secondDirectory[0].length = 99;
+    assert.equal(firstDirectory[0].length, 2, 'Directory entries must not alias earlier results');
+    assert.equal(secondDirectory[1].length, 3, 'Entries in one directory must not alias each other');
     const data = new ArrayBuffer(127), view = new DataView(data);
     new Uint8Array(data).set(new TextEncoder().encode('PMTiles'));
     view.setUint8(7, 3);
@@ -207,10 +376,25 @@ const checks = {
     headerView.setInt32(119, 23456789, true);
     headerView.setInt32(123, 487654321, true);
     Object.assign(expectedHeader, { centerZoom: 12, centerLon: 2.3456789, centerLat: 48.7654321 });
-    assert.deepEqual(decodeHeader(headerData), expectedHeader);
+    const firstHeader = decodeHeader(headerData);
+    assert.deepEqual(firstHeader, expectedHeader);
     assert.deepEqual(decodeHeader(headerData), expectedHeader, 'Repeated calls must reset all reused counters');
+    const otherHeader = decodeHeader(data);
+    assert.notEqual(otherHeader, firstHeader, 'Archives must own independent headers');
+    assert.equal(otherHeader.rootDirectoryOffset, 127);
+    otherHeader.minZoom = 99;
+    assert.deepEqual(firstHeader, expectedHeader, 'Decoding and mutating another archive must not change earlier results');
+    for (let i = 0; i < 8; i++) {
+      const invalid = headerData.slice(0);
+      new Uint8Array(invalid)[i] ^= 0xff;
+      assert.throws(() => decodeHeader(invalid), /Expected a PMTiles v3 archive/);
+    }
+    assert.deepEqual(decodeHeader(headerData), expectedHeader, 'Invalid signatures must not poison later decodes');
     assert.equal(await decompress(data, 1), data);
     assert.equal(new TextDecoder().decode(await decompress(gzipSync('utility'), 2)), 'utility');
+    const inflated = await Promise.all(['first', 'second'].map(text => decompress(gzipSync(text), 2)));
+    assert.deepEqual(inflated.map(buffer => new TextDecoder().decode(buffer)), ['first', 'second']);
+    await assert.rejects(decompress(Uint8Array.of(0).buffer, 2));
     await assert.rejects(decompress(data, 3), /Unsupported PMTiles compression/);
     const archive = {
       options: {}, _directories: new Map(),
@@ -221,20 +405,117 @@ const checks = {
       url: `data:application/octet-stream;base64,${Buffer.from([128, 128, 128, 128, 128, 42]).toString('base64')}`,
     };
     await assert.rejects(getZxy(archive, 0, 0, 0), /Truncated PMTiles directory/);
-    assert.equal(archive._directories.size, 0, 'Failed directory reads must be retryable');
-    archive.url = `data:application/octet-stream;base64,${Buffer.from([1, 0, 1, 1, 1, 42]).toString('base64')}`;
+    assert.equal(pluginState(archive)._directories.size, 0, 'Failed directory reads must be retryable');
+    pluginState(archive).url = `data:application/octet-stream;base64,${Buffer.from([1, 0, 1, 1, 1, 42]).toString('base64')}`;
     const tiles = await Promise.all([getZxy(archive, 0, 0, 0), getZxy(archive, 0, 0, 0)]);
     for (const tile of tiles) assert.deepEqual([...new Uint8Array(tile.data)], [42]);
-    assert.equal(archive._directories.size, 1, 'Concurrent reads must share the directory cache');
+    assert.notEqual(tiles[0], tiles[1]);
+    assert.notEqual(tiles[0].data, tiles[1].data);
+    assert.equal(pluginState(archive)._directories.size, 1, 'Concurrent reads must share the directory cache');
     let rejectDirectory;
-    archive._directories.set('0:5', new Promise((resolve, reject) => { rejectDirectory = reject; }));
+    pluginState(archive)._directories.set('0:5', new Promise((resolve, reject) => { rejectDirectory = reject; }));
     const pending = getZxy(archive, 0, 0, 0);
     await Promise.resolve();
     const replacement = Promise.resolve([{ tileId: 0, runLength: 1, length: 1, offset: 0 }]);
-    archive._directories.set('0:5', replacement);
+    pluginState(archive)._directories.set('0:5', replacement);
     rejectDirectory(new Error('Evicted directory failed'));
     await assert.rejects(pending, /Evicted directory failed/);
-    assert.equal(archive._directories.get('0:5'), replacement, 'An evicted request must not delete its replacement');
+    assert.equal(pluginState(archive)._directories.get('0:5'), replacement, 'An evicted request must not delete its replacement');
+    for (const cycle of [0, 1, 2, null]) {
+      const traversal = {
+        options: {},
+        _header: Promise.resolve({
+          minZoom: 0, maxZoom: 0, rootDirectoryOffset: 0, rootDirectoryLength: 1,
+          leafDirectoryOffset: 0, leafDirectoryLength: 10,
+        }),
+        _directories: new Map(),
+      };
+      for (let depth = 0; depth < 4; depth++) {
+        traversal._directories.set(`${depth}:1`, Promise.resolve([{
+          tileId: 0, runLength: 0, length: 1,
+          offset: depth === 2 && cycle !== null ? cycle : depth + 1,
+        }]));
+      }
+      await assert.rejects(getZxy(traversal, 0, 0, 0),
+        cycle === null ? /depth exceeds four levels/ : /Cyclic PMTiles directory/);
+    }
+    const emptyArchive = { options: {}, _header: Promise.resolve({ minZoom: 1, maxZoom: 1 }) };
+    const area = { coords: { z: 0, x: 0, y: 0 }, request: new AbortController() };
+    const emptySources = await Promise.all([loadSource(emptyArchive, area), loadSource(emptyArchive, area)]);
+    assert.deepEqual(emptySources[0], { type: 'FeatureCollection', features: [] });
+    assert.notEqual(emptySources[0], emptySources[1]);
+    assert.notEqual(emptySources[0].features, emptySources[1].features);
+    emptySources[0].features.push({ type: 'Feature' });
+    assert.deepEqual(emptySources[1].features, [], 'Empty source results must not share feature arrays');
+    assert.equal(await loadSource({ _geojson: true, options: { data: emptySources[1] } }, area), emptySources[1]);
+  },
+
+  async 'archive-requests'() {
+    const originalFetch = globalThis.fetch;
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const requests = [];
+    try {
+      globalThis.document = { baseURI: 'https://example.test/' };
+      globalThis.fetch = async (url, options) => {
+        await Promise.resolve();
+        requests.push({ url: String(url), options });
+        options.signal?.throwIfAborted();
+        return new Response(JSON.stringify({ type: 'FeatureCollection', features: [], url: String(url) }));
+      };
+      const areas = [new AbortController(), new AbortController()].map(request => ({ request }));
+      const sources = ['first.json', 'second.json'].map(url => ({ _geojson: true, options: { url } }));
+      const loaded = await Promise.all(sources.map((source, i) => loadSource(source, areas[i])));
+      assert.deepEqual(loaded.map(source => source.url), ['https://example.test/first.json', 'https://example.test/second.json']);
+      assert.notEqual(requests[0].options, requests[1].options);
+      assert.equal(requests[0].options.signal, areas[0].request.signal);
+      assert.equal(requests[1].options.signal, areas[1].request.signal);
+      await assert.rejects(loadSource({ _geojson: true, options: {} }, areas[0]), /requires either data or url/);
+      await assert.rejects(loadSource({ _geojson: true, options: { data: {}, url: 'both.json' } }, areas[0]), /requires either data or url/);
+      globalThis.fetch = async () => new Response('', { status: 404 });
+      await assert.rejects(loadSource(sources[0], areas[0]), /Unable to load GeoJSON: HTTP 404/);
+      await assert.rejects(readArchive({ url: 'missing' }, 0, 1), /Unable to read PMTiles: HTTP 404/);
+      requests.length = 0;
+      globalThis.fetch = async (url, options) => {
+        await Promise.resolve();
+        requests.push({ url, options });
+        options.signal?.throwIfAborted();
+        const range = options.headers.Range.slice(6);
+        const [start, end] = range.split('-').map(Number);
+        return new Response(Uint8Array.from({ length: end - start + 1 }, (_, i) => start + i), {
+          status: 206, headers: { 'Content-Range': `bytes ${range}/127`, ETag: '"stable"' },
+        });
+      };
+      const backend = { url: 'https://example.test/archive.pmtiles' };
+      const ranges = await Promise.all([
+        readArchive(backend, 0, 2, areas[0].request.signal),
+        readArchive(backend, 4, 3, areas[1].request.signal),
+      ]);
+      assert.deepEqual(ranges.map(buffer => [...new Uint8Array(buffer)]), [[0, 1], [4, 5, 6]]);
+      assert.notEqual(requests[0].options, requests[1].options);
+      assert.notEqual(requests[0].options.headers, requests[1].options.headers);
+      assert.equal(requests[0].options.signal, areas[0].request.signal);
+      assert.equal(requests[1].options.signal, areas[1].request.signal);
+      areas[0].request.abort();
+      await assert.rejects(readArchive(backend, 0, 1, areas[0].request.signal), { name: 'AbortError' });
+      for (const [offset, length] of [[-1, 1], [0, 0], [0.5, 1], [Number.MAX_SAFE_INTEGER, 1]]) {
+        await assert.rejects(readArchive(backend, offset, length), /Invalid PMTiles byte range/);
+      }
+      globalThis.fetch = async () => new Response(Uint8Array.of(1), {
+        status: 206, headers: { 'Content-Range': 'bytes 0-0/127', ETag: '"changed"' },
+      });
+      await assert.rejects(readArchive(backend, 0, 1), /archive changed/);
+      delete backend._etag;
+      await assert.rejects(readArchive(backend, 1, 1), /Invalid PMTiles range response/);
+      globalThis.fetch = async () => new Response(Uint8Array.of(1), {
+        status: 206, headers: { 'Content-Range': 'bytes 0-1/127' },
+      });
+      delete backend._etag;
+      await assert.rejects(readArchive(backend, 0, 2), /Truncated PMTiles range/);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+      else delete globalThis.document;
+    }
   },
 
   async models() {
@@ -248,6 +529,25 @@ const checks = {
       accessors: [{ bufferView: 0, componentType: 5126, count: 2, type: 'VEC2' }],
     };
     assert.deepEqual([...readAccessor(model, 0).data], [1, 2, 3, 4]);
+    const retainedAccessor = readAccessor(model, 0);
+    readAccessor(model, 0).data[0] = 99;
+    assert.deepEqual([...retainedAccessor.data], [1, 2, 3, 4], 'Accessor results own their decoded buffers');
+    for (const [componentType, Type, values] of [
+      [5120, Int8Array, [-128, 127]], [5121, Uint8Array, [0, 255]],
+      [5122, Int16Array, [-32768, 32767]], [5123, Uint16Array, [0, 65535]],
+      [5125, Uint32Array, [0, 4294967295]], [5126, Float32Array, [1.5, -2.25]],
+    ]) {
+      const buffer = new ArrayBuffer(2 + 2 * Type.BYTES_PER_ELEMENT), view = new DataView(buffer);
+      const setter = Type === Int8Array ? 'setInt8' : Type === Uint8Array ? 'setUint8' :
+        Type === Int16Array ? 'setInt16' : Type === Uint16Array ? 'setUint16' :
+          Type === Uint32Array ? 'setUint32' : 'setFloat32';
+      for (let i = 0; i < values.length; i++) view[setter](2 + i * Type.BYTES_PER_ELEMENT, values[i], true);
+      const accessor = readAccessor({
+        buffers: [{ binary: buffer }], bufferViews: [{ buffer: 0, byteLength: buffer.byteLength }],
+        accessors: [{ bufferView: 0, byteOffset: 2, componentType, count: 2, type: 'SCALAR' }],
+      }, 0);
+      assert.deepEqual([...accessor.data], [...Float32Array.from(values)], 'Accessor reads must handle every component type and unaligned byte offsets');
+    }
     model.bufferViews[0].byteLength = 12;
     assert.throws(() => readAccessor(model, 0), /outside buffer view/);
     const sparse = {
@@ -260,6 +560,17 @@ const checks = {
     const matrix = nodeMatrix({ translation: [2, 3, 4], scale: [2, 3, 4] });
     assert.deepEqual([matrix[0], matrix[5], matrix[10], ...matrix.slice(12)], [2, 3, 4, 2, 3, 4, 1]);
     assert.deepEqual([...vertexNormals([0, 0, 0, 1, 0, 0, 0, 1, 0])], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    const identity = nodeMatrix({});
+    nodeMatrix({})[0] = 99;
+    assert.deepEqual(identity, emptyNode().worldMatrix, 'Default node transforms remain independent');
+    const normals = vertexNormals([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, 2]);
+    vertexNormals([0, 0, 0, 0, 0, 0, 0, 0, 0])[0] = 99;
+    assert.deepEqual([...normals], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    const styleContext = { backend: { options: {} } }, style = materialFor(styleContext, {});
+    materialFor(styleContext, {}).color[0] = 99;
+    materialFor(styleContext, {}).emissive[0] = 99;
+    assert.deepEqual(style.color, [1, 1, 1]);
+    assert.deepEqual(style.emissive, [0, 0, 0]);
     assert.deepEqual(textureSampler({ wrapS: 33071, wrapT: 33648, magFilter: 9728, minFilter: 9986 }),
       { addressModeU: 'clamp-to-edge', addressModeV: 'mirror-repeat', magFilter: 'nearest', minFilter: 'nearest' });
     const originalFetch = globalThis.fetch;
@@ -274,14 +585,39 @@ const checks = {
         asset: { version: '2.0' }, scenes: [{ nodes: [0] }], nodes: [{}],
       }));
       await loadModel(backend);
-      assert.equal(backend.model.id, 'https://example.test/model.gltf');
-      assert.equal(backend.model.parent, root);
-      assert.equal(root.children[0], backend.model);
-      assert.equal(backend.model.children.length, 1);
+      assert.equal(pluginState(backend).model.id, 'https://example.test/model.gltf');
+      assert.equal(pluginState(backend).model.parent, root);
+      assert.equal(root.children[0], pluginState(backend).model);
+      assert.equal(pluginState(backend).model.children.length, 1);
+      const another = { _added: { promise: Promise.resolve() }, modelUrl: 'other.gltf', root: emptyNode(), options: {} };
+      await Promise.all([loadModel(backend), loadModel(another)]);
+      assert.notEqual(pluginState(backend).model, pluginState(another).model);
+      assert.notEqual(pluginState(backend).model.extras, pluginState(another).model.extras);
+      assert.notEqual(pluginState(backend).model.children[0].matrix, pluginState(another).model.children[0].matrix);
+      globalThis.fetch = async url => new Response(Uint8Array.of(url.endsWith('first.bin') ? 1 : 2));
+      const buffers = [{ uri: 'first.bin' }, { uri: 'second.bin' }];
+      await Promise.all(buffers.map(buffer => loadBuffer(buffer, 'https://example.test/')));
+      assert.deepEqual(buffers.map(buffer => [...new Uint8Array(buffer.binary)]), [[1], [2]]);
     } finally {
       globalThis.fetch = originalFetch;
       if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
       else delete globalThis.document;
+    }
+    const originalBitmap = Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap');
+    try {
+      globalThis.createImageBitmap = async (blob, options) => {
+        await Promise.resolve();
+        return { bytes: [...new Uint8Array(await blob.arrayBuffer())], type: blob.type, options: { ...options } };
+      };
+      const description = { buffers: [{ binary: Uint8Array.of(1, 2).buffer }],
+        bufferViews: [{ buffer: 0, byteLength: 1 }, { buffer: 0, byteOffset: 1, byteLength: 1 }] };
+      const images = await Promise.all([0, 1].map(bufferView => loadImage(description, '', { bufferView, mimeType: 'image/png' })));
+      assert.deepEqual(images.map(image => image.bytes), [[1], [2]]);
+      assert.deepEqual(images.map(image => image.type), ['image/png', 'image/png']);
+      assert.deepEqual(images[0].options, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    } finally {
+      if (originalBitmap) Object.defineProperty(globalThis, 'createImageBitmap', originalBitmap);
+      else delete globalThis.createImageBitmap;
     }
   },
 
@@ -305,6 +641,11 @@ const checks = {
     lamp.worldMatrix[12]++;
     const moved = cacheLightGrid([lamp], cached, 1024);
     assert.notEqual(moved, cached);
+    assert.deepEqual(cached.data, data, 'Moving a mesh cannot overwrite a retained light grid');
+    const emptyFirst = lightGrid([], 32), emptySecond = lightGrid([], 32);
+    emptyFirst.data[6] = 99;
+    assert.equal(emptySecond.data[6], 0, 'Empty grids need independent mutable upload headers');
+    assert.notEqual(worldLights(lamp.extras.lights, matrix), values);
     lamp.extras.lights = [...lamp.extras.lights];
     assert.notEqual(cacheLightGrid([lamp], moved, 1024), moved);
     assert.equal(cacheLightGrid([], moved, 1024).count, 0);
@@ -341,7 +682,7 @@ const checks = {
     lamp.visible = headlight.visible = true;
     updatePointLights(backend);
     assert.equal(sun.lightCount, 2, 'Re-enabled layers restore both grids');
-    backend.renderer.device.limits.maxStorageBufferBindingSize = sun.staticLightGrid.data.byteLength;
+    pluginState(backend).renderer.device.limits.maxStorageBufferBindingSize = sun.staticLightGrid.data.byteLength;
     headlight.extras.lights = [...headlight.extras.lights];
     assert.throws(() => updatePointLights(backend), /GPU storage limit/);
   },
@@ -390,6 +731,17 @@ const checks = {
     assert.equal(walls.tri.length, 9);
     assert.equal(collider(mesh), walls);
     assert.ok(walls.cells.size > 0);
+    const otherMesh = { ...emptyNode(), program: {}, geometry: { attributes: { position: { data: [...vertices] } } } };
+    const otherWalls = collider(otherMesh);
+    otherWalls.tri[0] = 99;
+    otherWalls.origin[0] = 99;
+    otherWalls.cells.clear();
+    assert.equal(walls.tri[0], 0);
+    assert.equal(walls.origin[0], 0);
+    assert.ok(walls.cells.size > 0, 'Collider caches must be independent across geometries');
+    const hits = [{ distance: 2, id: 'far' }, { distance: 1, id: 'first' }, { distance: 1, id: 'second' }];
+    assert.equal(sortHits(hits), hits);
+    assert.deepEqual(hits.map(hit => hit.id), ['first', 'second', 'far']);
   },
 
   shaders() {
@@ -414,10 +766,136 @@ const checks = {
       [6, 5, 2, 1, 4, 3]);
   },
 
+  'simulation-clock'() {
+    const classes = new Set();
+    const container = {
+      style: { color: 'red' },
+      classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); } },
+    };
+    styleTimeControl(container, false);
+    assert.deepEqual(container.style, { color: 'red', background: '#fff', padding: '8px', margin: '' });
+    assert.deepEqual([...classes], ['leaflet-control', 'leaflet-bar']);
+    styleTimeControl(container, true);
+    assert.deepEqual(container.style, { color: 'red', background: '', padding: '2px 0 6px 20px', margin: '0' });
+    assert.equal(classes.size, 0);
+    styleTimeControl(container, false);
+    assert.equal(container.style.padding, '8px');
+    const events = [];
+    const style = { setProperty() {}, removeProperty() {} };
+    const map = {
+      getCenter() { return { lat: 48.858, lng: 2.2945 }; },
+      getSize() { return { x: 800, y: 600 }; },
+      getContainer() { return { style }; },
+      fire(name, event) { events.push(event); },
+      off() {},
+    };
+    const state = {
+      map, control: { live: false, time: new Date('2026-06-21T12:00:00Z') },
+      date: { value: '', validity: { valid: true } }, slider: { value: '' },
+      output: {}, status: {}, projection: { left: 0, top: 0 },
+      sunDisc: { style: {}, remove() {} }, moonDisc: { style: {}, remove() {} },
+    };
+    updateSun(state);
+    const firstDate = state.control.time, firstSun = map._sunlight;
+    const savedSun = structuredClone(firstSun);
+    assert.equal(events[0].time.toISOString(), firstDate.toISOString());
+    assert.notEqual(events[0].time, firstDate);
+    events[0].time.setUTCFullYear(2000);
+    assert.equal(firstDate.getUTCFullYear(), 2026);
+    state.date.value = '2026-12-21';
+    state.slider.value = '600';
+    useSelectedTime(state);
+    assert.equal(state.control.time.toISOString(), '2026-12-21T10:00:00.000Z');
+    assert.notEqual(state.control.time, firstDate);
+    assert.equal(firstDate.toISOString(), '2026-06-21T12:00:00.000Z');
+    assert.deepEqual(firstSun, savedSun);
+    assert.notEqual(events[0], events[1]);
+    assert.notEqual(events[0].time, events[1].time);
+    const selectedTime = state.control.time;
+    state.date.value = '';
+    useSelectedTime(state);
+    assert.ok(Number.isNaN(state.control.time.getTime()));
+    assert.equal(selectedTime.toISOString(), '2026-12-21T10:00:00.000Z');
+    assert.equal(map._sunlight, undefined);
+    assert.deepEqual(events.at(-1), { time: null, live: false });
+    const before = Date.now();
+    useLiveTime(state);
+    assert.equal(state.control.live, true);
+    assert.ok(state.control.time.getTime() >= before && state.control.time.getTime() <= Date.now());
+    const liveTime = state.control.time;
+    useLiveTime(state);
+    assert.notEqual(state.control.time, liveTime);
+    assert.notEqual(events.at(-1).time, state.control.time);
+    removeSun(state);
+    assert.deepEqual(events.at(-1), { time: null, live: false });
+    assert.notEqual(events.at(-1), events.at(-4));
+    assert.equal(map._sunlight, undefined);
+  },
+
   sky() {
     const size = { x: 800, y: 600 };
     assert.deepEqual(projectCelestialBody([0, 0, -1], size, Math.PI / 2, 0), { left: 400, top: 300 - 900 * Math.cos(Math.PI / 2) });
     assert.equal(projectCelestialBody([0, 0, 1], size, Math.PI / 2, 0), null);
+    const target = { left: -1, top: -1 };
+    const first = projectCelestialBody([0, 0, -1], size, Math.PI / 2, 0);
+    const saved = { ...first };
+    assert.equal(projectCelestialBody([1, 0, -1], size, Math.PI / 2, 0, target), target);
+    assert.equal(target.left, 1300);
+    assert.deepEqual(first, saved, 'Buffered projections must not mutate independent results');
+    const beforeHidden = { ...target };
+    assert.equal(projectCelestialBody([0, 0, 1], size, Math.PI / 2, 0, target), null);
+    assert.deepEqual(target, beforeHidden, 'Hidden bodies must not overwrite the projection buffer');
+    assert.notEqual(projectCelestialBody([0, 0, -1], size, Math.PI / 2, 0), first);
+    const color = [99, 99, 99, 99];
+    assert.equal(mix([0, 10, 20], [10, 20, 30], 0.5, color), color);
+    assert.deepEqual(color, [5, 15, 25]);
+    assert.deepEqual(mix([], [], 0.5, color), []);
+    const mixed = mix([0], [10], 0.5);
+    mix([10], [20], 0.5);
+    assert.deepEqual(mixed, [5]);
+    assert.equal(rgb([1.2, 2.7, -1.5]), 'rgb(1, 3, -1)');
+    assert.equal(rgb([]), 'rgb()');
+    const night = atmosphere(-18);
+    const nightCopy = structuredClone(night);
+    const day = atmosphere(25);
+    assert.equal(day.background, 'linear-gradient(rgb(53, 144, 213), rgb(223, 238, 250))');
+    assert.equal(night.background, 'linear-gradient(rgb(3, 7, 20), rgb(17, 28, 54))');
+    day.tint[0] = 99;
+    assert.deepEqual(night, nightCopy);
+    assert.deepEqual(atmosphere(25).tint, [1, 1, 1], 'Atmosphere results must not alias each other or the constant stops');
+    const style = {
+      value: '',
+      setProperty(name, value) { this.value = value; },
+      removeProperty() { this.value = ''; },
+    };
+    const sky = { clientHeight: 600, style: { display: '' }, append(disc) { disc.parentNode = this; } };
+    const map = {
+      _cameraPitch: 90, _cameraBearing: 0, _pitchSky: sky,
+      _sunlight: { altitude: 20, direction: [0, 0, -1], background: 'day',
+        moon: { altitude: 10, direction: [0.1, 0, -1] } },
+      getSize() { return size; },
+      getContainer() { return { style }; },
+    };
+    const control = {
+      map, originalSky: 'original', projection: target,
+      sunDisc: { style: {} }, moonDisc: { style: {} },
+    };
+    updateSky(control);
+    assert.equal(control.sunDisc.hidden, false);
+    assert.equal(control.moonDisc.hidden, false);
+    assert.equal(control.sunDisc.style.left, '400px');
+    assert.equal(control.moonDisc.style.left, '490px');
+    assert.equal(style.value, 'day');
+    assert.equal(control.projection, target);
+    map._sunlight.moon.direction = [0, 0, 1];
+    updateSky(control);
+    assert.equal(control.moonDisc.hidden, true);
+    assert.equal(control.sunDisc.hidden, false);
+    delete map._sunlight;
+    updateSky(control);
+    assert.equal(control.sunDisc.hidden, true);
+    assert.equal(control.moonDisc.hidden, true);
+    assert.equal(style.value, 'original');
   },
 };
 

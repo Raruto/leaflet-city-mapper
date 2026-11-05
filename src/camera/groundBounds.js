@@ -1,11 +1,16 @@
 import { pointOf } from './pointOf.js';
 import { project } from './project.js';
+import { state as sharedState } from '../state.js';
 
-export function groundBounds(map, padding = [0, 0]) {
+export function groundBounds(map, padding = sharedState.allocationCameraZeroPadding) {
   const min = pointOf(padding).divideBy(2), max = map.getSize().subtract(min);
-  const corners = [[min.x, min.y], [max.x, min.y], [min.x, max.y], [max.x, max.y]];
-  const points = [];
-  let point;
-  for (point of corners) points.push(project(map, point, true, true));
-  return new L.Bounds(points);
+  const bounds = /* allocation: required -- The returned native bounds owns its independent projected corners. */ new L.Bounds();
+  const minX = min.x, minY = min.y;
+  let i;
+  for (i = 0; i < 4; i++) {
+    min.x = i % 2 ? max.x : minX;
+    min.y = i < 2 ? minY : max.y;
+    bounds.extend(project(map, min, true, true));
+  }
+  return bounds;
 }
