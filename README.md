@@ -12,6 +12,7 @@
 _For a working example see one of the following demos:_
 
 - [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
+- [City of Paris in 3D with OpenLayers](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-openlayers.html)
 - [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-geojson.html)
 - [Native Leaflet layers on WebGPU](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-native.html)
 
@@ -25,6 +26,21 @@ Just load Leaflet before this plugin:
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
 ```
+
+The [OpenLayers example](examples/leaflet-city-mapper-openlayers.html) replaces
+the Leaflet script with [openlayers-bindings.js](examples/openlayers-bindings.js)
+and Leaflet CSS with OpenLayers CSS; its application code stays unchanged.
+That parser-blocking adapter loads OpenLayers and exposes the `L` bindings needed
+It loads neither Leaflet JavaScript nor Leaflet CSS. Zoom and attribution use native
+OpenLayers controls; the layer selector, compass, time and walk UI are hosted in
+`ol.control.Control` instances. The compass reuses the plugin's icon, pitch display,
+drag sensitivity, keyboard navigation and reset behavior.
+Zoom uses OpenLayers view animations with Leaflet's 250 ms CSS scale easing,
+40 ms wheel debounce and snapped wheel steps, rather than OpenLayers' default
+resolution interpolation and fractional wheel steps. Cursor anchors respect pitch.
+The adapter targets this source-layer example, not arbitrary Leaflet plugins or
+native Leaflet vector/marker layers. WebGPU is still required.
+
 And then create a native `L.Layer`:
 
 ```js

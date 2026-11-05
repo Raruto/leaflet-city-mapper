@@ -1,0 +1,277 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { Given, Then } from '@cucumber/cucumber';
+import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
+
+Given('the OpenLayers example replaces only the Leaflet script and stylesheet', { timeout: 60000 }, async function () {
+  const [original, example] = await Promise.all(['leaflet-city-mapper.html', 'leaflet-city-mapper-openlayers.html']
+    .map(name => readFile(new URL(`../../examples/${name}`, import.meta.url), 'utf8')));
+  assert.equal(example.replaceAll('\r\n', '\n'), original.replaceAll('\r\n', '\n')
+    .replace('https://unpkg.com/leaflet@1.9/dist/leaflet-src.js', 'openlayers-bindings.js')
+    .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css', 'https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css'));
+  this.openlayersErrors = [];
+  this.leafletRequests = [];
+  this.page.on('pageerror', error => this.openlayersErrors.push(error.message));
+  this.page.on('request', request => {
+    if (/\/leaflet@[^/]+\/dist\/.*\.(js|css)/.test(request.url())) this.leafletRequests.push(request.url());
+  });
+  await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
+  await this.page.clock.install();
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-openlayers.html`);
+  assert.deepEqual(this.openlayersErrors, []);
+  await this.page.waitForFunction(() => globalThis.map && document.querySelector('.ol-city-rotate'));
+});
+
+Then('OpenLayers drives the source layers and camera without Leaflet JavaScript', { timeout: 120000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const wait = (promise, layer) => {
+      let timer;
+      return Promise.race([promise, new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Layer did not become ready: ${layer.options.url || globals.sceneByLayer.get(layer)?._type}`)), 60000);
+      })]).finally(() => clearTimeout(timer));
+    };
+    await Promise.all(Object.values(map._layers).map(layer => wait(globals.sceneByLayer.get(layer)?.ready, layer)));
+    const sources = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)?._3d);
+    await Promise.all(sources.map(layer => wait(globals.sceneByLayer.get(layer)._added.promise, layer)));
+    const view = map.ol.getView(), projected = map.options.crs.project(map.getCenter());
+    const initial = map.getCenter(), zoom = map.getZoom();
+    const bounds = map.getBounds();
+    const roundtrip = new L.Point(250, 320);
+    const pixel = map.latLngToContainerPoint(map.containerPointToLatLng(roundtrip));
+    const origin = map.project([0, 0], 0);
+    let moves = 0;
+    const onMove = () => moves++;
+    map.on('move', onMove);
+    map.setView([48.859, 2.296], zoom + 1);
+    const synchronized = map.ol.getView().getZoom() === zoom + 1 && map.getCenter().equals([48.859, 2.296]);
+    view.setCenter(ol.proj.fromLonLat([2.295, 48.858]));
+    const externalView = map.getCenter().equals([48.858, 2.295]) && moves >= 2;
+    map.off('move', onMove);
+    map.setView(initial, zoom);
+    return {
+      openlayers: map.ol instanceof ol.Map,
+      center: Math.hypot(projected.x - ol.proj.fromLonLat([initial.lng, initial.lat])[0],
+        projected.y - ol.proj.fromLonLat([initial.lng, initial.lat])[1]) < 1e-6,
+      origin: origin.distanceTo([128, 128]) < 1e-8,
+      roundtrip: pixel.distanceTo(roundtrip) < 1e-5,
+      bounds: bounds.isValid() && bounds.contains(initial),
+      angles: map.getPitch() === 45 && map.getBearing() === 30,
+      synchronized, externalView,
+      rendered: sources.length >= 5 && sources.every(layer => Boolean(globals.sceneByLayer.get(layer).renderer)),
+      shared: new Set(sources.map(layer => globals.sceneByLayer.get(layer).renderer)).size === 1,
+      canvas: document.querySelectorAll('canvas.leaflet-3d').length === 1,
+      nativeControls: [ol.control.Zoom, ol.control.Attribution].every(Type =>
+        map.ol.getControls().getArray().some(control => control instanceof Type)),
+      customControls: [...map._controls].every(control => control._olControl instanceof ol.control.Control),
+      noLeafletCSS: [...document.styleSheets].every(sheet => !sheet.href?.includes('leaflet.css')),
+    };
+  });
+  for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
+  assert.deepEqual(this.openlayersErrors, []);
+  assert.deepEqual(this.leafletRequests, []);
+});
+
+Then('OpenLayers animates wheel and button zoom without restarting each frame', { timeout: 30000 }, async function () {
+  await this.page.clock.pauseAt(new Date(Date.now() + 1000));
+  const initial = await this.page.evaluate(() => ({ center: map.getCenter(), zoom: map.getZoom() }));
+  try {
+    for (const kind of ['wheel', 'button', 'out']) {
+      await this.page.evaluate(kind => {
+        const pixel = new L.Point(350, 300);
+        const state = window.zoomMeasurement = {
+          samples: [], starts: 0, ends: 0, before: map.getZoom(), started: performance.now(),
+          pixel, anchor: map.containerPointToLatLng(pixel),
+        };
+        state.listener = event => {
+          if (event.type === 'zoomstart') state.starts++;
+          else if (event.type === 'zoomend') state.ends++;
+          else state.samples.push({ zoom: map.getZoom(), time: performance.now() - state.started });
+        };
+        map.on('zoomstart zoom zoomend', state.listener);
+        if (kind !== 'wheel') document.querySelector(kind === 'out' ? '.ol-zoom-out' : '.ol-zoom-in').click();
+        else {
+          const rect = map.getContainer().getBoundingClientRect();
+          map.ol.getViewport().dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true, cancelable: true, deltaY: -120,
+            clientX: rect.left + pixel.x, clientY: rect.top + pixel.y,
+          }));
+        }
+      }, kind);
+      // Advance actual animation frames deterministically, even in an occluded Windows browser.
+      await this.page.clock.runFor(600);
+      const result = await this.page.evaluate(kind => {
+        const state = window.zoomMeasurement;
+        map.off('zoomstart zoom zoomend', state.listener);
+        delete window.zoomMeasurement;
+        const timing = new Animation(new KeyframeEffect(null, [], {
+          duration: 250, fill: 'both', easing: 'cubic-bezier(0,0,0.25,1)',
+        }));
+        const scale = 2 ** (map.getZoom() - state.before);
+        const curveError = Math.max(...state.samples.map(sample => {
+          timing.currentTime = Math.max(0, sample.time - (kind === 'wheel' ? 40 : 0));
+          const progress = timing.effect.getComputedTiming().progress;
+          return Math.abs(2 ** (sample.zoom - state.before) - (1 + (scale - 1) * progress));
+        }));
+        return {
+          starts: state.starts, ends: state.ends, delta: map.getZoom() - state.before, curveError,
+          intermediate: new Set(state.samples.filter(value =>
+            value.zoom > Math.min(state.before, map.getZoom()) && value.zoom < Math.max(state.before, map.getZoom()))
+            .map(value => value.zoom)).size,
+          anchored: map.latLngToContainerPoint(state.anchor).distanceTo(state.pixel) < 0.1,
+        };
+      }, kind);
+      assert.equal(result.starts, 1, `${kind}: one zoomstart`);
+      assert.equal(result.ends, 1, `${kind}: one zoomend`);
+      assert.equal(result.delta, kind === 'out' ? -1 : 1, `${kind}: one snapped level`);
+      assert.ok(result.intermediate >= 2, `${kind}: fractional intermediate zooms`);
+      assert.ok(result.curveError < 0.002, `${kind}: Leaflet CSS scale curve (${result.curveError})`);
+      if (kind === 'wheel') assert.equal(result.anchored, true, `${kind}: pitched anchor`);
+    }
+  } finally {
+    await this.page.evaluate(initial => map.setView(initial.center, initial.zoom), initial);
+  }
+  assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('OpenLayers wheel steps match Leaflet', { timeout: 60000 }, async function () {
+  const leaflet = await readFile(new URL('../../node_modules/leaflet/dist/leaflet-src.js', import.meta.url), 'utf8');
+  await this.page.evaluate(source => {
+    const frame = window.zoomReference = document.createElement('iframe');
+    frame.style.cssText = 'position:absolute;left:-10000px;width:800px;height:600px';
+    document.body.append(frame);
+    const script = frame.contentDocument.createElement('script');
+    script.textContent = source;
+    frame.contentDocument.head.append(script);
+    const element = frame.contentDocument.createElement('div');
+    element.style.cssText = 'width:800px;height:600px';
+    frame.contentDocument.body.append(element);
+    frame.referenceMap = new frame.contentWindow.L.Map(element, { center: [48.858, 2.295], zoom: 17,
+      minZoom: 14, maxZoom: 24, zoomAnimation: false });
+  }, leaflet);
+  const initial = await this.page.evaluate(() => ({ center: map.getCenter(), zoom: map.getZoom() }));
+  try {
+    for (const [deltaY, deltaMode, count] of [[-120, 0, 1], [-1, 0, 1], [120, 0, 1], [-3, 1, 1], [-1, 2, 1], [-120, 0, 3]]) {
+      await this.page.evaluate(({ deltaY, deltaMode, count }) => {
+        for (const target of [zoomReference.referenceMap, map]) {
+          target.setView([48.858, 2.295], 17, { animate: false });
+          const container = target.ol ? target.ol.getViewport() : target.getContainer();
+          const rect = container.getBoundingClientRect();
+          for (let i = 0; i < count; i++) container.dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true, cancelable: true, deltaY, deltaMode,
+            clientX: rect.left + 300, clientY: rect.top + 300,
+          }));
+        }
+      }, { deltaY, deltaMode, count });
+      await this.page.clock.runFor(350);
+      const zooms = await this.page.evaluate(() => [map.getZoom(), zoomReference.referenceMap.getZoom()]);
+      assert.equal(zooms[0], zooms[1], `wheel ${deltaY}, mode ${deltaMode}, count ${count}`);
+    }
+  } finally {
+    await this.page.evaluate(() => {
+      zoomReference.referenceMap.remove();
+      zoomReference.remove();
+      delete window.zoomReference;
+    });
+    await this.page.evaluate(initial => map.setView(initial.center, initial.zoom), initial);
+    await this.page.clock.resume();
+  }
+});
+
+Then('the OpenLayers compass preserves the plugin appearance and gestures', { timeout: 30000 }, async function () {
+  const button = this.page.getByRole('button', { name: 'Reset bearing and pitch', exact: true });
+  const appearance = await button.evaluate(element => ({
+    width: element.clientWidth, height: element.clientHeight,
+    icon: getComputedStyle(element.firstElementChild).backgroundImage,
+    transform: element.firstElementChild.style.transform,
+    original: element === element._rotateControl._button,
+  }));
+  assert.equal(appearance.width, 30);
+  assert.equal(appearance.height, 30);
+  assert.match(appearance.icon, /svg/);
+  assert.match(appearance.transform, /rotateX\(45deg\)/);
+  assert.equal(appearance.original, true);
+  const before = await this.page.evaluate(() => ({
+    bearing: map.getBearing(), pitch: map.getPitch(), center: map.getCenter(),
+  }));
+  const box = await button.boundingBox();
+  await this.page.mouse.move(box.x + 15, box.y + 15);
+  await this.page.mouse.down();
+  await this.page.mouse.move(box.x + 55, box.y - 5, { steps: 4 });
+  await this.page.mouse.up();
+  const dragged = await this.page.evaluate(() => ({
+    bearing: map.getBearing(), pitch: map.getPitch(), center: map.getCenter(), enabled: map.dragging.enabled(),
+  }));
+  assert.ok(Math.abs(dragged.bearing - before.bearing - 32) < 0.01, JSON.stringify({ before, dragged }));
+  assert.ok(Math.abs(dragged.pitch - before.pitch - 10) < 0.01, JSON.stringify({ before, dragged }));
+  assert.equal(dragged.enabled, true);
+  assert.deepEqual(dragged.center, before.center);
+  await button.focus();
+  await this.page.keyboard.press('ArrowRight');
+  await this.page.keyboard.press('ArrowUp');
+  assert.ok(await this.page.evaluate(({ bearing, pitch }) =>
+    Math.abs(map.getBearing() - bearing - 5) < 1e-6 && Math.abs(map.getPitch() - pitch - 5) < 1e-6, dragged));
+  await this.page.keyboard.press('Home');
+  await this.page.waitForFunction(() => map.getPitch() < 1e-8 && Math.min(map.getBearing(), 360 - map.getBearing()) < 1e-8);
+  await this.page.evaluate(({ bearing, pitch }) => {
+    cityMapperTestOperations.mapSetPitchAndBearing(map, pitch, bearing);
+  }, before);
+  assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('the OpenLayers example preserves map and layer control interactions', { timeout: 60000 }, async function () {
+  const labels = this.page.locator('.ol-city-layers label');
+  const traffic = labels.filter({ hasText: /^ Traffic$/ }).locator('input');
+  const shadows = labels.filter({ hasText: /^ Shadows$/ }).locator('input');
+  const trees = labels.filter({ hasText: /^ Trees$/ }).locator('input');
+  for (const checkbox of [traffic, shadows, trees]) {
+    await checkbox.uncheck();
+    assert.equal(await checkbox.isChecked(), false);
+    await checkbox.check();
+    assert.equal(await checkbox.isChecked(), true);
+  }
+  await labels.filter({ hasText: /^ Plan IGN$/ }).locator('input').check();
+  await labels.filter({ hasText: /^ Orthophoto IGN$/ }).locator('input').check();
+  const beforeButton = await this.page.evaluate(() => map.getZoom());
+  await this.page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await this.page.waitForFunction(zoom => map.getZoom() > zoom && !map.ol.getView().getAnimating(), beforeButton);
+  await this.page.getByRole('button', { name: 'Attributions', exact: true }).click();
+  assert.equal(await this.page.getByRole('link', { name: 'OpenLayers', exact: true }).isVisible(), true);
+  const initial = await this.page.evaluate(() => ({ lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() }));
+  await this.page.mouse.move(350, 350);
+  await this.page.mouse.down();
+  await this.page.mouse.move(400, 380, { steps: 4 });
+  await this.page.mouse.up();
+  assert.equal(await this.page.evaluate(value => !map.getCenter().equals(value), initial), true);
+  await this.page.mouse.wheel(0, -100);
+  await this.page.waitForFunction(zoom => map.getZoom() > zoom, initial.zoom);
+  const touched = await this.page.evaluate(() => {
+    const before = { bearing: map.getBearing(), pitch: map.getPitch(), zoom: map.getZoom() };
+    const element = map.getContainer(), rect = element.getBoundingClientRect();
+    const send = (type, points) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: points.map(([x, y]) =>
+        ({ clientX: rect.left + x, clientY: rect.top + y })) });
+      element.dispatchEvent(event);
+    };
+    send('touchstart', [[250, 200], [350, 200]]);
+    send('touchmove', [[200, 150], [400, 100]]);
+    send('touchend', []);
+    return map.getBearing() !== before.bearing && map.getPitch() > before.pitch &&
+      map.getZoom() > before.zoom && map.dragging.enabled() && map.options.zoomSnap === 1;
+  });
+  assert.equal(touched, true);
+  await this.page.getByRole('button', { name: 'Reset bearing and pitch' }).click();
+  await this.page.waitForFunction(() => map.getPitch() < 1e-8 &&
+    Math.min(map.getBearing(), 360 - map.getBearing()) < 1e-8);
+  const walk = this.page.getByRole('button', { name: /walk/i });
+  await walk.click();
+  assert.equal(await walk.getAttribute('aria-pressed'), 'true');
+  await this.page.keyboard.press('Escape');
+  assert.equal(await walk.getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(this.openlayersErrors, []);
+  const cleanup = await this.page.evaluate(() => {
+    map.remove();
+    return !map._loaded && !document.querySelector('.leaflet-3d') && map.ol.getTarget() == null;
+  });
+  assert.equal(cleanup, true);
+});
