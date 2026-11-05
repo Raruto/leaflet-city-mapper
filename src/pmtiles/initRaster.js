@@ -1,16 +1,16 @@
-import { isLoading } from './isLoading.js';
-import { getRasterEvents } from './getRasterEvents.js';
-import { readyRaster } from './readyRaster.js';
-import { reportError } from './reportError.js';
-import { emptyNode } from '../scene/emptyNode.js';
-import { read } from './read.js';
-import { getHeader } from './getHeader.js';
-import { getZxy } from './getZxy.js';
-import { onPMTileAdd } from './onPMTileAdd.js';
-import { onPMTileRemove } from './onPMTileRemove.js';
-import { getRasterTileSize } from './getRasterTileSize.js';
-import { setPMTileOpacity } from './setPMTileOpacity.js';
-import { setPMTileZIndex } from './setPMTileZIndex.js';
+import { isLoading } from './raster/isLoading.js';
+import { getRasterEvents } from './raster/getRasterEvents.js';
+import { readyRaster } from './raster/readyRaster.js';
+import { reportError } from './raster/reportError.js';
+import { emptyNode } from '../scene/graph/emptyNode.js';
+import { read } from './archive/read.js';
+import { getHeader } from './archive/getHeader.js';
+import { getZxy } from './archive/getZxy.js';
+import { onPMTileAdd } from './raster/onPMTileAdd.js';
+import { onPMTileRemove } from './raster/onPMTileRemove.js';
+import { getRasterTileSize } from './raster/getRasterTileSize.js';
+import { setPMTileOpacity } from './raster/setPMTileOpacity.js';
+import { setPMTileZIndex } from './raster/setPMTileZIndex.js';
 
 export function initRaster(layer, options) {
   layer._read = read.bind(null, layer);

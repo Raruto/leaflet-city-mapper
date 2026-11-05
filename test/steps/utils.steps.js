@@ -4,43 +4,43 @@ import { readFile } from 'node:fs/promises';
 import { Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
 import { parseColor } from '../../src/utils/parseColor.js';
-import { triangulate } from '../../src/geometry/triangulate.js';
+import { triangulate } from '../../src/geometry/triangulation/triangulate.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
 import { setVertexColor } from '../../src/geometry/setVertexColor.js';
-import { treeGeometry } from '../../src/geometry/treeGeometry.js';
-import { lightGeometry } from '../../src/geometry/lightGeometry.js';
-import { lampPostGeometry } from '../../src/geometry/lampPostGeometry.js';
-import { emptyNode } from '../../src/scene/emptyNode.js';
-import { setParent } from '../../src/scene/setParent.js';
-import { traverse } from '../../src/scene/traverse.js';
-import { decodeDirectory } from '../../src/pmtiles/decodeDirectory.js';
-import { getZxy } from '../../src/pmtiles/getZxy.js';
-import { decodeHeader } from '../../src/pmtiles/decodeHeader.js';
-import { decompress } from '../../src/pmtiles/decompress.js';
-import { tileId } from '../../src/pmtiles/tileId.js';
-import { decodeModel } from '../../src/model/decodeModel.js';
-import { loadModel } from '../../src/model/loadModel.js';
-import { readAccessor } from '../../src/model/readAccessor.js';
-import { nodeMatrix } from '../../src/model/nodeMatrix.js';
+import { treeGeometry } from '../../src/geometry/trees/treeGeometry.js';
+import { lightGeometry } from '../../src/geometry/lights/lightGeometry.js';
+import { lampPostGeometry } from '../../src/geometry/lights/lampPostGeometry.js';
+import { emptyNode } from '../../src/scene/graph/emptyNode.js';
+import { setParent } from '../../src/scene/graph/setParent.js';
+import { traverse } from '../../src/scene/graph/traverse.js';
+import { decodeDirectory } from '../../src/pmtiles/archive/decodeDirectory.js';
+import { getZxy } from '../../src/pmtiles/archive/getZxy.js';
+import { decodeHeader } from '../../src/pmtiles/archive/decodeHeader.js';
+import { decompress } from '../../src/pmtiles/archive/decompress.js';
+import { tileId } from '../../src/pmtiles/archive/tileId.js';
+import { decodeModel } from '../../src/model/decoding/decodeModel.js';
+import { loadModel } from '../../src/model/loading/loadModel.js';
+import { readAccessor } from '../../src/model/decoding/readAccessor.js';
+import { nodeMatrix } from '../../src/model/decoding/nodeMatrix.js';
 import { vertexNormals } from '../../src/geometry/vertexNormals.js';
-import { textureSampler } from '../../src/model/textureSampler.js';
-import { lightGrid } from '../../src/rendering/lightGrid.js';
-import { cacheLightGrid } from '../../src/rendering/cacheLightGrid.js';
-import { updatePointLights } from '../../src/rendering/updatePointLights.js';
-import { worldLights } from '../../src/rendering/worldLights.js';
-import { bridgeElevation } from '../../src/geometry/bridgeElevation.js';
+import { textureSampler } from '../../src/model/materials/textureSampler.js';
+import { lightGrid } from '../../src/rendering/lighting/lightGrid.js';
+import { cacheLightGrid } from '../../src/rendering/lighting/cacheLightGrid.js';
+import { updatePointLights } from '../../src/rendering/lighting/updatePointLights.js';
+import { worldLights } from '../../src/rendering/lighting/worldLights.js';
+import { bridgeElevation } from '../../src/geometry/bridges/bridgeElevation.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
 import { terrainGrid } from '../../src/terrain/terrainGrid.js';
 import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
-import { toLanes } from '../../src/traffic/toLanes.js';
-import { tripsAt } from '../../src/traffic/tripsAt.js';
-import { routeGeometry } from '../../src/traffic/routeGeometry.js';
-import { collider } from '../../src/geometry/collider.js';
-import { horizontalRay } from '../../src/geometry/horizontalRay.js';
-import { materialShaders } from '../../src/rendering/materialShaders.js';
-import { sortMeshes } from '../../src/rendering/sortMeshes.js';
+import { toLanes } from '../../src/traffic/routes/toLanes.js';
+import { tripsAt } from '../../src/traffic/scheduling/tripsAt.js';
+import { routeGeometry } from '../../src/traffic/routes/routeGeometry.js';
+import { collider } from '../../src/geometry/collision/collider.js';
+import { horizontalRay } from '../../src/geometry/collision/horizontalRay.js';
+import { materialShaders } from '../../src/rendering/shaders/materialShaders.js';
+import { sortMeshes } from '../../src/rendering/meshes/sortMeshes.js';
 import { projectCelestialBody } from '../../src/sunlight/projectCelestialBody.js';
-import { roofCoverage } from '../../src/geometry/roofCoverage.js';
+import { roofCoverage } from '../../src/geometry/terrain/roofCoverage.js';
 
 const checks = {
   'roof-coverage'() {
@@ -389,11 +389,11 @@ Then('the standalone 3D {string} utilities preserve their results and errors', a
 Then('standalone browser math preserves scene transforms and picking', async function () {
   const result = await this.page.evaluate(async base => {
     const [{ emptyNode }, { setParent }, { updateWorldMatrix }, { updateCamera }, { intersectMeshes }] = await Promise.all([
-      import(`${base}/src/scene/emptyNode.js`),
-      import(`${base}/src/scene/setParent.js`),
-      import(`${base}/src/scene/updateWorldMatrix.js`),
-      import(`${base}/src/scene/updateCamera.js`),
-      import(`${base}/src/geometry/intersectMeshes.js`),
+      import(`${base}/src/scene/graph/emptyNode.js`),
+      import(`${base}/src/scene/graph/setParent.js`),
+      import(`${base}/src/scene/graph/updateWorldMatrix.js`),
+      import(`${base}/src/scene/graph/updateCamera.js`),
+      import(`${base}/src/geometry/collision/intersectMeshes.js`),
     ]);
     const parent = emptyNode(), child = emptyNode();
     parent.position = [10, 20, 30];

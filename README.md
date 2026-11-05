@@ -91,17 +91,43 @@ npm run test  # build and run browser tests
 
 After that you can start developing inside the `src` folder (eg. open "http://localhost:8080/examples" in your browser to preview changes).
 
-Source-style tests enforce no arrows, nested functions or callback-based array
-methods in `src/**/*.js`, at most one exported binding and at most one function
-per file (including private helpers, object/class methods and constructors).
-Move additional functions and exports to separate modules. Run the function-count
-checks with `npm test -- --name "Function counting|Source modules define"`.
-Module-level `const` bindings must be exported from a `constants` folder;
-module-level `let` bindings from a `state` folder. Imports and function-local
-variables remain allowed. Module-level `var` is rejected. Each dedicated module
-still follows the one-export rule. Run `npm test -- --name "Module variable"`.
-These folders live beside their domain modules, for example
-`src/geometry/constants/HEIGHT.js`; shared constants live in `src/constants`.
+### Source layout
+
+Modules are grouped by feature, with direct imports rather than barrel re-exports:
+
+```text
+src/
+  scene/
+    camera/          Camera API, projection, animation, controls and gestures
+    leaflet-core/    Leaflet layer integration with the shared WebGPU scene
+      events/        Leaflet event forwarding
+      methods/       Layer mutation hooks
+      markers/       Marker geometry, positioning and dragging
+      vectors/       Vector layer synchronization
+      images/        Image overlay synchronization
+      tiles/         GridLayer tiles and fading
+      overlays/      Popup and tooltip positioning
+      meshes/        Layer mesh and texture helpers
+    layers/          Source routing and layer initialization
+    lifecycle/       Renderer attachment, map events and frame scheduling
+    sources/         GeoJSON and streamed source geometry
+    picking/         Raycasting, highlighting and feature interaction
+    graph/           Scene nodes, transforms and placement
+  rendering/         Pipelines, shaders, meshes, textures and lighting
+  geometry/          Triangulation, collision, trees, lights, bridges and primitives
+    leaflet-core/    Geometry generation for Leaflet vector layers
+  model/             glTF loading, decoding and materials
+  pmtiles/           Archive access and raster tile lifecycle
+  traffic/           Vehicles, routes, scheduling, simulation, loading and rendering
+  terrain/           Terrain loading and sampling
+  sunlight/          Sun, moon, sky and time controls
+  walk/              First-person walking
+  utils/             Shared colour and numeric helpers
+```
+
+Keep helpers and their `constants`/`state` folders close to their consumers.
+The one-function and one-export rules still apply. Folder organization is for
+navigation; it does not imply a runtime performance improvement.
 
 
 **Compatibile with:**

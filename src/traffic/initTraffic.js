@@ -9,18 +9,18 @@
  * L.Control.Time on the same map drives the time; without one, vehicles run live.
  */
 import { build } from '../geometry/build.js';
-import { init3D } from '../scene/init3D.js';
-import { tooltip } from './tooltip.js';
-import { speed } from './constants/speed.js';
-import { vehicles } from './constants/vehicles.js';
-import { trafficShader } from './constants/trafficShader.js';
-import { addTraffic } from './addTraffic.js';
-import { placeTraffic } from './placeTraffic.js';
-import { removeTraffic } from './removeTraffic.js';
-import { readyTraffic } from './readyTraffic.js';
-import { tickTraffic } from './tickTraffic.js';
-import { updateTraffic } from './updateTraffic.js';
-import { updateTrafficTerrain } from './updateTrafficTerrain.js';
+import { init3D } from '../scene/lifecycle/init3D.js';
+import { tooltip } from './routes/tooltip.js';
+import { speed } from './simulation/constants/speed.js';
+import { vehicles } from './vehicles/constants/vehicles.js';
+import { trafficShader } from './rendering/constants/trafficShader.js';
+import { addTraffic } from './lifecycle/addTraffic.js';
+import { placeTraffic } from './simulation/placeTraffic.js';
+import { removeTraffic } from './lifecycle/removeTraffic.js';
+import { readyTraffic } from './lifecycle/readyTraffic.js';
+import { tickTraffic } from './simulation/tickTraffic.js';
+import { updateTraffic } from './simulation/updateTraffic.js';
+import { updateTrafficTerrain } from './simulation/updateTrafficTerrain.js';
 
 export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = speed, ...options } = {}) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];

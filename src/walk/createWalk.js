@@ -1,4 +1,4 @@
-import { init3D } from '../scene/init3D.js';
+import { init3D } from '../scene/lifecycle/init3D.js';
 import { onBlur } from './onBlur.js';
 import { onKey } from './onKey.js';
 import { onPointer } from './onPointer.js';

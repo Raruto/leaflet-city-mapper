@@ -1,5 +1,5 @@
 import { onAddSun } from './onAddSun.js';
-import { underEntry } from '../scene/underEntry.js';
+import { underEntry } from '../scene/graph/underEntry.js';
 import { initialize } from './initialize.js';
 import { onAdd } from './onAdd.js';
 import { addTo } from './addTo.js';

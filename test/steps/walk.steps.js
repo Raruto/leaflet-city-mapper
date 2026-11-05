@@ -4,7 +4,7 @@ import { Then } from '@cucumber/cucumber';
 Then('Time and Walk controls clean up and can be added again', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const { trafficNow } = await import('/src/traffic/trafficNow.js');
+    const { trafficNow } = await import('/src/traffic/scheduling/trafficNow.js');
     const traffic = { layer: { _map: map } };
     const time = new L.Control.Time({ position: 'topleft' }).addTo(map);
     const standalone = time instanceof L.Control && time.getPosition() === 'topleft' &&

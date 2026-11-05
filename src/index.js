@@ -1,16 +1,16 @@
-import './scene/mapCamera.js';
-import { init3D } from './scene/init3D.js';
-import { initNativeGPU } from './scene/initNativeGPU.js';
+import './scene/camera/mapCamera.js';
+import { init3D } from './scene/lifecycle/init3D.js';
+import { initNativeGPU } from './scene/leaflet-core/initNativeGPU.js';
 import { initRaster } from './pmtiles/initRaster.js';
-import { setGeoJSONData } from './scene/setGeoJSONData.js';
+import { setGeoJSONData } from './scene/sources/setGeoJSONData.js';
 import { initTerrain } from './terrain/initTerrain.js';
 import './sunlight/initSunlight.js';
 import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
-import { indexState } from './scene/constants/indexState.js';
-import { initializeNativeLayer } from './scene/initializeNativeLayer.js';
-import { layerLayerAdd } from './scene/layerLayerAdd.js';
-import { layerInitialize } from './scene/layerInitialize.js';
+import { indexState } from './scene/layers/constants/indexState.js';
+import { initializeNativeLayer } from './scene/leaflet-core/initializeNativeLayer.js';
+import { layerLayerAdd } from './scene/layers/layerLayerAdd.js';
+import { layerInitialize } from './scene/layers/layerInitialize.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -23,9 +23,11 @@ import { layerInitialize } from './scene/layerInitialize.js';
  * types receive flat options (`{ ...source, pane, attribution }`), so `layer.options.url` etc.
  *
  * Folder layout:
- * - Source routing is wired here through scene/ helpers; initializers live in their domain folders.
- * - scene/: Leaflet lifecycle, interaction and scene updates; rendering/: WebGPU pipelines.
- * - geometry/, model/ and pmtiles/: shared mesh, glTF and archive operations.
+ * - scene/layers/: source routing; initializers live in their domain folders.
+ * - scene/leaflet-core/: Leaflet layer integration; scene/camera/: camera and controls.
+ * - scene/lifecycle/, sources/, picking/ and graph/: scene updates and interaction.
+ * - rendering/: WebGPU pipelines, shaders, meshes, textures and lighting.
+ * - geometry/, model/ and pmtiles/: mesh operations, glTF loading and archive/raster operations.
  * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.

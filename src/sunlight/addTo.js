@@ -1,4 +1,4 @@
-import { underEntry } from '../scene/underEntry.js';
+import { underEntry } from '../scene/graph/underEntry.js';
 import { styleTimeControl } from './styleTimeControl.js';
 
 export function addTo(map) {

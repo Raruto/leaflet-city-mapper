@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Given, Then } from '@cucumber/cucumber';
-import { along } from '../../src/traffic/along.js';
-import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
-import { speed } from '../../src/traffic/constants/speed.js';
-import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
+import { along } from '../../src/traffic/simulation/along.js';
+import { scheduledTrips } from '../../src/traffic/scheduling/scheduledTrips.js';
+import { speed } from '../../src/traffic/simulation/constants/speed.js';
+import { vehicleOffsets } from '../../src/traffic/simulation/vehicleOffsets.js';
 import { cyclingCounts, mobilityLanes, trafficHour, parisMobility, parisTransit } from '../../examples/data/paris-traffic.js';
 import parisTraffic from '../../examples/data/paris-traffic.js';
 import { trafficResponse, fulfillTrafficRoute } from '../fixtures/traffic-data.js';
@@ -300,8 +300,8 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   const result = await this.page.evaluate(async () => {
     const layer = cruiseBoats, owner = cityMapperTestState.renderers.get(map);
     const [{ along }, { scheduledTrips }] = await Promise.all([
-      import(new URL('../src/traffic/along.js', location.href)),
-      import(new URL('../src/traffic/scheduledTrips.js', location.href)),
+      import(new URL('../src/traffic/simulation/along.js', location.href)),
+      import(new URL('../src/traffic/scheduling/scheduledTrips.js', location.href)),
     ]);
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;
     const cruiseRoute = cruise.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
@@ -468,7 +468,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   // Without a clock the boats run live on the current timetable.
   await this.page.evaluate(() => map.removeLayer(sunlightOverlay));
   assert.equal(await this.page.evaluate(async () => {
-    const { scheduledTrips } = await import(new URL('../src/traffic/scheduledTrips.js', location.href));
+    const { scheduledTrips } = await import(new URL('../src/traffic/scheduling/scheduledTrips.js', location.href));
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;
     await new Promise(requestAnimationFrame);
     const boats = cruiseBoats.root.children.find(mesh => mesh.extras.featureFaces.length);

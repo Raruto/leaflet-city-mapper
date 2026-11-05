@@ -1,18 +1,18 @@
-import { updateCamera } from "../scene/updateCamera.js";
-import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
-import { destroyTexture } from './destroyTexture.js';
-import { drawGeometry } from './drawGeometry.js';
-import { updatePointLights } from './updatePointLights.js';
+import { updateCamera } from "../scene/graph/updateCamera.js";
+import { updateWorldMatrix } from "../scene/graph/updateWorldMatrix.js";
+import { destroyTexture } from './textures/destroyTexture.js';
+import { drawGeometry } from './meshes/drawGeometry.js';
+import { updatePointLights } from './lighting/updatePointLights.js';
 import { renderSunlight } from '../sunlight/renderSunlight.js';
-import { sortMeshes } from "./sortMeshes.js";
-import { cancelUpdate } from '../scene/cancelUpdate.js';
-import { update } from '../scene/update.js';
-import { getRasterTileSize } from '../pmtiles/getRasterTileSize.js';
-import { pruneRasterTiles } from '../pmtiles/pruneRasterTiles.js';
+import { sortMeshes } from "./meshes/sortMeshes.js";
+import { cancelUpdate } from '../scene/lifecycle/cancelUpdate.js';
+import { update } from '../scene/lifecycle/update.js';
+import { getRasterTileSize } from '../pmtiles/raster/getRasterTileSize.js';
+import { pruneRasterTiles } from '../pmtiles/raster/pruneRasterTiles.js';
 import { getElevation } from "../terrain/getElevation.js";
-import { roofCoverage } from "../geometry/roofCoverage.js";
-import { compareRoofTiles } from './compareRoofTiles.js';
-import { collectMeshes } from './collectMeshes.js';
+import { roofCoverage } from "../geometry/terrain/roofCoverage.js";
+import { compareRoofTiles } from './meshes/compareRoofTiles.js';
+import { collectMeshes } from './meshes/collectMeshes.js';
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.

@@ -1,10 +1,10 @@
-import { destroyTexture } from '../rendering/destroyTexture.js';
-import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
-import { disposeMesh } from '../rendering/disposeMesh.js';
-import { setRasterTerrain } from '../pmtiles/setRasterTerrain.js';
-import { removeRasterTile } from '../pmtiles/removeRasterTile.js';
+import { destroyTexture } from '../rendering/textures/destroyTexture.js';
+import { conformModelToTerrain } from '../geometry/terrain/conformModelToTerrain.js';
+import { disposeMesh } from '../rendering/meshes/disposeMesh.js';
+import { setRasterTerrain } from '../pmtiles/raster/setRasterTerrain.js';
+import { removeRasterTile } from '../pmtiles/raster/removeRasterTile.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
-import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
+import { onRemove3DLayer } from '../scene/lifecycle/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {

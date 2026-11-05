@@ -118,7 +118,7 @@ Then('the native PMTiles methods handle directories, compression and failures', 
       `One cached root request for reader ${query || 'default'}`);
   }
   const real = await this.page.evaluate(async () => {
-    const { getZxy } = await import('/src/pmtiles/getZxy.js');
+    const { getZxy } = await import('/src/pmtiles/archive/getZxy.js');
     const buildings = new L.Layer({ source: { type: 'pmtiles', url: '../examples/data/paris-buildings.pmtiles' } });
     await buildings.ready;
     const header = buildings.header;

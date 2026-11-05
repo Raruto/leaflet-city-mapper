@@ -1,4 +1,4 @@
-import { update } from '../scene/update.js';
+import { update } from '../scene/lifecycle/update.js';
 import { limbs } from './constants/limbs.js';
 import { local } from './local.js';
 

@@ -1,4 +1,4 @@
-import { box } from "../../geometry/box.js";
+import { box } from "../../geometry/primitives/box.js";
 import { trousers } from './trousers.js';
 import { shirt } from './shirt.js';
 import { skin } from './skin.js';

@@ -1,4 +1,4 @@
-import * as disposeMesh from '../rendering/disposeMesh.js';
+import * as disposeMesh from '../rendering/meshes/disposeMesh.js';
 import { onKey } from './onKey.js';
 import { onBlur } from './onBlur.js';
 import { onPointer } from './onPointer.js';
