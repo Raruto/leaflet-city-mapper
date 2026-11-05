@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { textureSampler } from './textureSampler.js';
 
 export function textureFor(context, reference, color = false) {
@@ -7,7 +9,7 @@ export function textureFor(context, reference, color = false) {
   if ((reference.texCoord || 0) !== 0 || reference.extensions) {
     throw /* allocation: required -- Texture validation errors retain this model conversion stack. */ new Error('Model textures currently require untransformed TEXCOORD_0 UVs');
   }
-  const device = pluginState(backend).renderer.device;
+  const device = sceneByLayer.get(backend).renderer.device;
   // A glTF image may serve both color and data maps: those cannot share a GPU format.
   const key = `${reference.index}:${color}`;
   if (!textures.has(key)) {

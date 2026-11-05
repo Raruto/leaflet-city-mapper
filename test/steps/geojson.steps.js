@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -38,8 +40,8 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     let done = completed();
     layer.addTo(map);
     const first = await done;
-    const type = pluginState(layer)._type;
-    let area = pluginState(layer)._areas.get('geojson');
+    const type = globals.sceneByLayer.get(layer)._type;
+    let area = globals.sceneByLayer.get(layer)._areas.get('geojson');
     const mesh = area.mesh;
     const face = mesh.extras.featureFaces[0];
     const identity = face.id === 'office' && face.properties.height === 25;
@@ -47,11 +49,11 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     map.panTo([41.9, 12.5], { animate: false });
     CityMapper.setBearing(map, 90);
     CityMapper.setPitch(map, 60);
-    const retained = pluginState(layer)._areas.get('geojson') === area;
+    const retained = globals.sceneByLayer.get(layer)._areas.get('geojson') === area;
     const previousArea = area;
     const terrainUpdate = new Promise(resolve => {
       const progress = () => {
-        const refreshed = pluginState(layer)._areas.get('geojson');
+        const refreshed = globals.sceneByLayer.get(layer)._areas.get('geojson');
         if (refreshed !== previousArea && refreshed?.mesh) {
           layer.off('progress', progress);
           resolve(previousArea.request.signal.aborted);
@@ -61,20 +63,20 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     });
     map.fire('terrainchange');
     const terrainUpdated = await terrainUpdate;
-    area = pluginState(layer)._areas.get('geojson');
+    area = globals.sceneByLayer.get(layer)._areas.get('geojson');
     done = completed();
     CityMapper.setData(layer, { type: 'FeatureCollection', features: [] });
     const empty = await done;
-    const released = area.request.signal.aborted && !pluginState(layer).root.children.includes(mesh);
+    const released = area.request.signal.aborted && !globals.sceneByLayer.get(layer).root.children.includes(mesh);
     done = completed();
     CityMapper.setData(layer, data);
     const replaced = await done;
     layer.remove();
-    const removed = pluginState(layer)._areas.size === 0;
+    const removed = globals.sceneByLayer.get(layer)._areas.size === 0;
     done = completed();
     layer.addTo(map);
     const readded = await done;
-    const tooltip = Boolean(pluginState(layer)._tooltip);
+    const tooltip = Boolean(globals.sceneByLayer.get(layer)._tooltip);
     layer.remove();
     map.remove();
     return { first, empty, replaced, readded, type, identity, geometry, retained, terrainUpdated, released, removed, tooltip, errors };
@@ -104,7 +106,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       const failed = new Promise(resolve => layer.once('error', ({ error }) => resolve(error.message)));
       layer.addTo(map);
       failures.push(await failed);
-      if (pluginState(layer).root.children.length) throw new Error('Invalid source attached a mesh');
+      if (globals.sceneByLayer.get(layer).root.children.length) throw new Error('Invalid source attached a mesh');
       layer.remove();
     }
     const fetchSource = globalThis.fetch;
@@ -155,14 +157,14 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   }));
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
   await this.page.waitForFunction(() => {
-    return Object.values(map._layers).some(layer => pluginState(layer)._geojson &&
-      [...pluginState(layer)._areas.values()].some(area => area.done && area.buildings === 5));
+    return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
+      [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
   });
   assert.match(await this.page.locator('#status').textContent(), /^Colosseum: 5 parts;/);
   const geometry = await this.page.evaluate(() => {
-    const layer = Object.values(map._layers).find(layer => pluginState(layer)._geojson);
+    const layer = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson);
     const features = layer.options.data.features;
-    const mesh = pluginState(layer)._areas.get('geojson').mesh;
+    const mesh = globals.sceneByLayer.get(layer)._areas.get('geojson').mesh;
     const positions = mesh.geometry.attributes.position.data;
     const roofs = mesh.extras.featureFaces.map(face => {
       let highest = -Infinity;

@@ -1,4 +1,13 @@
-import { state as sharedState } from '../state.js';
+import { mapMethods } from '../globals/mapMethods.js';
+import { markerMethods } from '../globals/markerMethods.js';
+import { popupEvents } from '../globals/popupEvents.js';
+import { tooltipEvents } from '../globals/tooltipEvents.js';
+import { popupPosition } from '../globals/popupPosition.js';
+import { popupPan } from '../globals/popupPan.js';
+import { tooltipPosition } from '../globals/tooltipPosition.js';
+import { tiledBounds } from '../globals/tiledBounds.js';
+import { gridEvents } from '../globals/gridEvents.js';
+
 import { initNativeGPU } from '../core/initNativeGPU.js';
 
 import { mapLayerPointToContainerPoint } from './mapLayerPointToContainerPoint.js';
@@ -27,7 +36,7 @@ import { tooltipSetPosition } from '../core/tooltipSetPosition.js';
 import { gridlayerGetEvents } from '../core/gridlayerGetEvents.js';
 import { gridlayerGetTiledPixelBounds } from '../core/gridlayerGetTiledPixelBounds.js';
 
-sharedState.mapMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
+mapMethods.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
 
 L.Map.mergeOptions({
   rotate: true, bearing: 0, pitch: 0, pitchMaxDistance: 3,
@@ -54,7 +63,7 @@ L.Map.include({
 
 L.Map.addInitHook(initializeCameraMap);
 
-sharedState.markerMethods = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
+markerMethods.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
 L.Marker.mergeOptions({ rotation: 0, rotateWithView: false, keepUpright: false, scale: 1 });
 L.Marker.include({
   setIcon: markerSetIcon,
@@ -66,27 +75,27 @@ L.Marker.include({
 
 // Keep Leaflet's focusable marker and its drag events; only translate its screen position back to ground.
 
-sharedState.popupEvents = L.Popup.prototype.getEvents;
+popupEvents.value = L.Popup.prototype.getEvents;
 L.Popup.include({
   getEvents: popupGetEvents,
 });
-sharedState.tooltipEvents = L.Tooltip.prototype.getEvents;
+tooltipEvents.value = L.Tooltip.prototype.getEvents;
 L.Tooltip.include({
   getEvents: tooltipGetEvents,
 });
-sharedState.popupPosition = L.Popup.prototype._updatePosition;
-sharedState.popupPan = L.Popup.prototype._adjustPan;
+popupPosition.value = L.Popup.prototype._updatePosition;
+popupPan.value = L.Popup.prototype._adjustPan;
 L.Popup.include({
   _adjustPan: popupAdjustPan,
   _updatePosition: popupUpdatePosition,
 });
-sharedState.tooltipPosition = L.Tooltip.prototype._setPosition;
+tooltipPosition.value = L.Tooltip.prototype._setPosition;
 L.Tooltip.include({
   _setPosition: tooltipSetPosition,
 });
 
-sharedState.tiledBounds = L.GridLayer.prototype._getTiledPixelBounds;
-sharedState.gridEvents = L.GridLayer.prototype.getEvents;
+tiledBounds.value = L.GridLayer.prototype._getTiledPixelBounds;
+gridEvents.value = L.GridLayer.prototype.getEvents;
 L.GridLayer.include({
   getEvents: gridlayerGetEvents,
   _getTiledPixelBounds: gridlayerGetTiledPixelBounds,

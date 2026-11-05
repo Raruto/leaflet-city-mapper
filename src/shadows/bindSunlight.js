@@ -1,20 +1,21 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sunBindGroup } from '../globals/sunBindGroup.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function bindSunlight(layer) {
-  const gpuCreateBindGroup1 = sharedState.allocationRenderBindSunlightCreateBindGroup1;
-  const sun = pluginState(layer).renderer.sunlight;
-  sun.bindGroup = pluginState(layer).renderer.device.createBindGroup((
-    gpuCreateBindGroup1.layout = sun.layout,
-    gpuCreateBindGroup1.entries[0].resource.buffer = sun.buffer,
-    gpuCreateBindGroup1.entries[1].resource = sun.texture.createView(),
-    gpuCreateBindGroup1.entries[2].resource = sun.sampler,
-    gpuCreateBindGroup1.entries[3].resource.buffer = sun.lights,
-    gpuCreateBindGroup1
+  const sun = sceneByLayer.get(layer).renderer.sunlight;
+  sun.bindGroup = sceneByLayer.get(layer).renderer.device.createBindGroup((
+    sunBindGroup.layout = sun.layout,
+    sunBindGroup.entries[0].resource.buffer = sun.buffer,
+    sunBindGroup.entries[1].resource = sun.texture.createView(),
+    sunBindGroup.entries[2].resource = sun.sampler,
+    sunBindGroup.entries[3].resource.buffer = sun.lights,
+    sunBindGroup
   ));
-  gpuCreateBindGroup1.layout = null;
-  gpuCreateBindGroup1.entries[0].resource.buffer = null;
-  gpuCreateBindGroup1.entries[1].resource = null;
-  gpuCreateBindGroup1.entries[2].resource = null;
-  gpuCreateBindGroup1.entries[3].resource.buffer = null;
+  sunBindGroup.layout = null;
+  sunBindGroup.entries[0].resource.buffer = null;
+  sunBindGroup.entries[1].resource = null;
+  sunBindGroup.entries[2].resource = null;
+  sunBindGroup.entries[3].resource.buffer = null;
 }

@@ -1,11 +1,12 @@
+import { cameraAngles } from '../globals/cameraAngles.js';
 import { pointOf } from './pointOf.js';
 import { angles } from './angles.js';
-import { state as sharedState } from '../state.js';
+
 
 export function project(map, point, inverse = false, limit = false) {
   const half = map.getSize().divideBy(2), distance = map.getSize().y * 1.5;
   if (!distance) return pointOf(point);
-  const [cos, sin, tilt, rise] = angles(map, sharedState.allocationCameraAngles);
+  const [cos, sin, tilt, rise] = angles(map, cameraAngles);
   const p = pointOf(point).subtract(half);
   if (inverse) {
     const far = map.getSize().y * map.options.pitchMaxDistance;

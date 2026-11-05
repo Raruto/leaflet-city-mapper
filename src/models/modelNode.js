@@ -1,5 +1,9 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { geometrySemantics } from '../globals/geometrySemantics.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nextId } from '../globals/nextId.js';
+import { geometryEmpty } from '../globals/geometryEmpty.js';
+
+
 
 import { emptyNode } from '../scene/emptyNode.js';
 import { nodeMatrix } from './nodeMatrix.js';
@@ -25,7 +29,7 @@ export function modelNode(context, index) {
   if (spec.mesh !== undefined) {
     for (primitive of description.meshes[spec.mesh].primitives) {
       attributes = /* allocation: required -- Each primitive retains independent GPU attribute descriptors. */ {};
-      for ([semantic, name] of sharedState.allocationGeometrySemantics) {
+      for ([semantic, name] of geometrySemantics) {
         if (primitive.attributes[semantic] !== undefined) attributes[name] = readAccessor(description, primitive.attributes[semantic]);
       }
       if (!attributes.position) throw /* allocation: required -- Validation errors retain this primitive conversion stack. */ new Error('glTF mesh has no positions');
@@ -56,7 +60,7 @@ export function modelNode(context, index) {
       }
       program = createProgram(backend, style);
       resources.push(program);
-      device = pluginState(backend).renderer.device;
+      device = sceneByLayer.get(backend).renderer.device;
       if (attributes.index?.data instanceof Uint8Array) {
         attributes.index.data = Uint16Array.from(attributes.index.data);
       }
@@ -84,7 +88,7 @@ export function modelNode(context, index) {
         geometry,
         program,
         fadeDuration: 250,
-        id: sharedState.nextId++,
+        id: nextId.value++,
         renderOrder: 0
       };
       mesh.name = description.meshes[spec.mesh].name;
@@ -92,7 +96,7 @@ export function modelNode(context, index) {
       setParent(mesh, group);
     }
   }
-  for (child of spec.children || sharedState.allocationGeometryEmpty) setParent(modelNode(context, child), group);
+  for (child of spec.children || geometryEmpty) setParent(modelNode(context, child), group);
   active.delete(index);
   return group;
 }

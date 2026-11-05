@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -14,11 +16,11 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
       if (!descriptor.colorAttachments.length) passes++;
       return begin.call(this, descriptor);
     };
-    pluginState(map)._sunlight = { altitude: 45, direction: [0.2,0.8,0.4] };
-    const render = () => { const before = passes; nativeChecks.render.render(pluginState(layer)._shared); return passes - before; };
+    globals.cameraByMap.get(map)._sunlight = { altitude: 45, direction: [0.2,0.8,0.4] };
+    const render = () => { const before = passes; nativeChecks.render.render(globals.sceneByLayer.get(layer)._shared); return passes - before; };
     try {
       const first = render();
-      pluginState(map)._cameraBearing = 25;
+      globals.cameraByMap.get(map)._cameraBearing = 25;
       const pan = render();
       mesh.position[0] += 1;
       const moved = render();
@@ -28,17 +30,17 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
       const stable = render();
       mesh._appearance = 0.5;
       const fading = render();
-      pluginState(map)._sunlight.direction[0] += 0.1;
+      globals.cameraByMap.get(map)._sunlight.direction[0] += 0.1;
       const sun = render();
       nativeChecks.graph.setParent(mesh, null);
       render();
-      const disabled = !pluginState(layer).renderer.sunlight.enabled;
-      nativeChecks.graph.setParent(mesh, pluginState(layer).root);
+      const disabled = !globals.sceneByLayer.get(layer).renderer.sunlight.enabled;
+      nativeChecks.graph.setParent(mesh, globals.sceneByLayer.get(layer).root);
       const restored = render();
       return {first,pan,moved,geometry,stable,fading,sun,disabled,restored};
     } finally {
       GPUCommandEncoder.prototype.beginRenderPass = begin;
-      delete pluginState(map)._sunlight;
+      delete globals.cameraByMap.get(map)._sunlight;
       nativeChecks.gpu.disposeMesh(layer, mesh);
       layer.remove();
     }
@@ -47,21 +49,21 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
 });
 
 Then('sky and terrain change from day to night and celestial bodies follow the camera', { timeout: 90000 }, async function () {
-  await this.page.waitForFunction(() => pluginState(sunlightOverlay).control && pluginState(map)._sunlight);
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
   const result = await this.page.evaluate(async () => {
-    const owner = cityMapperTestState.renderers.get(map), { device } = pluginState(owner).renderer;
-    const input = pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
-    const date = pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
+    const owner = globals.renderers.get(map), { device } = globals.sceneByLayer.get(owner).renderer;
+    const input = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
+    const date = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
     date.value = '2026-06-21';
     const select = minute => {
       input.value = String(minute);
       input.dispatchEvent(new Event('input', { bubbles: true }));
       nativeChecks.render.render(owner);
     };
-    pluginState(owner).renderer.context.configure({ device, format: pluginState(owner).renderer.format, alphaMode: 'premultiplied',
+    globals.sceneByLayer.get(owner).renderer.context.configure({ device, format: globals.sceneByLayer.get(owner).renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const brightness = async () => {
-      const { canvas, context } = pluginState(owner).renderer;
+      const { canvas, context } = globals.sceneByLayer.get(owner).renderer;
       const bytesPerRow = Math.ceil(canvas.width * 4 / 256) * 256;
       const buffer = device.createBuffer({ size: bytesPerRow * canvas.height,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -85,12 +87,12 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     select(0);
     const night = await brightness();
     const nightSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
-    const nightTint = Array.from(pluginState(owner).renderer.uniformData.slice(56, 59));
+    const nightTint = Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59));
     CityMapper.setPitch(map, 85);
-    const skyApplied = getComputedStyle(pluginState(map)._pitchSky).backgroundImage === nightSky;
+    const skyApplied = getComputedStyle(globals.cameraByMap.get(map)._pitchSky).backgroundImage === nightSky;
     select(300);
-    CityMapper.setBearing(map, -pluginState(map)._sunlight.azimuth);
-    const sun = pluginState(map)._pitchSky.querySelector('.sunlight-sun');
+    CityMapper.setBearing(map, -globals.cameraByMap.get(map)._sunlight.azimuth);
+    const sun = globals.cameraByMap.get(map)._pitchSky.querySelector('.sunlight-sun');
     const sunVisible = !sun.hidden;
     const sunPosition = [sun.style.left, sun.style.top];
     select(315);
@@ -101,11 +103,11 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     let moonMinute;
     for (let minute = 0; minute < 1440; minute += 15) {
       select(minute);
-      if (pluginState(map)._sunlight.moon.altitude > 1 && pluginState(map)._sunlight.moon.altitude < 10) { moonMinute = minute; break; }
+      if (globals.cameraByMap.get(map)._sunlight.moon.altitude > 1 && globals.cameraByMap.get(map)._sunlight.moon.altitude < 10) { moonMinute = minute; break; }
     }
     if (moonMinute === undefined) throw new Error('No lunar rise/set found on the test date');
-    CityMapper.setBearing(map, -pluginState(map)._sunlight.moon.azimuth);
-    const moon = pluginState(map)._pitchSky.querySelector('.sunlight-moon');
+    CityMapper.setBearing(map, -globals.cameraByMap.get(map)._sunlight.moon.azimuth);
+    const moon = globals.cameraByMap.get(map)._pitchSky.querySelector('.sunlight-moon');
     const moonVisible = !moon.hidden;
     const moonPosition = [moon.style.left, moon.style.top];
     select((moonMinute + 15) % 1440);
@@ -114,7 +116,7 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     const hiddenAtZeroPitch = sun.hidden && moon.hidden;
     map.removeLayer(sunlightOverlay);
     nativeChecks.render.render(owner);
-    const restored = Array.from(pluginState(owner).renderer.uniformData.slice(56, 59));
+    const restored = Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59));
     const skyRestored = !map.getContainer().style.getPropertyValue('--leaflet-sky-background');
     return { day, night, daySky, nightSky, nightTint, sunVisible, sunMoved, sunBehind,
       moonVisible, moonMoved, hiddenAtZeroPitch, restored, skyRestored, skyApplied,
@@ -131,22 +133,22 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
 });
 
 Then('the solar control starts at current time and its slider controls the sunlight', { timeout: 60000 }, async function () {
-  await this.page.waitForFunction(() => pluginState(sunlightOverlay).control && pluginState(map)._sunlight);
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
   const initial = await this.page.evaluate(() => ({
-    current: Math.abs(pluginState(sunlightOverlay).control.time.getTime() - Date.now()) < 65000 && pluginState(sunlightOverlay).control.live,
-    date: pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=date]').value,
-    minute: Number(pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=range]').value),
-    time: pluginState(sunlightOverlay).control.time.toISOString(),
-    inLayers: layers.getContainer().contains(pluginState(sunlightOverlay).control.getContainer()),
+    current: Math.abs(globals.sceneByLayer.get(sunlightOverlay).control.time.getTime() - Date.now()) < 65000 && globals.sceneByLayer.get(sunlightOverlay).control.live,
+    date: globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]').value,
+    minute: Number(globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]').value),
+    time: globals.sceneByLayer.get(sunlightOverlay).control.time.toISOString(),
+    inLayers: layers.getContainer().contains(globals.sceneByLayer.get(sunlightOverlay).control.getContainer()),
     overlays: layers._layers.filter(e => e.overlay).map(e => e.name),
-    control: pluginState(sunlightOverlay).control instanceof L.Control.Time,
-    nestedStyle: !pluginState(sunlightOverlay).control.getContainer().classList.contains('leaflet-control'),
+    control: globals.sceneByLayer.get(sunlightOverlay).control instanceof L.Control.Time,
+    nestedStyle: !globals.sceneByLayer.get(sunlightOverlay).control.getContainer().classList.contains('leaflet-control'),
   }));
   assert.equal(initial.current, true);
   assert.equal(initial.date, initial.time.slice(0, 10));
   assert.equal(initial.minute, Number(initial.time.slice(11, 13)) * 60 + Number(initial.time.slice(14, 16)));
   assert.equal(initial.inLayers, true);
-  assert.equal(pluginState(initial).control, true);
+  assert.equal(globals.sceneByLayer.get(initial).control, true);
   assert.equal(initial.nestedStyle, true);
   assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Eiffel Tower',
     'Streetlights', 'Traffic', 'Shadows']);
@@ -156,9 +158,9 @@ Then('the solar control starts at current time and its slider controls the sunli
   await slider.press('Home');
   await slider.press('ArrowRight');
   const selected = await this.page.evaluate(() => ({
-    time: pluginState(sunlightOverlay).control.time.toISOString(), live: pluginState(sunlightOverlay).control.live,
-    output: pluginState(sunlightOverlay).control.getContainer().querySelector('output').textContent,
-    altitude: pluginState(map)._sunlight.altitude,
+    time: globals.sceneByLayer.get(sunlightOverlay).control.time.toISOString(), live: globals.sceneByLayer.get(sunlightOverlay).control.live,
+    output: globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('output').textContent,
+    altitude: globals.cameraByMap.get(map)._sunlight.altitude,
   }));
   assert.equal(selected.time, '2026-06-21T00:01:00.000Z');
   assert.equal(selected.live, false);
@@ -166,22 +168,22 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.ok(selected.altitude < 0);
   await this.page.getByRole('button', { name: 'Now', exact: true }).click();
   assert.equal(await this.page.evaluate(() =>
-    pluginState(sunlightOverlay).control.live && Math.abs(pluginState(sunlightOverlay).control.time.getTime() - Date.now()) < 5000), true);
+    globals.sceneByLayer.get(sunlightOverlay).control.live && Math.abs(globals.sceneByLayer.get(sunlightOverlay).control.time.getTime() - Date.now()) < 5000), true);
   await this.page.getByLabel('Shadows', { exact: true }).uncheck();
-  assert.equal(await this.page.evaluate(() => pluginState(map)._sunlight === undefined), true);
+  assert.equal(await this.page.evaluate(() => globals.cameraByMap.get(map)._sunlight === undefined), true);
   await this.page.getByLabel('Shadows', { exact: true }).check();
-  assert.equal(await this.page.evaluate(() => !!pluginState(map)._sunlight), true);
+  assert.equal(await this.page.evaluate(() => !!globals.cameraByMap.get(map)._sunlight), true);
   await this.page.getByLabel('Solar date (UTC)').fill('');
   assert.match(await this.page.locator('.sunlight-status').textContent(), /Error/);
-  assert.equal(await this.page.evaluate(() => pluginState(map)._sunlight === undefined), true);
+  assert.equal(await this.page.evaluate(() => globals.cameraByMap.get(map)._sunlight === undefined), true);
   await this.page.getByRole('button', { name: 'Now', exact: true }).click();
-  assert.equal(await this.page.evaluate(() => !!pluginState(map)._sunlight && pluginState(sunlightOverlay).control.live), true);
+  assert.equal(await this.page.evaluate(() => !!globals.cameraByMap.get(map)._sunlight && globals.sceneByLayer.get(sunlightOverlay).control.live), true);
   await this.page.evaluate(() => map.removeLayer(sunlightOverlay));
-  assert.equal(await this.page.evaluate(() => !pluginState(map)._sunlight && !document.querySelector('.sunlight-control')), true);
+  assert.equal(await this.page.evaluate(() => !globals.cameraByMap.get(map)._sunlight && !document.querySelector('.sunlight-control')), true);
 });
 
 Then('solar lighting and depth shadows follow the time slider', { timeout: 90000 }, async function () {
-  await this.page.waitForFunction(() => pluginState(sunlightOverlay).control);
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control);
   const gpuErrors = [];
   this.page.on('console', message => { if (message.type() === 'error') gpuErrors.push(message.text()); });
   await this.page.getByLabel('Solar date (UTC)').fill('2026-06-21');
@@ -189,11 +191,11 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     input.value = '720'; input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await this.page.waitForFunction(() => {
-    const renderer = pluginState(cityMapperTestState.renderers.get(map)).renderer;
-    return pluginState(map)._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
+    const renderer = globals.sceneByLayer.get(globals.renderers.get(map)).renderer;
+    return globals.cameraByMap.get(map)._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
   });
   const result = await this.page.evaluate(async () => {
-    const owner = cityMapperTestState.renderers.get(map), renderer = pluginState(owner).renderer;
+    const owner = globals.renderers.get(map), renderer = globals.sceneByLayer.get(owner).renderer;
     nativeChecks.render.render(owner);
     await renderer.device.queue.onSubmittedWorkDone();
     const { device, sunlight } = renderer;
@@ -210,8 +212,8 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const capture = async disabled => {
-      const altitude = pluginState(map)._sunlight.altitude;
-      if (disabled) pluginState(map)._sunlight.altitude = 2;
+      const altitude = globals.cameraByMap.get(map)._sunlight.altitude;
+      if (disabled) globals.cameraByMap.get(map)._sunlight.altitude = 2;
       nativeChecks.render.render(owner);
       const width = renderer.canvas.width, height = renderer.canvas.height;
       const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
@@ -223,7 +225,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
       await buffer.mapAsync(GPUMapMode.READ);
       const pixels = new Uint8Array(buffer.getMappedRange()).slice();
       buffer.unmap(); buffer.destroy();
-      pluginState(map)._sunlight.altitude = altitude;
+      globals.cameraByMap.get(map)._sunlight.altitude = altitude;
       return pixels;
     };
     let darker = 0;
@@ -233,7 +235,7 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
         unshadowed[i] + unshadowed[i + 1] + unshadowed[i + 2]) darker++;
     }
     return {
-      altitude: pluginState(map)._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
+      altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
       covered, darker,
     };
   });
@@ -245,11 +247,11 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
   await this.page.getByRole('slider', { name: 'Time of day (UTC)' }).evaluate(input => {
     input.value = '0'; input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await this.page.waitForFunction(() => pluginState(map)._sunlight.altitude < 0);
+  await this.page.waitForFunction(() => globals.cameraByMap.get(map)._sunlight.altitude < 0);
   assert.equal(await this.page.evaluate(() => {
-    const owner = cityMapperTestState.renderers.get(map);
+    const owner = globals.renderers.get(map);
     nativeChecks.render.render(owner);
-    return pluginState(owner).renderer.uniformData[51];
+    return globals.sceneByLayer.get(owner).renderer.uniformData[51];
   }), 0);
   assert.deepEqual(gpuErrors, []);
 });

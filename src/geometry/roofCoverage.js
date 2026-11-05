@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 /** Test the mesh's ground footprint against loaded imagery, including coarse parent tiles. */
 export function roofCoverage(mesh, backend, rasters) {
   const map = backend._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
@@ -6,8 +8,8 @@ export function roofCoverage(mesh, backend, rasters) {
   let layer, zoom, origin, scale, minX, minY, maxX, maxY, i, x, y, z, px, py, nw, se, remaining, tile, size, left;
   let top, pieces, x0, y0, x1, y1, l, t, r, b;
   for (layer of rasters) {
-    zoom = pluginState(layer)._tileZoom, origin = map.project(pluginState(backend)._sceneOrigin, zoom);
-    scale = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(pluginState(backend)._sceneOrigin.lat * Math.PI / 180));
+    zoom = sceneByLayer.get(layer)._tileZoom, origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
+    scale = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * Math.PI / 180));
     minX = minY = Infinity; maxX = maxY = -Infinity;
     for (i = 0; i < 8; i++) {
       x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];
@@ -17,10 +19,10 @@ export function roofCoverage(mesh, backend, rasters) {
       minX = Math.min(minX, px); minY = Math.min(minY, py);
       maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
     }
-    if (pluginState(layer).header.maxLat !== undefined && pluginState(layer).header.minLon !== undefined &&
-      pluginState(layer).header.minLat !== undefined && pluginState(layer).header.maxLon !== undefined) {
-      nw = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [pluginState(layer).header.maxLat, pluginState(layer).header.minLon], zoom);
-      se = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [pluginState(layer).header.minLat, pluginState(layer).header.maxLon], zoom);
+    if (sceneByLayer.get(layer).header.maxLat !== undefined && sceneByLayer.get(layer).header.minLon !== undefined &&
+      sceneByLayer.get(layer).header.minLat !== undefined && sceneByLayer.get(layer).header.maxLon !== undefined) {
+      nw = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [sceneByLayer.get(layer).header.maxLat, sceneByLayer.get(layer).header.minLon], zoom);
+      se = map.project(/* allocation: required -- The projection callback may retain this archive corner coordinate. */ [sceneByLayer.get(layer).header.minLat, sceneByLayer.get(layer).header.maxLon], zoom);
       minX = Math.max(minX, nw.x); minY = Math.max(minY, nw.y);
       maxX = Math.min(maxX, se.x); maxY = Math.min(maxY, se.y);
       if (minX >= maxX || minY >= maxY) continue;
@@ -29,7 +31,7 @@ export function roofCoverage(mesh, backend, rasters) {
     remaining = /* allocation: required -- Rectangle subtraction needs an operation-local worklist across reentrant tile access. */ [
       /* allocation: required -- The uncovered footprint has independently mutable rectangle coordinates. */ [minX, minY, maxX, maxY],
     ];
-    for (tile of pluginState(layer)._rasterTiles.values()) {
+    for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
       // Failed imagery already reports an error; do not hide the building indefinitely.
       if (!tile.done && !tile.error) continue;
       size = 256 * 2 ** (zoom - tile.coords.z);

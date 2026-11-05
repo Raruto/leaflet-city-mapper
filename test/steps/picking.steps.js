@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -15,18 +17,18 @@ Then('DOM tooltip content stays inside the map without interpreting text as HTML
     const position = {
       clientX: rect.right - 2, clientY: rect.bottom - 2,
     };
-    pluginState(layer).hoveredFeature = feature;
+    globals.sceneByLayer.get(layer).hoveredFeature = feature;
     nativeChecks.picking.showFeature(layer, feature, position);
-    const tooltip = pluginState(layer)._tooltip;
+    const tooltip = globals.sceneByLayer.get(layer)._tooltip;
     const bounds = tooltip.getBoundingClientRect();
     const contained = bounds.left >= rect.left && bounds.right <= rect.right &&
       bounds.top >= rect.top && bounds.bottom <= rect.bottom;
     const literal = tooltip.firstChild === node && !tooltip.querySelector('img') &&
       tooltip.textContent === '<img src=x onerror=alert(1)>';
     const shown = !tooltip.hidden && container.style.cursor === 'pointer';
-    pluginState(layer).hoveredFeature = null;
+    globals.sceneByLayer.get(layer).hoveredFeature = null;
     nativeChecks.picking.showFeature(layer, null);
-    const restored = tooltip.hidden && container.style.cursor === 'crosshair' && !pluginState(layer).hoveredFeature;
+    const restored = tooltip.hidden && container.style.cursor === 'crosshair' && !globals.sceneByLayer.get(layer).hoveredFeature;
     layer.remove();
     const cleaned = !tooltip.isConnected && container.style.cursor === 'crosshair';
     container.style.cursor = '';
@@ -45,23 +47,23 @@ Then('3D click reports the picked object without changing the map view', { timeo
     const near = CityMapper.layer({ source: { type: '3d', center: [48.85835, 2.29465], tooltip: () => 'Near' } }).addTo(map);
     await Promise.all([origin, far, near].map(nativeChecks.ready));
     for (const [layer, height] of [[far, 0], [near, 20]]) {
-      pluginState(layer).model = nativeChecks.group();
-      pluginState(layer).model.id = height ? 'near' : 'far';
+      globals.sceneByLayer.get(layer).model = nativeChecks.group();
+      globals.sceneByLayer.get(layer).model.id = height ? 'near' : 'far';
       const mesh = nativeChecks.mesh(layer, {
         position: [-60, height, -60, 0, height, 60, 60, height, -60],
         normal: [0, 1, 0, 0, 1, 0, 0, 1, 0],
         color: [1, 0, 0, 1, 0, 0, 1, 0, 0],
       });
-      nativeChecks.graph.setParent(mesh, pluginState(layer).model);
-      nativeChecks.graph.setParent(pluginState(layer).model, pluginState(layer).root);
+      nativeChecks.graph.setParent(mesh, globals.sceneByLayer.get(layer).model);
+      nativeChecks.graph.setParent(globals.sceneByLayer.get(layer).model, globals.sceneByLayer.get(layer).root);
       nativeChecks.render.update(layer);
     }
     origin.remove();
     const container = map.getContainer();
     const position = () => {
-      nativeChecks.render.render(pluginState(near)._shared);
-      const world = new DOMPoint(0, 20, 0, 1).matrixTransform(new DOMMatrix(pluginState(near).root.worldMatrix));
-      const point = world.matrixTransform(new DOMMatrix(pluginState(near).camera.projectionViewMatrix));
+      nativeChecks.render.render(globals.sceneByLayer.get(near)._shared);
+      const world = new DOMPoint(0, 20, 0, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(near).root.worldMatrix));
+      const point = world.matrixTransform(new DOMMatrix(globals.sceneByLayer.get(near).camera.projectionViewMatrix));
       const x = point.x / point.w, y = point.y / point.w;
       const rect = container.getBoundingClientRect();
       return { clientX: rect.left + (x + 1) * rect.width / 2,
@@ -84,17 +86,17 @@ Then('3D click reports the picked object without changing the map view', { timeo
     const sharedPicking = nearClicks === 1 && farClicks === 1;
     container.dispatchEvent(new MouseEvent('click', position()));
     const repeatedClickStable = map.getZoom() === firstZoom && map.getCenter().equals(firstCenter) && movements === 0;
-    const tooltipShown = !pluginState(near)._tooltip.hidden && pluginState(near)._tooltip.textContent === 'Near';
+    const tooltipShown = !globals.sceneByLayer.get(near)._tooltip.hidden && globals.sceneByLayer.get(near)._tooltip.textContent === 'Near';
     const center = map.getCenter();
     container.dispatchEvent(new MouseEvent('click', { clientX: -1000, clientY: -1000 }));
     const emptyUnchanged = map.getZoom() === firstZoom && map.getCenter().equals(center);
     let zoomStable = true;
     diagnostic.poses = [];
-    const pickedMesh = pluginState(near).model.children[0];
+    const pickedMesh = globals.sceneByLayer.get(near).model.children[0];
     for (const [pitch, bearing] of [[0, 0], [45, 90], [75, 270], [85, 180]]) {
       CityMapper.setPitch(map, pitch);
       CityMapper.setBearing(map, bearing);
-      map.setView(pluginState(near).location, 22, { animate: false });
+      map.setView(globals.sceneByLayer.get(near).location, 22, { animate: false });
       const zoom = map.getZoom(), center = map.getCenter();
       movements = 0;
       nativeChecks.picking.onClick(near, new MouseEvent('click', position()));
@@ -136,26 +138,26 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     });
     const feature = { id: 'test', properties: { height: 10 }, mesh,
       vertexStart: 0, vertexEnd: 3 };
-    pluginState(layer).hoveredFeature = feature;
+    globals.sceneByLayer.get(layer).hoveredFeature = feature;
     nativeChecks.picking.setHighlight(layer, feature);
     nativeChecks.picking.showFeature(layer, feature, position);
     const displayed = !tooltip.hidden && tooltip.textContent === 'Height: 10 m' &&
       tooltip.style.left === '32px' && tooltip.style.top === '32px' &&
-      container.style.cursor === 'pointer' && pluginState(layer).highlightedFeature === feature;
+      container.style.cursor === 'pointer' && globals.sceneByLayer.get(layer).highlightedFeature === feature;
     let clicked;
     layer.on('featureclick', event => { clicked = event; });
     nativeChecks.picking.showFeature(layer, feature, position);
     layer.fire('featureclick', { feature, originalEvent: new MouseEvent('click', position) });
     const clickNotPinned = !tooltip.hidden && clicked.feature === feature && !('selected' in clicked);
-    pluginState(layer).hoveredFeature = null;
+    globals.sceneByLayer.get(layer).hoveredFeature = null;
     nativeChecks.picking.setHighlight(layer, null);
     nativeChecks.picking.showFeature(layer, null);
-    const hidden = tooltip.hidden && container.style.cursor === 'crosshair' && !pluginState(layer).highlightedFeature;
-    pluginState(layer).hoveredFeature = feature;
+    const hidden = tooltip.hidden && container.style.cursor === 'crosshair' && !globals.sceneByLayer.get(layer).highlightedFeature;
+    globals.sceneByLayer.get(layer).hoveredFeature = feature;
     nativeChecks.picking.setHighlight(layer, feature);
     nativeChecks.picking.showFeature(layer, feature, position);
     nativeChecks.picking.onPointerLeave(layer);
-    const leaveCleared = tooltip.hidden && container.style.cursor === 'crosshair' && !pluginState(layer).highlightedFeature;
+    const leaveCleared = tooltip.hidden && container.style.cursor === 'crosshair' && !globals.sceneByLayer.get(layer).highlightedFeature;
     const other = CityMapper.layer({ source: { type: '3d',
       center: [map.getCenter().lat, map.getCenter().lng],
       url: 'paris-buildings.pmtiles', style: () => ({ top: 10 }),
@@ -164,7 +166,7 @@ Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 
     nativeChecks.picking.showFeature(layer, feature, position);
     nativeChecks.picking.showFeature(other, feature, position);
     layer.remove();
-    const sharedCursor = container.style.cursor === 'pointer' && !pluginState(other)._tooltip.hidden;
+    const sharedCursor = container.style.cursor === 'pointer' && !globals.sceneByLayer.get(other)._tooltip.hidden;
     other.remove();
     const removed = !tooltip.isConnected && !container.querySelector('.leaflet-3d-tooltip') &&
       container.style.cursor === 'crosshair';

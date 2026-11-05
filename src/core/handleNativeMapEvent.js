@@ -1,13 +1,17 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { nativeEventMaps } from '../globals/nativeEventMaps.js';
+import { renderers } from '../globals/renderers.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { coreEventTypes } from '../globals/coreEventTypes.js';
+
+
 
 import { raycast } from '../picking/raycast.js';
 import { compareNativeHits } from './compareNativeHits.js';
 
 export function handleNativeMapEvent(event, type = event.type, targets) {
-  const map = this, context = sharedState.nativeEventMaps.get(map), fireDOMEvent = context.fireDOMEvent;
-  const owner = sharedState.renderers.get(map);
-  if (!pluginState(owner)?.renderer || targets || !sharedState.allocationCoreEventTypes.has(type)) {
+  const map = this, context = nativeEventMaps.get(map), fireDOMEvent = context.fireDOMEvent;
+  const owner = renderers.get(map);
+  if (!sceneByLayer.get(owner)?.renderer || targets || !coreEventTypes.has(type)) {
     return fireDOMEvent.call(this, event, type, targets);
   }
   const target = event.target;

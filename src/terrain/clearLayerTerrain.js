@@ -1,6 +1,8 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { setRasterTerrain } from '../raster/setRasterTerrain.js';
 
 export function clearLayerTerrain(layer) {
-  if (pluginState(layer)._type === 'pmtiles') setRasterTerrain(layer, null);
+  if (sceneByLayer.get(layer)._type === 'pmtiles') setRasterTerrain(layer, null);
 }

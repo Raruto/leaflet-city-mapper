@@ -1,5 +1,7 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { sunlightByControl } from '../globals/sunlightByControl.js';
+
+
 
 import { update as updateScene } from '../scene/update.js';
 import { atmosphere } from './atmosphere.js';
@@ -15,7 +17,7 @@ import { tickSun } from './tickSun.js';
 import { removeSun } from './removeSun.js';
 
 export function onAddSun(control, map) {
-  pluginState(map)._timeControl = control;
+  cameraByMap.get(map)._timeControl = control;
   const originalSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
   const disc = 'position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;';
   const sunDisc = L.DomUtil.create('div', 'sunlight-sun');
@@ -66,6 +68,6 @@ export function onAddSun(control, map) {
   state.timer = setInterval(tickSun, 60000, state);
   map.on('moveend', state.update);
   map.on('move rotate pitch resize', state.updateSky);
-  pluginState(control).onRemove = removeSun.bind(null, state);
+  sunlightByControl.set(control, state);
   return container;
 }

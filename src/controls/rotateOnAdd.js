@@ -1,10 +1,12 @@
+import { cameraDragSensitivity } from '../globals/cameraDragSensitivity.js';
+import { cameraBearingSensitivity } from '../globals/cameraBearingSensitivity.js';
 import { rotateButtonClick } from './rotateButtonClick.js';
 import { rotateButtonKeydown } from './rotateButtonKeydown.js';
 import { refreshRotateControl } from './refreshRotateControl.js';
 import { dragCamera } from './dragCamera.js';
 import { acceptRotateDrag } from './acceptRotateDrag.js';
 import { refreshRotateFocus } from './refreshRotateFocus.js';
-import { state as sharedState } from '../state.js';
+
 
 export function rotateOnAdd(map) {
   const container = L.DomUtil.create('div', 'leaflet-control-rotate leaflet-bar');
@@ -30,7 +32,7 @@ export function rotateOnAdd(map) {
   map.on('rotate pitch', this._refresh, this);
   this._refresh();
   this._dragState = dragCamera(map, button, acceptRotateDrag,
-    this.options.visualizePitch ? sharedState.allocationCameraDragSensitivity : sharedState.allocationCameraBearingSensitivity);
+    this.options.visualizePitch ? cameraDragSensitivity : cameraBearingSensitivity);
   button.addEventListener('focusout', refreshRotateFocus);
   L.DomEvent.on(button, 'dblclick contextmenu', L.DomEvent.stop);
   L.DomEvent.disableClickPropagation(container);

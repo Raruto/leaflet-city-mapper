@@ -1,11 +1,17 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { layerProto } from '../globals/layerProto.js';
+
+
 
 import { initNativeGPU } from '../core/initNativeGPU.js';
 import { removeLayerEvents } from './removeLayerEvents.js';
+import { addSceneLayer } from './addSceneLayer.js';
+import { get3DEvents } from './get3DEvents.js';
+import { getRasterEvents } from '../raster/getRasterEvents.js';
+import { emptyEvents } from './emptyEvents.js';
 
 export function layerLayerAdd(event) {
-  const native = !pluginState(this)._3d && (
+  const native = !sceneByLayer.get(this)._3d && (
     this instanceof L.GridLayer ||
     this instanceof L.Polyline ||
     this instanceof L.CircleMarker ||
@@ -18,22 +24,23 @@ export function layerLayerAdd(event) {
     }
     if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
   }
-  const map = event.target, state = pluginState(this);
+  const map = event.target, state = sceneByLayer.get(this);
   if (!map.hasLayer(this)) return;
-  if (state.onAdd) {
+  if (state.kind) {
     this._map = map;
     this._zoomAnimated = map._zoomAnimated;
-    if (state.getEvents) {
-      state.events = state.getEvents.call(this);
+    if (state.kind !== 'pending' && state.kind !== 'time') {
+      state.events = state.kind === 'raster' ? getRasterEvents(this) :
+        state._3d ? get3DEvents(this) : emptyEvents();
       state.eventMap = map;
       map.on(state.events, this);
       this.once('remove', removeLayerEvents, this);
     }
-    state.onAdd.call(this, map);
+    addSceneLayer(this, map);
     this.fire('add');
     map.fire('layeradd', /* allocation: required -- Give listeners an independent native layer event payload. */ { layer: this });
   } else {
-    sharedState.layerProto._layerAdd.call(this, event);
+    layerProto.value._layerAdd.call(this, event);
   }
   if (!native || !event.target.hasLayer(this)) return;
   initNativeGPU(this, event.target);

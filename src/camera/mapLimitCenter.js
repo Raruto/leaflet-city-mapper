@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { mapMethods } from '../globals/mapMethods.js';
+
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
@@ -6,7 +7,7 @@ import { groundBounds } from './groundBounds.js';
 
 export function mapLimitCenter(center, zoom, bounds) {
   if (!bounds || !this._loaded || !mapGetPitch(this) && !mapGetBearing(this)) {
-    return sharedState.mapMethods._limitCenter.call(this, center, zoom, bounds);
+    return mapMethods.value._limitCenter.call(this, center, zoom, bounds);
   }
   const half = this.getSize().divideBy(2), footprint = groundBounds(this), point = this.project(center, zoom);
   const view = /* allocation: required -- Native bounds-offset calculation consumes an independent view for this map query. */ new L.Bounds(point.add(footprint.min.subtract(half)), point.add(footprint.max.subtract(half)));

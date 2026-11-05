@@ -1,0 +1,1 @@
+export const coreQuadUV = Object.freeze([0, 0, 1, 0, 0, 1, 1, 1]);

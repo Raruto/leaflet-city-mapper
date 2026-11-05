@@ -155,19 +155,23 @@ Feature: Performance-oriented source style
     Then each source file defines at most one function
 
   @unit
-  Scenario: Module variable checks enforce the single exported state object
+  Scenario: Module variable checks enforce one global per dedicated module
     Then module variable checks handle these files:
       | file                         | source                                                    | violations |
       | src/geometry/example.js      | const HEIGHT = 8;                                         | 1          |
       | src/geometry/example.js      | export const HEIGHT = 8;                                  | 1          |
-      | src/state.js                 | export const state = {};                                  | 0          |
-      | src/state.js                 | const state = {}; export { state };                       | 0          |
-      | src\state.js                 | export const state = {};                                  | 0          |
+      | src/globals/HEIGHT.js        | export const HEIGHT = 8;                                  | 0          |
+      | src/globals/HEIGHT.js        | const HEIGHT = 8; export { HEIGHT };                      | 0          |
+      | src\globals\HEIGHT.js        | export const HEIGHT = 8;                                  | 0          |
       | src/state.js                 | const state = {};                                         | 1          |
       | src/state.js                 | export let state = {};                                    | 1          |
       | src/state.js                 | export const other = {};                                  | 1          |
       | src/state.js                 | export const state = {}, other = {};                      | 1          |
       | src/state.js                 | export const { state } = {};                              | 1          |
+      | src/globals/HEIGHT.js        | export const other = 8;                                   | 1          |
+      | src/globals/HEIGHT.js        | export const HEIGHT = 8, WIDTH = 4;                       | 1          |
+      | src/globals/HEIGHT.js        | export let HEIGHT = 8;                                    | 1          |
+      | src/globals/HEIGHT.js        | const HEIGHT = 8;                                         | 1          |
       | src/constants/HEIGHT.js      | export const HEIGHT = 8;                                  | 1          |
       | src/state/count.js           | export let count = 0;                                     | 1          |
       | src/geometry/example.js      | function example() { const HEIGHT = 8; let count = 0; }    | 0          |
@@ -175,8 +179,8 @@ Feature: Performance-oriented source style
       | src/geometry/example.js      | if (true) { const HEIGHT = 8; }                           | 1          |
 
   @unit
-  Scenario: Module variables live in one shared state object
-    Then module constants and state use the single state object
+  Scenario: Module variables live in dedicated global modules
+    Then module constants and state use dedicated global modules
 
   @unit
   Scenario: Directory depth checks reject all nested source folders

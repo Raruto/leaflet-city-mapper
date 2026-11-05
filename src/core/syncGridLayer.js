@@ -1,8 +1,9 @@
-import { pluginState } from './pluginState.js';
+import { coreWhite } from '../globals/coreWhite.js';
+
 import { styleNativeMesh } from './styleNativeMesh.js';
 import { quadNativeMesh } from './quadNativeMesh.js';
 import { boundsQuad } from './boundsQuad.js';
-import { state as sharedState } from '../state.js';
+
 
 export function syncGridLayer(state) {
   const { source, textures, meshes } = state;
@@ -14,9 +15,9 @@ export function syncGridLayer(state) {
     opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
     retained = textures.get(key);
     mesh = meshes.get(key);
-    if (mesh && retained?.image === tile.el && pluginState(retained).url === (tile.el.currentSrc || tile.el.src)) {
+    if (mesh && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
       retained.used = true;
-      styleNativeMesh(state, mesh, sharedState.allocationCoreWhite, opacity);
+      styleNativeMesh(state, mesh, coreWhite, opacity);
     } else {
       [nw, se] = source._tileCoordsToNwSe(tile.coords);
       mesh = quadNativeMesh(state, key, tile.el, boundsQuad(state,

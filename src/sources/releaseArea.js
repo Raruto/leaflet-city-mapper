@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { setHighlight } from '../picking/setHighlight.js';
 import { showFeature } from '../picking/showFeature.js';
 import { setParent } from '../scene/setParent.js';
@@ -9,9 +11,9 @@ export function releaseArea(backend, area) {
   area.request.abort();
   let attribute;
   if (area.mesh) {
-    if (pluginState(backend).highlightedFeature?.mesh === area.mesh) {
+    if (sceneByLayer.get(backend).highlightedFeature?.mesh === area.mesh) {
       setHighlight(backend, null);
-      pluginState(backend).hoveredFeature = null;
+      sceneByLayer.get(backend).hoveredFeature = null;
       showFeature(backend, null);
     }
     setParent(area.mesh, null);

@@ -1,7 +1,8 @@
-import { state as sharedState } from '../state.js';
+import { dragStates } from '../globals/dragStates.js';
+
 
 export function cameraDragClick(event) {
-  const state = sharedState.dragStates.get(this);
+  const state = dragStates.value.get(this);
   if (!state.moved) return;
   event.preventDefault();
   event.stopPropagation();

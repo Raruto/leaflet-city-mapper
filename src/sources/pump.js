@@ -1,5 +1,7 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { renderers } from '../globals/renderers.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 import { emptyNode } from "../scene/emptyNode.js";
 import { isClockWise } from "../triangulation/isClockWise.js";
@@ -20,16 +22,16 @@ import { buildArea } from './buildArea.js';
 
 /** Share four load/build slots across source layers, nearest ground blocks first. */
 export function pump(backend, map = backend._map) {
-  const shared = map && sharedState.renderers.get(map);
+  const shared = map && renderers.get(map);
   if (!shared) return;
   const layers = /* allocation: required -- Snapshot renderer ownership against reentrant progress listeners. */ [];
   let layer, area, center, areaBackend;
-  for (layer of pluginState(shared)._layers) {
-    if (Number.isFinite(pluginState(layer)._inflight) && pluginState(layer)._areas && (pluginState(layer).url || pluginState(layer)._geojson)) layers.push(layer);
+  for (layer of sceneByLayer.get(shared)._layers) {
+    if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
   }
   const pending = /* allocation: required -- Keep this scheduling pass independent of nested pump calls. */ [];
   for (layer of layers) {
-    for (area of pluginState(layer)._areas.values()) {
+    for (area of sceneByLayer.get(layer)._areas.values()) {
       if (area.started || area.request.signal.aborted) continue;
       center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
       pending.push(/* allocation: required -- Snapshot each asynchronous area request before sorting. */ {
@@ -41,12 +43,12 @@ export function pump(backend, map = backend._map) {
   }
   pending.sort(compareDistance);
   let inflight = 0;
-  for (layer of layers) inflight += pluginState(layer)._inflight;
+  for (layer of layers) inflight += sceneByLayer.get(layer)._inflight;
   for ({ layer: areaBackend, area } of pending) {
     if (inflight >= 4) break;
-    if (pluginState(areaBackend)._inflight >= 2) continue;
+    if (sceneByLayer.get(areaBackend)._inflight >= 2) continue;
     area.started = true;
-    pluginState(areaBackend)._inflight++;
+    sceneByLayer.get(areaBackend)._inflight++;
     inflight++;
     buildArea(areaBackend, area, map);
   }

@@ -1,9 +1,10 @@
-import { state as sharedState } from '../state.js';
+import { radians } from '../globals/radians.js';
+
 import { mapGetBearing } from './mapGetBearing.js';
 import { mapGetPitch } from './mapGetPitch.js';
 
 export function angles(map, target) {
-  const bearing = mapGetBearing(map) * sharedState.radians, pitch = mapGetPitch(map) * sharedState.radians;
+  const bearing = mapGetBearing(map) * radians, pitch = mapGetPitch(map) * radians;
   target ||= /* allocation: required -- Unbuffered callers retain independent angle snapshots. */ [];
   target[0] = Math.cos(bearing);
   target[1] = Math.sin(bearing);

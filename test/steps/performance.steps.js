@@ -233,10 +233,12 @@ function inspectModuleVariables(node, path, exported, errors) {
   if (!node || typeof node.type !== 'string' || FUNCTIONS.has(node.type)) return;
   if (node.type === 'VariableDeclaration') {
     const file = path.join('/');
-    if (file !== 'src/state.js' || node.kind !== 'const' || node.declarations.length !== 1 ||
-        node.declarations[0].id.type !== 'Identifier' || node.declarations[0].id.name !== 'state' ||
-        !exported.has('state')) {
-      errors.push(`${file}:${node.loc.start.line} module variables must use the single exported const state in src/state.js`);
+    const name = path.at(-1).replace(/\.js$/, '');
+    if (path.length !== 3 || path[0] !== 'src' || path[1] !== 'globals' ||
+        node.kind !== 'const' || node.declarations.length !== 1 ||
+        node.declarations[0].id.type !== 'Identifier' || node.declarations[0].id.name !== name ||
+        !exported.has(name)) {
+      errors.push(`${file}:${node.loc.start.line} module variables must be a single exported const matching their src/globals filename`);
     }
   }
   for (const value of Object.values(node)) {
@@ -252,7 +254,7 @@ Then('module variable checks handle these files:', function (table) {
   }
 });
 
-Then('module constants and state use the single state object', async function () {
+Then('module constants and state use dedicated global modules', async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -262,10 +264,11 @@ Then('module constants and state use the single state object', async function ()
   }
   assert.deepEqual(errors, []);
   assert.ok(!(await readdir('src')).includes('constants'), 'src/constants must not be reintroduced');
-  const module = await import('../../src/state.js');
-  assert.deepEqual(Object.keys(module), ['state']);
-  assert.equal(typeof module.state, 'object');
-  assert.notEqual(module.state, null);
+  assert.ok(!(await readdir('src')).includes('state.js'), 'The shared state aggregator must not be reintroduced');
+  for (const file of await readdir('src/globals')) {
+    const module = await import(`../../src/globals/${file}`);
+    assert.deepEqual(Object.keys(module), [file.replace(/\.js$/, '')]);
+  }
 });
 
 function isNestedSourceDirectory(directory) {

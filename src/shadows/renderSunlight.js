@@ -1,4 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { disabledShadow } from '../globals/disabledShadow.js';
+import { shadowValues } from '../globals/shadowValues.js';
+
 import { shadowCacheMatches } from './shadowCacheMatches.js';
 import { shadowMatrix } from './shadowMatrix.js';
 import { ensureShadowPipeline } from './ensureShadowPipeline.js';
@@ -8,16 +11,16 @@ import { resizeSunlight } from './resizeSunlight.js';
 /** One shared directional depth map. Off-screen but loaded geometry can cast shadows. */
 
 export function renderSunlight(backend, encoder, meshes, sunlight) {
-  const renderer = pluginState(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+  const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
   if (!meshes.length || !sunlight || sunlight.altitude < 3) {
     if (!sun.enabled) return;
-    device.queue.writeBuffer(sun.buffer, 0, sharedState.allocationRenderDisabledShadow);
+    device.queue.writeBuffer(sun.buffer, 0, disabledShadow);
     sun.enabled = false;
     sun.cache = null;
     return;
   }
   if (shadowCacheMatches(sun, meshes, sunlight)) return;
-  const values = sharedState.allocationRenderShadowValues;
+  const values = shadowValues;
   sun.enabled = true;
   resizeSunlight(backend, Math.min(2048, device.limits.maxTextureDimension2D));
   values.set(shadowMatrix(meshes, sunlight));
@@ -43,4 +46,3 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   }
   sun.cache = /* allocation: required -- Each sunlight owner retains a separate direction and caster snapshot. */ { direction: /* allocation: required -- Cached light direction must not alias the mutable live sunlight direction. */ [...sunlight.direction], meshes: snapshots };
 }
-import { state as sharedState } from '../state.js';

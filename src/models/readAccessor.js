@@ -1,11 +1,13 @@
-import { state as sharedState } from '../state.js';
+import { types } from '../globals/types.js';
+import { sizes } from '../globals/sizes.js';
+
 
 import { readAccessorValues } from './readAccessorValues.js';
 
 /** Decode packed, interleaved, normalized or sparse glTF accessor data. */
 
 export function readAccessor(description, index) {
-  const spec = description.accessors[index], Type = sharedState.types[spec.componentType], size = sharedState.sizes[spec.type];
+  const spec = description.accessors[index], Type = types[spec.componentType], size = sizes[spec.type];
   if (!Type || !size || !Number.isInteger(spec.count) || spec.count < 0) {
     throw /* allocation: required -- Accessor errors retain the failing decode stack. */ new Error('Invalid glTF accessor');
   }
@@ -20,7 +22,7 @@ export function readAccessor(description, index) {
     );
   }
   if (spec.sparse) {
-    const sparse = spec.sparse, Index = sharedState.types[sparse.indices.componentType];
+    const sparse = spec.sparse, Index = types[sparse.indices.componentType];
     if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {
       throw /* allocation: required -- Sparse accessor errors retain the failing decode stack. */ new Error('Invalid sparse glTF indices');
     }

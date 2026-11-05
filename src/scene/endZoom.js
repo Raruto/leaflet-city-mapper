@@ -1,5 +1,8 @@
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
 import { mapUpdateCameraOverlays } from '../camera/mapUpdateCameraOverlays.js';
-import { pluginState } from '../core/pluginState.js';
+
 import { update } from './update.js';
 
 /** Stop using the outgoing level after zoomend; the next redraw uses current tiles. */
@@ -7,14 +10,14 @@ import { update } from './update.js';
 export function endZoom() {
   const backend = this;
   let animation;
-  if (pluginState(backend)._zoomTransitions) {
-    for (animation of pluginState(backend)._zoomTransitions.keys()) animation.finish();
+  if (sceneByLayer.get(backend)._zoomTransitions) {
+    for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.finish();
   }
-  pluginState(backend)._zoomTransitions = null;
-  pluginState(backend)._zoomView = null;
-  delete pluginState(backend._map)._cameraView;
+  sceneByLayer.get(backend)._zoomTransitions = null;
+  sceneByLayer.get(backend)._zoomView = null;
+  delete cameraByMap.get(backend._map)._cameraView;
   backend._map.getContainer().classList.remove('leaflet-camera-zoom');
   mapUpdateCameraOverlays(backend._map);
-  pluginState(backend)._zoomLevel = null;
+  sceneByLayer.get(backend)._zoomLevel = null;
   update(backend);
 }

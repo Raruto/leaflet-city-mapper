@@ -1,17 +1,19 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { sortMeshes } from "./sortMeshes.js";
 import { roofCoverage } from "../geometry/roofCoverage.js";
 
 export function prepareFrameMeshes(backend, rasters, now, meshes) {
-  const candidates = pluginState(backend)._visibleMeshes, shadowMeshes = pluginState(backend)._shadowMeshes, renderer = pluginState(backend).renderer;
+  const candidates = sceneByLayer.get(backend)._visibleMeshes, shadowMeshes = sceneByLayer.get(backend)._shadowMeshes, renderer = sceneByLayer.get(backend).renderer;
   let appearing = false;
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   let mesh, progress;
   for (mesh of candidates) {
     if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
     if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
-      if (mesh._roofCoverageSignature !== pluginState(backend)._roofRaster?.signature) {
-        mesh._roofCoverageSignature = pluginState(backend)._roofRaster?.signature;
+      if (mesh._roofCoverageSignature !== sceneByLayer.get(backend)._roofRaster?.signature) {
+        mesh._roofCoverageSignature = sceneByLayer.get(backend)._roofRaster?.signature;
         mesh._roofCovered = roofCoverage(mesh, backend, rasters);
       }
       if (!mesh._roofCovered) { mesh._appearance = 0; continue; }

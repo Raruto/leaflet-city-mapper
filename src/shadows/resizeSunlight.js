@@ -1,19 +1,20 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { shadowTexture } from '../globals/shadowTexture.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { bindSunlight } from './bindSunlight.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 
 export function resizeSunlight(backend, size) {
-  const gpuCreateTexture1 = sharedState.allocationRenderResizeSunlightCreateTexture1;
-  const device = pluginState(backend).renderer.device, sun = pluginState(backend).renderer.sunlight;
+  const device = sceneByLayer.get(backend).renderer.device, sun = sceneByLayer.get(backend).renderer.sunlight;
   if (sun.size === size) return;
   if (sun.texture) destroyTexture(backend, sun.texture);
   sun.size = size;
   sun.texture = device.createTexture((
-    gpuCreateTexture1.size[0] = size,
-    gpuCreateTexture1.size[1] = size,
-    gpuCreateTexture1.usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
-    gpuCreateTexture1
+    shadowTexture.size[0] = size,
+    shadowTexture.size[1] = size,
+    shadowTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+    shadowTexture
   ));
 
   bindSunlight(backend);

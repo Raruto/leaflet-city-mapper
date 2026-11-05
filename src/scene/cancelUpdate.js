@@ -1,11 +1,13 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { pendingUpdates } from '../globals/pendingUpdates.js';
+
+
 
 export function cancelUpdate(backend) {
-  const frame = pluginState(backend)._frame;
-  sharedState.pendingUpdates.delete(backend);
-  pluginState(backend)._frame = null;
-  if (!sharedState.pendingUpdates.size && frame != null) {
+  const frame = sceneByLayer.get(backend)._frame;
+  pendingUpdates.delete(backend);
+  sceneByLayer.get(backend)._frame = null;
+  if (!pendingUpdates.size && frame != null) {
     cancelAnimationFrame(frame);
   }
 }

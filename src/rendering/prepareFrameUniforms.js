@@ -1,11 +1,12 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { frameBuffer } from '../globals/frameBuffer.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { destroyTexture } from './destroyTexture.js';
 import { updatePointLights } from '../lighting/updatePointLights.js';
 
 export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
-  const gpuCreateBuffer1 = sharedState.allocationRenderPrepareFrameUniformsCreateBuffer1;
-  const renderer = pluginState(backend).renderer, camera = pluginState(backend).camera;
+  const renderer = sceneByLayer.get(backend).renderer, camera = sceneByLayer.get(backend).camera;
   const view = camera.viewMatrix, direction = sunlight?.direction;
   const x = direction ? direction[0] : -300;
   const y = direction ? direction[1] : 500;
@@ -20,9 +21,9 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
     if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
     renderer.uniformBuffer = renderer.device.createBuffer((
-      gpuCreateBuffer1.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256,
-      gpuCreateBuffer1.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      gpuCreateBuffer1
+      frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256,
+      frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      frameBuffer
     ));
 
     renderer.uniformData = /* allocation: required -- Each renderer retains a CPU upload buffer matching its GPU uniform-buffer capacity. */ new Float32Array(renderer.uniformBuffer.size / 4);
@@ -30,7 +31,7 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   const frameData = renderer.uniformData;
   frameData.set(camera.viewMatrix, 0);
   frameData.set(camera.projectionMatrix, 16);
-  if (pluginState(backend)._roofRaster?.matrix) frameData.set(pluginState(backend)._roofRaster.matrix, 32);
+  if (sceneByLayer.get(backend)._roofRaster?.matrix) frameData.set(sceneByLayer.get(backend)._roofRaster.matrix, 32);
   else {
     frameData.fill(0, 32, 48);
     frameData[32] = frameData[37] = frameData[42] = frameData[47] = 1;

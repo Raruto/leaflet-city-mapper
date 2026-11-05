@@ -1,8 +1,9 @@
-import { state as sharedState } from '../state.js';
+import { pendingPlacements } from '../globals/pendingPlacements.js';
+
 
 import { runPlacements } from './runPlacements.js';
 
 export function replaceEntry() {
-  sharedState.pendingPlacements.push(this);
+  pendingPlacements.push(this);
   queueMicrotask(runPlacements);
 }

@@ -1,47 +1,55 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { meshPipeline } from '../globals/meshPipeline.js';
+import { meshImage } from '../globals/meshImage.js';
+import { meshTarget } from '../globals/meshTarget.js';
+import { meshCopySize } from '../globals/meshCopySize.js';
+import { meshBindGroup } from '../globals/meshBindGroup.js';
+import { meshOffsets } from '../globals/meshOffsets.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { alphaBlend } from '../globals/alphaBlend.js';
+import { drawEntries } from '../globals/drawEntries.js';
+import { drawMeshEntry } from '../globals/drawMeshEntry.js';
+import { drawFrameEntry } from '../globals/drawFrameEntry.js';
+import { drawTerrainEntry } from '../globals/drawTerrainEntry.js';
+import { drawTextureEntries } from '../globals/drawTextureEntries.js';
+import { drawSamplerEntries } from '../globals/drawSamplerEntries.js';
+
+
 /** Upload retained CPU data and draw one mesh in the active WebGPU render pass. */
 
 export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
-  const gpuCreateRenderPipeline1 = sharedState.allocationRenderDrawGeometryCreateRenderPipeline1;
-  const gpuCopyExternalImageToTexture2 = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture2;
-  const gpuCopyExternalImageToTexture3 = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture3;
-  const gpuCopyExternalImageToTexture4 = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture4;
-  const gpuCreateBindGroup5 = sharedState.allocationRenderDrawGeometryCreateBindGroup5;
-  const gpuSetBindGroup6 = sharedState.allocationRenderDrawGeometrySetBindGroup6;
   const { geometry, program } = mesh;
-  const device = pluginState(backend).renderer.device;
+  const device = sceneByLayer.get(backend).renderer.device;
   // Mixed-LOD imagery composites coarse-to-fine; its depth still occludes later 3D objects.
   // ponytail: self-occlusion during LOD blending needs separate per-LOD depth passes.
-  const depthCompare = program.depthTest === false || (mesh.ground && pluginState(backend).renderer.groundOverlap)
+  const depthCompare = program.depthTest === false || (mesh.ground && sceneByLayer.get(backend).renderer.groundOverlap)
     ? 'always' : 'less-equal';
   const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}`;
   let pipeline = program.pipelineCache.get(pipelineKey);
   if (!pipeline) {
     pipeline = device.createRenderPipeline((
-      gpuCreateRenderPipeline1.layout = program.pipelineLayout,
-      gpuCreateRenderPipeline1.vertex.module = program.vertex,
-      gpuCreateRenderPipeline1.vertex.buffers = program.vertexBuffers,
-      gpuCreateRenderPipeline1.fragment.module = program.fragment,
-      gpuCreateRenderPipeline1.fragment.targets[0].format = pluginState(backend).renderer.format,
-      gpuCreateRenderPipeline1.fragment.targets[0].blend = program.transparent ? sharedState.allocationRenderAlphaBlend : undefined,
-      gpuCreateRenderPipeline1.fragment.targets[0].writeMask = GPUColorWrite.ALL,
-      gpuCreateRenderPipeline1.primitive.cullMode = cullMode,
-      gpuCreateRenderPipeline1.primitive.frontFace = frontFace,
-      gpuCreateRenderPipeline1.depthStencil.depthWriteEnabled = program.depthWrite,
-      gpuCreateRenderPipeline1.depthStencil.depthCompare = depthCompare,
-      gpuCreateRenderPipeline1
+      meshPipeline.layout = program.pipelineLayout,
+      meshPipeline.vertex.module = program.vertex,
+      meshPipeline.vertex.buffers = program.vertexBuffers,
+      meshPipeline.fragment.module = program.fragment,
+      meshPipeline.fragment.targets[0].format = sceneByLayer.get(backend).renderer.format,
+      meshPipeline.fragment.targets[0].blend = program.transparent ? alphaBlend : undefined,
+      meshPipeline.fragment.targets[0].writeMask = GPUColorWrite.ALL,
+      meshPipeline.primitive.cullMode = cullMode,
+      meshPipeline.primitive.frontFace = frontFace,
+      meshPipeline.depthStencil.depthWriteEnabled = program.depthWrite,
+      meshPipeline.depthStencil.depthCompare = depthCompare,
+      meshPipeline
     ));
-    gpuCreateRenderPipeline1.layout = null;
-    gpuCreateRenderPipeline1.vertex.module = null;
-    gpuCreateRenderPipeline1.vertex.buffers = null;
-    gpuCreateRenderPipeline1.fragment.module = null;
+    meshPipeline.layout = null;
+    meshPipeline.vertex.module = null;
+    meshPipeline.vertex.buffers = null;
+    meshPipeline.fragment.module = null;
 
     program.pipelineCache.set(pipelineKey, pipeline);
   }
 
   const uniforms = program.uniforms;
-  const renderer = pluginState(backend).renderer;
+  const renderer = sceneByLayer.get(backend).renderer;
   const offset = renderer.uniformSlot++ * 256;
   const data = renderer.uniformData, base = offset / 4;
   data.set(mesh.worldMatrix, base);
@@ -71,23 +79,23 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
     if (texture.uploaded !== texture.image) {
       device.queue.copyExternalImageToTexture(
         (
-        gpuCopyExternalImageToTexture2.source = texture.image,
-        gpuCopyExternalImageToTexture2.flipY = Boolean(texture.flipY),
-        gpuCopyExternalImageToTexture2
+        meshImage.source = texture.image,
+        meshImage.flipY = Boolean(texture.flipY),
+        meshImage
       ),
         (
-        gpuCopyExternalImageToTexture3.texture = texture.texture,
-        gpuCopyExternalImageToTexture3
+        meshTarget.texture = texture.texture,
+        meshTarget
       ),
         (
-        gpuCopyExternalImageToTexture4[0] = texture.image.width,
-        gpuCopyExternalImageToTexture4[1] = texture.image.height,
-        gpuCopyExternalImageToTexture4
+        meshCopySize[0] = texture.image.width,
+        meshCopySize[1] = texture.image.height,
+        meshCopySize
       )
       );
-      gpuCopyExternalImageToTexture2.source = null;
+      meshImage.source = null;
 
-      gpuCopyExternalImageToTexture3.texture = null;
+      meshTarget.texture = null;
 
       texture.uploaded = texture.image;
     }
@@ -100,49 +108,49 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
       textures[i].sampler !== mesh.boundTextures[i][1]) bindingsChanged = true;
   }
   if (bindingsChanged) {
-    const entries = sharedState.allocationRenderDrawEntries;
+    const entries = drawEntries;
     entries.length = 0;
-    sharedState.allocationRenderDrawMeshEntry.resource.buffer = renderer.uniformBuffer;
-    sharedState.allocationRenderDrawFrameEntry.resource.buffer = renderer.uniformBuffer;
-    entries.push(sharedState.allocationRenderDrawMeshEntry, sharedState.allocationRenderDrawFrameEntry);
+    drawMeshEntry.resource.buffer = renderer.uniformBuffer;
+    drawFrameEntry.resource.buffer = renderer.uniformBuffer;
+    entries.push(drawMeshEntry, drawFrameEntry);
     if (program.terrain) {
-      sharedState.allocationRenderDrawTerrainEntry.resource = program.terrain.texture.createView();
-      entries.push(sharedState.allocationRenderDrawTerrainEntry);
+      drawTerrainEntry.resource = program.terrain.texture.createView();
+      entries.push(drawTerrainEntry);
     }
     mesh.boundBuffer = renderer.uniformBuffer;
     const boundTextures = mesh.boundTextures ||= /* allocation: required -- The mesh retains its own bound-texture snapshots between draws. */ [];
     boundTextures.length = textures.length;
     for (i = 0; i < textures.length; i++) {
       binding = program.bindings[i], texture = textures[i];
-      sharedState.allocationRenderDrawTextureEntries[i].binding = binding.texture;
-      sharedState.allocationRenderDrawTextureEntries[i].resource = texture.texture.createView();
-      sharedState.allocationRenderDrawSamplerEntries[i].binding = binding.sampler;
-      sharedState.allocationRenderDrawSamplerEntries[i].resource = texture.sampler;
-      entries.push(sharedState.allocationRenderDrawTextureEntries[i], sharedState.allocationRenderDrawSamplerEntries[i]);
+      drawTextureEntries[i].binding = binding.texture;
+      drawTextureEntries[i].resource = texture.texture.createView();
+      drawSamplerEntries[i].binding = binding.sampler;
+      drawSamplerEntries[i].resource = texture.sampler;
+      entries.push(drawTextureEntries[i], drawSamplerEntries[i]);
       boundTextures[i] ||= /* allocation: required -- Each mesh retains a separate texture-and-sampler comparison tuple for this binding slot. */ [];
       boundTextures[i][0] = texture.texture;
       boundTextures[i][1] = texture.sampler;
     }
     mesh.bindGroup = device.createBindGroup((
-      gpuCreateBindGroup5.layout = program.bindGroupLayout,
-      gpuCreateBindGroup5.entries = entries,
-      gpuCreateBindGroup5
+      meshBindGroup.layout = program.bindGroupLayout,
+      meshBindGroup.entries = entries,
+      meshBindGroup
     ));
-    gpuCreateBindGroup5.layout = null;
-    gpuCreateBindGroup5.entries = null;
-    sharedState.allocationRenderDrawMeshEntry.resource.buffer = null;
-    sharedState.allocationRenderDrawFrameEntry.resource.buffer = null;
-    sharedState.allocationRenderDrawTerrainEntry.resource = null;
+    meshBindGroup.layout = null;
+    meshBindGroup.entries = null;
+    drawMeshEntry.resource.buffer = null;
+    drawFrameEntry.resource.buffer = null;
+    drawTerrainEntry.resource = null;
     for (i = 0; i < textures.length; i++) {
-      sharedState.allocationRenderDrawTextureEntries[i].resource = null;
-      sharedState.allocationRenderDrawSamplerEntries[i].resource = null;
+      drawTextureEntries[i].resource = null;
+      drawSamplerEntries[i].resource = null;
     }
     entries.length = 0;
   }
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, mesh.bindGroup, (
-    gpuSetBindGroup6[0] = offset,
-    gpuSetBindGroup6
+    meshOffsets[0] = offset,
+    meshOffsets
   ));
 
   pass.setVertexBuffer(0, geometry.attributes.position.buffer);

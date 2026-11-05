@@ -1,9 +1,11 @@
-import { state as sharedState } from '../state.js';
+import { dragStates } from '../globals/dragStates.js';
+import { cameraFocusOptions } from '../globals/cameraFocusOptions.js';
+
 
 import { editable } from './editable.js';
 
 export function cameraDragDown(event) {
-  const state = sharedState.dragStates.get(this);
+  const state = dragStates.value.get(this);
   if (state.drag || !state.accept(event) || editable(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -15,7 +17,7 @@ export function cameraDragDown(event) {
     dragging: state.map.dragging?.enabled(),
   };
   state.map.dragging?.disable();
-  state.element.focus?.(sharedState.allocationCameraFocusOptions);
+  state.element.focus?.(cameraFocusOptions);
   state.element.setPointerCapture(event.pointerId);
   state.element.style.cursor = 'grabbing';
 }

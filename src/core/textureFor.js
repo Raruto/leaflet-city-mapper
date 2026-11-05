@@ -1,8 +1,10 @@
-import { pluginState } from './pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { coreSampler } from '../globals/coreSampler.js';
+
 import { disposeMesh } from '../rendering/disposeMesh.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { uploadCanvasTexture } from './uploadCanvasTexture.js';
-import { state as sharedState } from '../state.js';
+
 
 export function textureFor(state, key, image) {
   if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
@@ -11,7 +13,7 @@ export function textureFor(state, key, image) {
   const { backend, textures, meshes } = state;
   let texture = textures.get(key);
   const url = image.currentSrc || image.src;
-  if (!texture || texture.image !== image || pluginState(texture).url !== url) {
+  if (!texture || texture.image !== image || texture.url !== url) {
     if (texture) {
       const mesh = meshes.get(key);
       if (mesh) disposeMesh(backend, mesh);
@@ -21,14 +23,14 @@ export function textureFor(state, key, image) {
     }
     const width = image.naturalWidth || image.width, height = image.naturalHeight || image.height;
     if (!width || !height) return;
-    const { device } = pluginState(backend).renderer;
+    const { device } = sceneByLayer.get(backend).renderer;
     texture = /* allocation: required -- Each cached image owns its GPU texture lifecycle and upload state. */ {
       device, image, url, format: 'rgba8unorm', uploaded: null,
       texture: device.createTexture(/* allocation: required -- The device consumes an independent descriptor for this texture. */ {
         size: /* allocation: required -- This texture's extent must not alias concurrent upload sizes. */ [width, height], format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       }),
-      sampler: device.createSampler(sharedState.allocationCoreSampler),
+      sampler: device.createSampler(coreSampler),
     };
     textures.set(key, texture);
     if (image instanceof HTMLCanvasElement) {

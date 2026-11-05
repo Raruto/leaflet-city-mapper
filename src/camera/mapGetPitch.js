@@ -1,2 +1,4 @@
-import { pluginState } from '../core/pluginState.js';
-export function mapGetPitch(map) { return pluginState(map)._cameraPitch ?? 0; }
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
+export function mapGetPitch(map) { return cameraByMap.get(map)?._cameraPitch ?? 0; }

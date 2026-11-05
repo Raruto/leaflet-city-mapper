@@ -1,7 +1,8 @@
+import { defaultMaterial } from '../globals/defaultMaterial.js';
 import { textureBinding } from '../rendering/textureBinding.js';
 
 /** Material WGSL and texture bindings, without a GPU device or Leaflet layer. */
-export function materialShaders(material = sharedState.allocationRenderDefaultMaterial, sparkle = false, elevationWGSL = '') {
+export function materialShaders(material = defaultMaterial, sparkle = false, elevationWGSL = '') {
   const hasBase = Boolean(material.baseTexture);
   const hasMetal = Boolean(material.metalTexture);
   const hasEmissive = Boolean(material.emissiveTexture);
@@ -244,4 +245,3 @@ export function materialShaders(material = sharedState.allocationRenderDefaultMa
   `;
   return /* allocation: required -- Each caller owns its shader sources and matching texture-binding metadata. */ { vertex, fragment, bindings, textured, hasTerrain };
 }
-import { state as sharedState } from '../state.js';

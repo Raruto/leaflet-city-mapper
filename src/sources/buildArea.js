@@ -1,4 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 import { buildAreaFeature } from './buildAreaFeature.js';
 import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
@@ -9,14 +12,14 @@ export async function buildArea(backend, area, map) {
   let feature;
   try {
     await /* allocation: required -- Give this area build an independent frame-yield promise. */ new Promise(requestAnimationFrame);
-    await pluginState(pluginState(map)._terrain3D)?._terrainPromise;
+    await sceneByLayer.get(cameraByMap.get(map)._terrain3D)?._terrainPromise;
     if (area.request.signal.aborted) return;
     const data = await loadSource(backend, area);
     if (area.request.signal.aborted) return;
     if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
       throw /* allocation: required -- Preserve the failure stack for an invalid response. */ new Error('Invalid GeoJSON response');
     }
-    if (pluginState(backend)._geojson && typeof backend.options.style !== 'function') {
+    if (sceneByLayer.get(backend)._geojson && typeof backend.options.style !== 'function') {
       throw /* allocation: required -- Preserve the failure stack for an invalid style callback. */ new Error('style must be a function');
     }
     const context = sourceAreaContext(backend, area, map);
@@ -37,7 +40,7 @@ export async function buildArea(backend, area, map) {
       backend.fire('error', /* allocation: required -- Preserve each area failure as an independent event. */ { error });
     }
   } finally {
-    pluginState(backend)._inflight--;
+    sceneByLayer.get(backend)._inflight--;
     pump(backend, map);
   }
 }

@@ -1,9 +1,11 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { archiveDecoder } from '../globals/archiveDecoder.js';
+
 import { getZxy } from './getZxy.js';
-import { state as sharedState } from '../state.js';
+
 
 export async function loadSource(layer, area) {
-  if (pluginState(layer)._geojson) {
+  if (sceneByLayer.get(layer)._geojson) {
     const { data, url } = layer.options;
     if (data !== undefined && url) {
       throw /* allocation: required -- Preserve the stack of this ambiguous source configuration. */ new Error('GeoJSON source requires either data or url');
@@ -21,7 +23,7 @@ export async function loadSource(layer, area) {
   }
   const result = await getZxy(layer, area.coords.z, area.coords.x, area.coords.y, area.request.signal);
   return result
-    ? JSON.parse(sharedState.archiveDecoder.decode(result.data))
+    ? JSON.parse(archiveDecoder.decode(result.data))
     : /* allocation: required -- Each empty source result must be independently mutable. */ {
       type: 'FeatureCollection',
       features: /* allocation: required -- Empty results must not share a mutable feature array. */ [],

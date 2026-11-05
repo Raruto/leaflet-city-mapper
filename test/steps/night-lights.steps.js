@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -51,26 +53,27 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
   this.page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   const loaded = () => this.page.waitForFunction(() => {
     const layer = window.streetlights;
-    if (!pluginState(layer)?._areas) return false;
-    const failed = [...pluginState(layer)._areas.values()].find(area => area.error);
+    if (!globals.sceneByLayer.get(layer)?._areas) return false;
+    const failed = [...globals.sceneByLayer.get(layer)._areas.values()].find(area => area.error);
     if (failed) throw new Error(failed.error);
-    return pluginState(layer)._inflight === 0 && [...pluginState(layer)._areas.values()].some(area => area.buildings > 0);
+    return globals.sceneByLayer.get(layer)._inflight === 0 && [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.buildings > 0);
   }, null, { timeout: 60000 });
   await loaded();
   await this.page.waitForFunction(() => {
-    const owner = cityMapperTestState.renderers.get(map);
-    return pluginState(owner)?._roofRaster && pluginState(pluginState(map)._terrain3D)?._rasterTiles.size > 0 &&
-      !Object.values(map._layers).some(layer => (pluginState(layer).isLoading || layer.isLoading)?.call(layer)) &&
-      [...pluginState(owner)._layers].every(layer => !pluginState(layer)._3d || !pluginState(layer).url || (pluginState(layer)._inflight === 0 &&
-        [...pluginState(layer)._areas.values()].every(area => area.done || area.error)));
+    const owner = globals.renderers.get(map);
+    return globals.sceneByLayer.get(owner)?._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
+      !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
+        ? CityMapper.isLoading(layer) : layer.isLoading?.()) &&
+      [...globals.sceneByLayer.get(owner)._layers].every(layer => !globals.sceneByLayer.get(layer)._3d || !globals.sceneByLayer.get(layer).url || (globals.sceneByLayer.get(layer)._inflight === 0 &&
+        [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done || area.error)));
   }, null, { timeout: 60000 });
   const result = await this.page.evaluate(async () => {
     const { style: lampStyle, tooltip: lampTooltip } = streetlights.options;
-    const layer = streetlights, owner = cityMapperTestState.renderers.get(map);
-    const { device, context, canvas, format } = pluginState(owner).renderer;
+    const layer = streetlights, owner = globals.renderers.get(map);
+    const { device, context, canvas, format } = globals.sceneByLayer.get(owner).renderer;
     const gpuErrors = [];
     device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
-    const features = pluginState(layer).root.children.flatMap(mesh => mesh.extras.featureFaces);
+    const features = globals.sceneByLayer.get(layer).root.children.flatMap(mesh => mesh.extras.featureFaces);
     const actualStyle = lampStyle(features[0]);
     const surfaceOnly = features.every(feature => lampStyle(feature) !== null);
     const poles = [];
@@ -85,7 +88,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
       const key = feature.properties.cod_ouvrag || feature.id;
       if (!supportIds.has(key)) { supportIds.add(key); expectedPoles++; }
     }
-    const poleVertices = pluginState(layer).root.children.reduce((sum, mesh) =>
+    const poleVertices = globals.sceneByLayer.get(layer).root.children.reduce((sum, mesh) =>
       sum + mesh.geometry.attributes.uv.data.reduce((count, value, i) => count + Number(i % 2 === 0 && value === 3), 0), 0);
     const tooltip = lampTooltip({ properties: { foyer: '<img src=x onerror=alert(1)>', support_hauteur: '7',
       lampe_flux: 'None', lampe_temperature_couleur: '2700', lib_regime: 'HORAIRE EP' } });
@@ -93,8 +96,8 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     nativeChecks.geometry.lightGeometry({ x: 10, y: 20, ground: 3 }, { top: 8, lightRadius: 12, color: 0xffcc88 },
       (a, ah, b, bh, c, ch) => geometry.push([a, ah], [b, bh], [c, ch]));
     const emitterHeight = geometry.every(([point, height]) => Math.abs(point.ground + height - 11) <= 0.651);
-    const date = pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
-    const slider = pluginState(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
+    const date = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
+    const slider = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
     const select = minute => {
       date.value = '2026-06-21'; slider.value = String(minute);
       slider.dispatchEvent(new Event('input', { bubbles: true }));
@@ -124,20 +127,20 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
       return count;
     };
     select(0);
-    const nightStrength = pluginState(owner).renderer.uniformData[55];
+    const nightStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
     const lit = await capture();
-    pluginState(layer).root.visible = false;
+    globals.sceneByLayer.get(layer).root.visible = false;
     const unlit = await capture();
-    pluginState(layer).root.visible = true;
+    globals.sceneByLayer.get(layer).root.visible = true;
     const lampPixels = brighter(lit, unlit);
     const tower = layers._layers.find(entry => entry.name === 'Eiffel Tower').layer;
     const programs = new Set();
-    nativeChecks.graph.traverse(pluginState(tower).root, mesh => { if (mesh.program) programs.add(mesh.program); });
+    nativeChecks.graph.traverse(globals.sceneByLayer.get(tower).root, mesh => { if (mesh.program) programs.add(mesh.program); });
     for (const program of programs) program.nightSparkle = false;
     const darkTower = await capture();
-    pluginState(tower).root.visible = false;
+    globals.sceneByLayer.get(tower).root.visible = false;
     const withoutTower = await capture();
-    pluginState(tower).root.visible = true;
+    globals.sceneByLayer.get(tower).root.visible = true;
     let towerSurfacePixels = 0;
     for (let i = 0; i < darkTower.length; i += 4) {
       if (Math.abs(darkTower[i] - withoutTower[i]) + Math.abs(darkTower[i + 1] - withoutTower[i + 1]) +
@@ -146,41 +149,41 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     for (const program of programs) program.nightSparkle = true;
     const towerPixels = brighter(lit, darkTower);
     // Hide terrain and the luminous sprite triangles: only nearby 3D surfaces can brighten.
-    const terrain = [...pluginState(owner)._layers].find(layer => pluginState(layer)._type === 'terrain');
-    pluginState(terrain).root.visible = false;
-    const ranges = pluginState(layer).root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
+    const terrain = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer)._type === 'terrain');
+    globals.sceneByLayer.get(terrain).root.visible = false;
+    const ranges = globals.sceneByLayer.get(layer).root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
     for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;
     const objectsLit = await capture();
-    pluginState(layer).root.visible = false;
+    globals.sceneByLayer.get(layer).root.visible = false;
     const objectsUnlit = await capture();
-    pluginState(layer).root.visible = true;
-    pluginState(terrain).root.visible = true;
+    globals.sceneByLayer.get(layer).root.visible = true;
+    globals.sceneByLayer.get(terrain).root.visible = true;
     for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
     const objectPixels = brighter(objectsLit, objectsUnlit);
     select(720);
-    const dayStrength = pluginState(owner).renderer.uniformData[55];
+    const dayStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
     const dayLit = await capture();
-    pluginState(layer).root.visible = false;
+    globals.sceneByLayer.get(layer).root.visible = false;
     const dayWithoutLamps = await capture();
-    pluginState(layer).root.visible = true;
+    globals.sceneByLayer.get(layer).root.visible = true;
     const dayLampPixels = brighter(dayLit, dayWithoutLamps) + brighter(dayWithoutLamps, dayLit);
     select(0);
     map.removeLayer(sunlightOverlay);
     nativeChecks.render.render(owner);
-    const disabledStrength = pluginState(owner).renderer.uniformData[55];
+    const disabledStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
     map.addLayer(sunlightOverlay);
     nativeChecks.render.render(owner);
-    window.oldLightMeshes = [...pluginState(layer).root.children];
+    window.oldLightMeshes = [...globals.sceneByLayer.get(layer).root.children];
     return {
       count: features.length, ids: features.every(f => f.id === f.properties.foyer),
       surfaceOnly, poleBounds, poleVertices, expectedPoles,
       geometry: geometry.length, emitterHeight,
-      validBuffers: pluginState(layer).root.children.every(mesh =>
+      validBuffers: globals.sceneByLayer.get(layer).root.children.every(mesh =>
         Object.values(mesh.geometry.attributes).every(attribute => [...attribute.data].every(Number.isFinite))),
       style: actualStyle, safeTooltip: !tooltip.querySelector('img') && tooltip.textContent.includes('<img'),
       explicitEstimates: tooltip.textContent.includes('6000 lm (assumed)') && tooltip.textContent.includes('not measured lux'),
       nightStrength, dayStrength, disabledStrength, lampPixels, dayLampPixels, towerPixels, towerSurfacePixels, objectPixels,
-      shared: pluginState(layer).renderer === pluginState(tower).renderer, gpuErrors,
+      shared: globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(tower).renderer, gpuErrors,
     };
   });
   assert.ok(result.count > 100, JSON.stringify(result));
@@ -206,10 +209,10 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
   assert.deepEqual(result.gpuErrors, []);
   const control = this.page.getByRole('checkbox', { name: 'Streetlights', exact: true });
   await control.uncheck();
-  assert.equal(await this.page.evaluate(() => !streetlights._map && pluginState(streetlights)._areas.size === 0), true);
+  assert.equal(await this.page.evaluate(() => !streetlights._map && globals.sceneByLayer.get(streetlights)._areas.size === 0), true);
   await control.check();
   await loaded();
   assert.equal(await this.page.evaluate(() =>
-    pluginState(streetlights).root.children.every(mesh => !window.oldLightMeshes.includes(mesh))), true);
+    globals.sceneByLayer.get(streetlights).root.children.every(mesh => !window.oldLightMeshes.includes(mesh))), true);
   assert.deepEqual(errors, []);
 });

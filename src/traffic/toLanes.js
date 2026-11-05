@@ -1,9 +1,10 @@
+import { trafficEmptyList } from '../globals/trafficEmptyList.js';
 // GeoJSON (Multi)LineStrings become lanes ({latlngs, properties, elevation?}); prepare() adds `points` ([x, z, ground]),
 // `lengths` and `length` in layer-local metres.
 
-import { state as sharedState } from '../state.js';
 
-export function toLanes({ features = sharedState.allocationTrafficEmptyList }) {
+
+export function toLanes({ features = trafficEmptyList }) {
   const lanes = /* allocation: required -- The caller retains independent lanes for its source. */ [];
   let geometry, properties, lines, line, latlngs, lng, lat, i;
   for ({ geometry, properties } of features) {

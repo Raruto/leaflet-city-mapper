@@ -1,3 +1,4 @@
+import { cameraAnimatedOptions } from '../globals/cameraAnimatedOptions.js';
 import { mapSetBearing } from './mapSetBearing.js';
-import { state as sharedState } from '../state.js';
-export function mapResetNorth(map, options = sharedState.allocationCameraAnimatedOptions) { return mapSetBearing(map, 0, options); }
+
+export function mapResetNorth(map, options = cameraAnimatedOptions) { return mapSetBearing(map, 0, options); }

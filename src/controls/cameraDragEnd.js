@@ -1,6 +1,7 @@
-import { state as sharedState } from '../state.js';
+import { dragStates } from '../globals/dragStates.js';
+
 import { finishCameraDrag } from './finishCameraDrag.js';
 
 export function cameraDragEnd(event) {
-  finishCameraDrag(sharedState.dragStates.get(this), event);
+  finishCameraDrag(dragStates.value.get(this), event);
 }

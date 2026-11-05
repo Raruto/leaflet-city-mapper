@@ -1,11 +1,13 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
 import { collectMeshes } from './collectMeshes.js';
 
 export function collectFrameMeshes(backend, sunlight, sceneChanged) {
-  const camera = pluginState(backend).camera;
+  const camera = sceneByLayer.get(backend).camera;
   const projection = camera.projectionViewMatrix;
-  const renderer = pluginState(backend).renderer;
+  const renderer = sceneByLayer.get(backend).renderer;
   const frustum = renderer.frustum ||= /* allocation: required -- Each renderer retains its own mutable frustum planes between frames. */ [
     /* allocation: required -- Renderer retains its left frustum plane coefficients. */ new Float64Array(4),
     /* allocation: required -- Renderer retains its right frustum plane coefficients. */ new Float64Array(4),
@@ -27,10 +29,10 @@ export function collectFrameMeshes(backend, sunlight, sceneChanged) {
     }
     frustumLengths[i] = Math.hypot(plane[0], plane[1], plane[2]);
   }
-  const candidates = pluginState(backend)._visibleMeshes ||= /* allocation: required -- Backend retains its visible-mesh list through frame preparation. */ [];
+  const candidates = sceneByLayer.get(backend)._visibleMeshes ||= /* allocation: required -- Backend retains its visible-mesh list through frame preparation. */ [];
   candidates.length = 0;
-  const shadowMeshes = pluginState(backend)._shadowMeshes ||= /* allocation: required -- Backend retains its caster list through the shadow pass. */ [];
+  const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes ||= /* allocation: required -- Backend retains its caster list through the shadow pass. */ [];
   shadowMeshes.length = 0;
-  if (sceneChanged) updateWorldMatrix(pluginState(backend).scene);
-  collectMeshes(pluginState(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
+  if (sceneChanged) updateWorldMatrix(sceneByLayer.get(backend).scene);
+  collectMeshes(sceneByLayer.get(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
 }

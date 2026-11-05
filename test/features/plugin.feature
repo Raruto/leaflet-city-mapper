@@ -1,4 +1,8 @@
 Feature: Separate plugin integration
+  Scenario: Global instance associations contain data instead of plugin methods
+    Given the instrumented city mapper plugin is loaded after Leaflet alone
+    Then native instance data is isolated in explicit feature associations
+
   Scenario: The plugin does not add attributes to native Leaflet instances
     Given native Leaflet attributes are recorded before loading the plugin
     Then the plugin adds no methods or properties to native Leaflet instances

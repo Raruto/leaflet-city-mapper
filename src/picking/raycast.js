@@ -1,9 +1,13 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { trafficByLayer } from '../globals/trafficByLayer.js';
+
+
 import { intersectMeshes } from '../collision/intersectMeshes.js';
 import { traverse } from '../scene/traverse.js';
 import { updateCamera } from '../scene/updateCamera.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
 import { collectVisibleMesh } from './collectVisibleMesh.js';
+import { placeTraffic } from '../traffic/placeTraffic.js';
 
 /** Raycasting, hover/click highlight and tooltips. */
 /**
@@ -15,17 +19,18 @@ import { collectVisibleMesh } from './collectVisibleMesh.js';
  * @returns {Object[]} Nearest hit per mesh: object, shared-world point/distance and triangle faceIndex.
  */
 
-export function raycast(backend, event, objects = pluginState(backend).root.children, recursive = true) {
-  if (!pluginState(backend).renderer) {
+export function raycast(backend, event, objects = sceneByLayer.get(backend).root.children, recursive = true) {
+  if (!sceneByLayer.get(backend).renderer) {
     return /* allocation: required -- Keep each caller's mutable hit list independent. */ [];
   }
-  pluginState(backend)._beforeRaycast?.();
+  const traffic = trafficByLayer.get(backend);
+  if (traffic) placeTraffic(traffic);
   const rect = backend._map.getContainer().getBoundingClientRect();
-  updateWorldMatrix(pluginState(backend).scene);
-  updateCamera(pluginState(backend).camera);
+  updateWorldMatrix(sceneByLayer.get(backend).scene);
+  updateCamera(sceneByLayer.get(backend).camera);
   // Unproject the mouse (-1..1) into a world-space ray from the camera.
-  const inverseCamera = pluginState(backend).raycaster.inverse;
-  const matrix = pluginState(backend).camera.projectionViewMatrix;
+  const inverseCamera = sceneByLayer.get(backend).raycaster.inverse;
+  const matrix = sceneByLayer.get(backend).camera.projectionViewMatrix;
   inverseCamera.m11 = matrix[0], inverseCamera.m12 = matrix[1], inverseCamera.m13 = matrix[2], inverseCamera.m14 = matrix[3];
   inverseCamera.m21 = matrix[4], inverseCamera.m22 = matrix[5], inverseCamera.m23 = matrix[6], inverseCamera.m24 = matrix[7];
   inverseCamera.m31 = matrix[8], inverseCamera.m32 = matrix[9], inverseCamera.m33 = matrix[10], inverseCamera.m34 = matrix[11];
@@ -48,22 +53,22 @@ export function raycast(backend, event, objects = pluginState(backend).root.chil
       !Number.isFinite(inverseCamera.m43) || !Number.isFinite(inverseCamera.m44)) {
     throw /* allocation: required -- Give each singular query its own failure stack. */ new Error('Singular 3D transform');
   }
-  pluginState(backend).raycaster.origin[0] = pluginState(backend).camera.position[0];
-  pluginState(backend).raycaster.origin[1] = pluginState(backend).camera.position[1];
-  pluginState(backend).raycaster.origin[2] = pluginState(backend).camera.position[2];
-  pluginState(backend).raycaster.direction[0] = endX / endW - pluginState(backend).raycaster.origin[0];
-  pluginState(backend).raycaster.direction[1] = endY / endW - pluginState(backend).raycaster.origin[1];
-  pluginState(backend).raycaster.direction[2] = endZ / endW - pluginState(backend).raycaster.origin[2];
-  const direction = pluginState(backend).raycaster.direction;
+  sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
+  sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];
+  sceneByLayer.get(backend).raycaster.origin[2] = sceneByLayer.get(backend).camera.position[2];
+  sceneByLayer.get(backend).raycaster.direction[0] = endX / endW - sceneByLayer.get(backend).raycaster.origin[0];
+  sceneByLayer.get(backend).raycaster.direction[1] = endY / endW - sceneByLayer.get(backend).raycaster.origin[1];
+  sceneByLayer.get(backend).raycaster.direction[2] = endZ / endW - sceneByLayer.get(backend).raycaster.origin[2];
+  const direction = sceneByLayer.get(backend).raycaster.direction;
   const rayLength = Math.hypot(direction[0], direction[1], direction[2]) || 1;
-  pluginState(backend).raycaster.direction[0] /= rayLength;
-  pluginState(backend).raycaster.direction[1] /= rayLength;
-  pluginState(backend).raycaster.direction[2] /= rayLength;
-  const meshes = pluginState(backend).raycaster.meshes;
+  sceneByLayer.get(backend).raycaster.direction[0] /= rayLength;
+  sceneByLayer.get(backend).raycaster.direction[1] /= rayLength;
+  sceneByLayer.get(backend).raycaster.direction[2] /= rayLength;
+  const meshes = sceneByLayer.get(backend).raycaster.meshes;
   meshes.length = 0;
   for (object of objects) {
     if (recursive) traverse(object, collectVisibleMesh, meshes);
     else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
   }
-  return intersectMeshes(pluginState(backend).raycaster, meshes, pluginState(backend).renderer.uniformData?.[55]);
+  return intersectMeshes(sceneByLayer.get(backend).raycaster, meshes, sceneByLayer.get(backend).renderer.uniformData?.[55]);
 }

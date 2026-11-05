@@ -1,4 +1,6 @@
-import { state as sharedState } from '../state.js';
+import { mapMethods } from '../globals/mapMethods.js';
+import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
+
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
@@ -7,10 +9,10 @@ import { pointOf } from './pointOf.js';
 import { groundBounds } from './groundBounds.js';
 
 export function mapGetBoundsZoom(bounds, inside, padding) {
-  if (!mapGetPitch(this) && !mapGetBearing(this)) return sharedState.mapMethods.getBoundsZoom.call(this, bounds, inside, padding);
+  if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.getBoundsZoom.call(this, bounds, inside, padding);
   if (!inside) return fitCameraBounds(this, bounds,
     /* allocation: required -- Fitting may reenter through map callbacks and needs call-local padding options. */ {
-      padding: pointOf(padding || sharedState.allocationCameraZeroPadding).divideBy(2),
+      padding: pointOf(padding || cameraZeroPadding).divideBy(2),
     }).zoom;
   bounds = bounds instanceof L.LatLngBounds ? bounds
     : /* allocation: required -- Native bounds normalization must not alias caller coordinates. */ new L.LatLngBounds(bounds);

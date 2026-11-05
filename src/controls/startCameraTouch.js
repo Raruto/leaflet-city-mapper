@@ -1,11 +1,14 @@
+import { touchByContainer } from '../globals/touchByContainer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
 import { mapStopPitchBearingAnimation } from '../camera/mapStopPitchBearingAnimation.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
-import { pluginState } from '../core/pluginState.js';
+
 export function startCameraTouch(event) {
-  const state = pluginState(this)._cameraTouchState, { map, container } = state;
+  const state = touchByContainer.get(this), { map, container } = state;
   if (state.touch || event.touches.length !== 2 || event.target.closest('.leaflet-control')) return;
-  if (!pluginState(map).touchRotate.enabled() && !pluginState(map).touchPitch.enabled()) return;
+  if (!cameraByMap.get(map).touchRotate.enabled() && !cameraByMap.get(map).touchPitch.enabled()) return;
   const [a, b] = event.touches;
   if (Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) < 1) return;
   mapStopPitchBearingAnimation(map);

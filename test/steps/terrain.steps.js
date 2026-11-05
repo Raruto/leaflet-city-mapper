@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
@@ -19,28 +21,28 @@ Then('new ground tiles blend continuously while retained tiles stay opaque', { t
         maxLon: se.lng - 1e-7, minLat: se.lat + 1e-7 }),
       getZxy: async () => ({ data: image }),
     } } }).addTo(map);
-    await pluginState(raster).ready;
+    await globals.sceneByLayer.get(raster).ready;
     const key = `${zoom}/${cell.x}/${cell.y}`;
-    while (!pluginState(raster)._rasterTiles.get(key)?.done) await new Promise(requestAnimationFrame);
-    const tile = pluginState(raster)._rasterTiles.get(key), mesh = tile.mesh;
+    while (!globals.sceneByLayer.get(raster)._rasterTiles.get(key)?.done) await new Promise(requestAnimationFrame);
+    const tile = globals.sceneByLayer.get(raster)._rasterTiles.get(key), mesh = tile.mesh;
     const point = map.latLngToContainerPoint(map.unproject(cell.add([0.5, 0.5]).multiplyBy(256)));
     await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1);
     mesh.fadeStart = performance.now() - 125;
     const middle = await nativeChecks.pixels(raster, Math.floor(point.x - 5), Math.floor(point.y - 5), 10, 10);
     const alphas = middle.filter((_, i) => i % 4 === 3);
     mesh.fadeStart = performance.now() - 300;
-    nativeChecks.render.render(pluginState(raster)._shared);
+    nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
     const start = mesh.fadeStart;
     const opaque = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
     const neighbor = map.unproject(cell.add([2, 1]).multiplyBy(256));
-    pluginState(raster).header.maxLon = neighbor.lng - 1e-7;
+    globals.sceneByLayer.get(raster).header.maxLon = neighbor.lng - 1e-7;
     const { updateRasterTiles } = await import('/src/raster/updateRasterTiles.js');
     updateRasterTiles(raster);
     while (CityMapper.isLoading(raster)) await new Promise(requestAnimationFrame);
-    nativeChecks.render.render(pluginState(raster)._shared);
-    const retained = pluginState(raster)._rasterTiles.get(key) === tile && mesh.fadeStart === start && mesh._appearance === 1;
+    nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
+    const retained = globals.sceneByLayer.get(raster)._rasterTiles.get(key) === tile && mesh.fadeStart === start && mesh._appearance === 1;
     const after = [...await nativeChecks.pixels(raster, Math.floor(point.x), Math.floor(point.y), 1, 1)];
-    const loadedNeighbor = pluginState(raster)._rasterTiles.get(`${zoom}/${cell.x + 1}/${cell.y}`)?.done;
+    const loadedNeighbor = globals.sceneByLayer.get(raster)._rasterTiles.get(`${zoom}/${cell.x + 1}/${cell.y}`)?.done;
     raster.remove();
     return { minimum: Math.min(...alphas), maximum: Math.max(...alphas), retained, loadedNeighbor, opaque, after };
   });
@@ -74,7 +76,7 @@ Then('buildings wait only for their own roof imagery and never restart their app
         return { data: image };
       },
     } } }).addTo(map);
-    await pluginState(raster).ready;
+    await globals.sceneByLayer.get(raster).ready;
     const ring = [[-30,-30],[30,-30],[30,30],[-30,30],[-30,-30]].map(offset => {
       const p = map.unproject(cell.add([0.5,0.5]).multiplyBy(256).add(offset)); return [p.lng,p.lat];
     });
@@ -82,9 +84,9 @@ Then('buildings wait only for their own roof imagery and never restart their app
       data:{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[ring]}}]},
     } }).addTo(map);
     await nativeChecks.ready(building);
-    while (![...pluginState(building)._areas.values()].some(area=>area.mesh)) await new Promise(requestAnimationFrame);
-    const mesh = [...pluginState(building)._areas.values()][0].mesh;
-    nativeChecks.render.render(pluginState(building)._shared);
+    while (![...globals.sceneByLayer.get(building)._areas.values()].some(area=>area.mesh)) await new Promise(requestAnimationFrame);
+    const mesh = [...globals.sceneByLayer.get(building)._areas.values()][0].mesh;
+    nativeChecks.render.render(globals.sceneByLayer.get(building)._shared);
     const hidden = mesh._appearance === 0 && mesh.fadeStart === undefined;
     const rect = map.getContainer().getBoundingClientRect();
     const pointer = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
@@ -92,9 +94,9 @@ Then('buildings wait only for their own roof imagery and never restart their app
     const key = `${cell.x}/${cell.y}`;
     while (!releases.has(key)) await new Promise(requestAnimationFrame);
     releases.get(key)(); releases.delete(key);
-    while (!pluginState(raster)._rasterTiles.get(`${zoom}/${key}`)?.done) await new Promise(requestAnimationFrame);
-    pluginState(pluginState(building)._shared)._roofRaster.updatedAt = 0;
-    nativeChecks.render.render(pluginState(building)._shared);
+    while (!globals.sceneByLayer.get(raster)._rasterTiles.get(`${zoom}/${key}`)?.done) await new Promise(requestAnimationFrame);
+    globals.sceneByLayer.get(globals.sceneByLayer.get(building)._shared)._roofRaster.updatedAt = 0;
+    nativeChecks.render.render(globals.sceneByLayer.get(building)._shared);
     const simultaneous = mesh._roofRevealed && mesh.fadeStart !== undefined && CityMapper.isLoading(raster);
     mesh.fadeStart = performance.now() - 300;
     const pixel = [...await nativeChecks.pixels(building, 200, 150, 1, 1)];
@@ -104,7 +106,7 @@ Then('buildings wait only for their own roof imagery and never restart their app
     for (const resolve of releases.values()) resolve();
     releases.clear();
     await new Promise(requestAnimationFrame);
-    nativeChecks.render.render(pluginState(building)._shared);
+    nativeChecks.render.render(globals.sceneByLayer.get(building)._shared);
     const retained = mesh.fadeStart === fadeStart && mesh._appearance === 1;
     raster.remove(); building.remove();
     for (const resolve of releases.values()) resolve();
@@ -154,34 +156,34 @@ Then('coarse ground imagery precedes detail and survives delayed replacements', 
       }
     };
     try {
-      await pluginState(raster).ready;
+      await globals.sceneByLayer.get(raster).ready;
       await wait(() => {
-        const parents = [...pluginState(raster)._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
+        const parents = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
         return parents.length && parents.every(tile => tile.done);
       });
-      const parents = [...pluginState(raster)._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
+      const parents = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].filter(tile => tile.coords.z < zoom);
       for (const tile of parents) tile.mesh.fadeStart = performance.now() - 300;
       const pixels = await nativeChecks.pixels(raster, 190, 140, 20, 20);
       const coverage = pixels.filter((_, index) => index % 4 === 3 && pixels[index] === 255).length;
-      const retained = parents.every(tile => pluginState(raster)._rasterTiles.has(`${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`));
+      const retained = parents.every(tile => globals.sceneByLayer.get(raster)._rasterTiles.has(`${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`));
       release();
-      await wait(() => !CityMapper.isLoading(raster) && [...pluginState(raster)._wantedRasterTiles].every(key => pluginState(raster)._rasterTiles.get(key)?.done));
-      for (const tile of pluginState(raster)._rasterTiles.values()) {
+      await wait(() => !CityMapper.isLoading(raster) && [...globals.sceneByLayer.get(raster)._wantedRasterTiles].every(key => globals.sceneByLayer.get(raster)._rasterTiles.get(key)?.done));
+      for (const tile of globals.sceneByLayer.get(raster)._rasterTiles.values()) {
         tile.loadedAt = tile.mesh.fadeStart = performance.now() - 300;
       }
-      pluginState(raster)._pruneAfter = 0;
-      nativeChecks.render.render(pluginState(raster)._shared);
-      const replaced = [...pluginState(raster)._rasterTiles.values()].every(tile => tile.coords.z === zoom);
+      globals.sceneByLayer.get(raster)._pruneAfter = 0;
+      nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
+      const replaced = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].every(tile => tile.coords.z === zoom);
       raster.remove();
       fail = true;
       raster.addTo(map);
       await wait(() => errors.length && !CityMapper.isLoading(raster));
-      for (const tile of pluginState(raster)._rasterTiles.values()) {
+      for (const tile of globals.sceneByLayer.get(raster)._rasterTiles.values()) {
         if (tile.done) tile.loadedAt = tile.mesh.fadeStart = performance.now() - 300;
       }
-      pluginState(raster)._pruneAfter = 0;
-      nativeChecks.render.render(pluginState(raster)._shared);
-      const preservedOnError = [...pluginState(raster)._rasterTiles.values()].some(tile => tile.done && tile.coords.z < zoom);
+      globals.sceneByLayer.get(raster)._pruneAfter = 0;
+      nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
+      const preservedOnError = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].some(tile => tile.done && tile.coords.z < zoom);
       return { coarseFirst: requests[0] === zoom - 2, bounded: maximum <= 4, coverage, retained, replaced,
         preservedOnError, errors };
     } finally { release(); raster.remove(); }
@@ -241,13 +243,13 @@ Then('fading terrain detail covers retained ground without depth interference', 
       }
     };
     try {
-      await Promise.all([pluginState(raster).ready, pluginState(terrain).ready]);
-      await pluginState(terrain)._terrainPromise;
-      await wait(() => pluginState(terrain)._rasterTiles.size > 0 && [...pluginState(raster)._rasterTiles.values()]
+      await Promise.all([globals.sceneByLayer.get(raster).ready, globals.sceneByLayer.get(terrain).ready]);
+      await globals.sceneByLayer.get(terrain)._terrainPromise;
+      await wait(() => globals.sceneByLayer.get(terrain)._rasterTiles.size > 0 && [...globals.sceneByLayer.get(raster)._rasterTiles.values()]
         .filter(tile => tile.coords.z < zoom).every(tile => tile.done));
-      for (const [tile, mesh] of pluginState(terrain)._rasterTiles) tile.loadedAt = mesh.fadeStart = performance.now() - 300;
+      for (const [tile, mesh] of globals.sceneByLayer.get(terrain)._rasterTiles) tile.loadedAt = mesh.fadeStart = performance.now() - 300;
       release();
-      await wait(() => !CityMapper.isLoading(raster) && pluginState(terrain)._rasterTiles.size === pluginState(raster)._rasterTiles.size);
+      await wait(() => !CityMapper.isLoading(raster) && globals.sceneByLayer.get(terrain)._rasterTiles.size === globals.sceneByLayer.get(raster)._rasterTiles.size);
       const object = nativeChecks.gpu.createMesh(terrain, {
         position: [-500, -10, -500, 500, -10, -500, 500, -10, 500,
           -500, -10, -500, 500, -10, 500, -500, -10, 500],
@@ -260,28 +262,28 @@ Then('fading terrain detail covers retained ground without depth interference', 
         CityMapper.setPitch(map, pitch); CityMapper.setBearing(map, bearing);
         map.setZoom(zoom + delta, { animate: false });
         map.panBy([pan, 0], { animate: false });
-        for (const [tile, mesh] of pluginState(terrain)._rasterTiles) {
+        for (const [tile, mesh] of globals.sceneByLayer.get(terrain)._rasterTiles) {
           // Keep the coarse tiles until their replacements finish fading.
           tile.loadedAt = performance.now() + 60000;
           mesh.fadeStart = performance.now() - (tile.coords.z === zoom ? 125 : 300);
         }
-        pluginState(raster)._pruneAfter = 0;
+        globals.sceneByLayer.get(raster)._pruneAfter = 0;
         const pixels = await nativeChecks.pixels(raster, 180, 130, 40, 40);
         const bad = pixels.filter((value, i) => i % 4 === 3 &&
           (value !== 255 || pixels[i - 1] < 60 || pixels[i - 2] !== 0 || pixels[i - 3] < 60)).length;
-        failures.push({ bad, sample: [...pixels.slice(0, 4)], coarse: [...pluginState(terrain)._rasterTiles.keys()]
+        failures.push({ bad, sample: [...pixels.slice(0, 4)], coarse: [...globals.sceneByLayer.get(terrain)._rasterTiles.keys()]
           .filter(tile => tile.coords.z < zoom).length });
       }
       object.position[1] = 20;
       const above = [...await nativeChecks.pixels(raster, 200, 150, 1, 1)];
       nativeChecks.gpu.disposeMesh(terrain, object);
-      for (const tile of pluginState(raster)._rasterTiles.values()) tile.loadedAt = performance.now() - 300;
-      pluginState(raster)._pruneAfter = 0;
+      for (const tile of globals.sceneByLayer.get(raster)._rasterTiles.values()) tile.loadedAt = performance.now() - 300;
+      globals.sceneByLayer.get(raster)._pruneAfter = 0;
       const { pruneRasterTiles } = await import('/src/raster/pruneRasterTiles.js');
       pruneRasterTiles(raster);
-      nativeChecks.render.render(pluginState(raster)._shared);
-      const steadyDepth = !pluginState(raster).renderer.groundOverlap &&
-        pluginState(terrain)._rasterProgram.pipelineCache.has('back:ccw:less-equal');
+      nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
+      const steadyDepth = !globals.sceneByLayer.get(raster).renderer.groundOverlap &&
+        globals.sceneByLayer.get(terrain)._rasterProgram.pipelineCache.has('back:ccw:less-equal');
       return { failures, above, steadyDepth };
     } finally {
       release(); raster.remove(); terrain.remove();
@@ -304,8 +306,8 @@ Then('streamed geometry dissolves progressively while remaining opaque', { timeo
       ].map(offset => { const p = map.containerPointToLatLng(map.getSize().divideBy(2).add(offset)); return [p.lng, p.lat]; })] } }],
     }, style: () => ({ top: 10 }) } }).addTo(map);
     await nativeChecks.ready(layer);
-    while (![...pluginState(layer)._areas.values()].some(area => area.mesh)) await new Promise(requestAnimationFrame);
-    const mesh = [...pluginState(layer)._areas.values()][0].mesh;
+    while (![...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.mesh)) await new Promise(requestAnimationFrame);
+    const mesh = [...globals.sceneByLayer.get(layer)._areas.values()][0].mesh;
     const count = async elapsed => {
       mesh.fadeStart = performance.now() - elapsed;
       const pixels = await nativeChecks.pixels(layer, 180, 130, 40, 40);
@@ -336,7 +338,7 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     layer.options.style = () => ({ top: 20, color: 0x00ff00 });
     await nativeChecks.loadBlock(layer, area, [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]);
     const mesh = area.mesh;
-    nativeChecks.render.render(pluginState(layer)._shared);
+    nativeChecks.render.render(globals.sceneByLayer.get(layer)._shared);
     mesh.fadeStart = performance.now() - 300;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 256;
@@ -358,28 +360,28 @@ Then('roof imagery follows raster loading, background changes and renderer owner
     const first = CityMapper.layer({ source: { type: 'pmtiles', url: 'roof-first.pmtiles', archive: archive(false) } });
     const second = CityMapper.layer({ source: { type: 'pmtiles', url: 'roof-second.pmtiles', archive: archive(true) } });
     const sample = async (offset, height) => {
-      nativeChecks.render.render(pluginState(layer)._shared);
+      nativeChecks.render.render(globals.sceneByLayer.get(layer)._shared);
       const crs = map.options.crs;
-      const origin = crs.project(pluginState(layer).location);
+      const origin = crs.project(globals.sceneByLayer.get(layer).location);
       const point = crs.project(map.unproject(boundary.add(offset), zoom));
-      const metres = Math.cos(pluginState(layer).location.lat * Math.PI / 180);
+      const metres = Math.cos(globals.sceneByLayer.get(layer).location.lat * Math.PI / 180);
       const projected = new DOMPoint((point.x - origin.x) * metres, height, -(point.y - origin.y) * metres, 1)
-        .matrixTransform(new DOMMatrix(pluginState(layer).root.worldMatrix))
-        .matrixTransform(new DOMMatrix(pluginState(layer).camera.projectionViewMatrix));
-      const { canvas } = pluginState(layer).renderer;
+        .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(layer).root.worldMatrix))
+        .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(layer).camera.projectionViewMatrix));
+      const { canvas } = globals.sceneByLayer.get(layer).renderer;
       return [...await nativeChecks.pixels(layer,
         Math.floor((projected.x / projected.w + 1) * canvas.width / 2),
         Math.floor((projected.y / projected.w + 1) * canvas.height / 2), 1, 1)];
     };
     const roof = async () => [await sample([-30, 0], 20), await sample([30, 0], 20)];
     const loaded = async raster => {
-      await pluginState(raster).ready;
+      await globals.sceneByLayer.get(raster).ready;
       const deadline = performance.now() + 5000;
-      while (!pluginState(raster)._rasterTiles.size || [...pluginState(raster)._rasterTiles.values()].some(tile => !tile.done)) {
+      while (!globals.sceneByLayer.get(raster)._rasterTiles.size || [...globals.sceneByLayer.get(raster)._rasterTiles.values()].some(tile => !tile.done)) {
         if (performance.now() > deadline) throw new Error(`Roof imagery did not load: ${JSON.stringify({
-          tiles: [...pluginState(raster)._rasterTiles.values()].map(({ coords, error, done }) => ({ coords, error, done })),
-          renderer: Boolean(pluginState(raster).renderer), shared: Boolean(pluginState(raster)._shared), hasLayer: map.hasLayer(raster),
-          attachedMap: raster._map === map, header: pluginState(raster).header, zoom: pluginState(raster)._tileZoom,
+          tiles: [...globals.sceneByLayer.get(raster)._rasterTiles.values()].map(({ coords, error, done }) => ({ coords, error, done })),
+          renderer: Boolean(globals.sceneByLayer.get(raster).renderer), shared: Boolean(globals.sceneByLayer.get(raster)._shared), hasLayer: map.hasLayer(raster),
+          attachedMap: raster._map === map, header: globals.sceneByLayer.get(raster).header, zoom: globals.sceneByLayer.get(raster)._tileZoom,
         })}`);
         await new Promise(requestAnimationFrame);
       }
@@ -389,13 +391,13 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       const before = await roof();
       release();
       await loaded(first);
-      const directCanvas = !(first instanceof L.GridLayer) && pluginState(first).renderer.canvas === pluginState(owner).renderer.canvas &&
-        pluginState(first).root.children.some(mesh => mesh.tile) && !first._container;
+      const directCanvas = !(first instanceof L.GridLayer) && globals.sceneByLayer.get(first).renderer.canvas === globals.sceneByLayer.get(owner).renderer.canvas &&
+        globals.sceneByLayer.get(first).root.children.some(mesh => mesh.tile) && !first._container;
       const textured = await roof();
-      const texture = pluginState(pluginState(layer)._shared)._roofRaster.texture.texture;
-      const signature = pluginState(pluginState(layer)._shared)._roofRaster.signature;
+      const texture = globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._shared)._roofRaster.texture.texture;
+      const signature = globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._shared)._roofRaster.signature;
       await roof();
-      const reused = signature === pluginState(pluginState(layer)._shared)._roofRaster.signature && texture === pluginState(pluginState(layer)._shared)._roofRaster.texture.texture;
+      const reused = signature === globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._shared)._roofRaster.signature && texture === globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._shared)._roofRaster.texture.texture;
       const boundaryX = boundary.x / 256;
       const westRed = (boundaryX - 1) % 2 === 0;
       CityMapper.setPitch(map, 55); CityMapper.setBearing(map, 35);
@@ -423,10 +425,10 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       map.panBy([20, 10], { animate: false });
       await loaded(second);
       const panned = await roof();
-      const transferTexture = pluginState(pluginState(layer)._shared)._roofRaster.texture.texture;
+      const transferTexture = globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._shared)._roofRaster.texture.texture;
       owner.remove();
       const transferred = await roof();
-      const sameTexture = pluginState(layer)._shared === layer && pluginState(layer)._roofRaster.texture.texture === transferTexture;
+      const sameTexture = globals.sceneByLayer.get(layer)._shared === layer && globals.sceneByLayer.get(layer)._roofRaster.texture.texture === transferTexture;
       CityMapper.setOpacity(second, 0);
       const transparent = await roof();
       CityMapper.setOpacity(second, 1);
@@ -497,9 +499,9 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       const deadline = performance.now() + 12000;
       while (!condition()) {
         if (performance.now() > deadline) throw new Error(`Terrain fixture did not settle: ${JSON.stringify({
-          meshes: pluginState(terrain)._rasterTiles.size, tiles: pluginState(raster)._rasterTiles.size,
-          loaded: [...pluginState(raster)._rasterTiles.values()].filter(tile => tile.done).length,
-          inflight: pluginState(buildings)._inflight, errors,
+          meshes: globals.sceneByLayer.get(terrain)._rasterTiles.size, tiles: globals.sceneByLayer.get(raster)._rasterTiles.size,
+          loaded: [...globals.sceneByLayer.get(raster)._rasterTiles.values()].filter(tile => tile.done).length,
+          inflight: globals.sceneByLayer.get(buildings)._inflight, errors,
         })}`);
         await new Promise(requestAnimationFrame);
       }
@@ -524,23 +526,23 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
       await Promise.all([nativeChecks.ready(buildings), nativeChecks.ready(model)]);
       if (order === 'before') terrain.addTo(map);
       raster.addTo(map);
-      await pluginState(raster).ready;
-      await wait(() => pluginState(raster)._rasterTiles.size > 0 && [...pluginState(raster)._rasterTiles.values()].every(tile => tile.done));
+      await globals.sceneByLayer.get(raster).ready;
+      await wait(() => globals.sceneByLayer.get(raster)._rasterTiles.size > 0 && [...globals.sceneByLayer.get(raster)._rasterTiles.values()].every(tile => tile.done));
       if (order === 'after') terrain.addTo(map);
-      const initiallyFlat = [...pluginState(raster)._rasterTiles.values()].every(tile =>
-        tile.image && tile.mesh.parent === pluginState(raster).root && tile.mesh.visible);
-      pluginState(terrain)._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
-      nativeChecks.render.render(pluginState(buildings)._shared);
+      const initiallyFlat = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].every(tile =>
+        tile.image && tile.mesh.parent === globals.sceneByLayer.get(raster).root && tile.mesh.visible);
+      globals.sceneByLayer.get(terrain)._terrainTiles.set(`${coords.x}/${coords.y}`, new Float32Array(256 * 256).fill(250));
+      nativeChecks.render.render(globals.sceneByLayer.get(buildings)._shared);
       const partialElevation = nativeChecks.getElevation(terrain, map.getCenter());
-      const partialCameraY = pluginState(buildings).camera.target[1];
-      pluginState(terrain)._terrainTiles.delete(`${coords.x}/${coords.y}`);
+      const partialCameraY = globals.sceneByLayer.get(buildings).camera.target[1];
+      globals.sceneByLayer.get(terrain)._terrainTiles.delete(`${coords.x}/${coords.y}`);
       release();
-      await pluginState(terrain)._terrainPromise;
-      const settled = () => pluginState(terrain)._rasterTiles.size === pluginState(raster)._rasterTiles.size &&
-        pluginState(buildings)._inflight === 0 && [...pluginState(buildings)._areas.values()].every(area => area.done);
+      await globals.sceneByLayer.get(terrain)._terrainPromise;
+      const settled = () => globals.sceneByLayer.get(terrain)._rasterTiles.size === globals.sceneByLayer.get(raster)._rasterTiles.size &&
+        globals.sceneByLayer.get(buildings)._inflight === 0 && [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
       await wait(settled);
       let elevationError = 0, deformation = 0, buildingError = 0, uvError = 0;
-      for (const [tile, mesh] of pluginState(terrain)._rasterTiles) {
+      for (const [tile, mesh] of globals.sceneByLayer.get(terrain)._rasterTiles) {
         if (mesh.texture !== tile.texture || mesh.fadeStart !== tile.loadedAt || tile.mesh.visible) {
           throw new Error('DEM adaptation must reuse the imagery texture and appearance without a duplicate flat tile');
         }
@@ -554,50 +556,50 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
           for (let column = 0; column <= 64; column++) {
             const i = row * 65 + column;
             const expected = height(new L.Point((tileCoords.x + column / 64) * 256, (tileCoords.y + row / 64) * 256));
-            elevationError = Math.max(elevationError, Math.abs(heights[i] + pluginState(terrain).root.position[1] - expected));
+            elevationError = Math.max(elevationError, Math.abs(heights[i] + globals.sceneByLayer.get(terrain).root.position[1] - expected));
             uvError = Math.max(uvError, Math.abs(uv[i * 2 + 1] - row / 64));
             if (positions[i * 3 + 1] !== 0) throw new Error('Terrain unit grids must stay flat on the CPU');
           }
         }
         deformation = Math.max(deformation, Math.abs(heights[0] - heights.at(-1)));
       }
-      for (const area of pluginState(buildings)._areas.values()) {
+      for (const area of globals.sceneByLayer.get(buildings)._areas.values()) {
         if (!area.mesh) continue;
         const positions = area.mesh.geometry.attributes.position.data;
-        const crsOrigin = map.options.crs.project(pluginState(buildings).location);
-        const metres = Math.cos(pluginState(buildings).location.lat * Math.PI / 180);
+        const crsOrigin = map.options.crs.project(globals.sceneByLayer.get(buildings).location);
+        const metres = Math.cos(globals.sceneByLayer.get(buildings).location.lat * Math.PI / 180);
         for (let i = 0; i < positions.length; i += 3) {
           const latlng = map.options.crs.unproject(new L.Point(
             crsOrigin.x + positions[i] / metres, crsOrigin.y - positions[i + 2] / metres));
           const ground = height(map.project(latlng, zoom));
-          const aboveGround = positions[i + 1] + pluginState(buildings).root.position[1] - ground;
+          const aboveGround = positions[i + 1] + globals.sceneByLayer.get(buildings).root.position[1] - ground;
           buildingError = Math.max(buildingError, Math.min(Math.abs(aboveGround), Math.abs(aboveGround - 15)));
         }
       }
-      const modelError = Math.abs(pluginState(model).root.position[1] - height(map.project(pluginState(model).location, zoom)));
+      const modelError = Math.abs(globals.sceneByLayer.get(model).root.position[1] - height(map.project(globals.sceneByLayer.get(model).location, zoom)));
       CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0);
-      nativeChecks.render.render(pluginState(buildings)._shared);
-      const roofMesh = [...pluginState(buildings)._areas.values()].find(area => area.mesh).mesh;
+      nativeChecks.render.render(globals.sceneByLayer.get(buildings)._shared);
+      const roofMesh = [...globals.sceneByLayer.get(buildings)._areas.values()].find(area => area.mesh).mesh;
       const roofPositions = roofMesh.geometry.attributes.position.data;
       const roofCenter = [0, 1, 2].map(axis =>
         (roofPositions[axis] + roofPositions[3 + axis] + roofPositions[6 + axis]) / 3);
       const roofWorld = new DOMPoint(...roofCenter, 1).matrixTransform(new DOMMatrix(roofMesh.worldMatrix));
-      const roofProjected = roofWorld.matrixTransform(new DOMMatrix(pluginState(buildings).camera.projectionViewMatrix));
-      const { canvas: output } = pluginState(buildings).renderer;
+      const roofProjected = roofWorld.matrixTransform(new DOMMatrix(globals.sceneByLayer.get(buildings).camera.projectionViewMatrix));
+      const { canvas: output } = globals.sceneByLayer.get(buildings).renderer;
       const roofPixel = await nativeChecks.pixels(buildings,
         Math.floor((roofProjected.x / roofProjected.w + 1) * output.width / 2),
         Math.floor((roofProjected.y / roofProjected.w + 1) * output.height / 2), 1, 1);
-      const roofOrigin = map.project(pluginState(pluginState(buildings)._shared)._sceneOrigin, zoom);
+      const roofOrigin = map.project(globals.sceneByLayer.get(globals.sceneByLayer.get(buildings)._shared)._sceneOrigin, zoom);
       const pixelsPerMetre = map.options.crs.scale(zoom) /
-        (40075016.68557849 * Math.cos(pluginState(pluginState(buildings)._shared)._sceneOrigin.lat * Math.PI / 180));
+        (40075016.68557849 * Math.cos(globals.sceneByLayer.get(globals.sceneByLayer.get(buildings)._shared)._sceneOrigin.lat * Math.PI / 180));
       const roofRow = (roofOrigin.y + roofWorld.z * pixelsPerMetre) % 256;
       const roofImagePixel = [...ctx.getImageData(128, Math.floor(roofRow), 1, 1).data];
       map.setView(map.unproject(coords.add([0.5, 0.5]).multiplyBy(256), zoom), zoom, { animate: false });
       CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0);
       await wait(settled);
-      nativeChecks.render.render(pluginState(buildings)._shared);
-      const tile = [...pluginState(raster)._rasterTiles.values()].find(t => t.coords.x === coords.x && t.coords.y === coords.y);
-      const mesh = pluginState(terrain)._rasterTiles.get(tile);
+      nativeChecks.render.render(globals.sceneByLayer.get(buildings)._shared);
+      const tile = [...globals.sceneByLayer.get(raster)._rasterTiles.values()].find(t => t.coords.x === coords.x && t.coords.y === coords.y);
+      const mesh = globals.sceneByLayer.get(terrain)._rasterTiles.get(tile);
       const pixels = [];
       const heights = await nativeChecks.terrainHeights(terrain,
         [16, 48].map(row => ({ mesh, u: 0.5, v: row / 64 })));
@@ -606,7 +608,7 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         const position = mesh.geometry.attributes.position.data;
         const projected = new DOMPoint(position[i], heights[sample], position[i + 2], 1)
           .matrixTransform(new DOMMatrix(mesh.worldMatrix))
-          .matrixTransform(new DOMMatrix(pluginState(buildings).camera.projectionViewMatrix));
+          .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(buildings).camera.projectionViewMatrix));
         const pixel = await nativeChecks.pixels(buildings,
           Math.floor((projected.x / projected.w + 1) / 2 * output.width),
           Math.floor((projected.y / projected.w + 1) / 2 * output.height), 1, 1);
@@ -617,8 +619,8 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         CityMapper.setPitch(map, pitch);
         CityMapper.setBearing(map, pitch * 2);
         map.panBy([12, 8], { animate: false });
-        nativeChecks.render.render(pluginState(buildings)._shared);
-        const camera = pluginState(buildings).camera;
+        nativeChecks.render.render(globals.sceneByLayer.get(buildings)._shared);
+        const camera = globals.sceneByLayer.get(buildings).camera;
         const distance = Math.hypot(...camera.position.map((v, i) => v - camera.target[i]));
         cameraError = Math.max(cameraError, Math.abs(
           camera.position[1] - camera.target[1] - Math.cos(pitch * Math.PI / 180) * distance));
@@ -626,26 +628,26 @@ Then('terrain enabled {string} raster loading preserves imagery, elevations and 
         projectionError = Math.max(projectionError, Math.abs(projected.x / projected.w), Math.abs(projected.y / projected.w));
       }
       await wait(settled);
-      nativeChecks.render.render(pluginState(buildings)._shared);
-      await pluginState(buildings).renderer.device.queue.onSubmittedWorkDone();
-      const hidden = pluginState(terrain)._rasterTiles.size === pluginState(raster)._rasterTiles.size;
+      nativeChecks.render.render(globals.sceneByLayer.get(buildings)._shared);
+      await globals.sceneByLayer.get(buildings).renderer.device.queue.onSubmittedWorkDone();
+      const hidden = globals.sceneByLayer.get(terrain)._rasterTiles.size === globals.sceneByLayer.get(raster)._rasterTiles.size;
       terrain.remove();
-      const restored = !pluginState(map)._terrain3D && pluginState(terrain)._rasterTiles.size === 0 &&
-        [...pluginState(raster)._rasterTiles.values()].every(tile => tile.mesh.parent === pluginState(raster).root) && pluginState(model).root.position[1] === 0;
+      const restored = !globals.cameraByMap.get(map)._terrain3D && globals.sceneByLayer.get(terrain)._rasterTiles.size === 0 &&
+        [...globals.sceneByLayer.get(raster)._rasterTiles.values()].every(tile => tile.mesh.parent === globals.sceneByLayer.get(raster).root) && globals.sceneByLayer.get(model).root.position[1] === 0;
       // Remove while elevation requests are pending; their callbacks must not hide restored tiles.
       pending = new Promise(resolve => { release = resolve; });
       terrain.addTo(map);
-      const cancelledLoad = pluginState(terrain)._terrainPromise;
+      const cancelledLoad = globals.sceneByLayer.get(terrain)._terrainPromise;
       terrain.remove();
       release();
       await cancelledLoad;
       await new Promise(requestAnimationFrame);
-      const cancelled = pluginState(terrain)._rasterTiles.size === 0 &&
-        [...pluginState(raster)._rasterTiles.values()].every(tile => tile.mesh.parent === pluginState(raster).root);
+      const cancelled = globals.sceneByLayer.get(terrain)._rasterTiles.size === 0 &&
+        [...globals.sceneByLayer.get(raster)._rasterTiles.values()].every(tile => tile.mesh.parent === globals.sceneByLayer.get(raster).root);
       terrain.addTo(map);
-      await pluginState(terrain)._terrainPromise;
+      await globals.sceneByLayer.get(terrain)._terrainPromise;
       await wait(settled);
-      return { initiallyFlat, hidden, restored, cancelled, reattached: pluginState(terrain)._rasterTiles.size > 0,
+      return { initiallyFlat, hidden, restored, cancelled, reattached: globals.sceneByLayer.get(terrain)._rasterTiles.size > 0,
         elevationError, deformation, buildingError, modelError, uvError, cameraError, projectionError,
         partialElevation, partialCameraY, pixels,
         roofPixel: [...roofPixel], roofImagePixel, errors };
@@ -677,13 +679,13 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
     const first = CityMapper.layer({ source: { type: '3d' } }).addTo(map), second = CityMapper.layer({ source: { type: '3d' } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
     tiles.addTo(map);
-    await pluginState(tiles).ready;
+    await globals.sceneByLayer.get(tiles).ready;
     let samples = 0, frozen = true, transferred = false, resumed = false;
-    const { device } = pluginState(first).renderer;
+    const { device } = globals.sceneByLayer.get(first).renderer;
     const submit = device.queue.submit;
     device.queue.submit = function (...args) {
-      if (!map._animatingZoom || !pluginState(first)._zoomTransitions?.size) return submit.apply(this, args);
-      const animation = pluginState(first)._zoomTransitions.keys().next().value;
+      if (!map._animatingZoom || !globals.sceneByLayer.get(first)._zoomTransitions?.size) return submit.apply(this, args);
+      const animation = globals.sceneByLayer.get(first)._zoomTransitions.keys().next().value;
       const time = animation.currentTime;
       const before = getComputedStyle(animation.effect.target).transform;
       const deadline = performance.now() + 40;
@@ -697,21 +699,21 @@ Then('raster zoom transitions stay paused between WebGPU frames and resume on re
       map.once('zoomend', resolve);
       map.setZoomAround(map.getSize().divideBy(2), 18, { animate: true });
     });
-    const cleaned = !pluginState(first)._zoomTransitions;
+    const cleaned = !globals.sceneByLayer.get(first)._zoomTransitions;
     delete device.queue.submit;
     await new Promise(resolve => setTimeout(resolve, 300));
     const moved = new Promise(resolve => map.once('zoomend', resolve));
     map.setZoomAround(map.getSize().divideBy(2), 17, { animate: true });
     const deadline = performance.now() + 2000;
-    while (!pluginState(first)._zoomTransitions?.size) {
+    while (!globals.sceneByLayer.get(first)._zoomTransitions?.size) {
       if (performance.now() > deadline) throw new Error('Expected an active synchronized raster zoom transition');
       await new Promise(requestAnimationFrame);
     }
-    const transitions = pluginState(first)._zoomTransitions;
+    const transitions = globals.sceneByLayer.get(first)._zoomTransitions;
     first.remove();
-    transferred = pluginState(second)._zoomTransitions === transitions;
+    transferred = globals.sceneByLayer.get(second)._zoomTransitions === transitions;
     second.remove();
-    const retained = pluginState(cityMapperTestState.renderers.get(map))?._zoomTransitions === transitions;
+    const retained = globals.sceneByLayer.get(globals.renderers.get(map))?._zoomTransitions === transitions;
     tiles.remove();
     resumed = [...transitions.keys()].every(animation => animation.playState !== 'paused');
     await moved;

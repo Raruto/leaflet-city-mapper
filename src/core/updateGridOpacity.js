@@ -1,4 +1,4 @@
-import { pluginState } from './pluginState.js';
+
 import { cancelGridFade } from './cancelGridFade.js';
 import { scheduleGridFade } from './scheduleGridFade.js';
 
@@ -20,7 +20,8 @@ export function updateGridOpacity() {
     }
   }
   if (prune && !this._noPrune) this._pruneTiles();
-  pluginState(this)._nativeGPU?.refresh?.();
+  refreshNativeLayerContract(this);
   cancelGridFade(layer);
   if (fading) scheduleGridFade(layer);
 }
+import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';

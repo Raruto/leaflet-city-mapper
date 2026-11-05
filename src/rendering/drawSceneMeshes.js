@@ -1,17 +1,18 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { scenePass } from '../globals/scenePass.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { drawGeometry } from './drawGeometry.js';
 
 export function drawSceneMeshes(backend, encoder, meshes) {
-  const gpuBeginRenderPass1 = sharedState.allocationRenderDrawSceneMeshesBeginRenderPass1;
-  const renderer = pluginState(backend).renderer;
+  const renderer = sceneByLayer.get(backend).renderer;
   const pass = encoder.beginRenderPass((
-    gpuBeginRenderPass1.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(),
-    gpuBeginRenderPass1.depthStencilAttachment.view = renderer.depthTexture.createView(),
-    gpuBeginRenderPass1
+    scenePass.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(),
+    scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(),
+    scenePass
   ));
-  gpuBeginRenderPass1.colorAttachments[0].view = null;
-  gpuBeginRenderPass1.depthStencilAttachment.view = null;
+  scenePass.colorAttachments[0].view = null;
+  scenePass.depthStencilAttachment.view = null;
   pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
   pass.setBindGroup(1, renderer.sunlight.bindGroup);
   let mesh, world, uniforms, determinant, frontFace, program;
@@ -22,7 +23,7 @@ export function drawSceneMeshes(backend, encoder, meshes) {
       mesh.program.uniforms.opacity.value = mesh.opacity;
     }
     uniforms = mesh.program.uniforms;
-    if (uniforms.roofTexture) uniforms.roofTexture.value = pluginState(backend)._roofRaster?.texture || renderer.roofFallbackTexture;
+    if (uniforms.roofTexture) uniforms.roofTexture.value = sceneByLayer.get(backend)._roofRaster?.texture || renderer.roofFallbackTexture;
     if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion ||
         mesh._worldMatrixVersion === undefined) {
       determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -

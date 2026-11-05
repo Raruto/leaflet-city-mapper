@@ -1,4 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { getElevation } from '../terrain/getElevation.js';
 
 export function projectRing(context, ring) {
@@ -11,12 +14,12 @@ export function projectRing(context, ring) {
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw /* allocation: required -- Preserve the failure stack for invalid ring coordinates. */ new Error('Invalid GeoJSON coordinates');
     location = /* allocation: required -- Keep projection inputs isolated for this ring vertex. */ new L.LatLng(lat, lng);
     point = crs.project(location);
-    elevation = pluginState(map)._terrain3D ? getElevation(pluginState(map)._terrain3D, location) : undefined;
+    elevation = cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, location) : undefined;
     path.push(/* allocation: required -- Retain the distinct projected point for this polygon mesh. */ {
       x: (point.x - origin.x) * metres,
       y: (point.y - origin.y) * metres,
-      ground: Number.isFinite(elevation) && Number.isFinite(pluginState(backend).root.position[1])
-        ? elevation - pluginState(backend).root.position[1] : 0,
+      ground: Number.isFinite(elevation) && Number.isFinite(sceneByLayer.get(backend).root.position[1])
+        ? elevation - sceneByLayer.get(backend).root.position[1] : 0,
     });
   }
   return path;

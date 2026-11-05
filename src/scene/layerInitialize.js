@@ -1,14 +1,19 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
+import { layerProto } from '../globals/layerProto.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { pendingInitializations } from '../globals/pendingInitializations.js';
+import { loading } from '../globals/loading.js';
+
+
 
 import { init3D } from './init3D.js';
 import { noOperation } from '../utils/noOperation.js';
 import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
 
-export function layerInitialize(options = sharedState.allocationSceneEmptyOptions) {
+export function layerInitialize(options = sceneEmptyOptions) {
   if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options.source) {
-    if (sharedState.layerProto.initialize) return sharedState.layerProto.initialize.apply(this, arguments);
+    if (layerProto.value.initialize) return layerProto.value.initialize.apply(this, arguments);
     L.Util.setOptions(this, options);
     return;
   }
@@ -23,18 +28,16 @@ export function layerInitialize(options = sharedState.allocationSceneEmptyOption
   } = options;
   const settings = /* allocation: required -- Preserve this layer's source settings across queued initialization. */ { ...source, ...core };
   L.Util.setOptions(this, core);
-  pluginState(this)._type = type;
+  sceneByLayer.get(this)._type = type;
   if (type === '3d') {
     init3D(this, settings);
     return;
   }
-  pluginState(this).onAdd = noOperation;
-  pluginState(this).onRemove = noOperation;
-  // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
+  sceneByLayer.get(this).kind = 'pending';
   const task = /* allocation: required -- Keep this layer's queued initialization independent. */ { layer: this, type, settings, ready: null };
-  sharedState.pendingInitializations.push(task);
-  sharedState.loading = sharedState.loading.catch(noOperation).then(resolveNextInitialization);
-  const ready = pluginState(this).ready = sharedState.loading.then(initializeLayer);
+  pendingInitializations.push(task);
+  loading.value = loading.value.catch(noOperation).then(resolveNextInitialization);
+  const ready = sceneByLayer.get(this).ready = loading.value.then(initializeLayer);
   task.ready = ready;
   ready.catch(noOperation);
 }

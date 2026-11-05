@@ -1,4 +1,7 @@
-import { state as sharedState } from './state.js';
+import { layerProto } from './globals/layerProto.js';
+import { layerCallInitHooks as sharedLayerCallInitHooks } from './globals/layerCallInitHooks.js';
+import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';
+
 import './camera/mapCamera.js';
 import { init3D } from './scene/init3D.js';
 import { initNativeGPU } from './core/initNativeGPU.js';
@@ -43,7 +46,7 @@ import { getLocation } from './scene/getLocation.js';
  * - rendering/, shaders/, shadows/ and lighting/: WebGPU drawing and illumination.
  * - geometry/, triangulation/ and collision/: mesh operations and spatial queries.
  * - models/, archives/ and raster/: glTF loading, archive access and raster tiles.
- * - state.js: the single shared object for constants and module-level state.
+ * - globals/: one shared value per module, imported directly by its consumers.
  * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
@@ -52,8 +55,8 @@ import { getLocation } from './scene/getLocation.js';
  * 'pmtiles' and other sources use '3d'.
  */
 
-sharedState.layerProto = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
-sharedState.layerCallInitHooks = L.Layer.prototype.callInitHooks;
+layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
+sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
 
 /**
  * The '3d' layer type: native WebGPU scene synchronized with the map camera.
@@ -113,7 +116,7 @@ L.Layer.include({
   callInitHooks: layerCallInitHooks,
 });
 
-sharedState.removeLayer = L.Map.prototype.removeLayer;
+sharedRemoveLayer.value = L.Map.prototype.removeLayer;
 L.Map.include({ removeLayer });
 
 globalThis.CityMapper = {

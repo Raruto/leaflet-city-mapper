@@ -1,0 +1,15 @@
+export const shadowCamera = {
+  position: [0, 0, 0],
+  target: [0, 0, 0],
+  up: [0, 0, -1],
+  x: [0, 0, 0],
+  y: [0, 0, 0],
+  z: [0, 0, 0],
+  fov: 45,
+  aspect: 1,
+  near: 1,
+  far: 500,
+  viewMatrix: [],
+  projectionMatrix: [],
+  projectionViewMatrix: [],
+};

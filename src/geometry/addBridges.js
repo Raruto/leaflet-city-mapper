@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { createMesh } from '../rendering/createMesh.js';
 import { triangulate } from '../triangulation/triangulate.js';
 import { local } from './bridgeLocal.js';
@@ -10,13 +12,13 @@ import { local } from './bridgeLocal.js';
  */
 
 export function addBridges(backend, geojson) {
-  const map = backend._map, crs = map.options.crs, zoom = pluginState(backend)._terrainZoom;
-  const origin = crs.project(pluginState(backend).location), metres = Math.cos(pluginState(backend).location.lat * Math.PI / 180);
-  const base = pluginState(backend).root.position[1];
+  const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
+  const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180);
+  const base = sceneByLayer.get(backend).root.position[1];
   const position = /* allocation: required -- The bridge mesh retains its own position buffer. */ [];
   const normal = /* allocation: required -- The bridge mesh retains its own normal buffer. */ [];
   const color = /* allocation: required -- The bridge mesh retains its own color buffer. */ [];
-  pluginState(backend)._bridges = /* allocation: required -- Each backend retains an independent terrain bridge index. */ new Map();
+  sceneByLayer.get(backend)._bridges = /* allocation: required -- Each backend retains an independent terrain bridge index. */ new Map();
   let geometry, polygons, polygon, rings, ring, path, pixels, points, lng, lat, z, p, coordinate;
   let triangles, paths, start, i, contour, holes, bridgeTriangles, minX, minY, maxX, maxY, t, triangle, bridge, x, y;
   let key, a, b, c, pa, pb, pc, start2, q, length, nx, nz, corner, k, bucket, polygonIndex;
@@ -70,8 +72,8 @@ export function addBridges(backend, geojson) {
       for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
         for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
           key = `${x}/${y}`;
-          bucket = pluginState(backend)._bridges.get(key);
-          if (!bucket) pluginState(backend)._bridges.set(key, bucket = /* allocation: required -- This spatial cell retains its own bridge references. */ []);
+          bucket = sceneByLayer.get(backend)._bridges.get(key);
+          if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* allocation: required -- This spatial cell retains its own bridge references. */ []);
           bucket.push(bridge);
         }
       }
@@ -103,6 +105,6 @@ export function addBridges(backend, geojson) {
     }
   }
   if (position.length) {
-    pluginState(backend)._bridgeMesh = createMesh(backend, /* allocation: required -- Mesh construction receives the bridge-owned attribute buffers. */ { position, normal, color });
+    sceneByLayer.get(backend)._bridgeMesh = createMesh(backend, /* allocation: required -- Mesh construction receives the bridge-owned attribute buffers. */ { position, normal, color });
   }
 }

@@ -1,15 +1,18 @@
+import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
+import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
+import { cameraAngles } from '../globals/cameraAngles.js';
 import { pointOf } from './pointOf.js';
 import { angles } from './angles.js';
 import { verticalGroundY } from './verticalGroundY.js';
-import { state as sharedState } from '../state.js';
 
-export function fitCameraBounds(map, bounds, options = sharedState.allocationCameraEmptyOptions) {
+
+export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   bounds = bounds.getBounds ? bounds.getBounds() : bounds instanceof L.LatLngBounds ? bounds
     : /* allocation: required -- Normalize caller coordinates without mutating their bounds. */ new L.LatLngBounds(bounds);
   const zoom = map.getZoom() ?? 0, half = map.getSize().divideBy(2), distance = map.getSize().y * 1.5;
-  const min = pointOf(options.paddingTopLeft || options.padding || sharedState.allocationCameraZeroPadding).subtract(half);
-  const max = half.subtract(pointOf(options.paddingBottomRight || options.padding || sharedState.allocationCameraZeroPadding));
-  const [cos, sin, tilt, rise] = angles(map, sharedState.allocationCameraAngles);
+  const min = pointOf(options.paddingTopLeft || options.padding || cameraZeroPadding).subtract(half);
+  const max = half.subtract(pointOf(options.paddingBottomRight || options.padding || cameraZeroPadding));
+  const [cos, sin, tilt, rise] = angles(map, cameraAngles);
   const far = map.getSize().y * map.options.pitchMaxDistance;
   const top = verticalGroundY(min.y, tilt, distance, rise, far);
   const bottom = verticalGroundY(max.y, tilt, distance, rise, far);

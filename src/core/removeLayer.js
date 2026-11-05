@@ -1,13 +1,16 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { removeLayer as sharedRemoveLayer } from '../globals/removeLayer.js';
+
+import { removeSceneLayer } from '../scene/removeSceneLayer.js';
+
 
 
 export function removeLayer(layer) {
   const id = L.Util.stamp(layer);
   if (!this._layers[id]) return this;
-  const state = pluginState(layer);
-  if (!state.onRemove) return sharedState.removeLayer.call(this, layer);
-  if (this._loaded) state.onRemove.call(layer, this);
+  const state = sceneByLayer.get(layer);
+  if (!state.kind) return sharedRemoveLayer.value.call(this, layer);
+  if (this._loaded) removeSceneLayer(layer, this);
   delete this._layers[id];
   if (this._loaded) {
     this.fire('layerremove', /* allocation: required -- Native layer-removal listeners can retain or mutate event data. */ { layer });

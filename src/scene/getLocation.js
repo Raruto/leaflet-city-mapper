@@ -1,5 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function getLocation(layer) {
-  return pluginState(layer).location;
+  return sceneByLayer.get(layer)?.location;
 }

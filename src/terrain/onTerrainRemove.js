@@ -1,4 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { renderEmpty } from '../globals/renderEmpty.js';
+
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
@@ -9,35 +12,34 @@ import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {
-  pluginState(layer)._terrainController?.abort();
-  pluginState(layer)._terrainLoading = false;
-  pluginState(layer)._terrainReady = false;
+  sceneByLayer.get(layer)._terrainController?.abort();
+  sceneByLayer.get(layer)._terrainLoading = false;
+  sceneByLayer.get(layer)._terrainReady = false;
   map.eachLayer(clearLayerTerrain);
   let tile, l, grid, attribute;
-  for (tile of pluginState(layer)._rasterTiles.keys()) removeRasterTile(layer, tile);
-  if (pluginState(map)._terrain3D === layer) delete pluginState(map)._terrain3D;
+  for (tile of sceneByLayer.get(layer)._rasterTiles.keys()) removeRasterTile(layer, tile);
+  if (cameraByMap.get(map)._terrain3D === layer) delete cameraByMap.get(map)._terrain3D;
   for (l of Object.values(map._layers)) {
     conformModelToTerrain(l, null);
     setTerrainHeight(l);
   }
 
   map.fire('terrainchange');
-  pluginState(layer)._terrainTiles.clear();
-  pluginState(layer)._terrainOriginElevation = 0;
-  pluginState(layer)._terrainPromise = null;
-  if (pluginState(layer)._rasterProgram) {
-    pluginState(layer)._rasterProgram.pipelineCache.clear();
+  sceneByLayer.get(layer)._terrainTiles.clear();
+  sceneByLayer.get(layer)._terrainOriginElevation = 0;
+  sceneByLayer.get(layer)._terrainPromise = null;
+  if (sceneByLayer.get(layer)._rasterProgram) {
+    sceneByLayer.get(layer)._rasterProgram.pipelineCache.clear();
   }
-  pluginState(layer)._rasterProgram = null;
-  if (pluginState(layer)._dem) destroyTexture(layer, pluginState(layer)._dem.texture);
-  pluginState(layer)._dem = null;
-  for (grid of pluginState(layer)._terrainGrids?.values() || sharedState.allocationRenderEmpty) {
+  sceneByLayer.get(layer)._rasterProgram = null;
+  if (sceneByLayer.get(layer)._dem) destroyTexture(layer, sceneByLayer.get(layer)._dem.texture);
+  sceneByLayer.get(layer)._dem = null;
+  for (grid of sceneByLayer.get(layer)._terrainGrids?.values() || renderEmpty) {
     for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
-  pluginState(layer)._terrainGrids = null;
-  pluginState(layer)._bridges = null;
-  disposeMesh(layer, pluginState(layer)._bridgeMesh);
-  pluginState(layer)._bridgeMesh = null;
+  sceneByLayer.get(layer)._terrainGrids = null;
+  sceneByLayer.get(layer)._bridges = null;
+  disposeMesh(layer, sceneByLayer.get(layer)._bridgeMesh);
+  sceneByLayer.get(layer)._bridgeMesh = null;
   onRemove3DLayer(layer, map);
 }
-import { state as sharedState } from '../state.js';

@@ -1,14 +1,18 @@
-import { state as sharedState } from '../state.js';
+import { shadowBounds as sharedShadowBounds } from '../globals/shadowBounds.js';
+import { shadowCamera } from '../globals/shadowCamera.js';
+import { shadowLow } from '../globals/shadowLow.js';
+import { shadowHigh } from '../globals/shadowHigh.js';
+
 import { shadowBounds } from './shadowBounds.js';
 import { updateCamera } from '../scene/updateCamera.js';
 
 export function shadowMatrix(meshes, sunlight) {
-  const { min, max } = shadowBounds(meshes, sharedState.allocationRenderShadowBounds);
-  const camera = sharedState.allocationRenderShadowCamera;
+  const { min, max } = shadowBounds(meshes, sharedShadowBounds);
+  const camera = shadowCamera;
   camera.viewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created view transform. */ new DOMMatrix();
   camera.projectionTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created projection transform. */ new DOMMatrix();
   camera.projectionViewTransform ||= /* allocation: required -- The reusable shadow camera owns its browser-created combined transform. */ new DOMMatrix();
-  const low = sharedState.allocationRenderShadowLow, high = sharedState.allocationRenderShadowHigh;
+  const low = shadowLow, high = shadowHigh;
   let i, axis, x, y, z, value;
   const radius = Math.max(100, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]));
   for (i = 0; i < 3; i++) {

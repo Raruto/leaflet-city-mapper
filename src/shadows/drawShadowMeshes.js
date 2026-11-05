@@ -1,15 +1,16 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { shadowPass } from '../globals/shadowPass.js';
+import { shadowBindGroup } from '../globals/shadowBindGroup.js';
+import { shadowOffsets } from '../globals/shadowOffsets.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 export function drawShadowMeshes(backend, encoder, meshes) {
-  const gpuBeginRenderPass1 = sharedState.allocationRenderDrawShadowMeshesBeginRenderPass1;
-  const gpuCreateBindGroup2 = sharedState.allocationRenderDrawShadowMeshesCreateBindGroup2;
-  const gpuSetBindGroup3 = sharedState.allocationRenderDrawShadowMeshesSetBindGroup3;
-  const renderer = pluginState(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+  const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
   const pass = encoder.beginRenderPass((
-    gpuBeginRenderPass1.depthStencilAttachment.view = sun.texture.createView(),
-    gpuBeginRenderPass1
+    shadowPass.depthStencilAttachment.view = sun.texture.createView(),
+    shadowPass
   ));
-  gpuBeginRenderPass1.depthStencilAttachment.view = null;
+  shadowPass.depthStencilAttachment.view = null;
   let pipeline = sun.pipeline;
   pass.setPipeline(pipeline);
   pass.setBindGroup(1, sun.depthBindGroup);
@@ -27,12 +28,12 @@ export function drawShadowMeshes(backend, encoder, meshes) {
     if (mesh._shadowBuffer !== renderer.uniformBuffer) {
       mesh._shadowBuffer = renderer.uniformBuffer;
       mesh._shadowBindGroup = device.createBindGroup((
-        gpuCreateBindGroup2.layout = sun.meshLayout,
-        gpuCreateBindGroup2.entries[0].resource.buffer = renderer.uniformBuffer,
-        gpuCreateBindGroup2
+        shadowBindGroup.layout = sun.meshLayout,
+        shadowBindGroup.entries[0].resource.buffer = renderer.uniformBuffer,
+        shadowBindGroup
       ));
-      gpuCreateBindGroup2.layout = null;
-      gpuCreateBindGroup2.entries[0].resource.buffer = null;
+      shadowBindGroup.layout = null;
+      shadowBindGroup.entries[0].resource.buffer = null;
     }
     for (attribute of Object.values(mesh.geometry.attributes)) {
       if (attribute.needsUpdate) {
@@ -41,8 +42,8 @@ export function drawShadowMeshes(backend, encoder, meshes) {
       }
     }
     pass.setBindGroup(0, mesh._shadowBindGroup, (
-      gpuSetBindGroup3[0] = offset,
-      gpuSetBindGroup3
+      shadowOffsets[0] = offset,
+      shadowOffsets
     ));
 
     pass.setVertexBuffer(0, mesh.geometry.attributes.position.buffer);

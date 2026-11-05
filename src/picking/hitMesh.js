@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { CELL } from '../globals/CELL.js';
+
 import { computeBounds } from '../geometry/computeBounds.js';
 import { collider } from '../collision/collider.js';
 
@@ -16,8 +17,8 @@ export function hitMesh(mesh, data) {
   const seen = data.seen;
   seen.clear();
   let ix, iz, t, height, d, cell;
-  for (ix = Math.floor(Math.min(ox, ox + dx * reach) / sharedState.CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / sharedState.CELL); ix++)
-    for (iz = Math.floor(Math.min(oz, oz + dz * reach) / sharedState.CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / sharedState.CELL); iz++) {
+  for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
+    for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
       cell = c.cells.get(ix + ',' + iz);
       if (!cell) continue;
       for (t of cell) {

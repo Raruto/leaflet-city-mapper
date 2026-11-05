@@ -1,8 +1,9 @@
+import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
 import { build } from '../geometry/build.js';
 import { createTrafficMesh } from './createTrafficMesh.js';
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { trafficBounds } from './trafficBounds.js';
-import { state as sharedState } from '../state.js';
+
 
 export function rebuildTrafficMesh(state) {
   const { trips, model, vertices } = state;
@@ -24,7 +25,7 @@ export function rebuildTrafficMesh(state) {
   state.mesh = createTrafficMesh(state, /* allocation: required -- The replacement mesh retains its own geometry arrays. */ {
     position: /* allocation: required -- Compute output positions belong independently to this mesh. */ new Array(color.length).fill(0),
     normal: /* allocation: required -- Compute output normals belong independently to this mesh. */ new Array(color.length).fill(0), color,
-  }, featureFaces, sharedState.allocationTrafficEmptyOptions, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+  }, featureFaces, trafficEmptyOptions, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
   state.mesh.geometry.drawRange.count = count;
   state.mesh.extras.dynamicLights = true;
   trafficBounds(state);

@@ -1,10 +1,11 @@
+import { geometryDecoder } from '../globals/geometryDecoder.js';
 /** Decode a static glTF JSON document or GLB v2 container. */
 import { hasUnsupportedPrimitives } from './hasUnsupportedPrimitives.js';
-import { state as sharedState } from '../state.js';
+
 
 export function decodeModel(data) {
   const view = /* allocation: required -- The view is bound to this model input buffer. */ new DataView(data);
-  const decoder = sharedState.allocationGeometryDecoder;
+  const decoder = geometryDecoder;
   let description;
   let offset, length, type, chunk;
   if (view.getUint32(0, true) === 0x46546c67) {

@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { init3D } from '../scene/init3D.js';
 import { onBlur } from './onBlur.js';
 import { onKey } from './onKey.js';
@@ -15,7 +17,7 @@ export function createWalk(control, {
   ...options
 }) {
   const layer = /* allocation: required -- Each walk mode owns a native layer lifecycle. */ new L.Layer();
-  pluginState(layer)._type = 'walk';
+  sceneByLayer.get(layer)._type = 'walk';
   init3D(layer, options);
   const keys = /* allocation: required -- Keep pressed keys independent for each control. */ new Set();
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
@@ -51,7 +53,7 @@ export function createWalk(control, {
       normal: /* allocation: required -- Each walker retains its reusable nearest-wall normal. */ [0, 0],
     },
     local: /* allocation: required -- Keep reusable foot coordinates local to this walker. */ [0, 0, 0],
-    state: pluginState(control).walker = pluginState(layer).walker = /* allocation: required -- Expose a distinct mutable walker position per control. */ { latlng: null, heading: 0, phase: 0 }
+    state: control.walker = sceneByLayer.get(layer).walker = /* allocation: required -- Expose a distinct mutable walker position per control. */ { latlng: null, heading: 0, phase: 0 }
   }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);

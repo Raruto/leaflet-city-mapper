@@ -1,7 +1,10 @@
+import { touchByContainer } from '../globals/touchByContainer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
-import { pluginState } from '../core/pluginState.js';
+
 export function moveCameraTouch(event) {
-  const state = pluginState(this)._cameraTouchState, { map, container, touch } = state;
+  const state = touchByContainer.get(this), { map, container, touch } = state;
   if (!touch || event.touches.length !== 2) return;
   const [a, b] = event.touches;
   const angle = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
@@ -9,7 +12,7 @@ export function moveCameraTouch(event) {
   middle.x = (a.clientX + b.clientX) / 2 - rect.left;
   middle.y = (a.clientY + b.clientY) / 2 - rect.top;
   const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * 180 / Math.PI;
-  mapSetPitchAndBearing(map, pluginState(map).touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, pluginState(map).touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
+  mapSetPitchAndBearing(map, cameraByMap.get(map).touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, cameraByMap.get(map).touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
   const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
   if (distance < 1) return;
   const zoom = touch.zooming ? Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(),

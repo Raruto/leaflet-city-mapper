@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { local } from '../../src/walk/local.js';
@@ -12,6 +14,8 @@ Then('walk coordinate conversion reuses only its caller-owned buffer', function 
     root: { position: [0, 5, 0] },
     _map: { options: { crs: { project } } },
   };
+  globals.sceneByLayer.set(layer, layer);
+  globals.cameraByMap.set(layer._map, layer._map);
   const first = [0, 0, 0], second = [0, 0, 0];
   const a = local.call({ layer, state: { latlng: { lat: 11, lng: 21 } } }, first);
   const b = local.call({ layer, state: { latlng: { lat: 12, lng: 22 } } }, second);
@@ -29,7 +33,7 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     const traffic = { layer: { _map: map } };
     const time = new L.Control.Time({ position: 'topleft' }).addTo(map);
     const standalone = time instanceof L.Control && time.getPosition() === 'topleft' &&
-      time.getContainer().parentNode === map._controlCorners.topleft && !!pluginState(map)._sunlight;
+      time.getContainer().parentNode === map._controlCorners.topleft && !!globals.cameraByMap.get(map)._sunlight;
     time.getContainer().querySelector('input[type=date]').value = '2026-06-21';
     const slider = time.getContainer().querySelector('input[type=range]');
     slider.value = '720';
@@ -37,20 +41,20 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     const selected = time.time.getTime();
     const trafficTime = !trafficNow(traffic).live && trafficNow(traffic).time.getTime() === selected;
     time.remove();
-    const timeRemoved = !pluginState(map)._sunlight && !time.getContainer().isConnected && trafficNow(traffic).live;
+    const timeRemoved = !globals.cameraByMap.get(map)._sunlight && !time.getContainer().isConnected && trafficNow(traffic).live;
     time.layer.addTo(map);
     const layers = new L.Control.Layers({}, { Shadows: time.layer }).addTo(map);
     await new Promise(resolve => queueMicrotask(resolve));
     const nested = layers.getContainer().contains(time.getContainer()) &&
       !time.getContainer().classList.contains('leaflet-control') && time.time.getTime() === selected;
     layers.getContainer().querySelector('input').click();
-    const unchecked = !map.hasLayer(time.layer) && !pluginState(map)._sunlight && !time.getContainer().isConnected;
+    const unchecked = !map.hasLayer(time.layer) && !globals.cameraByMap.get(map)._sunlight && !time.getContainer().isConnected;
     layers.getContainer().querySelector('input').click();
     await new Promise(resolve => queueMicrotask(resolve));
-    const rechecked = map.hasLayer(time.layer) && !!pluginState(map)._sunlight &&
+    const rechecked = map.hasLayer(time.layer) && !!globals.cameraByMap.get(map)._sunlight &&
       layers.getContainer().contains(time.getContainer()) && time.time.getTime() === selected;
     time.remove();
-    const adapterRemoved = !map.hasLayer(time.layer) && !pluginState(map)._sunlight;
+    const adapterRemoved = !map.hasLayer(time.layer) && !globals.cameraByMap.get(map)._sunlight;
     time.addTo(map);
     const restoredStandalone = time.getContainer().parentNode === map._controlCorners.topleft;
     time.remove();
@@ -60,13 +64,13 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     await nativeChecks.ready(control._walk.layer);
     const before = { zoom: map.getZoom(), pitch: CityMapper.getPitch(map), dragging: map.dragging.enabled() };
     control.getContainer().querySelector('button').click();
-    const walking = control instanceof L.Control && !!pluginState(control).walker.latlng && !map.dragging.enabled();
+    const walking = control instanceof L.Control && !!control.walker.latlng && !map.dragging.enabled();
     control.remove();
     const walkRemoved = !map.hasLayer(control._walk.layer) && !control.getContainer().isConnected &&
       map.getZoom() === before.zoom && CityMapper.getPitch(map) === before.pitch &&
       map.dragging.enabled() === before.dragging && !control._walk.meshes;
     control.addTo(map);
-    await pluginState(control._walk.layer)._added.promise;
+    await globals.sceneByLayer.get(control._walk.layer)._added.promise;
     control.getContainer().querySelector('button').click();
     const restarted = control.getContainer().querySelector('button').getAttribute('aria-pressed') === 'true';
     control.remove();
@@ -95,27 +99,27 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   const button = this.page.getByRole('button', { name: 'Walk', exact: true });
   await button.click();
   await this.page.waitForFunction(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return pluginState(walk).root.children.length === 5;
+    const walk = Object.values(test3d.map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return globals.sceneByLayer.get(walk).root.children.length === 5;
   });
   const start = await this.page.evaluate(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return { lat: pluginState(walk).walker.latlng.lat, phase: pluginState(walk).walker.phase };
+    const walk = Object.values(test3d.map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return { lat: globals.sceneByLayer.get(walk).walker.latlng.lat, phase: globals.sceneByLayer.get(walk).walker.phase };
   });
   await this.page.keyboard.down('KeyW');
   try {
     await this.page.waitForFunction(lat => {
-      const walk = Object.values(test3d.map._layers).find(layer => pluginState(layer)._type === 'walk');
-      return (pluginState(walk).walker.latlng.lat - lat) * 111320 > 0.5;
+      const walk = Object.values(test3d.map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+      return (globals.sceneByLayer.get(walk).walker.latlng.lat - lat) * 111320 > 0.5;
     }, start.lat);
     await this.page.waitForTimeout(1200);
   } finally {
     await this.page.keyboard.up('KeyW');
   }
   const stopped = await this.page.evaluate(() => {
-    const walk = Object.values(test3d.map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return { lat: pluginState(walk).walker.latlng.lat, phase: pluginState(walk).walker.phase,
-      centerError: test3d.map.latLngToContainerPoint(pluginState(walk).walker.latlng).distanceTo(test3d.map.getSize().divideBy(2)) };
+    const walk = Object.values(test3d.map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return { lat: globals.sceneByLayer.get(walk).walker.latlng.lat, phase: globals.sceneByLayer.get(walk).walker.phase,
+      centerError: test3d.map.latLngToContainerPoint(globals.sceneByLayer.get(walk).walker.latlng).distanceTo(test3d.map.getSize().divideBy(2)) };
   });
   const travelled = (stopped.lat - start.lat) * 111320;
   assert.ok(travelled > 2.5 && travelled < 4, `Stopped before the 4 m wall: ${travelled} m`);
@@ -125,8 +129,8 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   await this.page.keyboard.down('KeyS');
   try {
     await this.page.waitForFunction(lat => {
-      const walk = Object.values(test3d.map._layers).find(layer => pluginState(layer)._type === 'walk');
-      return (lat - pluginState(walk).walker.latlng.lat) * 111320 > 0.5;
+      const walk = Object.values(test3d.map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+      return (lat - globals.sceneByLayer.get(walk).walker.latlng.lat) * 111320 > 0.5;
     }, stopped.lat);
   } finally {
     await this.page.keyboard.up('KeyS');
@@ -137,7 +141,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
 });
 
 Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls and Esc restores the map', { timeout: 90000 }, async function () {
-  await this.page.waitForFunction(() => pluginState(pluginState(map)._terrain3D)?._bridgeMesh, null, { timeout: 30000 });
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._bridgeMesh, null, { timeout: 30000 });
   await this.page.evaluate(() => {
     for (const { name, overlay, layer } of layers._layers) {
       if (overlay && !['Terrain (3D)', 'Buildings'].includes(name)) layer.remove();
@@ -152,15 +156,15 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await button.click();
   assert.equal(await button.getAttribute('aria-pressed'), 'true');
   await this.page.waitForFunction(() => {
-    const walk = Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return pluginState(walk).walker.latlng && pluginState(walk).root.children.length === 5;
+    const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return globals.sceneByLayer.get(walk).walker.latlng && globals.sceneByLayer.get(walk).root.children.length === 5;
   });
   const state = () => this.page.evaluate(() => {
-    const walk = Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk'), [body] = pluginState(walk).root.children;
+    const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk'), [body] = globals.sceneByLayer.get(walk).root.children;
     return {
-      ...pluginState(walk).walker.latlng, heading: pluginState(walk).walker.heading, bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
+      ...globals.sceneByLayer.get(walk).walker.latlng, heading: globals.sceneByLayer.get(walk).walker.heading, bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
       dragging: map.dragging.enabled(), center: map.getCenter(),
-      feet: body.position[1] + pluginState(walk).root.position[1], deck: nativeChecks.getElevation(pluginState(map)._terrain3D, pluginState(walk).walker.latlng),
+      feet: body.position[1] + globals.sceneByLayer.get(walk).root.position[1], deck: nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, globals.sceneByLayer.get(walk).walker.latlng),
     };
   });
   const start = await state();
@@ -191,13 +195,13 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await this.page.keyboard.down('KeyD');
   await this.page.keyboard.down('KeyW');
   await this.page.waitForFunction(heading => {
-    const walk = Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return pluginState(walk).walker.heading > heading + 0.6;
+    const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return globals.sceneByLayer.get(walk).walker.heading > heading + 0.6;
   }, looked.heading);
   await this.page.keyboard.up('KeyD');
   await this.page.waitForFunction(() => {
-    const walk = Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk');
-    return Math.abs(((-pluginState(walk).walker.heading * 180 / Math.PI - CityMapper.getBearing(map)) % 360 + 540) % 360 - 180) < 5;
+    const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    return Math.abs(((-globals.sceneByLayer.get(walk).walker.heading * 180 / Math.PI - CityMapper.getBearing(map)) % 360 + 540) % 360 - 180) < 5;
   });
   await this.page.keyboard.up('KeyW');
   const turned = await state();
@@ -207,15 +211,15 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
 
   // Champ de Mars side street: running south ends against a building facade (after sliding along it).
   await this.page.evaluate(() => {
-    const walk = Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk');
-    pluginState(walk).walker.latlng = new L.LatLng(48.8560, 2.2950);
-    pluginState(walk).walker.heading = Math.PI;
-    map.setView(pluginState(walk).walker.latlng, map.getZoom(), { animate: false });
+    const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
+    globals.sceneByLayer.get(walk).walker.latlng = new L.LatLng(48.8560, 2.2950);
+    globals.sceneByLayer.get(walk).walker.heading = Math.PI;
+    map.setView(globals.sceneByLayer.get(walk).walker.latlng, map.getZoom(), { animate: false });
   });
   await this.page.waitForFunction(() => {
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
-    return pluginState(buildings)._areas.size > 0 && pluginState(buildings)._inflight === 0 &&
-      [...pluginState(buildings)._areas.values()].every(area => area.done);
+    return globals.sceneByLayer.get(buildings)._areas.size > 0 && globals.sceneByLayer.get(buildings)._inflight === 0 &&
+      [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
   });
   await this.page.keyboard.down('KeyW');
   let previous, stuck;
@@ -233,7 +237,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await this.page.keyboard.press('Escape');
   const after = await this.page.evaluate(() => ({
     dragging: map.dragging.enabled(), zoom: map.getZoom(), pitch: CityMapper.getPitch(map),
-    meshes: pluginState(Object.values(map._layers).find(layer => pluginState(layer)._type === 'walk')).root.children.length,
+    meshes: globals.sceneByLayer.get(Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk')).root.children.length,
   }));
   assert.deepEqual(after, { dragging: true, zoom: before.zoom, pitch: before.pitch, meshes: 0 });
   assert.equal(await button.getAttribute('aria-pressed'), 'false');

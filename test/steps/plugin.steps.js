@@ -1,5 +1,33 @@
+import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
+
+Then('native instance data is isolated in explicit feature associations', async function () {
+  const result = await this.page.evaluate(async () => {
+    const layers = [];
+    for (const type of ['3d', 'geojson', 'pmtiles', 'terrain', 'traffic']) {
+      const layer = CityMapper.layer({ source: {
+        type, data: { type: 'FeatureCollection', features: [] },
+        archive: { getHeader: async () => ({ maxZoom: 19 }) },
+      } });
+      await CityMapper.ready(layer);
+      layers.push(layer);
+    }
+    const maps = [new L.Map(document.body.appendChild(document.createElement('div')), { rotate: false }),
+      new L.Map(document.body.appendChild(document.createElement('div')), { rotate: false })];
+    CityMapper.setPitch(maps[0], 35);
+    const records = layers.map(layer => globals.sceneByLayer.get(layer));
+    const camera = maps.map(map => globals.cameraByMap.get(map));
+    const functions = records.concat(camera).flatMap(record =>
+      Object.entries(record).filter(([, value]) => typeof value === 'function').map(([key]) => key));
+    const independent = new Set(records).size === layers.length && camera[0] !== camera[1] &&
+      CityMapper.getPitch(maps[0]) === 35 && CityMapper.getPitch(maps[1]) === 0;
+    for (const map of maps) map.remove();
+    return { functions, independent, genericAccessor: 'pluginState' in globalThis ||
+      'instanceStates' in globals };
+  });
+  assert.deepEqual(result, { functions: [], independent: true, genericAccessor: false });
+});
 
 Then('every local source in the city example is available', async function () {
   const url = `${this.baseUrl}/examples/leaflet-city-mapper.html`;

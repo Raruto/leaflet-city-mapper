@@ -1,7 +1,9 @@
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { coreMatrixKeys } from '../globals/coreMatrixKeys.js';
 import { markerCameraIconPoint } from './markerCameraIconPoint.js';
-import { pluginState } from './pluginState.js';
+
 import { localPosition } from './localPosition.js';
-import { state as sharedState } from '../state.js';
+
 import { transformNativePoint } from './transformNativePoint.js';
 
 export function markerQuadCorners(state, key, image) {
@@ -14,10 +16,10 @@ export function markerQuadCorners(state, key, image) {
     point: /* allocation: required -- Retain one homogeneous projection scratch point per marker. */ { x: 0, y: 0, z: 0, w: 1 },
   };
   const root = matrices.root, camera = matrices.camera, point = matrices.point;
-  const worldMatrix = pluginState(backend).root.worldMatrix, projection = pluginState(backend).camera.projectionViewMatrix;
+  const worldMatrix = sceneByLayer.get(backend).root.worldMatrix, projection = sceneByLayer.get(backend).camera.projectionViewMatrix;
   let i, keyName;
   for (i = 0; i < 16; i++) {
-    keyName = sharedState.allocationCoreMatrixKeys[i];
+    keyName = coreMatrixKeys[i];
     root[keyName] = worldMatrix[i];
     camera[keyName] = projection[i];
   }

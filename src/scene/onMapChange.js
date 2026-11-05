@@ -1,5 +1,7 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { pendingMapChanges } from '../globals/pendingMapChanges.js';
+
+
 import { update } from './update.js';
 import { render } from "../rendering/render.js";
 
@@ -9,8 +11,8 @@ import { renderPendingMapChange } from './renderPendingMapChange.js';
 
 export function onMapChange() {
   const layer = this;
-  if (pluginState(layer)._queued) return;
-  pluginState(layer)._queued = true;
-  sharedState.pendingMapChanges.push(layer);
+  if (sceneByLayer.get(layer)._queued) return;
+  sceneByLayer.get(layer)._queued = true;
+  pendingMapChanges.push(layer);
   queueMicrotask(renderPendingMapChange);
 }

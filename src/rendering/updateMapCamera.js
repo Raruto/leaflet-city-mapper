@@ -1,26 +1,29 @@
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { mapMethods } from '../globals/mapMethods.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-import { pluginState } from '../core/pluginState.js';
+
 import { updateCamera } from "../scene/updateCamera.js";
 import { getElevation } from "../terrain/getElevation.js";
-import { state as sharedState } from '../state.js';
+
 import { animationPoint } from '../camera/animationPoint.js';
 
 export function updateMapCamera(backend, size) {
   const map = backend._map;
   // Match the map's perspective, including the intermediate view of an animated zoom.
-  const zoom = pluginState(map)._cameraView?.zoom ?? map.getZoom();
-  const pixelsPerMeter = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(pluginState(backend)._sceneOrigin.lat * Math.PI / 180));
-  const origin = animationPoint(map, sharedState.mapMethods.layerPointToContainerPoint.call(map,
-    map.project(pluginState(backend)._sceneOrigin).subtract(map.getPixelOrigin())));
+  const zoom = cameraByMap.get(map)._cameraView?.zoom ?? map.getZoom();
+  const pixelsPerMeter = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * Math.PI / 180));
+  const origin = animationPoint(map, mapMethods.value.layerPointToContainerPoint.call(map,
+    map.project(sceneByLayer.get(backend)._sceneOrigin).subtract(map.getPixelOrigin())));
   const distance = size.y * 1.5 / pixelsPerMeter;
   const targetX = (size.x / 2 - origin.x) / pixelsPerMeter;
   // CSS zoom keeps the logical view's ground plane until zoomend.
-  const targetY = (pluginState(map)._terrain3D ? getElevation(pluginState(map)._terrain3D, map.getCenter()): undefined) ?? 0;
+  const targetY = (cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, map.getCenter()): undefined) ?? 0;
   const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
   const pitch = mapGetPitch(map) * Math.PI / 180;
   const bearing = mapGetBearing(map) * Math.PI / 180;
-  const camera = pluginState(backend).camera;
+  const camera = sceneByLayer.get(backend).camera;
   camera.fov = 2 * Math.atan(1 / 3) * 180 / Math.PI;
   camera.aspect = size.x / size.y;
   camera.near = Math.max(0.1, distance / 10000);

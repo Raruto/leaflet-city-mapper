@@ -1,9 +1,11 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
 import { trafficStorage } from './trafficStorage.js';
 
 export function rebaseTraffic(state) {
-  const { device } = pluginState(state.layer).renderer;
+  const { device } = sceneByLayer.get(state.layer).renderer;
   if (state.gpu?.device !== device) {
     destroyTrafficGpu(state);
     const template = /* allocation: required -- Device restoration uploads independent retained CPU template bytes. */ new Float32Array(

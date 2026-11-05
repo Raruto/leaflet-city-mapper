@@ -1,3 +1,4 @@
+import { geometryEmpty } from '../globals/geometryEmpty.js';
 import { isClockWise } from "./isClockWise.js";
 import { cross } from './cross.js';
 import { clean } from './clean.js';
@@ -7,7 +8,7 @@ import { crossesBoundary } from './crossesBoundary.js';
 import { containsVertex } from './containsVertex.js';
 import { area } from './area.js';
 import { sortHoles } from './sortHoles.js';
-import { state as sharedState } from '../state.js';
+
 
 /**
  * Triangulates a polygon given as `{x, y}` points.
@@ -20,7 +21,7 @@ import { state as sharedState } from '../state.js';
  * @returns {number[][]} Triangles as indices in `[...contour, ...holes.flat()]`.
  */
 
-export function triangulate(contour, holes = sharedState.allocationGeometryEmpty) {
+export function triangulate(contour, holes = geometryEmpty) {
   const paths = /* allocation: required -- Ring traversal belongs to this independently reentrant triangulation. */ [contour, ...holes];
   const points = paths.flat();
   let p, index, path, ring, hole, distance, h, a, b, d, h2, p2, clipped, i, c, triangle2;

@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { loadDirectory } from './loadDirectory.js';
 import { decompress } from './decompress.js';
 import { tileId } from './tileId.js';
@@ -8,8 +10,9 @@ import { getHeader } from './getHeader.js';
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 
 export async function getZxy(backend, z, x, y, signal) {
-  if (backend.options.archive && backend.options.archive !== backend && pluginState(backend.options.archive).getZxy) {
-    return pluginState(backend.options.archive).getZxy(z, x, y, signal);
+  if (!sceneByLayer.has(backend)) return backend.getZxy(z, x, y, signal);
+  if (backend.options.archive && backend.options.archive !== backend) {
+    return getZxy(backend.options.archive, z, x, y, signal);
   }
   const id = tileId(z, x, y);
   signal?.throwIfAborted();
@@ -29,18 +32,18 @@ export async function getZxy(backend, z, x, y, signal) {
     else if (depth === 1) secondOffset = offset;
     else if (depth === 2) thirdOffset = offset;
     key = `${offset}:${length}`;
-    if (!pluginState(backend)._directories.has(key)) {
-      if (pluginState(backend)._directories.size >= 32) {
-        pluginState(backend)._directories.delete(pluginState(backend)._directories.keys().next().value);
+    if (!sceneByLayer.get(backend)._directories.has(key)) {
+      if (sceneByLayer.get(backend)._directories.size >= 32) {
+        sceneByLayer.get(backend)._directories.delete(sceneByLayer.get(backend)._directories.keys().next().value);
       }
-      pluginState(backend)._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
+      sceneByLayer.get(backend)._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
     }
-    pending = pluginState(backend)._directories.get(key);
+    pending = sceneByLayer.get(backend)._directories.get(key);
     entries = void 0;
     try {
       entries = await pending;
     } catch (error) {
-      if (pluginState(backend)._directories.get(key) === pending) pluginState(backend)._directories.delete(key);
+      if (sceneByLayer.get(backend)._directories.get(key) === pending) sceneByLayer.get(backend)._directories.delete(key);
       throw error;
     }
     signal?.throwIfAborted();

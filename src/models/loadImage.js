@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { geometryImageOptions } from '../globals/geometryImageOptions.js';
+
 
 export async function loadImage(description, directory, image) {
   let blob;
@@ -14,5 +15,5 @@ export async function loadImage(description, directory, image) {
     blob = await response.blob();
   }
   // Preserve straight alpha and raw samples; GPU sRGB formats do color decoding.
-  return createImageBitmap(blob, sharedState.allocationGeometryImageOptions);
+  return createImageBitmap(blob, geometryImageOptions);
 }

@@ -1,3 +1,4 @@
+import { sceneWalkHandlers } from '../globals/sceneWalkHandlers.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapSetPitch } from '../camera/mapSetPitch.js';
@@ -6,7 +7,7 @@ import { onKey } from './onKey.js';
 import { onBlur } from './onBlur.js';
 import { onPointer } from './onPointer.js';
 import { onTerrain } from './onTerrain.js';
-import { state as sharedState } from '../state.js';
+
 
 export function start() {
   const map = this.layer._map;
@@ -20,7 +21,7 @@ export function start() {
     zoom: map.getZoom(), pitch: mapGetPitch(map), scrollWheelZoom: map.options.scrollWheelZoom,
     handlers: /* allocation: required -- Snapshot enabled handlers for this session. */ [],
   };
-  for (name of sharedState.allocationSceneWalkHandlers) {
+  for (name of sceneWalkHandlers) {
     if (map[name]?.enabled()) this.saved.handlers.push(name);
   }
   for (name of this.saved.handlers) map[name].disable();

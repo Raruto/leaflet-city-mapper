@@ -1,6 +1,8 @@
+import * as globals from '../fixtures/globals.js';
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
-import { state } from '../../src/state.js';
+
 import { createProgram } from '../../src/rendering/createProgram.js';
 import { createGeometry } from '../../src/raster/createGeometry.js';
 import { drawGeometry } from '../../src/rendering/drawGeometry.js';
@@ -91,6 +93,7 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     const backend = { options: {}, fire: (...event) => failures.push(event),
       renderer: { device, format: 'rgba8unorm', sunlight: { layout: {} }, uniformBuffer: {},
         uniformData: new Float32Array(1024), uniformSlot: 1 } };
+    globals.sceneByLayer.set(backend, backend);
     const first = createProgram(backend), second = createProgram(backend);
     assert.notEqual(first.vertexBuffers, second.vertexBuffers);
     assert.ok(Object.isFrozen(first.vertexBuffers[0]));
@@ -131,9 +134,9 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     assert.equal(pipelines[1].frontFace, 'cw');
     assert.notEqual(groups[0].entries[0].resource.buffer, groups[1].entries[0].resource.buffer);
     assert.deepEqual(offsets, [[256], [512], [768]]);
-    assert.equal(state.allocationRenderDrawMeshEntry.resource.buffer, null);
-    assert.equal(state.allocationRenderDrawTextureEntries[0].resource, null);
-    assert.equal(state.allocationRenderDrawEntries.length, 0);
+    assert.equal(globals.drawMeshEntry.resource.buffer, null);
+    assert.equal(globals.drawTextureEntries[0].resource, null);
+    assert.equal(globals.drawEntries.length, 0);
     await Promise.resolve();
     assert.deepEqual(failures, []);
     await reportCompilation(backend, [Promise.resolve({ messages: [{ type: 'error', message: '' }] })]);

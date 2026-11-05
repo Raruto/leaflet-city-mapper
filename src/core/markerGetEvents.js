@@ -1,8 +1,9 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { markerMethods } from '../globals/markerMethods.js';
+
+
 
 export function markerGetEvents() {
-  const events = pluginState(sharedState.markerMethods).getEvents.call(this);
+  const events = markerMethods.value.getEvents.call(this);
   events.rotate = events.pitch = events.move = this.update;
   return events;
 }

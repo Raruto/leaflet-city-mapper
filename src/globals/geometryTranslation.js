@@ -1,0 +1,1 @@
+export const geometryTranslation = [0, 0, 0];

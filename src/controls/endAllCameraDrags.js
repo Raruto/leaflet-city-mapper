@@ -1,8 +1,9 @@
-import { state as sharedState } from '../state.js';
+import { cameraDrags } from '../globals/cameraDrags.js';
+
 
 import { finishCameraDrag } from './finishCameraDrag.js';
 
 export function endAllCameraDrags() {
   let state;
-  for (state of sharedState.cameraDrags) finishCameraDrag(state);
+  for (state of cameraDrags.value) finishCameraDrag(state);
 }

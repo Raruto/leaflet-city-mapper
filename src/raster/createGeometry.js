@@ -1,22 +1,26 @@
-import { state as sharedState } from '../state.js';
+import { rasterBuffer } from '../globals/rasterBuffer.js';
+import { rasterPositions } from '../globals/rasterPositions.js';
+import { rasterNormals } from '../globals/rasterNormals.js';
+import { rasterUVs } from '../globals/rasterUVs.js';
+import { rasterIndices } from '../globals/rasterIndices.js';
+
 
 export function createGeometry(device) {
-  const gpuCreateBuffer1 = sharedState.allocationRenderCreateGeometryCreateBuffer1;
   const attributes = /* allocation: required -- Each raster geometry owns its attribute table and GPU buffer lifetimes. */ {
-    position: /* allocation: required -- The raster geometry retains position metadata and its GPU buffer. */ { size: 3, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(sharedState.allocationRenderRasterPositions) },
-    normal: /* allocation: required -- The raster geometry retains normal metadata and its GPU buffer. */ { size: 3, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(sharedState.allocationRenderRasterNormals) },
-    uv: /* allocation: required -- The raster geometry retains UV metadata and its GPU buffer. */ { size: 2, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(sharedState.allocationRenderRasterUVs) },
-    index: /* allocation: required -- The raster geometry retains index metadata and its GPU buffer. */ { data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Uint16Array(sharedState.allocationRenderRasterIndices) },
+    position: /* allocation: required -- The raster geometry retains position metadata and its GPU buffer. */ { size: 3, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(rasterPositions) },
+    normal: /* allocation: required -- The raster geometry retains normal metadata and its GPU buffer. */ { size: 3, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(rasterNormals) },
+    uv: /* allocation: required -- The raster geometry retains UV metadata and its GPU buffer. */ { size: 2, data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Float32Array(rasterUVs) },
+    index: /* allocation: required -- The raster geometry retains index metadata and its GPU buffer. */ { data: /* allocation: required -- Each raster geometry owns its mutable CPU attribute data and GPU upload lifetime. */ new Uint16Array(rasterIndices) },
   };
   let name, attribute;
   for ([name, attribute] of Object.entries(attributes)) {
     attribute.count = attribute.data.length / (attribute.size || 1);
     attribute.indexFormat = 'uint16';
     attribute.buffer = device.createBuffer((
-      gpuCreateBuffer1.size = attribute.data.byteLength,
-      gpuCreateBuffer1.usage = name === 'index' ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+      rasterBuffer.size = attribute.data.byteLength,
+      rasterBuffer.usage = name === 'index' ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
         : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      gpuCreateBuffer1
+      rasterBuffer
     ));
 
     device.queue.writeBuffer(attribute.buffer, 0, attribute.data);

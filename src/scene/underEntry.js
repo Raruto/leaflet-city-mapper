@@ -1,4 +1,3 @@
-import { state as sharedState } from '../state.js';
 
 import { placeUnderEntry } from './placeUnderEntry.js';
 import { replaceEntry } from './replaceEntry.js';

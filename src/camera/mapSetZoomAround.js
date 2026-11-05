@@ -1,9 +1,10 @@
-import { state as sharedState } from '../state.js';
+import { mapMethods } from '../globals/mapMethods.js';
+
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
 export function mapSetZoomAround(latlng, zoom, options) {
-  if (!mapGetPitch(this) && !mapGetBearing(this)) return sharedState.mapMethods.setZoomAround.call(this, latlng, zoom, options);
+  if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.setZoomAround.call(this, latlng, zoom, options);
   zoom = this._limitZoom(zoom);
   const scale = this.getZoomScale(zoom), half = this.getSize().divideBy(2);
   const screen = latlng instanceof L.Point ? latlng : this.latLngToContainerPoint(latlng);

@@ -1,5 +1,7 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function isLoading(layer) {
-  return pluginState(layer)._loadingTiles > 0;
+  return sceneByLayer.get(layer)._loadingTiles > 0;
 }

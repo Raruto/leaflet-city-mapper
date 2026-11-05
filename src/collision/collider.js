@@ -1,7 +1,9 @@
-import { state as sharedState } from '../state.js';
+import { colliders } from '../globals/colliders.js';
+import { CELL } from '../globals/CELL.js';
+
 
 export function collider(mesh) {
-  let c = sharedState.colliders.get(mesh.geometry);
+  let c = colliders.get(mesh.geometry);
   if (c) return c;
   const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv } = mesh.geometry.attributes;
 
@@ -45,8 +47,8 @@ export function collider(mesh) {
     tri.push(...v);
     nrm.push(nx / h, nz / h);
 
-    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / sharedState.CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / sharedState.CELL); ix++)
-      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / sharedState.CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / sharedState.CELL); iz++) {
+    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
+      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
         key = ix + ',' + iz;
         if (!cells.has(key)) {
           cells.set(key, /* allocation: required -- Each retained spatial cell owns its triangle membership list. */ []);
@@ -60,6 +62,6 @@ export function collider(mesh) {
     cells,
     origin: /* allocation: required -- Collision translation needs the original mesh origin snapshot. */ [m[12], m[13], m[14]]
   };
-  sharedState.colliders.set(mesh.geometry, c);
+  colliders.set(mesh.geometry, c);
   return c;
 }

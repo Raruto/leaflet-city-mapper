@@ -1,6 +1,9 @@
-import { state as sharedState } from '../state.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { nativeMethodHandlers } from '../globals/nativeMethodHandlers.js';
+import { nativeRenderByLayer } from '../globals/nativeRenderByLayer.js';
+
 import { createLayer } from '../scene/createLayer.js';
-import { pluginState } from './pluginState.js';
+
 
 import { createMesh } from '../rendering/createMesh.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
@@ -48,29 +51,27 @@ export async function nativeLayer(state) {
   state.methods = /* allocation: required -- Layer removal restores this layer's own method descriptors. */ new Map();
   state.originalMethods = /* allocation: required -- Native overrides retain the original methods for this layer. */ new Map();
   state.images = /* allocation: required -- Each layer unregisters its own image listeners on disposal. */ new Set();
-  pluginState(map)._nativeGPUOrder ||= 0;
-  pluginState(map)._nativeGPUBack ||= 0;
+  cameraByMap.get(map)._nativeGPUOrder ||= 0;
+  cameraByMap.get(map)._nativeGPUBack ||= 0;
   state.dirty = true;
   state.viewDirty = true;
   state.failed = false;
-  state.order = ++pluginState(map)._nativeGPUOrder;
+  state.order = ++cameraByMap.get(map)._nativeGPUOrder;
   state.marker = source instanceof L.Marker;
   state.paneOrder = Number(getComputedStyle(source.getPane()).zIndex) || 0;
-  state.refresh = refreshNativeLayer;
-  state.reorder = reorderNativeLayer;
-  state.dispose = disposeNativeLayer;
+  state.disposed = false;
   const currentEvents = 'load tileload tileunload move drag';
   source.on(currentEvents, refreshNativeEvent, state);
   map.on('zoomend', refreshNativeEvent, state);
   if (state.marker) map.on('move zoom rotate pitch resize viewreset', updateNativeLayerView, state);
   nativeEvents(state);
   let name, own, original;
-  for (name in sharedState.nativeMethodHandlers) {
+  for (name in nativeMethodHandlers) {
     if (typeof source[name] !== 'function') continue;
     own = Object.getOwnPropertyDescriptor(source, name), original = source[name];
     state.methods.set(name, /* allocation: required -- Each overridden method retains its own restoration descriptor. */ { own, original });
     state.originalMethods.set(name, original);
-    source[name] = sharedState.nativeMethodHandlers[name];
+    source[name] = nativeMethodHandlers[name];
   }
   const ready = state.ready = Promise.withResolvers();
   backend.once('ready', resolveNativeReady, state);
@@ -86,7 +87,7 @@ export async function nativeLayer(state) {
   }
   if (!current(state)) return source;
 
-  pluginState(backend)._beforeRender = beforeNativeRender.bind(null, state);
+  nativeRenderByLayer.set(backend, state);
   try {
     synchronizeNativeLayer(state);
   } catch (error) {

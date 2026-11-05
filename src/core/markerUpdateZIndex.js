@@ -1,9 +1,12 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { markerMethods } from '../globals/markerMethods.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function markerUpdateZIndex(offset) {
-  sharedState.markerMethods._updateZIndex.call(this, offset);
-  const changed = pluginState(this)._cameraZIndexOffset !== offset;
-  pluginState(this)._cameraZIndexOffset = offset;
-  if (changed) pluginState(this)._nativeGPU?.refresh?.();
+  markerMethods.value._updateZIndex.call(this, offset);
+  const changed = sceneByLayer.get(this)._cameraZIndexOffset !== offset;
+  sceneByLayer.get(this)._cameraZIndexOffset = offset;
+  if (changed) refreshNativeLayerContract(this);
 }
+import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';

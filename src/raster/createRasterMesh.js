@@ -1,5 +1,14 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { rasterTexture } from '../globals/rasterTexture.js';
+import { rasterSampler } from '../globals/rasterSampler.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { meshImage } from '../globals/meshImage.js';
+import { meshTarget } from '../globals/meshTarget.js';
+import { meshCopySize } from '../globals/meshCopySize.js';
+import { rasterPoint } from '../globals/rasterPoint.js';
+import { TILE_SIZE } from '../globals/TILE_SIZE.js';
+import { nextId } from '../globals/nextId.js';
+
+
 
 import { createProgram } from "../rendering/createProgram.js";
 import { setParent } from "../scene/setParent.js";
@@ -7,23 +16,21 @@ import { setParent } from "../scene/setParent.js";
 import { createGeometry } from './createGeometry.js';
 
 export function createRasterMesh(backend, tile) {
-  const gpuCreateTexture1 = sharedState.allocationRenderCreateRasterMeshCreateTexture1;
-  const gpuCreateSampler2 = sharedState.allocationRenderCreateRasterMeshCreateSampler2;
-  const device = pluginState(backend).renderer.device;
+  const device = sceneByLayer.get(backend).renderer.device;
   const texture = /* allocation: required -- The raster tile retains its own GPU texture, sampler and image lifetime. */ {
     device,
     texture: device.createTexture((
-    gpuCreateTexture1.size[0] = tile.image.width,
-    gpuCreateTexture1.size[1] = tile.image.height,
-    gpuCreateTexture1.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    gpuCreateTexture1
+    rasterTexture.size[0] = tile.image.width,
+    rasterTexture.size[1] = tile.image.height,
+    rasterTexture.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    rasterTexture
   )),
-    sampler: device.createSampler(gpuCreateSampler2),
+    sampler: device.createSampler(rasterSampler),
     image: tile.image, format: 'rgba8unorm', srgb: false, uploaded: null,
   };
-  const source = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture2;
-  const destination = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture3;
-  const dimensions = sharedState.allocationRenderDrawGeometryCopyExternalImageToTexture4;
+  const source = meshImage;
+  const destination = meshTarget;
+  const dimensions = meshCopySize;
   source.source = tile.image;
   source.flipY = false;
   destination.texture = texture.texture;
@@ -34,21 +41,21 @@ export function createRasterMesh(backend, tile) {
   destination.texture = null;
   texture.uploaded = tile.image;
 
-  if (!pluginState(backend)._rasterProgram) {
-    pluginState(backend)._rasterProgram = createProgram(backend, /* allocation: required -- The raster program retains its first tile’s material and texture options. */ {
+  if (!sceneByLayer.get(backend)._rasterProgram) {
+    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* allocation: required -- The raster program retains its first tile’s material and texture options. */ {
       baseTexture: texture, unlit: true, alphaMode: 'BLEND',
     });
   }
-  if (!pluginState(backend)._rasterGeometry) pluginState(backend)._rasterGeometry = createGeometry(device);
+  if (!sceneByLayer.get(backend)._rasterGeometry) sceneByLayer.get(backend)._rasterGeometry = createGeometry(device);
   const { coords } = tile;
   const crs = backend._map.options.crs;
-  const origin = crs.project(pluginState(backend).location);
-  const metres = Math.cos(pluginState(backend).location.lat * Math.PI / 180);
+  const origin = crs.project(sceneByLayer.get(backend).location);
+  const metres = Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180);
   const scale = crs.scale(coords.z);
-  const point = sharedState.allocationRenderRasterPoint;
-  point.x = coords.x * sharedState.TILE_SIZE; point.y = coords.y * sharedState.TILE_SIZE;
+  const point = rasterPoint;
+  point.x = coords.x * TILE_SIZE; point.y = coords.y * TILE_SIZE;
   const corner = crs.transformation.untransform(point, scale);
-  point.x = (coords.x + 1) * sharedState.TILE_SIZE; point.y = (coords.y + 1) * sharedState.TILE_SIZE;
+  point.x = (coords.x + 1) * TILE_SIZE; point.y = (coords.y + 1) * TILE_SIZE;
   const opposite = crs.transformation.untransform(point, scale);
   const sizeX = (opposite.x - corner.x) * metres;
   const sizeZ = -(opposite.y - corner.y) * metres;
@@ -58,10 +65,10 @@ export function createRasterMesh(backend, tile) {
     rotation: /* allocation: required -- Each raster tile mesh owns its mutable scene rotation. */ [0, 0, 0],
     scale: /* allocation: required -- Each raster tile mesh owns its mutable scene scale. */ [sizeX, 1, sizeZ],
     worldMatrix: /* allocation: required -- Each raster tile mesh owns its mutable world-transform matrix. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    children: /* allocation: required -- Each raster tile mesh owns its scene-child list. */ [], visible: true, device, geometry: pluginState(backend)._rasterGeometry,
-    program: pluginState(backend)._rasterProgram, texture,
-    opacity: backend.options.opacity, id: sharedState.nextId++,
+    children: /* allocation: required -- Each raster tile mesh owns its scene-child list. */ [], visible: true, device, geometry: sceneByLayer.get(backend)._rasterGeometry,
+    program: sceneByLayer.get(backend)._rasterProgram, texture,
+    opacity: backend.options.opacity, id: nextId.value++,
     renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
   };
-  setParent(tile.mesh, pluginState(backend).root);
+  setParent(tile.mesh, sceneByLayer.get(backend).root);
 }

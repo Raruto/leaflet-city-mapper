@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 import { traverse } from '../scene/traverse.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
@@ -10,13 +12,13 @@ import { hitMesh } from './hitMesh.js';
 // ponytail: traffic vehicles and boats move on the GPU and are not obstacles.
 
 export function hit(layer, x, y, z, dx, dz, reach, data) {
-  updateWorldMatrix(pluginState(layer).scene);
+  updateWorldMatrix(sceneByLayer.get(layer).scene);
   data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
   data.best = reach, data.found = false;
   let other;
-  for (other of pluginState(pluginState(layer)._shared)._layers) {
+  for (other of sceneByLayer.get(sceneByLayer.get(layer)._shared)._layers) {
     if (shouldSkipOther(other, layer)) continue;
-    traverse(pluginState(other).root, hitMesh, data);
+    traverse(sceneByLayer.get(other).root, hitMesh, data);
   }
   return data.found ? data.normal : null;
 }

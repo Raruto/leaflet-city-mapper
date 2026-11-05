@@ -1,16 +1,19 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { gridFadeFrame } from '../globals/gridFadeFrame.js';
+import { pendingGridFades } from '../globals/pendingGridFades.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 import { updateGridOpacity } from './updateGridOpacity.js';
 
 export function runGridFades() {
-  sharedState.gridFadeFrame = null;
-  const layers = /* allocation: required -- Reentrant fade callbacks may reschedule layers; process only the starting frame snapshot. */ [...sharedState.pendingGridFades];
+  gridFadeFrame.value = null;
+  const layers = /* allocation: required -- Reentrant fade callbacks may reschedule layers; process only the starting frame snapshot. */ [...pendingGridFades];
   let layer, version;
   for ([layer, version] of layers) {
-    if (sharedState.pendingGridFades.get(layer) !== version) continue;
-    sharedState.pendingGridFades.delete(layer);
-    pluginState(layer)._fadeFrame = null;
+    if (pendingGridFades.get(layer) !== version) continue;
+    pendingGridFades.delete(layer);
+    sceneByLayer.get(layer)._fadeFrame = null;
     updateGridOpacity.call(layer);
   }
 }

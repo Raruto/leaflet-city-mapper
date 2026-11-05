@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Given } from '@cucumber/cucumber';
 
@@ -84,13 +86,13 @@ export async function prepare3DChecks(page) {
         }
         return mesh;
       },
-      async pixels(layer, x = 0, y = 0, width = pluginState(layer).renderer.canvas.width, height = pluginState(layer).renderer.canvas.height) {
-        const { device, context, format, canvas } = pluginState(layer).renderer;
+      async pixels(layer, x = 0, y = 0, width = globals.sceneByLayer.get(layer).renderer.canvas.width, height = globals.sceneByLayer.get(layer).renderer.canvas.height) {
+        const { device, context, format, canvas } = globals.sceneByLayer.get(layer).renderer;
         context.configure({
           device, format, alphaMode: 'premultiplied',
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         });
-        render.render(pluginState(layer)._shared);
+        render.render(globals.sceneByLayer.get(layer)._shared);
         const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
         const buffer = device.createBuffer({
           size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
@@ -117,8 +119,8 @@ export async function prepare3DChecks(page) {
         return pixels;
       },
       async terrainHeights(terrain, vertices) {
-        const { state: { elevationWGSL } } = await import('/src/state.js');
-        const { device } = pluginState(terrain).renderer;
+        const { elevationWGSL } = await import('/src/globals/elevationWGSL.js');
+        const { device } = globals.sceneByLayer.get(terrain).renderer;
         const module = device.createShaderModule({ code: `
           @group(0) @binding(0) var dem: texture_2d<f32>;
           @group(0) @binding(1) var<storage, read> terrains: array<vec4<f32>>;
@@ -154,7 +156,7 @@ export async function prepare3DChecks(page) {
         const pass = encoder.beginComputePass();
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, device.createBindGroup({ layout, entries: [
-          { binding: 0, resource: pluginState(terrain)._dem.texture.createView() },
+          { binding: 0, resource: globals.sceneByLayer.get(terrain)._dem.texture.createView() },
           { binding: 1, resource: { buffer: terrains } },
           { binding: 2, resource: { buffer: uvs } },
           { binding: 3, resource: { buffer: heights } },
@@ -172,23 +174,23 @@ export async function prepare3DChecks(page) {
         return CityMapper.ready(layer);
       },
       async loadBlock(layer, area, features) {
-        while (pluginState(layer)._inflight) await new Promise(requestAnimationFrame);
-        const geojson = pluginState(layer)._geojson, data = layer.options.data, url = layer.options.url;
-        pluginState(layer)._geojson = true;
+        while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame);
+        const geojson = globals.sceneByLayer.get(layer)._geojson, data = layer.options.data, url = layer.options.url;
+        globals.sceneByLayer.get(layer)._geojson = true;
         layer.options.data = { type: 'FeatureCollection', features };
         delete layer.options.url;
-        pluginState(layer)._areas.set('fixture', area);
+        globals.sceneByLayer.get(layer)._areas.set('fixture', area);
         try {
           sources.pump(layer);
-          while (pluginState(layer)._inflight) await new Promise(requestAnimationFrame);
+          while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame);
           return area;
         } finally {
-          pluginState(layer)._geojson = geojson;
+          globals.sceneByLayer.get(layer)._geojson = geojson;
           if (data === undefined) delete layer.options.data;
           else layer.options.data = data;
           if (url === undefined) delete layer.options.url;
           else layer.options.url = url;
-          pluginState(layer)._areas.delete('fixture');
+          globals.sceneByLayer.get(layer)._areas.delete('fixture');
         }
       },
       bounds(root, backend) {
@@ -209,8 +211,8 @@ export async function prepare3DChecks(page) {
         return { min, max };
       },
       intersections(mesh, origin, direction, backend) {
-        const camera = pluginState(backend).camera, ray = structuredClone(pluginState(backend).raycaster);
-        pluginState(backend).camera = {
+        const camera = globals.sceneByLayer.get(backend).camera, ray = structuredClone(globals.sceneByLayer.get(backend).raycaster);
+        globals.sceneByLayer.get(backend).camera = {
           ...structuredClone(camera), position: [...origin],
           target: origin.map((v, i) => v + direction[i]), up: [0, 0, 1],
         };
@@ -220,8 +222,8 @@ export async function prepare3DChecks(page) {
             clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
           }, [mesh], false).map(hit => hit.point);
         } finally {
-          pluginState(backend).camera = camera;
-          pluginState(backend).raycaster = ray;
+          globals.sceneByLayer.get(backend).camera = camera;
+          globals.sceneByLayer.get(backend).raycaster = ray;
         }
       },
     };
@@ -260,7 +262,7 @@ const openEiffelExample = async function () {
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.map && typeof CityMapper.getPitch === 'function');
   await this.page.waitForFunction(() => layers._layers.some(entry => entry.name === 'Shadows'));
-  await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => pluginState(layer).ready)));
+  await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   // Test-only shortcuts; the example keeps its layers inside the layers control.
   await this.page.evaluate(() => {
     const named = name => layers._layers.find(entry => entry.name === name).layer;
@@ -270,12 +272,12 @@ const openEiffelExample = async function () {
       streetlights: named('Streetlights'),
     });
   });
-  await this.page.waitForFunction(() => pluginState(sunlightOverlay).control);
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control);
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
-    !(pluginState(layer)._3d) || (pluginState(layer).root && (!pluginState(layer).modelUrl || pluginState(layer).model) &&
-      (!pluginState(layer).url || pluginState(layer).header))));
+    !(globals.sceneByLayer.get(layer)._3d) || (globals.sceneByLayer.get(layer).root && (!globals.sceneByLayer.get(layer).modelUrl || globals.sceneByLayer.get(layer).model) &&
+      (!globals.sceneByLayer.get(layer).url || globals.sceneByLayer.get(layer).header))));
   await this.page.evaluate(() => Promise.all(layers._layers
-    .filter(({ layer }) => !(pluginState(layer)._3d)).map(({ layer }) => pluginState(layer).ready)));
+    .filter(({ layer }) => !(globals.sceneByLayer.get(layer)._3d)).map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   const layout = await this.page.evaluate(() => {
     const rect = map.getContainer().getBoundingClientRect();
     return {
@@ -288,7 +290,7 @@ const openEiffelExample = async function () {
       vectorLayers: Object.values(map._layers).filter(layer => layer instanceof L.Path).length,
       backgrounds: [...document.querySelectorAll('.leaflet-control-layers-base label')].map(label => label.textContent.trim()),
       activeBackgrounds: layers._layers.filter(entry => !entry.overlay && map.hasLayer(entry.layer)).map(entry => entry.name),
-      orthophotoUrl: pluginState(layers._layers.find(entry => entry.name === 'Orthophoto IGN').layer).url
+      orthophotoUrl: globals.sceneByLayer.get(layers._layers.find(entry => entry.name === 'Orthophoto IGN').layer).url
     };
   });
   assert.equal(layout.width, layout.viewportWidth);

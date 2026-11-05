@@ -1,9 +1,10 @@
+import { directoryReader } from '../globals/directoryReader.js';
 import { varint } from './varint.js';
-import { state as sharedState } from '../state.js';
+
 /** Decode delta/varint directory columns, rejecting malformed entries. */
 
 export function decodeDirectory(data) {
-  const reader = sharedState.directoryReader;
+  const reader = directoryReader;
   const bytes = /* allocation: required -- The byte view must reference this directory input. */ new Uint8Array(data);
   reader.bytes = bytes;
   reader.cursor = 0;

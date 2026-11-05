@@ -1,5 +1,6 @@
-import { state as sharedState } from '../state.js';
+import { pendingRasterLoads } from '../globals/pendingRasterLoads.js';
+
 
 export function fireRasterLoad() {
-  sharedState.pendingRasterLoads.shift()?.fire('load');
+  pendingRasterLoads.shift()?.fire('load');
 }

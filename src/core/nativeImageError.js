@@ -1,7 +1,8 @@
-import { state as sharedState } from '../state.js';
+import { imageStates } from '../globals/imageStates.js';
+
 
 export function nativeImageError(event) {
-  const states = sharedState.imageStates.get(event.currentTarget);
+  const states = imageStates.get(event.currentTarget);
   if (!states) return;
   let state;
   for (state of states) {

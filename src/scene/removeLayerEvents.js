@@ -1,7 +1,9 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function removeLayerEvents() {
-  const state = pluginState(this);
+  const state = sceneByLayer.get(this);
   state.eventMap.off(state.events, this);
   state.events = state.eventMap = null;
 }

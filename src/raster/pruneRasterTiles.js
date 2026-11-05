@@ -1,27 +1,29 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { releaseRasterTile } from './releaseRasterTile.js';
 
 export function pruneRasterTiles(backend) {
-  const wanted = pluginState(backend)._wantedRasterTiles;
+  const wanted = sceneByLayer.get(backend)._wantedRasterTiles;
   const now = performance.now();
-  if (pluginState(backend)._pruneVersion === pluginState(backend)._rasterVersion && pluginState(backend)._pruneWanted === wanted &&
-    now < pluginState(backend)._pruneAfter) return Number.isFinite(pluginState(backend)._pruneAfter);
-  pluginState(backend)._pruneVersion = pluginState(backend)._rasterVersion;
-  pluginState(backend)._pruneWanted = wanted;
-  pluginState(backend)._pruneAfter = Infinity;
+  if (sceneByLayer.get(backend)._pruneVersion === sceneByLayer.get(backend)._rasterVersion && sceneByLayer.get(backend)._pruneWanted === wanted &&
+    now < sceneByLayer.get(backend)._pruneAfter) return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
+  sceneByLayer.get(backend)._pruneVersion = sceneByLayer.get(backend)._rasterVersion;
+  sceneByLayer.get(backend)._pruneWanted = wanted;
+  sceneByLayer.get(backend)._pruneAfter = Infinity;
   const pending = /* allocation: required -- Tile-unload listeners can reenter pruning, so the active coverage snapshot must remain independent. */ [];
   let key, tile, parts, overlaps, coords, zoom;
   for (key of wanted) {
-    tile = pluginState(backend)._rasterTiles.get(key);
+    tile = sceneByLayer.get(backend)._rasterTiles.get(key);
     if (tile?.done && now - tile.loadedAt < 250) {
-      pluginState(backend)._pruneAfter = Math.min(pluginState(backend)._pruneAfter, tile.loadedAt + 250);
+      sceneByLayer.get(backend)._pruneAfter = Math.min(sceneByLayer.get(backend)._pruneAfter, tile.loadedAt + 250);
     }
     if (!tile?.done || now - tile.loadedAt < 250) {
       parts = key.split('/');
       pending.push(/* allocation: required -- Reentrant unload callbacks must not overwrite coordinates in the active pending-coverage snapshot. */ { z: Number(parts[0]), x: Number(parts[1]), y: Number(parts[2]) });
     }
   }
-  for ([key, tile] of pluginState(backend)._rasterTiles) {
+  for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {
     if (wanted.has(key)) continue;
     overlaps = false;
     for (coords of pending) {
@@ -34,5 +36,5 @@ export function pruneRasterTiles(backend) {
     }
     if (!overlaps) releaseRasterTile(backend, tile);
   }
-  return Number.isFinite(pluginState(backend)._pruneAfter);
+  return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
 }

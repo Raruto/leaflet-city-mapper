@@ -1,9 +1,11 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { pendingZoomAnimations } from '../globals/pendingZoomAnimations.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 import { render } from '../rendering/render.js';
 
 export function renderPendingZoomAnimation() {
-  const layer = sharedState.pendingZoomAnimations.shift();
-  if (pluginState(layer)._shared === layer && pluginState(layer).renderer) render(layer);
+  const layer = pendingZoomAnimations.shift();
+  if (sceneByLayer.get(layer)._shared === layer && sceneByLayer.get(layer).renderer) render(layer);
 }

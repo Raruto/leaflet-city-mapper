@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { raycast } from './raycast.js';
 
 /**
@@ -8,20 +10,20 @@ import { raycast } from './raycast.js';
  */
 
 export function findFeature(backend, event) {
-  if (!pluginState(backend).root || !pluginState(backend).camera) {
+  if (!sceneByLayer.get(backend).root || !sceneByLayer.get(backend).camera) {
     return null;
   }
   let hit, object, ranges, low, high, middle, range;
-  for (hit of raycast(backend, event, pluginState(backend).root.children, Boolean(pluginState(backend).model))) {
-    if (pluginState(backend).model) {
+  for (hit of raycast(backend, event, sceneByLayer.get(backend).root.children, Boolean(sceneByLayer.get(backend).model))) {
+    if (sceneByLayer.get(backend).model) {
       object = hit.object;
-      while (object && object !== pluginState(backend).model) {
+      while (object && object !== sceneByLayer.get(backend).model) {
         object = object.parent;
       }
-      if (object === pluginState(backend).model) {
+      if (object === sceneByLayer.get(backend).model) {
         return /* allocation: required -- Return an independent model hit to each caller. */ {
-          id: pluginState(backend).model.id, properties: pluginState(backend).model.extras,
-          model: pluginState(backend).model, mesh: hit.object, point: hit.point
+          id: sceneByLayer.get(backend).model.id, properties: sceneByLayer.get(backend).model.extras,
+          model: sceneByLayer.get(backend).model, mesh: hit.object, point: hit.point
         };
       }
     }

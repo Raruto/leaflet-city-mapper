@@ -1,11 +1,14 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { pendingGridFades } from '../globals/pendingGridFades.js';
+import { gridFadeFrame } from '../globals/gridFadeFrame.js';
+
+
 
 import { runGridFades } from './runGridFades.js';
 
 export function scheduleGridFade(layer) {
-  pluginState(layer)._fadeVersion = (pluginState(layer)._fadeVersion || 0) + 1;
-  sharedState.pendingGridFades.set(layer, pluginState(layer)._fadeVersion);
-  if (sharedState.gridFadeFrame === null) sharedState.gridFadeFrame = requestAnimationFrame(runGridFades);
-  pluginState(layer)._fadeFrame = sharedState.gridFadeFrame;
+  sceneByLayer.get(layer)._fadeVersion = (sceneByLayer.get(layer)._fadeVersion || 0) + 1;
+  pendingGridFades.set(layer, sceneByLayer.get(layer)._fadeVersion);
+  if (gridFadeFrame.value === null) gridFadeFrame.value = requestAnimationFrame(runGridFades);
+  sceneByLayer.get(layer)._fadeFrame = gridFadeFrame.value;
 }

@@ -1,9 +1,10 @@
-import { state as sharedState } from '../state.js';
+import { pendingInitializations } from '../globals/pendingInitializations.js';
+
 
 import { initializerFor } from './initializerFor.js';
 
 export function resolveNextInitialization() {
-  const task = sharedState.pendingInitializations.shift();
+  const task = pendingInitializations.shift();
   try {
     task.initialize = initializerFor(task.type);
   } catch (error) {

@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { prepare3DChecks } from './3d.steps.js';
@@ -13,13 +15,13 @@ Then('source layers share load slots and start nearby blocks before distant ones
       getZxy: async () => { throw new Error('Out-of-view ground should not be requested'); },
     } } }).addTo(map);
     await Promise.all(layers.map(layer => nativeChecks.ready(layer)));
-    await pluginState(ground).ready;
-    await pluginState(ground)._added.promise;
+    await globals.sceneByLayer.get(ground).ready;
+    await globals.sceneByLayer.get(ground)._added.promise;
     const zoom = 16, center = map.project(map.getCenter(), zoom).divideBy(256).floor();
     const started = [], releases = [];
     let active = 0, maximum = 0;
     for (const [index, layer] of layers.entries()) {
-      pluginState(layer).url = `priority-${index}.pmtiles`;
+      globals.sceneByLayer.get(layer).url = `priority-${index}.pmtiles`;
       layer.options.archive = { getZxy: async (z, x, y) => {
         started.push(x - center.x);
         active++;
@@ -29,7 +31,7 @@ Then('source layers share load slots and start nearby blocks before distant ones
         return { data: new TextEncoder().encode('{"type":"FeatureCollection","features":[]}') };
       } };
       for (const offset of [100, 50, 0, 1]) {
-        pluginState(layer)._areas.set(`${offset}`, { coords: { z: zoom, x: center.x + offset, y: center.y },
+        globals.sceneByLayer.get(layer)._areas.set(`${offset}`, { coords: { z: zoom, x: center.x + offset, y: center.y },
           request: new AbortController() });
       }
     }
@@ -38,11 +40,11 @@ Then('source layers share load slots and start nearby blocks before distant ones
     const near = started.every(offset => offset < 2);
     // Cancel a layer while its slots are occupied; the remaining queue must still advance.
     layers[0].remove();
-    while (layers.some(layer => pluginState(layer)._inflight)) {
+    while (layers.some(layer => globals.sceneByLayer.get(layer)._inflight)) {
       for (const release of releases.splice(0)) release();
       await new Promise(requestAnimationFrame);
     }
-    const recovered = layers.slice(1).every(layer => [...pluginState(layer)._areas.values()].every(area => area.done));
+    const recovered = layers.slice(1).every(layer => [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done));
     for (const layer of layers.slice(1)) layer.remove();
     ground.remove();
     return { near, bounded: maximum === 4, recovered };
@@ -57,7 +59,7 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
     await nativeChecks.ready(layer);
     const idle = async () => {
       const deadline = performance.now() + 3000;
-      while (pluginState(layer)._inflight) {
+      while (globals.sceneByLayer.get(layer)._inflight) {
         if (performance.now() > deadline) throw new Error('Building request slots were not released');
         await new Promise(requestAnimationFrame);
       }
@@ -67,7 +69,7 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
     let hold = true;
     const requests = [];
     layer.on('error', () => errors++);
-    pluginState(layer.options.archive).getZxy = async (z, x, y, signal) => {
+    layer.options.archive.getZxy = async (z, x, y, signal) => {
       requests.push(`${x}/${y}`);
       active++;
       maximum = Math.max(maximum, active);
@@ -86,12 +88,12 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
     const home = map.getCenter();
     map.setView([48.85657, 2.39], 17, { animate: false });
     while (active < 2) await new Promise(requestAnimationFrame);
-    const pending = [...pluginState(layer)._areas.values()].filter(area => area.started && !area.done);
+    const pending = [...globals.sceneByLayer.get(layer)._areas.values()].filter(area => area.started && !area.done);
     const started = active;
     hold = false;
     map.setView(home, 17, { animate: false });
     await idle();
-    const recovered = pluginState(layer)._areas.size > 0 && [...pluginState(layer)._areas.values()].every(area => area.done && !area.error);
+    const recovered = globals.sceneByLayer.get(layer)._areas.size > 0 && [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done && !area.error);
     const noStale = pending.every(area => area.request.signal.aborted && !area.mesh && !area.done);
     hold = true;
     map.setView([48.85657, 2.39], 17, { animate: false });
@@ -99,12 +101,12 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
     const beforeRemoval = requests.length;
     layer.remove();
     await idle();
-    const stopped = requests.length === beforeRemoval && active === 0 && pluginState(layer)._areas.size === 0;
+    const stopped = requests.length === beforeRemoval && active === 0 && globals.sceneByLayer.get(layer)._areas.size === 0;
     hold = false;
     layer.addTo(map);
-    await pluginState(layer)._added.promise;
+    await globals.sceneByLayer.get(layer)._added.promise;
     await idle();
-    const reloaded = requests.length > beforeRemoval && [...pluginState(layer)._areas.values()].every(area => area.done);
+    const reloaded = requests.length > beforeRemoval && [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done);
     layer.remove();
     return { started, maximum, aborted, errors, recovered, noStale, stopped, reloaded };
   });
@@ -120,30 +122,30 @@ Then('building blocks cover pitched views and retain overlapping areas', async f
     const map = test3d.map;
     const layer = CityMapper.layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
     await nativeChecks.ready(layer);
-    const idle = async () => { while (pluginState(layer)._inflight) await new Promise(requestAnimationFrame); };
+    const idle = async () => { while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame); };
     await idle();
     let requests = 0;
-    pluginState(layer.options.archive).getZxy = async () => { requests++; return undefined; };
+    layer.options.archive.getZxy = async () => { requests++; return undefined; };
     const checks = [];
     const verify = async change => {
-      const previous = new Map(pluginState(layer)._areas), before = requests;
+      const previous = new Map(globals.sceneByLayer.get(layer)._areas), before = requests;
       change();
       await idle();
-      const bounds = map.getBounds(), z = pluginState(layer).header.minZoom;
+      const bounds = map.getBounds(), z = globals.sceneByLayer.get(layer).header.minZoom;
       const nw = map.project(bounds.getNorthWest(), z).divideBy(256).floor();
       const se = map.project(bounds.getSouthEast(), z).divideBy(256).floor();
-      const archiveNW = map.project([pluginState(layer).header.maxLat, pluginState(layer).header.minLon], z).divideBy(256).floor();
-      const archiveSE = map.project([pluginState(layer).header.minLat, pluginState(layer).header.maxLon], z).divideBy(256).floor();
+      const archiveNW = map.project([globals.sceneByLayer.get(layer).header.maxLat, globals.sceneByLayer.get(layer).header.minLon], z).divideBy(256).floor();
+      const archiveSE = map.project([globals.sceneByLayer.get(layer).header.minLat, globals.sceneByLayer.get(layer).header.maxLon], z).divideBy(256).floor();
       let missing = 0;
       for (let x = Math.max(nw.x, archiveNW.x); x <= Math.min(se.x, archiveSE.x); x++) {
         for (let y = Math.max(nw.y, archiveNW.y); y <= Math.min(se.y, archiveSE.y); y++) {
-          if (!pluginState(layer)._areas.get(`${x}/${y}`)?.done) missing++;
+          if (!globals.sceneByLayer.get(layer)._areas.get(`${x}/${y}`)?.done) missing++;
         }
       }
-      const retained = [...pluginState(layer)._areas].every(([key, area]) => !previous.has(key) || previous.get(key) === area);
-      const added = [...pluginState(layer)._areas.keys()].filter(key => !previous.has(key)).length;
-      checks.push({ missing, retained, requests: requests - before, added, count: pluginState(layer)._areas.size,
-        clipped: [...pluginState(layer)._areas.values()].every(({ coords }) =>
+      const retained = [...globals.sceneByLayer.get(layer)._areas].every(([key, area]) => !previous.has(key) || previous.get(key) === area);
+      const added = [...globals.sceneByLayer.get(layer)._areas.keys()].filter(key => !previous.has(key)).length;
+      checks.push({ missing, retained, requests: requests - before, added, count: globals.sceneByLayer.get(layer)._areas.size,
+        clipped: [...globals.sceneByLayer.get(layer)._areas.values()].every(({ coords }) =>
           coords.x >= archiveNW.x && coords.x <= archiveSE.x &&
           coords.y >= archiveNW.y && coords.y <= archiveSE.y) });
     };
@@ -175,7 +177,7 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
     const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
     layer.options.style = () => ({ top: 10 });
-    const anchor = pluginState(layer).location, west = anchor.lng, south = anchor.lat;
+    const anchor = globals.sceneByLayer.get(layer).location, west = anchor.lng, south = anchor.lat;
     let geometry = { type: 'Polygon', coordinates: [[[west, south]]] };
     if (invalid === 'geometry') geometry = { type: 'LineString', coordinates: [[west, south], [west + 0.001, south]] };
     if (invalid === 'coordinates') geometry = { type: 'Polygon', coordinates: [[['bad', south]]] };
@@ -184,17 +186,17 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
     ] };
     const data = invalid === 'collection' ? { type: 'Feature', properties: {} }
       : { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry }] };
-    pluginState(layer).url = 'invalid-fixture.pmtiles';
+    globals.sceneByLayer.get(layer).url = 'invalid-fixture.pmtiles';
     layer.options.archive ||= {};
-    pluginState(layer.options.archive).getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(data)) });
+    layer.options.archive.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(data)) });
     const point = test3d.map.project(anchor, 16).divideBy(256).floor();
     const area = { coords: { z: 16, x: point.x, y: point.y }, request: new AbortController() };
     const errors = [];
     layer.on('error', event => errors.push(event.error.message));
-    pluginState(layer)._areas.set('invalid-fixture', area);
+    globals.sceneByLayer.get(layer)._areas.set('invalid-fixture', area);
     nativeChecks.sources.pump(layer);
-    while (pluginState(layer)._inflight) await new Promise(requestAnimationFrame);
-    const result = { error: area.error, events: errors, attached: pluginState(layer).root.children.length, done: Boolean(area.done) };
+    while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame);
+    const result = { error: area.error, events: errors, attached: globals.sceneByLayer.get(layer).root.children.length, done: Boolean(area.done) };
     layer.remove();
     return result;
   }, invalid);
@@ -207,8 +209,8 @@ Then('a source block with {string} reports {string} without attaching a mesh', a
 Then('building style for {int} storeys, {int} floors and ground {int} is {string}',
   async function (storeys, floors, ground, expected) {
     const result = await this.page.evaluate(({ storeys, floors, ground }) => {
-      const layer = layers._layers.find(entry => pluginState(entry.layer)._3d &&
-        !(pluginState(entry.layer)._type === 'terrain') && pluginState(entry.layer).url).layer;
+      const layer = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._3d &&
+        !(globals.sceneByLayer.get(entry.layer)._type === 'terrain') && globals.sceneByLayer.get(entry.layer).url).layer;
       const feature = { properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } };
       const style = layer.options.style(feature);
       return style === null ? null : {
@@ -270,21 +272,21 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.evaluate(() => {
-    const terrain = layers._layers.find(entry => pluginState(entry.layer)._type === 'terrain').layer;
+    const terrain = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._type === 'terrain').layer;
     terrain.remove();
   });
-  await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => pluginState(layer).ready)));
+  await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
-    !(pluginState(layer)._3d) || (pluginState(layer).root && (!pluginState(layer).modelUrl || pluginState(layer).model) &&
-      (!pluginState(layer).url || pluginState(layer).header))));
+    !(globals.sceneByLayer.get(layer)._3d) || (globals.sceneByLayer.get(layer).root && (!globals.sceneByLayer.get(layer).modelUrl || globals.sceneByLayer.get(layer).model) &&
+      (!globals.sceneByLayer.get(layer).url || globals.sceneByLayer.get(layer).header))));
   await this.page.evaluate(() => Promise.all(layers._layers
-    .filter(({ layer }) => !(pluginState(layer)._3d)).map(({ layer }) => pluginState(layer).ready)));
+    .filter(({ layer }) => !(globals.sceneByLayer.get(layer)._3d)).map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   await this.page.waitForFunction(() => {
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
-    const error = buildings && [...pluginState(buildings)._areas.values()].find(area => area.error);
+    const error = buildings && [...globals.sceneByLayer.get(buildings)._areas.values()].find(area => area.error);
     if (error) throw new Error(error.error);
-    return buildings && pluginState(buildings)._inflight === 0 && pluginState(buildings)._areas.size > 0 &&
-      [...pluginState(buildings)._areas.values()].reduce((sum, area) => sum + (area.buildings || 0), 0) === 2;
+    return buildings && globals.sceneByLayer.get(buildings)._inflight === 0 && globals.sceneByLayer.get(buildings)._areas.size > 0 &&
+      [...globals.sceneByLayer.get(buildings)._areas.values()].reduce((sum, area) => sum + (area.buildings || 0), 0) === 2;
   },
   null, { timeout: 45000 });
 });
@@ -293,14 +295,14 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
   const result = await this.page.evaluate(async () => {
     let tower, buildings;
     map.eachLayer(layer => {
-      if (pluginState(layer).model) tower = layer;
+      if (globals.sceneByLayer.get(layer).model) tower = layer;
       if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer;
     });
     const backend = tower;
-    const mesh = pluginState(buildings).group.children[0];
+    const mesh = globals.sceneByLayer.get(buildings).group.children[0];
     nativeChecks.graph.updateWorldMatrix(mesh, true);
-    const origin = map.options.crs.project(pluginState(tower).location);
-    const metres = Math.cos(pluginState(tower).location.lat * Math.PI / 180);
+    const origin = map.options.crs.project(globals.sceneByLayer.get(tower).location);
+    const metres = Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180);
     const hits = (lat, lon) => {
       const point = map.options.crs.project(new L.LatLng(lat, lon));
       return nativeChecks.intersections(mesh,
@@ -320,13 +322,13 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
       multipart: [hits(48.8587, 2.2962), hits(48.8587, 2.2967)],
       min: Math.min(...heights),
       max: Math.max(...heights),
-      sharedScene: pluginState(buildings).root.parent === pluginState(buildings).scene &&
-        Object.values(map._layers).filter(layer => pluginState(layer)._3d)
-          .every(layer => pluginState(layer).renderer === pluginState(buildings).renderer),
-      true3DLayer: pluginState(buildings)._3d && !(buildings instanceof L.GridLayer),
+      sharedScene: globals.sceneByLayer.get(buildings).root.parent === globals.sceneByLayer.get(buildings).scene &&
+        Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._3d)
+          .every(layer => globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(buildings).renderer),
+      true3DLayer: globals.sceneByLayer.get(buildings)._3d && !(buildings instanceof L.GridLayer),
       noSubclass: buildings.constructor === L.Layer && Object.getPrototypeOf(buildings) === L.Layer.prototype,
-      meshes: pluginState(buildings).group.children.length,
-      skipped: [...pluginState(buildings)._areas.values()].reduce((sum, area) => sum + (area.skipped || 0), 0)
+      meshes: globals.sceneByLayer.get(buildings).group.children.length,
+      skipped: [...globals.sceneByLayer.get(buildings)._areas.values()].reduce((sum, area) => sum + (area.skipped || 0), 0)
     };
   });
   assert.deepEqual(result.holes, []);
@@ -343,7 +345,7 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
 
   const genericStyle = await this.page.evaluate(async feature => {
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
-    const coords = { z: pluginState(buildings).header.minZoom };
+    const coords = { z: globals.sceneByLayer.get(buildings).header.minZoom };
     const point = map.project(new L.LatLng(48.8585, 2.2955), coords.z).divideBy(256).floor();
     Object.assign(coords, { x: point.x, y: point.y });
     const area = { coords, request: new AbortController() };
@@ -372,7 +374,7 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
   const interaction = await this.page.evaluate(async () => {
     let tower, buildings;
     map.eachLayer(layer => {
-      if (pluginState(layer).renderer && !pluginState(layer).model) tower = layer;
+      if (globals.sceneByLayer.get(layer).renderer && !globals.sceneByLayer.get(layer).model) tower = layer;
       if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer;
     });
     const backend = tower;
@@ -380,19 +382,19 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
     buildings.on('featurehover featureclick', event => {
       buildings.featureEvents.push({ type: event.type, id: event.feature?.id });
     });
-    const range = pluginState(buildings).group.children[0].extras.featureFaces[0];
-    const origin = map.options.crs.project(pluginState(tower).location);
+    const range = globals.sceneByLayer.get(buildings).group.children[0].extras.featureFaces[0];
+    const origin = map.options.crs.project(globals.sceneByLayer.get(tower).location);
     const point = map.options.crs.project(new L.LatLng(48.85855, 2.29555));
-    const world = new DOMPoint((point.x - origin.x) * Math.cos(pluginState(tower).location.lat * Math.PI / 180),
-      15, -(point.y - origin.y) * Math.cos(pluginState(tower).location.lat * Math.PI / 180), 1)
-      .matrixTransform(new DOMMatrix(pluginState(tower).camera.projectionViewMatrix));
+    const world = new DOMPoint((point.x - origin.x) * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180),
+      15, -(point.y - origin.y) * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180), 1)
+      .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
     const x = world.x / world.w, y = world.y / world.w;
     const rect = map.getContainer().getBoundingClientRect();
     const position = {
       clientX: rect.left + (x + 1) * rect.width / 2,
       clientY: rect.top + (1 - y) * rect.height / 2
     };
-    const before = pluginState(buildings).group.children[0].highlight ?? null;
+    const before = globals.sceneByLayer.get(buildings).group.children[0].highlight ?? null;
     map.getContainer().dispatchEvent(new MouseEvent('mousemove', { ...position, bubbles: true }));
     return {
       position,
@@ -406,9 +408,9 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
     let buildings;
     map.eachLayer(layer => { if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer; });
     return {
-      highlight: pluginState(buildings).group.children[0].highlight,
-      highlighted: pluginState(buildings).highlightedFeature?.vertexStart,
-      hovered: pluginState(buildings).hoveredFeature?.vertexStart
+      highlight: globals.sceneByLayer.get(buildings).group.children[0].highlight,
+      highlighted: globals.sceneByLayer.get(buildings).highlightedFeature?.vertexStart,
+      hovered: globals.sceneByLayer.get(buildings).hoveredFeature?.vertexStart
     };
   }, interaction.vertexStart);
   this.hoverHighlight = interaction.before === null &&
@@ -429,7 +431,7 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
   this.clickCleared = await this.page.evaluate(() => {
       let buildings;
       map.eachLayer(layer => { if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer; });
-      return pluginState(buildings)._tooltip.hidden && !pluginState(buildings).hoveredFeature && !pluginState(buildings).highlightedFeature &&
+      return globals.sceneByLayer.get(buildings)._tooltip.hidden && !globals.sceneByLayer.get(buildings).hoveredFeature && !globals.sceneByLayer.get(buildings).highlightedFeature &&
         map.getContainer().style.cursor !== 'pointer';
     });
   assert.equal(this.hoverHighlight, true, JSON.stringify({ interaction, highlightedColor }));
@@ -444,10 +446,10 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
 
 When('I move and toggle the Paris building volumes', { timeout: 60000 }, async function () {
   const status = text => this.page.waitForFunction(text => {
-    const buildings = layers._layers.find(entry => pluginState(entry.layer)._3d &&
-      !(pluginState(entry.layer)._type === 'terrain') && pluginState(entry.layer).url).layer;
-    if (pluginState(buildings)._inflight || !pluginState(buildings)._areas.size) return false;
-    const areas = [...pluginState(buildings)._areas.values()];
+    const buildings = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._3d &&
+      !(globals.sceneByLayer.get(entry.layer)._type === 'terrain') && globals.sceneByLayer.get(entry.layer).url).layer;
+    if (globals.sceneByLayer.get(buildings)._inflight || !globals.sceneByLayer.get(buildings)._areas.size) return false;
+    const areas = [...globals.sceneByLayer.get(buildings)._areas.values()];
     if (text === 'Unable to load') return areas.some(area => area.error);
     if (areas.some(area => !area.done)) return false;
     const loaded = areas.reduce((sum, area) => sum + (area.buildings || 0), 0);
@@ -456,7 +458,7 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   const meshes = () => this.page.evaluate(() => {
     let buildings;
     map.eachLayer(layer => { if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer; });
-    return pluginState(buildings).group.children.length;
+    return globals.sceneByLayer.get(buildings).group.children.length;
   });
   const away = () => this.page.evaluate(() => map.setView([48.85657, 2.39], 16, { animate: false }));
   const back = () => this.page.evaluate(() => map.setView([48.8582601, 2.29449985], 17, { animate: false }));
@@ -473,11 +475,11 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   this.independentBuildings = await this.page.evaluate(() => {
     let eiffel, buildings;
     map.eachLayer(layer => {
-      if (pluginState(layer).model) eiffel = layer;
+      if (globals.sceneByLayer.get(layer).model) eiffel = layer;
       if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer;
     });
-    return !eiffel && pluginState(buildings).group.parent === pluginState(buildings).scene &&
-      pluginState(buildings).renderer.canvas.isConnected && pluginState(buildings).group.children.length === 1;
+    return !eiffel && globals.sceneByLayer.get(buildings).group.parent === globals.sceneByLayer.get(buildings).scene &&
+      globals.sceneByLayer.get(buildings).renderer.canvas.isConnected && globals.sceneByLayer.get(buildings).group.children.length === 1;
   });
 
   await this.page.getByRole('checkbox', { name: 'Buildings', exact: true }).uncheck();
@@ -492,7 +494,7 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   await status('Unable to load');
   this.failureText = await this.page.evaluate(() => {
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
-    return [...pluginState(buildings)._areas.values()].map(area => area.error).filter(Boolean).join('; ');
+    return [...globals.sceneByLayer.get(buildings)._areas.values()].map(area => area.error).filter(Boolean).join('; ');
   });
   this.failBuildings = false;
   // Leaving the neighbourhood drops failed blocks; returning retries them.
@@ -515,21 +517,21 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   this.areaBudget = await this.page.evaluate(() => {
     let buildings;
     map.eachLayer(layer => { if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer; });
-    const z = pluginState(buildings).header.minZoom;
-    const nw = map.project([pluginState(buildings).header.maxLat, pluginState(buildings).header.minLon], z).divideBy(256).floor();
-    const se = map.project([pluginState(buildings).header.minLat, pluginState(buildings).header.maxLon], z).divideBy(256).floor();
-    return { areas: pluginState(buildings)._areas.size, inflight: pluginState(buildings)._inflight,
+    const z = globals.sceneByLayer.get(buildings).header.minZoom;
+    const nw = map.project([globals.sceneByLayer.get(buildings).header.maxLat, globals.sceneByLayer.get(buildings).header.minLon], z).divideBy(256).floor();
+    const se = map.project([globals.sceneByLayer.get(buildings).header.minLat, globals.sceneByLayer.get(buildings).header.maxLon], z).divideBy(256).floor();
+    return { areas: globals.sceneByLayer.get(buildings)._areas.size, inflight: globals.sceneByLayer.get(buildings)._inflight,
       maximum: (se.x - nw.x + 1) * (se.y - nw.y + 1) };
   });
   this.cancelledConstruction = await this.page.evaluate(async feature => {
     let buildings;
     map.eachLayer(layer => { if (layer.options.url?.endsWith('paris-buildings.pmtiles')) buildings = layer; });
-    const point = map.project(new L.LatLng(48.8585, 2.2955), pluginState(buildings).header.minZoom).divideBy(256).floor();
-    const area = { coords: { z: pluginState(buildings).header.minZoom, x: point.x, y: point.y }, request: new AbortController() };
-    const before = pluginState(buildings).root.children.length;
+    const point = map.project(new L.LatLng(48.8585, 2.2955), globals.sceneByLayer.get(buildings).header.minZoom).divideBy(256).floor();
+    const area = { coords: { z: globals.sceneByLayer.get(buildings).header.minZoom, x: point.x, y: point.y }, request: new AbortController() };
+    const before = globals.sceneByLayer.get(buildings).root.children.length;
     requestAnimationFrame(() => area.request.abort());
     await nativeChecks.loadBlock(buildings, area, Array(10000).fill(feature));
-    return !area.done && !area.mesh && pluginState(buildings).root.children.length === before;
+    return !area.done && !area.mesh && globals.sceneByLayer.get(buildings).root.children.length === before;
   }, this.sampleBuildings[0]);
 });
 

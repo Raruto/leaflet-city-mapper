@@ -1,11 +1,13 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { groundTraffic } from './groundTraffic.js';
 
 export function prepareTraffic(state) {
   const { layer, lanes } = state;
-  const crs = layer._map.options.crs, origin = crs.project(pluginState(layer).location);
-  const metres = Math.cos(pluginState(layer).location.lat * Math.PI / 180);
+  const crs = layer._map.options.crs, origin = crs.project(sceneByLayer.get(layer).location);
+  const metres = Math.cos(sceneByLayer.get(layer).location.lat * Math.PI / 180);
   let lane, lat, lng, point, i;
   for (lane of lanes) {
     lane.points = /* allocation: required -- Each lane retains independently mutable local-space coordinates. */ [];

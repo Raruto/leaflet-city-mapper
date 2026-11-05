@@ -1,11 +1,14 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { rendererDevices } from '../globals/rendererDevices.js';
+import { renderers } from '../globals/renderers.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 
 export function rendererDeviceError(event) {
-  const map = sharedState.rendererDevices.get(event.currentTarget);
-  const owner = sharedState.renderers.get(map);
-  if (pluginState(owner)?.renderer?.device !== event.currentTarget) return;
-  if (!pluginState(owner)._layers) return;
+  const map = rendererDevices.get(event.currentTarget);
+  const owner = renderers.get(map);
+  if (sceneByLayer.get(owner)?.renderer?.device !== event.currentTarget) return;
+  if (!sceneByLayer.get(owner)._layers) return;
   let layer;
-  for (layer of pluginState(owner)._layers) layer.fire('error', /* allocation: required -- Deliver an independently mutable error event to each layer. */ { error: event.error });
+  for (layer of sceneByLayer.get(owner)._layers) layer.fire('error', /* allocation: required -- Deliver an independently mutable error event to each layer. */ { error: event.error });
 }

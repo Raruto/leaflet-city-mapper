@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 import { render } from './render.js';
 import { updateSky } from './updateSky.js';
 import { updateSun } from './updateSun.js';
@@ -9,7 +11,7 @@ export function useSelectedTime(state) {
   if (!date.value || !date.validity.valid) {
     control.time = /* allocation: required -- Invalid selection state belongs only to this control. */ new Date(NaN);
     map.fire('simulationtimechange', /* allocation: required -- Listeners may retain the invalid-selection event. */ { time: null, live: false });
-    delete pluginState(map)._sunlight;
+    delete cameraByMap.get(map)._sunlight;
     updateSky(state);
     render(map);
     status.textContent = 'Error: choose a valid solar date';

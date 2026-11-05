@@ -1,6 +1,9 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 
 export function ready(instance) {
-  const state = pluginState(instance);
-  return state.ready || state.cameraReady || Promise.resolve(instance);
+  return sceneByLayer.get(instance)?.ready ||
+    cameraByMap.get(instance)?.cameraReady || Promise.resolve(instance);
 }

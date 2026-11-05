@@ -1,11 +1,14 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { pendingGridFades } from '../globals/pendingGridFades.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { gridFadeFrame } from '../globals/gridFadeFrame.js';
+
+
 
 export function cancelGridFade(layer) {
-  sharedState.pendingGridFades.delete(layer);
-  pluginState(layer)._fadeFrame = null;
-  if (!sharedState.pendingGridFades.size && sharedState.gridFadeFrame !== null) {
-    cancelAnimationFrame(sharedState.gridFadeFrame);
-    sharedState.gridFadeFrame = null;
+  pendingGridFades.delete(layer);
+  sceneByLayer.get(layer)._fadeFrame = null;
+  if (!pendingGridFades.size && gridFadeFrame.value !== null) {
+    cancelAnimationFrame(gridFadeFrame.value);
+    gridFadeFrame.value = null;
   }
 }

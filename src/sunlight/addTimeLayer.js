@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 export function addTimeLayer(map) {
-  return pluginState(this).control.addTo(map);
+  return sceneByLayer.get(this).control.addTo(map);
 }

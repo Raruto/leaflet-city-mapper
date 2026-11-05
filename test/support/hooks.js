@@ -156,12 +156,13 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     await route.fulfill({ contentType: 'text/javascript', body: `${pluginBundle}\n${pmtilesMock}` });
   };
   this.pluginBundle = pluginBundle;
-  // Source-level checks and the instrumented bundle must share the same private state.
-  await this.context.route('**/src/state.js', async route => {
-    if (!await this.page.evaluate(() => Boolean(globalThis.cityMapperTestState))) return route.continue();
+  // Source-level checks and the instrumented bundle share each global's identity.
+  await this.context.route('**/src/globals/*.js', async route => {
+    if (!await this.page.evaluate(() => Boolean(globalThis.globals))) return route.continue();
+    const name = new URL(route.request().url()).pathname.split('/').pop().slice(0, -3);
     await route.fulfill({
       contentType: 'text/javascript',
-      body: 'export const state = globalThis.cityMapperTestState;',
+      body: `export const ${name} = globalThis.globals.${name};`,
     });
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);

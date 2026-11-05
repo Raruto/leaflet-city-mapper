@@ -1,15 +1,18 @@
-import { pluginState } from './pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { nativeImageRefresh } from './nativeImageRefresh.js';
 import { nativeImageError } from './nativeImageError.js';
 import { removeImageState } from './removeImageState.js';
 import { addImageState } from './addImageState.js';
 import { update } from '../scene/update.js';
+import { hideTargets } from './hideTargets.js';
 
 export function refreshNativeLayer(state = this) {
   state.dirty = true;
   state.viewDirty = true;
   state.failed = false;
-  state.hide();
+  hideTargets(state);
   const source = state.source;
   let i, image;
   for (image of state.images) {
@@ -27,5 +30,5 @@ export function refreshNativeLayer(state = this) {
     image.addEventListener('load', nativeImageRefresh);
     image.addEventListener('error', nativeImageError);
   }
-  if (pluginState(state.backend)._shared) update(state.backend);
+  if (sceneByLayer.get(state.backend)._shared) update(state.backend);
 }

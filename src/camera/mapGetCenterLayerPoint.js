@@ -1,5 +1,6 @@
-import { state as sharedState } from '../state.js';
+import { mapMethods } from '../globals/mapMethods.js';
+
 
 export function mapGetCenterLayerPoint() {
-  return sharedState.mapMethods.containerPointToLayerPoint.call(this, this.getSize().divideBy(2));
+  return mapMethods.value.containerPointToLayerPoint.call(this, this.getSize().divideBy(2));
 }

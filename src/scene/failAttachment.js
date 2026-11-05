@@ -1,10 +1,12 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { renderers } from '../globals/renderers.js';
+
+
 import { showWebGPUWarning } from './showWebGPUWarning.js';
 
 export function failAttachment(error, backend, map) {
   showWebGPUWarning(map);
-  pluginState(backend)._rendererReady.reject(error);
-  sharedState.renderers.delete(map);
+  sceneByLayer.get(backend)._rendererReady.reject(error);
+  renderers.delete(map);
   throw error;
 }

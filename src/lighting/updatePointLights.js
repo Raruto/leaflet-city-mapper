@@ -1,17 +1,19 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { bindSunlight } from '../shadows/bindSunlight.js';
 import { cacheLightGrid } from './cacheLightGrid.js';
 import { collectLightMeshes } from './collectLightMeshes.js';
 
 export function updatePointLights(backend) {
-  const { device, sunlight: sun } = pluginState(backend).renderer;
+  const { device, sunlight: sun } = sceneByLayer.get(backend).renderer;
   const fixed = /* allocation: required -- Fixed-light traversal stays private across reentrant device callbacks. */ [];
   const moving = /* allocation: required -- Moving-light traversal stays private across reentrant device callbacks. */ [];
   let layer;
-  for (layer of pluginState(backend)._layers) {
-    if (!layer.options.nightLight || !pluginState(layer).root.visible) continue;
-    collectLightMeshes(pluginState(layer).root, fixed, moving);
+  for (layer of sceneByLayer.get(backend)._layers) {
+    if (!layer.options.nightLight || !sceneByLayer.get(layer).root.visible) continue;
+    collectLightMeshes(sceneByLayer.get(layer).root, fixed, moving);
   }
   const maxBytes = device.limits.maxStorageBufferBindingSize;
   const staticGrid = cacheLightGrid(fixed, sun.staticLightGrid, maxBytes);

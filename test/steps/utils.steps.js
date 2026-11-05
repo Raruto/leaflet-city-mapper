@@ -1,5 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
-import { state as sharedState } from '../../src/state.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
@@ -83,23 +84,26 @@ const checks = {
       _map: { project: point => Array.isArray(point) ? { x: point[1], y: point[0] } : point,
         options: { crs: { scale: () => 40075016.68557849 } } },
     };
+    globals.sceneByLayer.set(backend, backend);
+    globals.cameraByMap.set(backend._map, backend._map);
     const mesh = { geometry: { bounds: { min: [50, 0, 50], max: [300, 20, 300] } },
       worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
     const layer = { _tileZoom: 1, header: {}, _rasterTiles: new Map() };
+    globals.sceneByLayer.set(layer, layer);
     assert.equal(roofCoverage(mesh, backend, [layer]), false);
     for (const [x, y] of [[0, 0], [1, 0], [0, 1]]) {
-      pluginState(layer)._rasterTiles.set(`${x}/${y}`, { coords: { x, y, z: 1 }, done: true });
+      globals.sceneByLayer.get(layer)._rasterTiles.set(`${x}/${y}`, { coords: { x, y, z: 1 }, done: true });
     }
     assert.equal(roofCoverage(mesh, backend, [layer]), false);
-    pluginState(layer)._rasterTiles.set('1/1', { coords: { x: 1, y: 1, z: 1 }, done: true });
+    globals.sceneByLayer.get(layer)._rasterTiles.set('1/1', { coords: { x: 1, y: 1, z: 1 }, done: true });
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    pluginState(layer)._rasterTiles = new Map([['parent', { coords: { x: 0, y: 0, z: 0 }, done: true }]]);
+    globals.sceneByLayer.get(layer)._rasterTiles = new Map([['parent', { coords: { x: 0, y: 0, z: 0 }, done: true }]]);
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    pluginState(layer)._rasterTiles.clear();
-    pluginState(layer).header = { minLon: 400, maxLon: 500, maxLat: 400, minLat: 500 };
+    globals.sceneByLayer.get(layer)._rasterTiles.clear();
+    globals.sceneByLayer.get(layer).header = { minLon: 400, maxLon: 500, maxLat: 400, minLat: 500 };
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
-    pluginState(layer).header = { minLon: 0, maxLon: 100, maxLat: 0, minLat: 100 };
-    pluginState(layer)._rasterTiles.set('error', { coords: { x: 0, y: 0, z: 1 }, error: 'Reported tile error' });
+    globals.sceneByLayer.get(layer).header = { minLon: 0, maxLon: 100, maxLat: 0, minLat: 100 };
+    globals.sceneByLayer.get(layer)._rasterTiles.set('error', { coords: { x: 0, y: 0, z: 1 }, error: 'Reported tile error' });
     assert.equal(roofCoverage(mesh, backend, [layer]), true);
   },
 
@@ -236,7 +240,7 @@ const checks = {
       assert.ok(firstMesh.position.every(Number.isFinite));
       assert.ok(firstMesh.normal.every(Number.isFinite));
     }
-    const globals = new Map(['L', 'GPUBufferUsage', 'GPUShaderStage'].map(name =>
+    const originals = new Map(['L', 'GPUBufferUsage', 'GPUShaderStage'].map(name =>
       [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
     try {
       globalThis.L = { LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } };
@@ -253,18 +257,22 @@ const checks = {
         } },
       });
       const bridgeBackend = makeBackend(), secondBackend = makeBackend();
+      globals.sceneByLayer.set(bridgeBackend, bridgeBackend);
+      globals.sceneByLayer.set(secondBackend, secondBackend);
+      globals.cameraByMap.set(bridgeBackend._map, bridgeBackend._map);
+      globals.cameraByMap.set(secondBackend._map, secondBackend._map);
       const bridgeSource = { features: [{ geometry: { type: 'Polygon', coordinates: [
         [[0, 0, 20], [10, 0, 20], [10, 10, 20], [0, 10, 20], [0, 0, 20]],
       ] } }] };
       addBridges(bridgeBackend, bridgeSource);
-      const bridgeState = pluginState(bridgeBackend), attributes = bridgeState._bridgeMesh.geometry.attributes;
+      const bridgeState = globals.sceneByLayer.get(bridgeBackend), attributes = bridgeState._bridgeMesh.geometry.attributes;
       assert.equal(attributes.position.data.length, 108);
       assert.equal(bridgeElevation({ x: 5, y: 5 }, bridgeState._bridges), 20);
       const savedPositions = attributes.position.data.slice(), savedBridge = structuredClone(bridgeState._bridges);
       addBridges(secondBackend, bridgeSource);
       assert.deepEqual(attributes.position.data, savedPositions, 'Other backends cannot overwrite bridge mesh buffers');
       assert.deepEqual(bridgeState._bridges, savedBridge, 'Other backends cannot overwrite bridge terrain records');
-      assert.notEqual(pluginState(secondBackend)._bridges.get('0/0')[0], bridgeState._bridges.get('0/0')[0]);
+      assert.notEqual(globals.sceneByLayer.get(secondBackend)._bridges.get('0/0')[0], bridgeState._bridges.get('0/0')[0]);
       for (let i = 0; i < attributes.position.data.length; i += 9) {
         const p = attributes.position.data.slice(i, i + 3), q = attributes.position.data.slice(i + 3, i + 6);
         const r = attributes.position.data.slice(i + 6, i + 9), n = cross(sub(q, p), sub(r, p));
@@ -273,7 +281,7 @@ const checks = {
           'Bridge top, underside and walls retain winding consistent with their normals');
       }
     } finally {
-      for (const [name, descriptor] of globals) {
+      for (const [name, descriptor] of originals) {
         if (descriptor) Object.defineProperty(globalThis, name, descriptor);
         else delete globalThis[name];
       }
@@ -309,7 +317,7 @@ const checks = {
     }
     const bytes = Uint8Array.from([2, 1, 3, 1, 1, 2, 3, 1, 0]);
     const firstDirectory = decodeDirectory(bytes.buffer);
-    const reusedReader = sharedState.directoryReader;
+    const reusedReader = globals.directoryReader;
     assert.equal(reusedReader.bytes, null, 'Shared reader must release successful inputs');
     assert.equal(reusedReader.cursor, 0);
     assert.deepEqual(firstDirectory, [
@@ -337,7 +345,7 @@ const checks = {
     ], 'Later calls must not mutate previous directories');
     assert.notEqual(decodeDirectory(bytes.buffer), firstDirectory);
     const secondDirectory = decodeDirectory(bytes.buffer);
-    assert.equal(sharedState.directoryReader, reusedReader, 'Synchronous decodes must reuse the reader');
+    assert.equal(globals.directoryReader, reusedReader, 'Synchronous decodes must reuse the reader');
     assert.notEqual(secondDirectory[0], secondDirectory[1]);
     assert.notEqual(secondDirectory[0], firstDirectory[0]);
     secondDirectory[0].length = 99;
@@ -404,23 +412,24 @@ const checks = {
       }),
       url: `data:application/octet-stream;base64,${Buffer.from([128, 128, 128, 128, 128, 42]).toString('base64')}`,
     };
+    globals.sceneByLayer.set(archive, archive);
     await assert.rejects(getZxy(archive, 0, 0, 0), /Truncated PMTiles directory/);
-    assert.equal(pluginState(archive)._directories.size, 0, 'Failed directory reads must be retryable');
-    pluginState(archive).url = `data:application/octet-stream;base64,${Buffer.from([1, 0, 1, 1, 1, 42]).toString('base64')}`;
+    assert.equal(globals.sceneByLayer.get(archive)._directories.size, 0, 'Failed directory reads must be retryable');
+    globals.sceneByLayer.get(archive).url = `data:application/octet-stream;base64,${Buffer.from([1, 0, 1, 1, 1, 42]).toString('base64')}`;
     const tiles = await Promise.all([getZxy(archive, 0, 0, 0), getZxy(archive, 0, 0, 0)]);
     for (const tile of tiles) assert.deepEqual([...new Uint8Array(tile.data)], [42]);
     assert.notEqual(tiles[0], tiles[1]);
     assert.notEqual(tiles[0].data, tiles[1].data);
-    assert.equal(pluginState(archive)._directories.size, 1, 'Concurrent reads must share the directory cache');
+    assert.equal(globals.sceneByLayer.get(archive)._directories.size, 1, 'Concurrent reads must share the directory cache');
     let rejectDirectory;
-    pluginState(archive)._directories.set('0:5', new Promise((resolve, reject) => { rejectDirectory = reject; }));
+    globals.sceneByLayer.get(archive)._directories.set('0:5', new Promise((resolve, reject) => { rejectDirectory = reject; }));
     const pending = getZxy(archive, 0, 0, 0);
     await Promise.resolve();
     const replacement = Promise.resolve([{ tileId: 0, runLength: 1, length: 1, offset: 0 }]);
-    pluginState(archive)._directories.set('0:5', replacement);
+    globals.sceneByLayer.get(archive)._directories.set('0:5', replacement);
     rejectDirectory(new Error('Evicted directory failed'));
     await assert.rejects(pending, /Evicted directory failed/);
-    assert.equal(pluginState(archive)._directories.get('0:5'), replacement, 'An evicted request must not delete its replacement');
+    assert.equal(globals.sceneByLayer.get(archive)._directories.get('0:5'), replacement, 'An evicted request must not delete its replacement');
     for (const cycle of [0, 1, 2, null]) {
       const traversal = {
         options: {},
@@ -430,6 +439,7 @@ const checks = {
         }),
         _directories: new Map(),
       };
+      globals.sceneByLayer.set(traversal, traversal);
       for (let depth = 0; depth < 4; depth++) {
         traversal._directories.set(`${depth}:1`, Promise.resolve([{
           tileId: 0, runLength: 0, length: 1,
@@ -440,6 +450,7 @@ const checks = {
         cycle === null ? /depth exceeds four levels/ : /Cyclic PMTiles directory/);
     }
     const emptyArchive = { options: {}, _header: Promise.resolve({ minZoom: 1, maxZoom: 1 }) };
+    globals.sceneByLayer.set(emptyArchive, emptyArchive);
     const area = { coords: { z: 0, x: 0, y: 0 }, request: new AbortController() };
     const emptySources = await Promise.all([loadSource(emptyArchive, area), loadSource(emptyArchive, area)]);
     assert.deepEqual(emptySources[0], { type: 'FeatureCollection', features: [] });
@@ -447,7 +458,9 @@ const checks = {
     assert.notEqual(emptySources[0].features, emptySources[1].features);
     emptySources[0].features.push({ type: 'Feature' });
     assert.deepEqual(emptySources[1].features, [], 'Empty source results must not share feature arrays');
-    assert.equal(await loadSource({ _geojson: true, options: { data: emptySources[1] } }, area), emptySources[1]);
+    const inline = { _geojson: true, options: { data: emptySources[1] } };
+    globals.sceneByLayer.set(inline, inline);
+    assert.equal(await loadSource(inline, area), emptySources[1]);
   },
 
   async 'archive-requests'() {
@@ -464,16 +477,22 @@ const checks = {
       };
       const areas = [new AbortController(), new AbortController()].map(request => ({ request }));
       const sources = ['first.json', 'second.json'].map(url => ({ _geojson: true, options: { url } }));
+      for (const source of sources) globals.sceneByLayer.set(source, source);
       const loaded = await Promise.all(sources.map((source, i) => loadSource(source, areas[i])));
       assert.deepEqual(loaded.map(source => source.url), ['https://example.test/first.json', 'https://example.test/second.json']);
       assert.notEqual(requests[0].options, requests[1].options);
       assert.equal(requests[0].options.signal, areas[0].request.signal);
       assert.equal(requests[1].options.signal, areas[1].request.signal);
-      await assert.rejects(loadSource({ _geojson: true, options: {} }, areas[0]), /requires either data or url/);
-      await assert.rejects(loadSource({ _geojson: true, options: { data: {}, url: 'both.json' } }, areas[0]), /requires either data or url/);
+      const missing = { _geojson: true, options: {} }, ambiguous = { _geojson: true, options: { data: {}, url: 'both.json' } };
+      globals.sceneByLayer.set(missing, missing);
+      globals.sceneByLayer.set(ambiguous, ambiguous);
+      await assert.rejects(loadSource(missing, areas[0]), /requires either data or url/);
+      await assert.rejects(loadSource(ambiguous, areas[0]), /requires either data or url/);
       globalThis.fetch = async () => new Response('', { status: 404 });
       await assert.rejects(loadSource(sources[0], areas[0]), /Unable to load GeoJSON: HTTP 404/);
-      await assert.rejects(readArchive({ url: 'missing' }, 0, 1), /Unable to read PMTiles: HTTP 404/);
+      const unavailable = { url: 'missing' };
+      globals.sceneByLayer.set(unavailable, unavailable);
+      await assert.rejects(readArchive(unavailable, 0, 1), /Unable to read PMTiles: HTTP 404/);
       requests.length = 0;
       globalThis.fetch = async (url, options) => {
         await Promise.resolve();
@@ -486,6 +505,7 @@ const checks = {
         });
       };
       const backend = { url: 'https://example.test/archive.pmtiles' };
+      globals.sceneByLayer.set(backend, backend);
       const ranges = await Promise.all([
         readArchive(backend, 0, 2, areas[0].request.signal),
         readArchive(backend, 4, 3, areas[1].request.signal),
@@ -579,21 +599,23 @@ const checks = {
     const backend = {
       _added: { promise: Promise.resolve() }, modelUrl: 'model.gltf', root, options: {},
     };
+    globals.sceneByLayer.set(backend, backend);
     try {
       globalThis.document = { baseURI: 'https://example.test/' };
       globalThis.fetch = async () => new Response(JSON.stringify({
         asset: { version: '2.0' }, scenes: [{ nodes: [0] }], nodes: [{}],
       }));
       await loadModel(backend);
-      assert.equal(pluginState(backend).model.id, 'https://example.test/model.gltf');
-      assert.equal(pluginState(backend).model.parent, root);
-      assert.equal(root.children[0], pluginState(backend).model);
-      assert.equal(pluginState(backend).model.children.length, 1);
+      assert.equal(globals.sceneByLayer.get(backend).model.id, 'https://example.test/model.gltf');
+      assert.equal(globals.sceneByLayer.get(backend).model.parent, root);
+      assert.equal(root.children[0], globals.sceneByLayer.get(backend).model);
+      assert.equal(globals.sceneByLayer.get(backend).model.children.length, 1);
       const another = { _added: { promise: Promise.resolve() }, modelUrl: 'other.gltf', root: emptyNode(), options: {} };
+      globals.sceneByLayer.set(another, another);
       await Promise.all([loadModel(backend), loadModel(another)]);
-      assert.notEqual(pluginState(backend).model, pluginState(another).model);
-      assert.notEqual(pluginState(backend).model.extras, pluginState(another).model.extras);
-      assert.notEqual(pluginState(backend).model.children[0].matrix, pluginState(another).model.children[0].matrix);
+      assert.notEqual(globals.sceneByLayer.get(backend).model, globals.sceneByLayer.get(another).model);
+      assert.notEqual(globals.sceneByLayer.get(backend).model.extras, globals.sceneByLayer.get(another).model.extras);
+      assert.notEqual(globals.sceneByLayer.get(backend).model.children[0].matrix, globals.sceneByLayer.get(another).model.children[0].matrix);
       globalThis.fetch = async url => new Response(Uint8Array.of(url.endsWith('first.bin') ? 1 : 2));
       const buffers = [{ uri: 'first.bin' }, { uri: 'second.bin' }];
       await Promise.all(buffers.map(buffer => loadBuffer(buffer, 'https://example.test/')));
@@ -658,6 +680,8 @@ const checks = {
     const backend = { _layers: [{ options: { nightLight: true }, root }],
       renderer: { sunlight: sun, device: { limits: { maxStorageBufferBindingSize: 8192 },
         queue: { writeBuffer: recordLightUpload } } } };
+    globals.sceneByLayer.set(backend, backend);
+    globals.sceneByLayer.set(backend._layers[0], backend._layers[0]);
     updatePointLights(backend);
     assert.equal(sun.lightCount, 2);
     assert.equal(buffer.writes.length, 2);
@@ -682,7 +706,7 @@ const checks = {
     lamp.visible = headlight.visible = true;
     updatePointLights(backend);
     assert.equal(sun.lightCount, 2, 'Re-enabled layers restore both grids');
-    pluginState(backend).renderer.device.limits.maxStorageBufferBindingSize = sun.staticLightGrid.data.byteLength;
+    globals.sceneByLayer.get(backend).renderer.device.limits.maxStorageBufferBindingSize = sun.staticLightGrid.data.byteLength;
     headlight.extras.lights = [...headlight.extras.lights];
     assert.throws(() => updatePointLights(backend), /GPU storage limit/);
   },
@@ -789,6 +813,7 @@ const checks = {
       fire(name, event) { events.push(event); },
       off() {},
     };
+    globals.cameraByMap.set(map, map);
     const state = {
       map, control: { live: false, time: new Date('2026-06-21T12:00:00Z') },
       date: { value: '', validity: { valid: true } }, slider: { value: '' },
@@ -876,6 +901,7 @@ const checks = {
       getSize() { return size; },
       getContainer() { return { style }; },
     };
+    globals.cameraByMap.set(map, map);
     const control = {
       map, originalSky: 'original', projection: target,
       sunDisc: { style: {} }, moonDisc: { style: {} },

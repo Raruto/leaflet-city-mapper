@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 import { atmosphere } from './atmosphere.js';
 import { moonPosition } from './moonPosition.js';
 import { solarPosition } from './solarPosition.js';
@@ -14,7 +16,7 @@ export function updateSun(state) {
     slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
     output.textContent = `${time.slice(11, 16)} UTC${control.live ? ' · now' : ''}`;
     const center = map.getCenter();
-    const sun = pluginState(map)._sunlight = solarPosition(control.time, center.lat, center.lng);
+    const sun = cameraByMap.get(map)._sunlight = solarPosition(control.time, center.lat, center.lng);
     Object.assign(sun, atmosphere(sun.altitude));
     sun.moon = moonPosition(control.time, center.lat, center.lng);
     status.textContent = sun.altitude <= 0
@@ -29,7 +31,7 @@ export function updateSun(state) {
     updateSky(state);
     render(map);
   } catch (error) {
-    delete pluginState(map)._sunlight;
+    delete cameraByMap.get(map)._sunlight;
     updateSky(state);
     render(map);
     status.textContent = `Error: ${error.message}`;

@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { angles } from '../../src/camera/angles.js';
@@ -6,6 +8,7 @@ import { transformNativePoint } from '../../src/core/transformNativePoint.js';
 
 Then('camera scratch buffers preserve independent results and matrix transforms', function () {
   const map = { _cameraPitch: 60, _cameraBearing: 45 };
+  globals.cameraByMap.set(map, map);
   const first = angles(map), saved = first.slice(), target = [];
   assert.equal(angles(map, target), target);
   assert.deepEqual(target, saved);
@@ -36,7 +39,7 @@ async function createMap(page, options = {}) {
       rotate: true, zoomAnimation: false, inertia: false, ...options,
       rotateControl: { closeOnZeroBearing: false },
     });
-    await pluginState(cameraMap).cameraReady;
+    await globals.cameraByMap.get(cameraMap).cameraReady;
   }, options);
 }
 
@@ -59,14 +62,14 @@ Then('pitched zoom, panning and marker focus preserve their screen anchors', { t
     const bounds = new L.LatLngBounds([48.84, 2.27], [48.88, 2.32]);
     let fitError = 0;
     for (const [pitch, bearing] of [[0, 45], [60, 35], [80, 270]]) {
-      cityMapperTestState.operations.mapSetPitchAndBearing(map, pitch, bearing);
+      globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, pitch, bearing);
       map.fitBounds(bounds, { paddingTopLeft: [40, 30], paddingBottomRight: [20, 50], animate: false });
       for (const corner of [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]) {
         const p = map.latLngToContainerPoint(corner);
         fitError = Math.max(fitError, 40 - p.x, p.x - 580, 30 - p.y, p.y - 350);
       }
     }
-    cityMapperTestState.operations.mapSetPitchAndBearing(map, 45, 35);
+    globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, 45, 35);
     const padding = new L.Point(120, 80), minPadding = padding.divideBy(2), maxPadding = map.getSize().subtract(minPadding);
     const footprint = new L.Bounds([
       minPadding, new L.Point(maxPadding.x, minPadding.y), new L.Point(minPadding.x, maxPadding.y), maxPadding,
@@ -76,7 +79,7 @@ Then('pitched zoom, panning and marker focus preserve their screen anchors', { t
     const paddedInside = map.getBoundsZoom(bounds, true, padding) === insideZoom;
     map.setMaxBounds(bounds);
     map.setView(bounds.getNorthEast(), 17, { animate: false });
-    cityMapperTestState.operations.mapSetPitchAndBearing(map, 65, 75);
+    globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, 65, 75);
     map.panInsideBounds(bounds, { animate: false });
     const visible = map.getBounds();
     const min = map.project(bounds.getNorthWest()), max = map.project(bounds.getSouthEast());
@@ -100,7 +103,7 @@ Then('camera coordinates round-trip and native overlays remain aligned', { timeo
     const map = cameraMap, errors = [];
     for (const pitch of [0, 35, 75, 85]) {
       for (const bearing of [0, 35, 90, 270]) {
-        cityMapperTestState.operations.mapSetPitchAndBearing(map, pitch, bearing);
+        globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, pitch, bearing);
         for (const offset of [[0, 0], [20, 10], [-30, -15]]) {
           const point = map.getSize().divideBy(2).add(offset);
           const actual = map.latLngToContainerPoint(map.containerPointToLatLng(point));
@@ -108,7 +111,7 @@ Then('camera coordinates round-trip and native overlays remain aligned', { timeo
         }
       }
     }
-    cityMapperTestState.operations.mapSetPitchAndBearing(map, 45, 70);
+    globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, 45, 70);
     const destination = new L.LatLng(48.8597, 2.2924);
     map.setView(destination, map.getZoom(), { animate: false });
     const recentered = map.distance(map.getCenter(), destination) < 2;
@@ -128,7 +131,7 @@ Then('camera coordinates round-trip and native overlays remain aligned', { timeo
     marker.options.rotateWithView = marker.options.keepUpright = true;
     marker.options.scale = 2;
     CityMapper.setRotation(marker, Math.PI);
-    const direction = cityMapperTestState.operations.markerCameraIconPoint(marker, 1, 0);
+    const direction = globalThis.cityMapperTestOperations.markerCameraIconPoint(marker, 1, 0);
     const markerRotation = direction.x > 0 && Math.abs(Math.hypot(direction.x, direction.y) - 2) < 1e-10 &&
       marker._icon.style.transform.includes('scale(2)');
     let invalid = 0;
@@ -178,7 +181,7 @@ Then('camera orientation is accessible without dragging', { timeout: 30000 }, as
   await this.page.keyboard.press('ArrowRight');
   assert.equal(await this.page.evaluate(() => CityMapper.getBearing(cameraMap)), input);
   const icon = await this.page.evaluate(() => {
-    const control = pluginState(cameraMap).rotateControl.getContainer(), arrow = control.querySelector('.leaflet-control-rotate-arrow');
+    const control = globals.cameraByMap.get(cameraMap).rotateControl.getContainer(), arrow = control.querySelector('.leaflet-control-rotate-arrow');
     return { compact: control.getBoundingClientRect().width <= 40, svg: arrow.style.backgroundImage.includes('svg'),
       noPanel: !control.querySelector('details,input'), transforms: arrow.style.transform.includes('rotateX') };
   });
@@ -217,7 +220,7 @@ Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { time
     const touched = CityMapper.getBearing(map) !== before.bearing && CityMapper.getPitch(map) > before.pitch &&
       map.getZoom() > before.zoom;
     const restored = map.dragging.enabled() && map.options.zoomSnap === 1;
-    pluginState(map).touchRotate.disable(); pluginState(map).touchPitch.disable();
+    globals.cameraByMap.get(map).touchRotate.disable(); globals.cameraByMap.get(map).touchPitch.disable();
     const zoomRestored = map.touchZoom.enabled();
     const start = map.getCenter();
     map.panBy([30, 0], { animate: false });
@@ -251,14 +254,14 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
   assert.ok(Math.abs(pitch - 20) < 0.001);
   const settings = await this.page.evaluate(() => {
     const map = cameraMap;
-    pluginState(map).rotateControl.remove();
-    cityMapperTestState.operations.mapSetPitchAndBearing(map, 30, 40);
-    pluginState(map).rotateControl = new L.Control.Rotate({ visualizePitch: false }).addTo(map);
+    globals.cameraByMap.get(map).rotateControl.remove();
+    globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, 30, 40);
+    globals.cameraByMap.get(map).rotateControl = new L.Control.Rotate({ visualizePitch: false }).addTo(map);
     CityMapper.setBearing(map, 0);
-    const hiddenAtNorth = pluginState(map).rotateControl.getContainer().style.display === 'none';
+    const hiddenAtNorth = globals.cameraByMap.get(map).rotateControl.getContainer().style.display === 'none';
     CityMapper.setBearing(map, 20);
-    const visible = pluginState(map).rotateControl.getContainer().style.display !== 'none';
-    const arrow = pluginState(map).rotateControl.getContainer().querySelector('.leaflet-control-rotate-arrow');
+    const visible = globals.cameraByMap.get(map).rotateControl.getContainer().style.display !== 'none';
+    const arrow = globals.cameraByMap.get(map).rotateControl.getContainer().querySelector('.leaflet-control-rotate-arrow');
     return { hiddenAtNorth, visible, flat: arrow.style.transform.includes('rotateX(0deg)') };
   });
   assert.deepEqual(settings, { hiddenAtNorth: true, visible: true, flat: true });
@@ -277,7 +280,7 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
     try {
       Object.defineProperty(screen.orientation, 'angle', { configurable: true, value: 90 });
       window.DeviceOrientationEvent = { requestPermission: async () => 'granted' };
-      pluginState(map).compassBearing.enable();
+      globals.cameraByMap.get(map).compassBearing.enable();
       await new Promise(resolve => setTimeout(resolve, 0));
       const send = values => {
         const event = new Event('deviceorientation');
@@ -288,15 +291,15 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
       relative = CityMapper.getBearing(map);
       send({ webkitCompassHeading: 15, absolute: false });
       webkit = CityMapper.getBearing(map);
-      pluginState(map).compassBearing.disable();
+      globals.cameraByMap.get(map).compassBearing.disable();
       window.DeviceOrientationEvent.requestPermission = async () => 'denied';
       const error = new Promise(resolve => map.once('error', event => resolve(event.error.message)));
-      pluginState(map).compassBearing.enable();
-      denied = (await error).includes('denied') && !pluginState(map).compassBearing.enabled();
+      globals.cameraByMap.get(map).compassBearing.enable();
+      denied = (await error).includes('denied') && !globals.cameraByMap.get(map).compassBearing.enabled();
       window.DeviceOrientationEvent.requestPermission = () => { throw new Error('Permission unavailable'); };
       const thrown = new Promise(resolve => map.once('error', event => resolve(event.error.message)));
-      pluginState(map).compassBearing.enable();
-      failed = (await thrown).includes('unavailable') && !pluginState(map).compassBearing.enabled();
+      globals.cameraByMap.get(map).compassBearing.enable();
+      failed = (await thrown).includes('unavailable') && !globals.cameraByMap.get(map).compassBearing.enabled();
     } finally {
       window.DeviceOrientationEvent = deviceEvent;
       if (orientation) Object.defineProperty(screen.orientation, 'angle', orientation);
@@ -322,7 +325,7 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
     cameraMap.getContainer().style.width = '680px';
     await new Promise(requestAnimationFrame);
     await new Promise(requestAnimationFrame);
-    const resized = cameraMap.getSize().x === 680 && !pluginState(cameraMap).rotateControl;
+    const resized = cameraMap.getSize().x === 680 && !globals.cameraByMap.get(cameraMap).rotateControl;
     cameraMap.remove();
     return resized;
   });

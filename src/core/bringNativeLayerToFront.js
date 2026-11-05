@@ -1,4 +1,8 @@
-import { pluginState } from './pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+import { reorderNativeLayer } from './reorderNativeLayer.js';
+
 export function bringNativeLayerToFront(layer = this) {
-  pluginState(layer)?._nativeGPU?.reorder?.(true);
+  const native = sceneByLayer.get(layer)?._nativeGPU;
+  if (native?.backend && !native.disposed) reorderNativeLayer.call(native, true);
 }

@@ -1,6 +1,8 @@
-import { pluginState } from '../core/pluginState.js';
+import { touchByContainer } from '../globals/touchByContainer.js';
+
+
 import { endCameraTouch } from './endCameraTouch.js';
 
 export function endCameraTouchEvent(event) {
-  endCameraTouch(pluginState(this)._cameraTouchState, event);
+  endCameraTouch(touchByContainer.get(this), event);
 }

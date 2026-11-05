@@ -1,12 +1,14 @@
+import { dragByHandler } from '../globals/dragByHandler.js';
+
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-import { pluginState } from './pluginState.js';
+
 import { pointOf } from '../camera/pointOf.js';
 import { scheduleMarkerPan } from './scheduleMarkerPan.js';
 
 export function adjustCameraMarkerPan(event) {
   const marker = this._marker, map = marker._map;
-  if (!mapGetPitch(map) && !mapGetBearing(map)) return pluginState(this)._cameraOriginalAdjustPan.call(this, event);
+  if (!mapGetPitch(map) && !mapGetBearing(map)) return dragByHandler.get(this)._cameraOriginalAdjustPan.call(this, event);
   const screen = L.DomUtil.getPosition(marker._icon).add(map._getMapPanePos());
   const size = map.getSize(), padding = pointOf(marker.options.autoPanPadding);
   const speed = marker.options.autoPanSpeed;

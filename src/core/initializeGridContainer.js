@@ -1,6 +1,7 @@
-import { state as sharedState } from '../state.js';
+import { gridInitializers } from '../globals/gridInitializers.js';
+
 
 export function initializeGridContainer() {
-  sharedState.gridInitializers.get(this).call(this);
+  gridInitializers.get(this).call(this);
   this._container.remove();
 }

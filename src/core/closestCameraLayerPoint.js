@@ -1,7 +1,8 @@
-import { state as sharedState } from '../state.js';
+import { closestMethods } from '../globals/closestMethods.js';
+
 
 export function closestCameraLayerPoint(point) {
   this._project();
   this._parts = this._rings;
-  return sharedState.closestMethods.get(this).call(this, point);
+  return closestMethods.get(this).call(this, point);
 }

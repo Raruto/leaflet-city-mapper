@@ -1,20 +1,20 @@
-import { state as sharedState } from '../state.js';
+import { roofShader } from '../globals/roofShader.js';
+import { roofPipeline } from '../globals/roofPipeline.js';
+import { roofBlitSampler } from '../globals/roofBlitSampler.js';
+
 export function ensureRoofBlit(renderer) {
-  const gpuCreateShaderModule1 = sharedState.allocationRenderEnsureRoofBlitCreateShaderModule1;
-  const gpuCreateRenderPipeline2 = sharedState.allocationRenderEnsureRoofBlitCreateRenderPipeline2;
-  const gpuCreateSampler3 = sharedState.allocationRenderEnsureRoofBlitCreateSampler3;
   const device = renderer.device;
   if (!renderer.roofBlit) {
-    const module = device.createShaderModule(gpuCreateShaderModule1);
+    const module = device.createShaderModule(roofShader);
     renderer.roofBlit = /* allocation: required -- Each renderer retains its own roof-blit pipeline and sampler. */ {
       pipeline: device.createRenderPipeline((
-      gpuCreateRenderPipeline2.vertex.module = module,
-      gpuCreateRenderPipeline2.fragment.module = module,
-      gpuCreateRenderPipeline2
+      roofPipeline.vertex.module = module,
+      roofPipeline.fragment.module = module,
+      roofPipeline
     )),
-      sampler: device.createSampler(gpuCreateSampler3),
+      sampler: device.createSampler(roofBlitSampler),
     };
-    gpuCreateRenderPipeline2.vertex.module = null;
-    gpuCreateRenderPipeline2.fragment.module = null;
+    roofPipeline.vertex.module = null;
+    roofPipeline.fragment.module = null;
   }
 }

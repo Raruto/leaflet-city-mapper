@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { roundProfile } from '../globals/roundProfile.js';
+
 
 import { parseColor } from "../utils/parseColor.js";
 import { ring } from './treeRing.js';
@@ -23,8 +24,8 @@ export function treeGeometry(point, style, addTriangle) {
       base[(i + 1) % 8], crownBottom, 0, -1, 0, crown);
     surface(point, addTriangle, crownRadius, crownBottom, 0, top, crown);
   } else {
-    for (i = 1; i < sharedState.roundProfile.length; i++) {
-      [low, lr] = sharedState.roundProfile[i - 1], [high, hr] = sharedState.roundProfile[i];
+    for (i = 1; i < roundProfile.length; i++) {
+      [low, lr] = roundProfile[i - 1], [high, hr] = roundProfile[i];
       surface(point, addTriangle, lr * crownRadius, crownBottom + low * (top - crownBottom),
         hr * crownRadius, crownBottom + high * (top - crownBottom), crown);
     }

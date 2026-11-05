@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
 
@@ -7,15 +9,15 @@ When('I pan the shared WebGPU renderer', async function () {
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
   try {
-    await this.page.waitForFunction(() => pluginState(pluginState(map)._terrain3D)?._terrainReady);
+    await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._terrainReady);
     this.webgpuPan = await this.page.evaluate(async () => {
-      const modelLayer = layers._layers.find(({ layer }) => pluginState(layer).modelUrl)?.layer;
-      const owner = pluginState(modelLayer)?._shared;
-      if (!pluginState(owner)?.renderer?.device) throw new Error('The WebGPU model renderer is not ready');
+      const modelLayer = layers._layers.find(({ layer }) => globals.sceneByLayer.get(layer).modelUrl)?.layer;
+      const owner = globals.sceneByLayer.get(modelLayer)?._shared;
+      if (!globals.sceneByLayer.get(owner)?.renderer?.device) throw new Error('The WebGPU model renderer is not ready');
       nativeChecks.render.render(owner);
-      await pluginState(owner).renderer.device.queue.onSubmittedWorkDone();
+      await globals.sceneByLayer.get(owner).renderer.device.queue.onSubmittedWorkDone();
       let probe;
-      nativeChecks.graph.traverse(pluginState(modelLayer).model, mesh => {
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(modelLayer).model, mesh => {
         if (!probe && mesh.geometry && mesh.program.bindings.length && mesh._visibleInFrame) probe = mesh;
       });
       if (!probe) throw new Error('The model has no textured geometry to inspect');
@@ -27,14 +29,14 @@ When('I pan the shared WebGPU renderer', async function () {
         nativeChecks.render.render(owner);
         const sortedPoint = new DOMPoint(...probe.geometry.bounds.center, 1)
           .matrixTransform(new DOMMatrix(probe.worldMatrix))
-          .matrixTransform(new DOMMatrix(pluginState(owner).camera.projectionViewMatrix));
+          .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(owner).camera.projectionViewMatrix));
         sortDepthError = Math.abs(probe._sortDepth - sortedPoint.z / sortedPoint.w);
       } finally {
         probe.program.transparent = transparent;
       }
-      const canvas = pluginState(owner).renderer.canvas;
-      const device = pluginState(owner).renderer.device;
-      const renderer = pluginState(owner).renderer;
+      const canvas = globals.sceneByLayer.get(owner).renderer.canvas;
+      const device = globals.sceneByLayer.get(owner).renderer.device;
+      const renderer = globals.sceneByLayer.get(owner).renderer;
       const worldMatrix = probe.worldMatrix;
       const beforeWorldMatrix = Array.from(worldMatrix);
       const bindGroup = probe.bindGroup;
@@ -43,7 +45,7 @@ When('I pan the shared WebGPU renderer', async function () {
       const beforeFrame = Array.from(uniformData.subarray(0, 56));
       // The shader composes view × world: slot 0 must hold the camera, one mesh slot the probe's world matrix.
       const measure = () => {
-        const camera = pluginState(owner).camera, data = renderer.uniformData;
+        const camera = globals.sceneByLayer.get(owner).camera, data = renderer.uniformData;
         let world = Infinity;
         for (let slot = 1; slot < renderer.uniformSlot; slot++) {
           world = Math.min(world, Math.max(...probe.worldMatrix.map((value, i) => Math.abs(Math.fround(value) - data[slot * 64 + i]))));
@@ -61,7 +63,7 @@ When('I pan the shared WebGPU renderer', async function () {
       await renderer.device.queue.onSubmittedWorkDone();
       const secondErrors = measure();
       let meshes = 0, visibleMeshes = 0;
-      nativeChecks.graph.traverse(pluginState(owner).scene, mesh => {
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(owner).scene, mesh => {
         if (!mesh.geometry) return;
         meshes++;
         if (mesh._visibleInFrame) visibleMeshes++;
@@ -70,17 +72,17 @@ When('I pan the shared WebGPU renderer', async function () {
         beforeWorldMatrix.every((value, i) => value === worldMatrix[i]);
       const originalX = probe.position[0];
       probe.position[0] += 1;
-      nativeChecks.graph.updateWorldMatrix(pluginState(owner).scene);
+      nativeChecks.graph.updateWorldMatrix(globals.sceneByLayer.get(owner).scene);
       const transformInvalidated = beforeWorldMatrix.some((value, i) => value !== worldMatrix[i]);
       probe.position[0] = originalX + 1000000;
       nativeChecks.render.render(owner);
       const probeCulled = !probe._visibleInFrame;
       probe.position[0] = originalX;
-      nativeChecks.graph.updateWorldMatrix(pluginState(owner).scene);
+      nativeChecks.graph.updateWorldMatrix(globals.sceneByLayer.get(owner).scene);
       return {
         firstErrors, secondErrors, meshes, visibleMeshes, probeCulled, sortDepthError,
-        canvasReused: canvas === pluginState(owner).renderer.canvas,
-        deviceReused: device === pluginState(owner).renderer.device,
+        canvasReused: canvas === globals.sceneByLayer.get(owner).renderer.canvas,
+        deviceReused: device === globals.sceneByLayer.get(owner).renderer.device,
         worldMatrixReused, transformInvalidated,
         uniformDataReused: uniformData === renderer.uniformData,
         gpuUniformBufferReused: uniformBuffer === renderer.uniformBuffer,
@@ -115,9 +117,10 @@ Then('WebGPU matrices match DOMMatrix and frame resources are reused', function 
 
 // Settled scene: terrain meshes exist, the roof atlas was built and no raster layer is still loading.
 const waitForWebGPUScene = page => page.waitForFunction(() => {
-  const owner = cityMapperTestState.renderers.get(map);
-  return pluginState(owner)?.renderer?.device && pluginState(owner)._roofRaster && pluginState(pluginState(map)._terrain3D)?._rasterTiles.size > 0 &&
-    !Object.values(map._layers).some(layer => (pluginState(layer).isLoading || layer.isLoading)?.call(layer));
+  const owner = globals.renderers.get(map);
+  return globals.sceneByLayer.get(owner)?.renderer?.device && globals.sceneByLayer.get(owner)._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
+    !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
+      ? CityMapper.isLoading(layer) : layer.isLoading?.());
 }, null, { timeout: 50000 });
 
 When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, async function () {
@@ -127,8 +130,8 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuPacing = await this.page.evaluate(async () => {
-      const owner = cityMapperTestState.renderers.get(map);
-      const { device } = pluginState(owner).renderer;
+      const owner = globals.renderers.get(map);
+      const { device } = globals.sceneByLayer.get(owner).renderer;
       const frame = () => new Promise(requestAnimationFrame);
       const gpuErrors = [];
       const onGpuError = event => gpuErrors.push(event.error.message);
@@ -136,7 +139,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
       let renders = 0, uniformWrites = 0, otherWrites = 0, buffers = new Set();
       const writeBuffer = device.queue.writeBuffer;
       device.queue.writeBuffer = function (buffer) {
-        if (buffer === pluginState(owner).renderer.uniformBuffer) { uniformWrites++; renders++; }
+        if (buffer === globals.sceneByLayer.get(owner).renderer.uniformBuffer) { uniformWrites++; renders++; }
         else if (buffers.has(buffer)) otherWrites++;
         return writeBuffer.apply(this, arguments);
       };
@@ -156,7 +159,7 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         await frame();
         renders = 0;
         for (let i = 0; i < 5; i++) nativeChecks.render.update(owner);
-        for (const layer of pluginState(owner)._layers) nativeChecks.render.update(layer);
+        for (const layer of globals.sceneByLayer.get(owner)._layers) nativeChecks.render.update(layer);
         const deferredRenders = renders;
         await frame();
         const frameRenders = renders;
@@ -190,23 +193,23 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, a
         };
 
         let drawn = 0, totalMeshes = 0, sharedBindings = 0, ownBuffers = 0;
-        nativeChecks.graph.traverse(pluginState(owner).scene, mesh => {
+        nativeChecks.graph.traverse(globals.sceneByLayer.get(owner).scene, mesh => {
           if (!mesh.geometry) return;
           totalMeshes++;
           if (mesh.uniformBuffer) ownBuffers++;
           if (!mesh.visible || !mesh._visibleInFrame || mesh._appearance === 0) return;
           drawn++;
-          if (mesh.boundBuffer === pluginState(owner).renderer.uniformBuffer) sharedBindings++;
+          if (mesh.boundBuffer === globals.sceneByLayer.get(owner).renderer.uniformBuffer) sharedBindings++;
         });
-        const uniformSlots = pluginState(owner).renderer.uniformSlot;
-        const uniformCapacity = pluginState(owner).renderer.uniformBuffer.size / 256;
+        const uniformSlots = globals.sceneByLayer.get(owner).renderer.uniformSlot;
+        const uniformCapacity = globals.sceneByLayer.get(owner).renderer.uniformBuffer.size / 256;
         performanceMetrics.sceneMeshes = {
-          drawn, total: totalMeshes, shadowCasters: pluginState(owner)._shadowMeshes?.length || 0,
+          drawn, total: totalMeshes, shadowCasters: globals.sceneByLayer.get(owner)._shadowMeshes?.length || 0,
         };
 
         // Hover highlight is a shader vertex range: no vertex color re-upload.
-        const buildings = [...pluginState(owner)._layers].find(layer => pluginState(layer).group?.children.some(mesh => mesh.extras?.featureFaces?.length));
-        const target = pluginState(buildings).group.children.find(mesh => mesh.extras?.featureFaces?.length);
+        const buildings = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer).group?.children.some(mesh => mesh.extras?.featureFaces?.length));
+        const target = globals.sceneByLayer.get(buildings).group.children.find(mesh => mesh.extras?.featureFaces?.length);
         const feature = target.extras.featureFaces[0];
         await frame();
         otherWrites = 0;
@@ -285,9 +288,9 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuAtlas = await this.page.evaluate(async () => {
-      const owner = cityMapperTestState.renderers.get(map);
-      const terrain = pluginState(map)._terrain3D;
-      const { device } = pluginState(owner).renderer;
+      const owner = globals.renderers.get(map);
+      const terrain = globals.cameraByMap.get(map)._terrain3D;
+      const { device } = globals.sceneByLayer.get(owner).renderer;
       const gpuErrors = [];
       const onGpuError = event => gpuErrors.push(event.error.message);
       device.addEventListener('uncapturederror', onGpuError);
@@ -303,17 +306,17 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
         return createTexture.call(this, { ...descriptor, usage: descriptor.usage | GPUTextureUsage.COPY_SRC });
       };
       try {
-        nativeChecks.gpu.destroyTexture(owner, pluginState(owner)._roofRaster.texture.texture);
-        pluginState(owner)._roofRaster = null;
+        nativeChecks.gpu.destroyTexture(owner, globals.sceneByLayer.get(owner)._roofRaster.texture.texture);
+        globals.sceneByLayer.get(owner)._roofRaster = null;
         nativeChecks.render.render(owner);
       } finally {
         delete device.createTexture;
         delete device.queue.copyExternalImageToTexture;
       }
-      const atlas = pluginState(owner)._roofRaster.texture;
+      const atlas = globals.sceneByLayer.get(owner)._roofRaster.texture;
       const tiles = Object.values(map._layers)
-        .filter(layer => pluginState(layer)._type === 'pmtiles' && pluginState(layer)._rasterTiles && layer.options.opacity > 0)
-        .flatMap(layer => [...pluginState(layer)._rasterTiles.values()]
+        .filter(layer => globals.sceneByLayer.get(layer)._type === 'pmtiles' && globals.sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0)
+        .flatMap(layer => [...globals.sceneByLayer.get(layer)._rasterTiles.values()]
           .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
           .map(tile => ({ tile, layer })));
       const zoom = Math.max(...tiles.map(({ tile }) => tile.coords.z));
@@ -371,14 +374,14 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       }
       await device.queue.onSubmittedWorkDone();
       device.removeEventListener('uncapturederror', onGpuError);
-      const terrainTiles = tiles.filter(({ tile }) => pluginState(terrain)._rasterTiles.has(tile));
+      const terrainTiles = tiles.filter(({ tile }) => globals.sceneByLayer.get(terrain)._rasterTiles.has(tile));
       return {
         image: atlas.image,
         atlasSize: [atlas.width, atlas.height],
         uploads,
         tiles: tiles.length,
         terrainTiles: terrainTiles.length,
-        duplicatedTerrainTiles: terrainTiles.filter(({ tile }) => pluginState(terrain)._rasterTiles.get(tile).texture !== tile.texture).length,
+        duplicatedTerrainTiles: terrainTiles.filter(({ tile }) => globals.sceneByLayer.get(terrain)._rasterTiles.get(tile).texture !== tile.texture).length,
         roofTiles: tiles.length,
         contrast: best.contrast,
         colorError: Math.max(...actual.flatMap((quadrant, i) => quadrant.map((value, c) => Math.abs(value - best.expected[i][c])))),
@@ -415,13 +418,13 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
   try {
     await waitForWebGPUScene(this.page);
     this.webgpuTerrain = await this.page.evaluate(async () => {
-      const owner = cityMapperTestState.renderers.get(map);
-      const terrain = pluginState(map)._terrain3D;
-      const { device } = pluginState(owner).renderer;
+      const owner = globals.renderers.get(map);
+      const terrain = globals.cameraByMap.get(map)._terrain3D;
+      const { device } = globals.sceneByLayer.get(owner).renderer;
       const crs = map.options.crs;
       const coordsByTile = new Map();
       for (const layer of Object.values(map._layers)) {
-        for (const tile of pluginState(layer)._rasterTiles?.values() || []) coordsByTile.set(tile, tile.coords);
+        for (const tile of globals.sceneByLayer.get(layer)._rasterTiles?.values() || []) coordsByTile.set(tile, tile.coords);
       }
       const renderUploads = [];
       const copyExternal = device.queue.copyExternalImageToTexture;
@@ -434,20 +437,20 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       } finally {
         delete device.queue.copyExternalImageToTexture;
       }
-      const origin = crs.project(pluginState(terrain).location);
-      const metres = Math.cos(pluginState(terrain).location.lat * Math.PI / 180);
-      const base = pluginState(terrain)._terrainOriginElevation;
+      const origin = crs.project(globals.sceneByLayer.get(terrain).location);
+      const metres = Math.cos(globals.sceneByLayer.get(terrain).location.lat * Math.PI / 180);
+      const base = globals.sceneByLayer.get(terrain)._terrainOriginElevation;
       const { terrainElevation } = await import('../src/terrain/terrainElevation.js');
       // Run the shader's own elevation code on every grid vertex, as the vertex stage does.
       const vertices = [];
       let wrongVertexCount = 0, notUploaded = 0, wrongSize = 0, missingCoords = 0, raisedGrid = 0;
       const grids = new Set(), divisionLevels = new Set();
-      for (const [tile, mesh] of pluginState(terrain)._rasterTiles) {
+      for (const [tile, mesh] of globals.sceneByLayer.get(terrain)._rasterTiles) {
         const coords = coordsByTile.get(tile);
         if (!coords) { missingCoords++; continue; }
         if (mesh.texture.uploaded !== tile.image) notUploaded++;
         if (mesh.texture.texture.width !== tile.image.width || mesh.texture.texture.height !== tile.image.height) wrongSize++;
-        const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - pluginState(terrain)._terrainZoom)));
+        const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - globals.sceneByLayer.get(terrain)._terrainZoom)));
         const { position, uv } = mesh.geometry.attributes;
         grids.add(mesh.geometry.attributes);
         divisionLevels.add(divisions);
@@ -463,7 +466,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       for (const [i, { mesh, coords, divisions, u, v }] of vertices.entries()) {
         const latlng = map.unproject([(coords.x + u) * 256, (coords.y + v) * 256], coords.z);
         const point = crs.project(latlng);
-        const elevation = (terrainElevation(map.project(latlng, pluginState(terrain)._terrainZoom), pluginState(terrain)._terrainTiles) ?? base) - base;
+        const elevation = (terrainElevation(map.project(latlng, globals.sceneByLayer.get(terrain)._terrainZoom), globals.sceneByLayer.get(terrain)._terrainTiles) ?? base) - base;
         maxError = Math.max(maxError,
           Math.abs(mesh.position[0] + mesh.scale[0] * u - (point.x - origin.x) * metres),
           Math.abs(gpuHeights[i] - elevation),
@@ -472,11 +475,11 @@ When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function ()
       }
       await device.queue.onSubmittedWorkDone();
       return {
-        meshes: pluginState(terrain)._rasterTiles.size, vertices: vertices.length, maxError, relief,
+        meshes: globals.sceneByLayer.get(terrain)._rasterTiles.size, vertices: vertices.length, maxError, relief,
         missingCoords, wrongVertexCount, notUploaded, wrongSize, raisedGrid,
         grids: grids.size, divisionLevels: divisionLevels.size,
         terrainUploadsDuringRender: renderUploads.filter(source =>
-          [...pluginState(terrain)._rasterTiles.keys()].some(tile => tile.image === source)).length,
+          [...globals.sceneByLayer.get(terrain)._rasterTiles.keys()].some(tile => tile.image === source)).length,
       };
     });
   } finally {

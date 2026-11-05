@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { Then } from '@cucumber/cucumber';
@@ -76,8 +78,8 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   });
   const result = await this.page.evaluate(async () => {
     const archive = CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles' } });
-    await pluginState(archive).ready;
-    const header = pluginState(archive).header;
+    await globals.sceneByLayer.get(archive).ready;
+    const header = globals.sceneByLayer.get(archive).header;
     const read = async (x, y) => {
       const tile = await CityMapper.getZxy(archive, 1, x, y);
       return tile && new TextDecoder().decode(tile.data);
@@ -88,18 +90,18 @@ Then('the native PMTiles methods handle directories, compression and failures', 
     const errors = [];
     for (const query of ['version', 'compression', 'http', 'truncated', 'changed']) {
       const reader = CityMapper.layer({ source: { type: 'pmtiles', url: `fixture.pmtiles?${query}` } });
-      errors.push(await pluginState(reader).ready.then(() => CityMapper.getZxy(reader, 1, 0, 0))
+      errors.push(await globals.sceneByLayer.get(reader).ready.then(() => CityMapper.getZxy(reader, 1, 0, 0))
         .then(() => '', error => error.message));
     }
     const invalid = await CityMapper.getZxy(archive, 1, 2, 0).then(() => false, error => error.message === 'Invalid PMTiles tile coordinates');
     const full = CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?full' } });
-    await pluginState(full).ready;
+    await globals.sceneByLayer.get(full).ready;
     const fullTile = await CityMapper.getZxy(full, 1, 1, 0);
     const plain = CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?plain' } });
-    await pluginState(plain).ready;
+    await globals.sceneByLayer.get(plain).ready;
     const plainTile = await CityMapper.getZxy(plain, 1, 1, 0);
     const badDirectory = CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?directory' } });
-    const directoryError = await pluginState(badDirectory).ready.then(() => CityMapper.getZxy(badDirectory, 1, 0, 0))
+    const directoryError = await globals.sceneByLayer.get(badDirectory).ready.then(() => CityMapper.getZxy(badDirectory, 1, 0, 0))
       .then(() => false, error => error instanceof Error);
     return { tiles, cancelled, invalid, zoom: [header.minZoom, header.maxZoom], errors,
       full: new TextDecoder().decode(fullTile.data), plain: new TextDecoder().decode(plainTile.data),
@@ -121,14 +123,14 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   const real = await this.page.evaluate(async () => {
     const { getZxy } = await import('/src/archives/getZxy.js');
     const buildings = CityMapper.layer({ source: { type: 'pmtiles', url: '../examples/data/paris-buildings.pmtiles' } });
-    await pluginState(buildings).ready;
-    const header = pluginState(buildings).header;
+    await globals.sceneByLayer.get(buildings).ready;
+    const header = globals.sceneByLayer.get(buildings).header;
     const point = test3d.map.project(new L.LatLng(48.85826, 2.2945), header.minZoom).divideBy(256).floor();
     const tile = await getZxy(buildings, header.minZoom, point.x, point.y);
     const collection = JSON.parse(new TextDecoder().decode(tile.data));
     const raster = CityMapper.layer({ source: { type: 'pmtiles', url: '../examples/data/paris-orthophotos.pmtiles' } });
-    await pluginState(raster).ready;
-    const rasterHeader = pluginState(raster).header;
+    await globals.sceneByLayer.get(raster).ready;
+    const rasterHeader = globals.sceneByLayer.get(raster).header;
     const rasterPoint = test3d.map.project(new L.LatLng(48.85826, 2.2945), rasterHeader.maxZoom).divideBy(256).floor();
     const image = await CityMapper.getZxy(raster, rasterHeader.maxZoom, rasterPoint.x, rasterPoint.y);
     const bitmap = await createImageBitmap(new Blob([image.data]));
@@ -152,35 +154,35 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         getZxy: async () => ({ data: image }),
       };
       const layer = CityMapper.layer({ source: { type: 'pmtiles', url: 'test.pmtiles', archive } }).addTo(map);
-      const delayed = !pluginState(layer)._rasterTiles?.size;
+      const delayed = !globals.sceneByLayer.get(layer)._rasterTiles?.size;
       // The first routed layer may still be loading its router.
       while (!resolveHeader) await new Promise(resolve => setTimeout(resolve));
       resolveHeader({ minZoom: 0, maxZoom: 12 });
-      await pluginState(layer).ready;
+      await globals.sceneByLayer.get(layer).ready;
       const nativeZoom = layer.options.maxNativeZoom;
       const deadline = performance.now() + 5000;
-      while (!pluginState(layer)._rasterTiles.size || [...pluginState(layer)._rasterTiles.values()].some(tile => !tile.done)) {
+      while (!globals.sceneByLayer.get(layer)._rasterTiles.size || [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => !tile.done)) {
         if (performance.now() > deadline) throw new Error('PMTiles canvas tiles did not load');
         await new Promise(requestAnimationFrame);
       }
-      const tileZoom = pluginState(layer)._tileZoom;
-      const initialized = pluginState(layer).renderer.canvas.isConnected &&
-        [...pluginState(layer)._rasterTiles.values()].every(tile => tile.mesh.parent === pluginState(layer).root);
+      const tileZoom = globals.sceneByLayer.get(layer)._tileZoom;
+      const initialized = globals.sceneByLayer.get(layer).renderer.canvas.isConnected &&
+        [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile => tile.mesh.parent === globals.sceneByLayer.get(layer).root);
       const waitForZoom = async zoom => {
         const deadline = performance.now() + 5000;
-        while (pluginState(layer)._tileZoom !== zoom ||
-          ![...pluginState(layer)._rasterTiles.values()].some(tile => tile.coords.z === zoom) ||
-          [...pluginState(layer)._rasterTiles.values()].some(tile => tile.coords.z === zoom && !tile.done && !tile.error)) {
+        while (globals.sceneByLayer.get(layer)._tileZoom !== zoom ||
+          ![...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.coords.z === zoom) ||
+          [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.coords.z === zoom && !tile.done && !tile.error)) {
           if (performance.now() > deadline) throw new Error(`PMTiles zoom ${zoom} tiles did not settle`);
           await new Promise(requestAnimationFrame);
         }
       };
       map.setZoom(8, { animate: false });
       await waitForZoom(8);
-      const outgoing = [...pluginState(layer)._rasterTiles.values()].filter(tile => tile.coords.z === 8 && tile.done);
+      const outgoing = [...globals.sceneByLayer.get(layer)._rasterTiles.values()].filter(tile => tile.coords.z === 8 && tile.done);
       const pendingTiles = [];
       let releaseTiles = false;
-      pluginState(layer.options.archive).getZxy = z => z === 9 && !releaseTiles
+      layer.options.archive.getZxy = z => z === 9 && !releaseTiles
         ? new Promise(resolve => pendingTiles.push(resolve))
         : Promise.resolve({ data: image });
       map.setZoom(9, { animate: false });
@@ -189,31 +191,31 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         if (performance.now() > pendingDeadline) throw new Error('PMTiles zoom did not request new tiles');
         await new Promise(requestAnimationFrame);
       }
-      const visibleParents = new Set([...pluginState(layer)._wantedRasterTiles].map(key => {
+      const visibleParents = new Set([...globals.sceneByLayer.get(layer)._wantedRasterTiles].map(key => {
         const [z, x, y] = key.split('/').map(Number);
         if (z !== 9) throw new Error('Expected zoom 9 target tiles');
         return `8/${Math.floor(x / 2)}/${Math.floor(y / 2)}`;
       }));
       const overlapping = outgoing.filter(tile => visibleParents.has(`8/${tile.coords.x}/${tile.coords.y}`));
       const retained = overlapping.length > 0 &&
-        overlapping.every(tile => pluginState(layer)._rasterTiles.get(`8/${tile.coords.x}/${tile.coords.y}`) === tile);
+        overlapping.every(tile => globals.sceneByLayer.get(layer)._rasterTiles.get(`8/${tile.coords.x}/${tile.coords.y}`) === tile);
       releaseTiles = true;
       for (const resolve of pendingTiles) resolve({ data: image });
       await waitForZoom(9);
       const pruneDeadline = performance.now() + 5000;
-      while ([...pluginState(layer)._rasterTiles.keys()].some(key => key.startsWith('8/'))) {
+      while ([...globals.sceneByLayer.get(layer)._rasterTiles.keys()].some(key => key.startsWith('8/'))) {
         if (performance.now() > pruneDeadline) throw new Error('Outgoing PMTiles were not pruned after fading');
         await new Promise(requestAnimationFrame);
       }
-      const oldTilesRemoved = ![...pluginState(layer)._rasterTiles.keys()].some(key => key.startsWith('8/'));
+      const oldTilesRemoved = ![...globals.sceneByLayer.get(layer)._rasterTiles.keys()].some(key => key.startsWith('8/'));
       layer.remove();
-      const override = await pluginState(CityMapper.layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+      const override = await globals.sceneByLayer.get(CityMapper.layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
         archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }) }, maxNativeZoom: 10 } })).ready;
       const failed = CityMapper.layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
         archive: { getHeader: async () => { throw new Error('Missing archive'); } } } });
       let emitted;
       failed.on('error', event => { emitted = event.error; });
-      const error = await pluginState(failed).ready.then(() => null, error => error);
+      const error = await globals.sceneByLayer.get(failed).ready.then(() => null, error => error);
       const missing = CityMapper.layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
         archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }), getZxy: async () => undefined } } }).addTo(map);
       let tileError;
@@ -242,13 +244,13 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         failed: error?.message === 'Missing archive' && emitted === error,
         noFallback: failed.options.maxNativeZoom === undefined,
         tileBase: Object.getPrototypeOf(layer) === L.Layer.prototype &&
-          pluginState(layer)._type === 'pmtiles' && !(layer instanceof L.TileLayer) &&
+          globals.sceneByLayer.get(layer)._type === 'pmtiles' && !(layer instanceof L.TileLayer) &&
           !(layer instanceof L.GridLayer),
         directCanvas: !('_container' in layer) && !('createTile' in layer),
         missingRaster: tileError.error.message ===
           `Tile ${tileError.coords.z}/${tileError.coords.x}/${tileError.coords.y} is not in the offline archive` &&
           tileError.tile.error === tileError.error.message,
-        cancelled: signal.aborted && pluginState(cancelled)._rasterTiles.size === 0 };
+        cancelled: signal.aborted && globals.sceneByLayer.get(cancelled)._rasterTiles.size === 0 };
     });
     assert.deepEqual(result, {
       delayed: true, nativeZoom: 12, tileZoom: result.tileZoom, initialized: true, override: 10,

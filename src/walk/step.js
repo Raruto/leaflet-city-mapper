@@ -1,8 +1,12 @@
-import { state as sharedState } from '../state.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { limbs } from '../globals/limbs.js';
+import { parts } from '../globals/parts.js';
+import { moves } from '../globals/moves.js';
+
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
-import { pluginState } from '../core/pluginState.js';
+
 import * as createMesh from '../rendering/createMesh.js';
 import { build } from '../geometry/build.js';
 
@@ -16,20 +20,20 @@ export function step(now) {
   this.frame = requestAnimationFrame(this.step);
   const dt = Math.min(0.1, (now - (this.last ?? now)) / 1000);
   this.last = now;
-  if (!pluginState(layer).renderer) return;
+  if (!sceneByLayer.get(layer).renderer) return;
   let changed = false;
   let part, key, i;
   if (!this.meshes) {
     this.meshes = /* allocation: required -- Retain this walker's independently owned limb meshes. */ [];
-    for ([part] of sharedState.limbs) this.meshes.push(createMesh.createMesh(layer, build(sharedState.parts[part])));
+    for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
     changed = true;
   }
   let forward = 0, turn = 0;
-  for (key of this.keys) { forward += sharedState.moves[key]?.[0] || 0; turn += sharedState.moves[key]?.[1] || 0; }
+  for (key of this.keys) { forward += moves[key]?.[0] || 0; turn += moves[key]?.[1] || 0; }
   forward = Math.sign(forward); turn = Math.sign(turn);
   if (turn) { this.state.heading = wrap(this.state.heading + turn * 2.5 * dt); changed = true; }
   if (forward) {
-    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng, { position, scale } = pluginState(layer).root;
+    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng, { position, scale } = sceneByLayer.get(layer).root;
     let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
     const feet = local.call(this, this.local);
     for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];

@@ -1,10 +1,13 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { cameraAnimations } from '../globals/cameraAnimations.js';
+import { cameraAnimationFrame } from '../globals/cameraAnimationFrame.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 
 import { runCameraAnimations } from './runCameraAnimations.js';
 
 export function scheduleCameraAnimation(map, animation) {
-  sharedState.cameraAnimations.set(map, animation);
-  if (sharedState.cameraAnimationFrame === null) sharedState.cameraAnimationFrame = requestAnimationFrame(runCameraAnimations);
-  pluginState(map)._cameraFrame = sharedState.cameraAnimationFrame;
+  cameraAnimations.set(map, animation);
+  if (cameraAnimationFrame.value === null) cameraAnimationFrame.value = requestAnimationFrame(runCameraAnimations);
+  cameraByMap.get(map)._cameraFrame = cameraAnimationFrame.value;
 }

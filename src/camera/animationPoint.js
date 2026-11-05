@@ -1,6 +1,8 @@
-import { pluginState } from '../core/pluginState.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 export function animationPoint(map, point, inverse = false) {
-  const view = pluginState(map)._cameraView;
+  const view = cameraByMap.get(map)._cameraView;
   if (!view) return point;
   const half = map.getSize().divideBy(2), scale = map.getZoomScale(view.zoom);
   const shift = map.project(map.getCenter(), view.zoom).subtract(map.project(view.center, view.zoom));

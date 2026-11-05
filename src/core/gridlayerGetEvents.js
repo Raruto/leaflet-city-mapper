@@ -1,9 +1,9 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from './pluginState.js';
+import { gridEvents } from '../globals/gridEvents.js';
+
+
 
 export function gridlayerGetEvents() {
-  const events = sharedState.gridEvents.call(this);
-  pluginState(this)._cameraGridUpdate ||= L.Util.throttle(this._onMoveEnd, this.options.updateInterval, this);
-  events.rotate = events.pitch = pluginState(this)._cameraGridUpdate;
+  const events = gridEvents.value.call(this);
+  events.rotate = events.pitch = L.Util.throttle(this._onMoveEnd, this.options.updateInterval, this);
   return events;
 }

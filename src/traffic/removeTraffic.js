@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { trafficByLayer } from '../globals/trafficByLayer.js';
+
+
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
 
@@ -10,7 +12,7 @@ export function removeTraffic(state) {
   disposeTrafficObject(state, state.mesh);
   disposeTrafficObject(state, state.route);
   state.mesh = state.route = null;
-  delete pluginState(state.layer)._beforeRaycast;
+  trafficByLayer.delete(state.layer);
   destroyTrafficGpu(state);
   state.lanes.length = 0;
   state.trips.length = 0;

@@ -1,5 +1,9 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { frameCommands } from '../globals/frameCommands.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nativeRenderByLayer } from '../globals/nativeRenderByLayer.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+
+
 import { synchronizeZoomView } from './synchronizeZoomView.js';
 import { resizeRenderer } from './resizeRenderer.js';
 import { updateMapCamera } from './updateMapCamera.js';
@@ -13,6 +17,7 @@ import { renderSunlight } from '../shadows/renderSunlight.js';
 import { cancelUpdate } from '../scene/cancelUpdate.js';
 import { update } from '../scene/update.js';
 import { pruneRasterTiles } from '../raster/pruneRasterTiles.js';
+import { beforeNativeRender } from '../core/beforeNativeRender.js';
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
@@ -21,9 +26,8 @@ import { pruneRasterTiles } from '../raster/pruneRasterTiles.js';
  */
 
 export function render(backend) {
-  const gpuSubmit1 = sharedState.allocationRenderRenderSubmit1;
   cancelUpdate(backend);
-  if (pluginState(backend)._shared !== backend || !pluginState(backend).renderer) return;
+  if (sceneByLayer.get(backend)._shared !== backend || !sceneByLayer.get(backend).renderer) return;
   const map = backend._map;
   const now = performance.now();
   const size = map.getSize();
@@ -31,18 +35,19 @@ export function render(backend) {
   synchronizeZoomView(backend, now);
   resizeRenderer(backend, size);
   updateMapCamera(backend, size);
-  updateWorldMatrix(pluginState(backend).scene);
+  updateWorldMatrix(sceneByLayer.get(backend).scene);
   let sceneChanged = false;
-  let layer;
-  for (layer of pluginState(backend)._layers) {
-    if (!pluginState(layer)._beforeRender) continue;
-    pluginState(layer)._beforeRender();
+  let layer, native;
+  for (layer of sceneByLayer.get(backend)._layers) {
+    native = nativeRenderByLayer.get(layer);
+    if (!native) continue;
+    beforeNativeRender(native);
     sceneChanged = true;
   }
-  const sunlight = pluginState(map)._sunlight;
+  const sunlight = cameraByMap.get(map)._sunlight;
   collectFrameMeshes(backend, sunlight, sceneChanged);
-  const shadowMeshes = pluginState(backend)._shadowMeshes;
-  const renderer = pluginState(backend).renderer;
+  const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes;
+  const renderer = sceneByLayer.get(backend).renderer;
   const rasters = updateRoofRaster(backend, now);
   const meshes = renderer.frameMeshes ||= /* allocation: required -- Each renderer retains its final sorted mesh list between frames. */ [];
   meshes.length = 0;
@@ -53,12 +58,12 @@ export function render(backend) {
   drawSceneMeshes(backend, encoder, meshes);
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
   renderer.device.queue.submit((
-    gpuSubmit1[0] = encoder.finish(),
-    gpuSubmit1
+    frameCommands[0] = encoder.finish(),
+    frameCommands
   ));
-  gpuSubmit1[0] = null;
-  for (layer of pluginState(backend)._layers) {
-    if (pluginState(layer)._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
+  frameCommands[0] = null;
+  for (layer of sceneByLayer.get(backend)._layers) {
+    if (sceneByLayer.get(layer)._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
   }
   if (map._animatingZoom || appearing) update(backend);
 }

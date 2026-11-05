@@ -1,6 +1,16 @@
+import { Compass } from '../globals/Compass.js';
+import { ContainerResize } from '../globals/ContainerResize.js';
+import { PitchDrag } from '../globals/PitchDrag.js';
+import { ShiftRotate } from '../globals/ShiftRotate.js';
+import { TouchMode } from '../globals/TouchMode.js';
+import { cameraByMap } from '../globals/cameraByMap.js';
+import { touchByContainer } from '../globals/touchByContainer.js';
+import { cameraTouchStates } from '../globals/cameraTouchStates.js';
+import { cameraListenerOptions } from '../globals/cameraListenerOptions.js';
+import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
 import { notifyCameraTouchChange } from './notifyCameraTouchChange.js';
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+
+
 
 import { rotateOnAdd } from './rotateOnAdd.js';
 import { rotateOnRemove } from './rotateOnRemove.js';
@@ -21,27 +31,27 @@ import { cleanupCameraTouch } from './cleanupCameraTouch.js';
 import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { addCameraHandler } from './addCameraHandler.js';
 
-sharedState.Compass = L.Handler.extend({
+Compass.value = L.Handler.extend({
   addHooks: compassAddHooks,
   removeHooks: compassRemoveHooks,
 });
 
-sharedState.ContainerResize = L.Handler.extend({
+ContainerResize.value = L.Handler.extend({
   addHooks: containerResizeAddHooks,
   removeHooks: containerResizeRemoveHooks,
 });
 
-sharedState.PitchDrag = L.Handler.extend({
+PitchDrag.value = L.Handler.extend({
   addHooks: pitchDragAddHooks,
   removeHooks: pitchDragRemoveHooks,
 });
 
-sharedState.ShiftRotate = L.Handler.extend({
+ShiftRotate.value = L.Handler.extend({
   addHooks: shiftRotateAddHooks,
   removeHooks: shiftRotateRemoveHooks,
 });
 
-sharedState.TouchMode = L.Handler.extend({
+TouchMode.value = L.Handler.extend({
   addHooks: notifyCameraTouchChange,
   removeHooks: notifyCameraTouchChange,
 });
@@ -52,29 +62,29 @@ L.Control.Rotate = L.Control.extend({
   onRemove: rotateOnRemove,
 });
 
-if (pluginState(L).control) pluginState(L).control.rotate = rotateControl;
+if (L.control) L.control.rotate = rotateControl;
 
 export function cameraControls(map) {
-  addCameraHandler(map, 'trackContainerMutation', sharedState.ContainerResize);
+  addCameraHandler(map, 'trackContainerMutation', ContainerResize.value);
   if (!map.options.rotate) return;
-  addCameraHandler(map, 'shiftKeyRotate', sharedState.ShiftRotate);
-  addCameraHandler(map, 'pitchDrag', sharedState.PitchDrag);
-  addCameraHandler(map, 'compassBearing', sharedState.Compass);
-  addCameraHandler(map, 'touchRotate', sharedState.TouchMode);
-  addCameraHandler(map, 'touchPitch', sharedState.TouchMode);
+  addCameraHandler(map, 'shiftKeyRotate', ShiftRotate.value);
+  addCameraHandler(map, 'pitchDrag', PitchDrag.value);
+  addCameraHandler(map, 'compassBearing', Compass.value);
+  addCameraHandler(map, 'touchRotate', TouchMode.value);
+  addCameraHandler(map, 'touchPitch', TouchMode.value);
   const container = map.getContainer();
-  const state = pluginState(map)._cameraTouchState = /* allocation: required -- Each map owns its touch lifecycle state and handlers. */ { map, container, touch: null, nativeZoom: undefined };
-  pluginState(container)._cameraTouchState = state;
-  sharedState.cameraTouchStates.add(state);
-  container.addEventListener('touchstart', startCameraTouch, sharedState.allocationCameraListenerOptions);
-  container.addEventListener('touchmove', moveCameraTouch, sharedState.allocationCameraListenerOptions);
+  const state = cameraByMap.get(map)._cameraTouchState = /* allocation: required -- Each map owns its touch lifecycle state and handlers. */ { map, container, touch: null, nativeZoom: undefined };
+  touchByContainer.set(container, state);
+  cameraTouchStates.add(state);
+  container.addEventListener('touchstart', startCameraTouch, cameraListenerOptions);
+  container.addEventListener('touchmove', moveCameraTouch, cameraListenerOptions);
   container.addEventListener('touchend', endCameraTouchEvent, true);
   container.addEventListener('touchcancel', endCameraTouchEvent, true);
   window.addEventListener('blur', endAllCameraTouches);
   map.on('cameratouchchange', changeCameraTouch, map);
   if (map.options.rotateControl) {
-    pluginState(map).rotateControl = /* allocation: required -- Each map retains and removes its own rotation control. */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : sharedState.allocationCameraEmptyOptions);
-    pluginState(map).rotateControl.addTo(map);
+    cameraByMap.get(map).rotateControl = /* allocation: required -- Each map retains and removes its own rotation control. */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions);
+    cameraByMap.get(map).rotateControl.addTo(map);
   }
   map.once('unload', cleanupCameraTouch, map);
 }

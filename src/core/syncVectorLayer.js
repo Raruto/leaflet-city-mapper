@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { geometryPixelStates } from '../globals/geometryPixelStates.js';
+
 
 import { nativeGeometry } from '../geometry/nativeGeometry.js';
 import { localPixelForGeometry } from './localPixelForGeometry.js';
@@ -7,12 +8,12 @@ import { putNativeMesh } from './putNativeMesh.js';
 
 export function syncVectorLayer(state) {
   const { source } = state;
-  sharedState.geometryPixelStates.push(state);
+  geometryPixelStates.push(state);
   let geometry;
   try {
     geometry = nativeGeometry(source, state.map, localPixelForGeometry);
   } finally {
-    sharedState.geometryPixelStates.pop();
+    geometryPixelStates.pop();
   }
   const { fill, stroke } = geometry;
   let i, key, positions, color, opacity, r, g, b;

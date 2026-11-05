@@ -1,13 +1,15 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { createProgram } from '../rendering/createProgram.js';
 
 export function restoreObject(object, backend) {
-  const shared = pluginState(backend)._shared;
+  const shared = sceneByLayer.get(backend)._shared;
   let name, attribute, oldBuffer, texture;
-  if (object.geometry && object.geometry.device !== pluginState(shared).renderer.device) {
+  if (object.geometry && object.geometry.device !== sceneByLayer.get(shared).renderer.device) {
     const geometry = object.geometry;
     const material = object.program._layerMaterial;
-    const device = pluginState(shared).renderer.device;
+    const device = sceneByLayer.get(shared).renderer.device;
     if (geometry.attributes.index?.data instanceof Uint8Array) {
       geometry.attributes.index.data = /* allocation: required -- WebGPU index buffers must not use uint8 data. */ new Uint16Array(geometry.attributes.index.data);
     }
@@ -48,15 +50,15 @@ export function restoreObject(object, backend) {
     object.program = createProgram(backend, material);
     object.device = device;
   }
-  if (object.texture && object.texture.device !== pluginState(shared).renderer.device) {
+  if (object.texture && object.texture.device !== sceneByLayer.get(shared).renderer.device) {
     texture = object.texture;
-    texture.device = pluginState(shared).renderer.device;
-    texture.texture = pluginState(shared).renderer.device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for this replacement texture. */ {
+    texture.device = sceneByLayer.get(shared).renderer.device;
+    texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(/* allocation: required -- Supply a fresh GPU descriptor for this replacement texture. */ {
         size: /* allocation: required -- Snapshot the image dimensions for this GPU operation. */ [object.texture.image.width, object.texture.image.height],
         format: object.texture.format,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });
-    texture.sampler = pluginState(shared).renderer.device.createSampler(texture.samplerOptions);
+    texture.sampler = sceneByLayer.get(shared).renderer.device.createSampler(texture.samplerOptions);
     texture.uploaded = null;
   }
 }

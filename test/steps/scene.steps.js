@@ -1,4 +1,6 @@
-import { pluginState } from '../../src/core/pluginState.js';
+import * as globals from '../fixtures/globals.js';
+
+
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
 
@@ -7,7 +9,7 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     const layer = CityMapper.layer({ source: { type: '3d' } });
     await nativeChecks.ready(layer);
     layer.addTo(test3d.map);
-    await pluginState(layer)._added.promise;
+    await globals.sceneByLayer.get(layer)._added.promise;
     const scene = nativeChecks.group();
     const mesh = nativeChecks.mesh(layer, {
       position: [0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -16,10 +18,10 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     });
     mesh.worldMatrix = Array.from(new DOMMatrix().translate(0, 0, -1).toFloat64Array());
     const rect = layer._map.getContainer().getBoundingClientRect();
-    pluginState(layer).camera.position.splice(0, 3, 0.25, 0.25, 2);
-    pluginState(layer).camera.target.splice(0, 3, 0.25, 0.25, -1);
-    pluginState(layer).camera.up.splice(0, 3, 0, 1, 0);
-    pluginState(layer).camera.aspect = rect.width / rect.height;
+    globals.sceneByLayer.get(layer).camera.position.splice(0, 3, 0.25, 0.25, 2);
+    globals.sceneByLayer.get(layer).camera.target.splice(0, 3, 0.25, 0.25, -1);
+    globals.sceneByLayer.get(layer).camera.up.splice(0, 3, 0, 1, 0);
+    globals.sceneByLayer.get(layer).camera.aspect = rect.width / rect.height;
     const center = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
     const hit = nativeChecks.picking.raycast(layer, center, [mesh], false)[0];
     const worldCameraRay = hit?.object === mesh && hit.faceIndex === 0 &&
@@ -31,10 +33,10 @@ Then('layer-owned objects preserve values and visibility without engine classes'
       singularTransform = error.message === 'Singular 3D transform';
     }
     mesh.worldMatrix = matrix;
-    const objects = [scene, pluginState(layer).camera, pluginState(layer).raycaster, pluginState(layer).renderer, mesh, mesh.geometry, mesh.program];
+    const objects = [scene, globals.sceneByLayer.get(layer).camera, globals.sceneByLayer.get(layer).raycaster, globals.sceneByLayer.get(layer).renderer, mesh, mesh.geometry, mesh.program];
     const noEngine = !('Native' in L.Layer) && !('Native' in layer) && !('loadModel' in layer) &&
       objects.every(object => object.constructor === Object) &&
-      Object.getPrototypeOf(pluginState(layer).camera.position) === Array.prototype &&
+      Object.getPrototypeOf(globals.sceneByLayer.get(layer).camera.position) === Array.prototype &&
       Object.getPrototypeOf(mesh.worldMatrix) === Array.prototype &&
       objects.every(object => Object.getPrototypeOf(object) === Object.prototype &&
         Object.values(object).every(value => typeof value !== 'function')) &&
@@ -43,8 +45,8 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     const noLayerHelpers = ['add', 'remove', '_setTerrainHeight', '_lampPostGeometry', '_lightGeometry']
       .every(name => !Object.hasOwn(layer, name)) &&
       prototype === L.Layer.prototype && layer.remove === L.Layer.prototype.remove;
-    const independent = scene.position !== pluginState(layer).root.position &&
-      scene.children !== pluginState(layer).root.children && scene.worldMatrix !== pluginState(layer).root.worldMatrix;
+    const independent = scene.position !== globals.sceneByLayer.get(layer).root.position &&
+      scene.children !== globals.sceneByLayer.get(layer).root.children && scene.worldMatrix !== globals.sceneByLayer.get(layer).root.worldMatrix;
     const nodes = [
       { id: 1, program: { transparent: true }, _sortDepth: 0.2 },
       { id: 2, program: { transparent: false } },
@@ -67,9 +69,9 @@ Then('layer-owned objects preserve values and visibility without engine classes'
     const hiddenMesh = nativeChecks.group();
     Object.assign(hiddenMesh, { geometry: mesh.geometry, program: mesh.program, id: 4 });
     nativeChecks.graph.setParent(hiddenMesh, hidden);
-    nativeChecks.graph.setParent(scene, pluginState(layer).root);
+    nativeChecks.graph.setParent(scene, globals.sceneByLayer.get(layer).root);
     nativeChecks.render.update(layer);
-    nativeChecks.render.render(pluginState(layer)._shared);
+    nativeChecks.render.render(globals.sceneByLayer.get(layer)._shared);
     const meshes = [];
     nativeChecks.graph.traverse(scene, node => {
       if (programs.includes(node.program)) meshes.push(node);
@@ -94,27 +96,27 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
     const beforeReady = CityMapper.layer({ source: { type: '3d', ariaLabel: 'Automatic origin' } }).addTo(map);
     const afterReady = CityMapper.layer({ source: { type: '3d' } });
     await Promise.all([beforeReady, afterReady].map(nativeChecks.ready));
-    const deferred = pluginState(afterReady).location == null && !pluginState(afterReady).renderer;
+    const deferred = globals.sceneByLayer.get(afterReady).location == null && !globals.sceneByLayer.get(afterReady).renderer;
     afterReady.addTo(map);
-    await pluginState(afterReady)._added.promise;
-    const origins = pluginState(beforeReady).location.equals(initial) && pluginState(afterReady).location.equals(initial);
-    const shared = pluginState(beforeReady).renderer === pluginState(afterReady).renderer &&
-      Math.hypot(...pluginState(beforeReady).root.position) === 0 && Math.hypot(...pluginState(afterReady).root.position) === 0;
+    await globals.sceneByLayer.get(afterReady)._added.promise;
+    const origins = globals.sceneByLayer.get(beforeReady).location.equals(initial) && globals.sceneByLayer.get(afterReady).location.equals(initial);
+    const shared = globals.sceneByLayer.get(beforeReady).renderer === globals.sceneByLayer.get(afterReady).renderer &&
+      Math.hypot(...globals.sceneByLayer.get(beforeReady).root.position) === 0 && Math.hypot(...globals.sceneByLayer.get(afterReady).root.position) === 0;
     beforeReady.remove();
     afterReady.remove();
     map.setView([48.86, 2.3], 17, { animate: false });
     beforeReady.addTo(map);
     afterReady.addTo(map);
-    await Promise.all([pluginState(beforeReady)._added.promise, pluginState(afterReady)._added.promise]);
-    const retained = pluginState(beforeReady).location.equals(initial) && pluginState(afterReady).location.equals(initial) &&
-      pluginState(beforeReady).renderer === pluginState(afterReady).renderer;
+    await Promise.all([globals.sceneByLayer.get(beforeReady)._added.promise, globals.sceneByLayer.get(afterReady)._added.promise]);
+    const retained = globals.sceneByLayer.get(beforeReady).location.equals(initial) && globals.sceneByLayer.get(afterReady).location.equals(initial) &&
+      globals.sceneByLayer.get(beforeReady).renderer === globals.sceneByLayer.get(afterReady).renderer;
     beforeReady.remove();
     afterReady.remove();
     const center = [48.858, 2.295];
     const explicit = CityMapper.layer({ source: { type: '3d', center } });
     await nativeChecks.ready(explicit);
     center[0] = 0;
-    const explicitPreserved = pluginState(explicit).location.equals([48.858, 2.295]);
+    const explicitPreserved = globals.sceneByLayer.get(explicit).location.equals([48.858, 2.295]);
     return { deferred, origins, shared, retained, explicitPreserved };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
@@ -134,26 +136,26 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     await Promise.all([first, second].map(nativeChecks.ready));
     const backend = first;
     const object = nativeChecks.group();
-    nativeChecks.graph.setParent(object, pluginState(second).root);
+    nativeChecks.graph.setParent(object, globals.sceneByLayer.get(second).root);
     nativeChecks.render.update(second);
-    const shared = pluginState(first)._shared === first && pluginState(second)._shared === first &&
-      cityMapperTestState.renderers.get(map) === first &&
-      pluginState(first).renderer === pluginState(second).renderer && pluginState(first).camera === pluginState(second).camera &&
-      pluginState(first).scene === pluginState(second).scene && pluginState(first).root !== pluginState(second).root &&
-      pluginState(first).root.parent === pluginState(second).root.parent && document.querySelectorAll('.leaflet-3d').length === 1;
-    nativeChecks.render.render(pluginState(first)._shared);
-    const worldPoint = new DOMPoint(10, 0, 20, 1).matrixTransform(new DOMMatrix(pluginState(second).root.worldMatrix));
+    const shared = globals.sceneByLayer.get(first)._shared === first && globals.sceneByLayer.get(second)._shared === first &&
+      globals.renderers.get(map) === first &&
+      globals.sceneByLayer.get(first).renderer === globals.sceneByLayer.get(second).renderer && globals.sceneByLayer.get(first).camera === globals.sceneByLayer.get(second).camera &&
+      globals.sceneByLayer.get(first).scene === globals.sceneByLayer.get(second).scene && globals.sceneByLayer.get(first).root !== globals.sceneByLayer.get(second).root &&
+      globals.sceneByLayer.get(first).root.parent === globals.sceneByLayer.get(second).root.parent && document.querySelectorAll('.leaflet-3d').length === 1;
+    nativeChecks.render.render(globals.sceneByLayer.get(first)._shared);
+    const worldPoint = new DOMPoint(10, 0, 20, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(second).root.worldMatrix));
     const world = [worldPoint.x / worldPoint.w, worldPoint.y / worldPoint.w, worldPoint.z / worldPoint.w];
-    const screenPoint = new DOMPoint(...world, 1).matrixTransform(new DOMMatrix(pluginState(second).camera.projectionViewMatrix));
+    const screenPoint = new DOMPoint(...world, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(second).camera.projectionViewMatrix));
     const screen = [screenPoint.x / screenPoint.w, screenPoint.y / screenPoint.w, screenPoint.z / screenPoint.w];
     const crs = map.options.crs;
-    const point = crs.project(pluginState(second).location);
-    const metres = Math.cos(pluginState(second).location.lat * Math.PI / 180);
+    const point = crs.project(globals.sceneByLayer.get(second).location);
+    const metres = Math.cos(globals.sceneByLayer.get(second).location.lat * Math.PI / 180);
     const latlng = crs.unproject(new L.Point(point.x + 10 / metres, point.y - 20 / metres));
     const expected = map.latLngToContainerPoint(latlng);
     const size = map.getSize();
     const error = new L.Point((screen[0] + 1) * size.x / 2, (1 - screen[1]) * size.y / 2).distanceTo(expected);
-    const renderer = pluginState(second).renderer;
+    const renderer = globals.sceneByLayer.get(second).renderer;
     const canvasDefaults = renderer.canvas.parentNode === map.getPane('webgpuPane') &&
       map.getPane('webgpuPane').parentNode === map.getContainer() &&
       map.getPane('webgpuPane').style.zIndex === '1' &&
@@ -161,30 +163,30 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     let disposals = 0;
     const destroy = renderer.device.destroy.bind(renderer.device);
     renderer.device.destroy = function () { disposals++; destroy(); };
-    const sceneOrigin = pluginState(first).location;
-    const matrix = [...pluginState(first).camera.projectionViewMatrix];
+    const sceneOrigin = globals.sceneByLayer.get(first).location;
+    const matrix = [...globals.sceneByLayer.get(first).camera.projectionViewMatrix];
     nativeChecks.render.update(first);
     first.remove();
     await new Promise(requestAnimationFrame);
-    const retained = pluginState(second).renderer === renderer && renderer.canvas.isConnected && disposals === 0 &&
-      pluginState(second)._shared === second && cityMapperTestState.renderers.get(map) === second &&
-      pluginState(second)._sceneOrigin === sceneOrigin && !pluginState(first)._frame &&
-      pluginState(second).camera.projectionViewMatrix.every((value, index) => Math.abs(value - matrix[index]) < 1e-10);
-    const otherMap = new L.Map('second', { center: pluginState(second).location, zoom: 17, rotate: true });
+    const retained = globals.sceneByLayer.get(second).renderer === renderer && renderer.canvas.isConnected && disposals === 0 &&
+      globals.sceneByLayer.get(second)._shared === second && globals.renderers.get(map) === second &&
+      globals.sceneByLayer.get(second)._sceneOrigin === sceneOrigin && !globals.sceneByLayer.get(first)._frame &&
+      globals.sceneByLayer.get(second).camera.projectionViewMatrix.every((value, index) => Math.abs(value - matrix[index]) < 1e-10);
+    const otherMap = new L.Map('second', { center: globals.sceneByLayer.get(second).location, zoom: 17, rotate: true });
     first.addTo(otherMap);
-    await pluginState(first)._added.promise;
-    const movedOwner = pluginState(first)._shared === first && pluginState(first).renderer !== renderer &&
-      pluginState(second)._shared === second && pluginState(second).renderer === renderer;
+    await globals.sceneByLayer.get(first)._added.promise;
+    const movedOwner = globals.sceneByLayer.get(first)._shared === first && globals.sceneByLayer.get(first).renderer !== renderer &&
+      globals.sceneByLayer.get(second)._shared === second && globals.sceneByLayer.get(second).renderer === renderer;
     CityMapper.setBearing(otherMap, 70);
     CityMapper.setBearing(map, 65);
     await new Promise(requestAnimationFrame);
-    const independentUpdates = pluginState(first)._sceneOrigin === pluginState(first).location &&
-      pluginState(second).camera.projectionViewMatrix.some((value, index) => Math.abs(value - matrix[index]) > 1e-6);
+    const independentUpdates = globals.sceneByLayer.get(first)._sceneOrigin === globals.sceneByLayer.get(first).location &&
+      globals.sceneByLayer.get(second).camera.projectionViewMatrix.some((value, index) => Math.abs(value - matrix[index]) > 1e-6);
     first.remove();
     first.addTo(map);
-    await pluginState(first)._added.promise;
-    const rejoined = pluginState(first).renderer === renderer && pluginState(first)._shared === second &&
-      pluginState(first).root.position.every(value => Math.abs(value) < 1e-8);
+    await globals.sceneByLayer.get(first)._added.promise;
+    const rejoined = globals.sceneByLayer.get(first).renderer === renderer && globals.sceneByLayer.get(first)._shared === second &&
+      globals.sceneByLayer.get(first).root.position.every(value => Math.abs(value) < 1e-8);
     const overlayRegistration = control._layers.filter(entry => entry.layer === first).length === 1 &&
       control._layers.find(entry => entry.layer === first).name === 'First 3D layer';
     const checkbox = () => [...map.getContainer().querySelectorAll('.leaflet-control-layers-overlays label')]
@@ -192,21 +194,21 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     checkbox().click();
     const checkboxDisabled = !map.hasLayer(first);
     checkbox().click();
-    await pluginState(first)._added.promise;
-    const checkboxEnabled = map.hasLayer(first) && pluginState(first).renderer === renderer;
+    await globals.sceneByLayer.get(first)._added.promise;
+    const checkboxEnabled = map.hasLayer(first) && globals.sceneByLayer.get(first).renderer === renderer;
     const other = await nativeChecks.ready(CityMapper.layer({ source: {
-      type: '3d', center: [pluginState(second).location.lat, pluginState(second).location.lng],
+      type: '3d', center: [globals.sceneByLayer.get(second).location.lat, globals.sceneByLayer.get(second).location.lng],
     } }).addTo(otherMap));
-    const isolated = pluginState(other).renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
+    const isolated = globals.sceneByLayer.get(other).renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
     second.remove();
-    const transferredAgain = pluginState(first)._shared === first && pluginState(first).renderer === renderer &&
-      pluginState(first)._sceneOrigin === sceneOrigin && renderer.canvas.isConnected && disposals === 0;
+    const transferredAgain = globals.sceneByLayer.get(first)._shared === first && globals.sceneByLayer.get(first).renderer === renderer &&
+      globals.sceneByLayer.get(first)._sceneOrigin === sceneOrigin && renderer.canvas.isConnected && disposals === 0;
     first.remove();
     await renderer.device.lost;
-    const released = disposals === 1 && !renderer.canvas.isConnected && pluginState(other).renderer.canvas.isConnected;
+    const released = disposals === 1 && !renderer.canvas.isConnected && globals.sceneByLayer.get(other).renderer.canvas.isConnected;
     second.addTo(map);
-    await pluginState(second)._added.promise;
-    const restored = pluginState(second).renderer !== renderer && pluginState(second).root.children.includes(object);
+    await globals.sceneByLayer.get(second)._added.promise;
+    const restored = globals.sceneByLayer.get(second).renderer !== renderer && globals.sceneByLayer.get(second).root.children.includes(object);
     map.remove();
     otherMap.remove();
     return { pendingRemoved, shared, canvasDefaults, error, retained, movedOwner, independentUpdates, rejoined, isolated,
@@ -252,12 +254,12 @@ Then('an unavailable WebGPU adapter emits an error and shows a warning without l
 
 When('I select the {string} background in the 3D example', async function (background) {
   await this.page.evaluate(() => {
-    const overlays = layers._layers.filter(entry => entry.overlay && pluginState(entry.layer)._3d &&
-      !(pluginState(entry.layer)._type === 'terrain'))
+    const overlays = layers._layers.filter(entry => entry.overlay && globals.sceneByLayer.get(entry.layer)._3d &&
+      !(globals.sceneByLayer.get(entry.layer)._type === 'terrain'))
       .map(entry => entry.layer);
     window.exampleSceneBefore = {
-      overlays, renderer: pluginState(overlays[0]).renderer, canvas: pluginState(overlays[0]).renderer.canvas,
-      model: pluginState(overlays.find(layer => pluginState(layer).model)).model,
+      overlays, renderer: globals.sceneByLayer.get(overlays[0]).renderer, canvas: globals.sceneByLayer.get(overlays[0]).renderer.canvas,
+      model: globals.sceneByLayer.get(overlays.find(layer => globals.sceneByLayer.get(layer).model)).model,
       center: map.getCenter(), zoom: map.getZoom(), bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
     };
   });
@@ -271,17 +273,17 @@ Then('only the {string} background is active and the 3D scene is unchanged', asy
   }, background);
   const result = await this.page.evaluate(() => {
     const before = window.exampleSceneBefore;
-    const overlays = layers._layers.filter(entry => entry.overlay && pluginState(entry.layer)._3d &&
-      !(pluginState(entry.layer)._type === 'terrain'))
+    const overlays = layers._layers.filter(entry => entry.overlay && globals.sceneByLayer.get(entry.layer)._3d &&
+      !(globals.sceneByLayer.get(entry.layer)._type === 'terrain'))
       .map(entry => entry.layer);
-    const tower = overlays.find(layer => pluginState(layer).model);
+    const tower = overlays.find(layer => globals.sceneByLayer.get(layer).model);
     return {
       enabled: overlays.length === 4 && overlays.every(layer => map.hasLayer(layer)) &&
         layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers().every(layer => map.hasLayer(layer)),
-      shared: overlays.every(layer => pluginState(layer).renderer === pluginState(before).renderer),
+      shared: overlays.every(layer => globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(before).renderer),
       canvas: document.querySelectorAll('.leaflet-3d').length === 1 &&
-        before.canvas.isConnected && pluginState(tower).renderer.canvas === before.canvas,
-      model: pluginState(tower).model === pluginState(before).model && pluginState(tower).model.parent === pluginState(tower).root,
+        before.canvas.isConnected && globals.sceneByLayer.get(tower).renderer.canvas === before.canvas,
+      model: globals.sceneByLayer.get(tower).model === globals.sceneByLayer.get(before).model && globals.sceneByLayer.get(tower).model.parent === globals.sceneByLayer.get(tower).root,
       camera: map.getCenter().equals(before.center) && map.getZoom() === before.zoom &&
         CityMapper.getBearing(map) === before.bearing && CityMapper.getPitch(map) === before.pitch,
     };
@@ -305,26 +307,26 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await lightsControl.uncheck();
   await terrainControl.uncheck();
   await this.page.evaluate(() => {
-    const tower = layers._layers.find(entry => pluginState(entry.layer).model).layer;
+    const tower = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer).model).layer;
     // The Walk button is not managed by the overlays control under test.
     walk.remove();
-    window.exampleOverlayBefore = { tower, model: pluginState(tower).model, canvas: pluginState(tower).renderer.canvas, walk };
+    window.exampleOverlayBefore = { tower, model: globals.sceneByLayer.get(tower).model, canvas: globals.sceneByLayer.get(tower).renderer.canvas, walk };
   });
   await towerControl.uncheck();
   const towerDisabled = await this.page.evaluate(() => {
     const before = window.exampleOverlayBefore;
-    const buildings = layers._layers.find(entry => pluginState(entry.layer)._3d &&
-      !(pluginState(entry.layer)._type === 'terrain') && pluginState(entry.layer).url).layer;
+    const buildings = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._3d &&
+      !(globals.sceneByLayer.get(entry.layer)._type === 'terrain') && globals.sceneByLayer.get(entry.layer).url).layer;
     return !map.hasLayer(before.tower) && map.hasLayer(buildings) &&
-      before.canvas.isConnected && pluginState(buildings).renderer.canvas === before.canvas &&
+      before.canvas.isConnected && globals.sceneByLayer.get(buildings).renderer.canvas === before.canvas &&
       !map.attributionControl.getContainer().textContent.includes('CC0 model:') &&
-      !pluginState(before.tower)._tooltip;
+      !globals.sceneByLayer.get(before.tower)._tooltip;
   });
   await buildingsControl.uncheck();
   const treesRetained = await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
-    return map.hasLayer(tree) && pluginState(tree).renderer.canvas === window.exampleOverlayBefore.canvas &&
-      pluginState(tree).renderer.canvas.isConnected;
+    return map.hasLayer(tree) && globals.sceneByLayer.get(tree).renderer.canvas === window.exampleOverlayBefore.canvas &&
+      globals.sceneByLayer.get(tree).renderer.canvas.isConnected;
   });
   await treesControl.uncheck();
   const allDisabled = await this.page.evaluate(() =>
@@ -333,15 +335,15 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await towerControl.check();
   await this.page.waitForFunction(() => {
     const tower = window.exampleOverlayBefore.tower;
-    return pluginState(tower).renderer && pluginState(tower).model.parent === pluginState(tower).root;
+    return globals.sceneByLayer.get(tower).renderer && globals.sceneByLayer.get(tower).model.parent === globals.sceneByLayer.get(tower).root;
   });
   const towerRestored = await this.page.evaluate(() => {
     const before = window.exampleOverlayBefore;
     const tower = before.tower;
-    return map.hasLayer(tower) && pluginState(tower).model === pluginState(before).model &&
-      pluginState(tower).renderer.canvas !== before.canvas && pluginState(tower).renderer.canvas.isConnected &&
+    return map.hasLayer(tower) && globals.sceneByLayer.get(tower).model === globals.sceneByLayer.get(before).model &&
+      globals.sceneByLayer.get(tower).renderer.canvas !== before.canvas && globals.sceneByLayer.get(tower).renderer.canvas.isConnected &&
       map.attributionControl.getContainer().textContent.includes('CC0 model:') &&
-      pluginState(tower)._tooltip.hidden;
+      globals.sceneByLayer.get(tower)._tooltip.hidden;
   });
   await buildingsControl.check();
   await treesControl.check();
@@ -349,24 +351,24 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   await lightsControl.check();
   await trafficControl.check();
   await this.page.getByRole('radio', { name: background, exact: true }).check();
-  await this.page.waitForFunction(() => layers._layers.filter(entry => entry.overlay && pluginState(entry.layer)._3d)
-    .every(({ layer }) => pluginState(layer).root && pluginState(layer).renderer));
+  await this.page.waitForFunction(() => layers._layers.filter(entry => entry.overlay && globals.sceneByLayer.get(entry.layer)._3d)
+    .every(({ layer }) => globals.sceneByLayer.get(layer).root && globals.sceneByLayer.get(layer).renderer));
   const bothRestored = await this.page.evaluate(() => {
-    const overlays = layers._layers.filter(entry => entry.overlay && pluginState(entry.layer)._3d &&
-      !(pluginState(entry.layer)._type === 'terrain'))
+    const overlays = layers._layers.filter(entry => entry.overlay && globals.sceneByLayer.get(entry.layer)._3d &&
+      !(globals.sceneByLayer.get(entry.layer)._type === 'terrain'))
       .map(entry => entry.layer);
     const traffic = layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers();
     return traffic.length === 7 && traffic.every(layer => map.hasLayer(layer) &&
-      pluginState(layer).renderer === pluginState(overlays[0]).renderer) &&
+      globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(overlays[0]).renderer) &&
       overlays.every(layer => map.hasLayer(layer)) &&
-      overlays.every(layer => pluginState(layer).renderer === pluginState(overlays[0]).renderer) &&
+      overlays.every(layer => globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(overlays[0]).renderer) &&
       document.querySelectorAll('.leaflet-3d').length === 1;
   });
   this.exampleOverlayChecks = { trafficDisabled, towerDisabled, treesRetained, allDisabled, towerRestored, bothRestored };
   await this.page.evaluate(async () => {
     const { walk } = window.exampleOverlayBefore;
     walk.addTo(map);
-    await pluginState(walk._walk.layer)._added.promise;
+    await globals.sceneByLayer.get(walk._walk.layer)._added.promise;
   });
 });
 

@@ -1,5 +1,7 @@
+import { cameraByMap } from '../globals/cameraByMap.js';
+
 import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
-import { pluginState } from '../core/pluginState.js';
+
 import { updateSky } from './updateSky.js';
 import { constrainCameraToBounds } from './constrainCameraToBounds.js';
 import { cleanupCameraMap } from './cleanupCameraMap.js';
@@ -8,6 +10,7 @@ import { loadCameraControls } from '../controls/loadCameraControls.js';
 import { noOperation } from '../utils/noOperation.js';
 
 export function initializeCameraMap() {
+  cameraByMap.set(this, /* allocation: required -- Each map owns its camera and interaction data independently. */ {});
   if (!document.getElementById('leaflet-camera-zoom-style')) {
     const style = document.createElement('style');
     style.id = 'leaflet-camera-zoom-style';
@@ -21,7 +24,7 @@ export function initializeCameraMap() {
   this.once('unload', cleanupCameraMap, this);
   this.whenReady(cameraMapReady, this);
   if (this.options.rotate || this.options.trackContainerMutation) {
-    pluginState(this).cameraReady = loadCameraControls(this);
-    pluginState(this).cameraReady.catch(noOperation);
+    cameraByMap.get(this).cameraReady = loadCameraControls(this);
+    cameraByMap.get(this).cameraReady.catch(noOperation);
   }
 }

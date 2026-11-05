@@ -1,5 +1,7 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nextId } from '../globals/nextId.js';
+
+
 import { emptyNode } from '../scene/emptyNode.js';
 import { createProgram } from '../rendering/createProgram.js';
 
@@ -13,7 +15,7 @@ export function attachAreaMesh(context) {
     area.mesh = null, area.buildings = 0, area.skipped = context.skipped, area.done = true;
     return;
   }
-  const device = pluginState(backend).renderer.device;
+  const device = sceneByLayer.get(backend).renderer.device;
   const data = instanceAreaGeometry(context);
   const attributes = /* allocation: required -- Keep GPU attributes independent for this retained mesh. */ {
     position: /* allocation: required -- Retain typed vertex positions with this mesh. */ { size: 3, data: /* allocation: required -- Keep GPU-ready position data owned by this mesh. */ new Float32Array(data.positions) },
@@ -48,7 +50,7 @@ export function attachAreaMesh(context) {
         alphaMode: backend.options.nightLight ? 'BLEND' : undefined,
         doubleSided: Boolean(backend.options.nightLight),
       }),
-      id: sharedState.nextId++,
+      id: nextId.value++,
       renderOrder: 0,
       fadeDuration: 250,
       extras: /* allocation: required -- Keep picking ranges and lights tied to this mesh. */ { featureFaces: context.featureFaces, lights: context.lights },
@@ -56,6 +58,6 @@ export function attachAreaMesh(context) {
   area.buildings = context.featureFaces.length;
   area.skipped = context.skipped;
   area.done = true;
-  setParent(area.mesh, pluginState(backend).root);
+  setParent(area.mesh, sceneByLayer.get(backend).root);
   update(backend);
 }

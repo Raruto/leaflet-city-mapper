@@ -1,11 +1,12 @@
-import { state as sharedState } from '../state.js';
+import { dragStates } from '../globals/dragStates.js';
+
 import { mapStopPitchBearingAnimation } from '../camera/mapStopPitchBearingAnimation.js';
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
 export function cameraDragMove(event) {
-  const state = sharedState.dragStates.get(this);
+  const state = dragStates.value.get(this);
   if (!state.drag || state.drag.id !== event.pointerId) return;
   const x = event.clientX - state.drag.x, y = event.clientY - state.drag.y;
   if (Math.hypot(x, y) < 3 && !state.moved) return;

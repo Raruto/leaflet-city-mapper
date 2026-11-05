@@ -44,7 +44,11 @@ const buildings = CityMapper.layer({
 ```
 
 Plugin operations are standalone functions; native Leaflet instances and
-prototypes receive no additional attributes. Internal state lives in `WeakMap`s.
+prototypes receive no additional attributes. Internal data lives in dedicated
+`WeakMap`s in `src/globals/`, imported directly (for example,
+`cameraByMap.get(map)` and `sceneByLayer.get(layer)`). Operations are
+standalone functions, not methods stored alongside instance data; there is no
+generic per-instance state accessor.
 This replaces the previous `new L.Layer({ source: ... })`, `layer.ready`,
 `layer.setData(...)` and `map.setPitch(...)` API:
 
@@ -67,7 +71,11 @@ chain Leaflet methods normally, but call subsequent plugin operations separately
 Existing native methods are still overridden where needed for GPU integration.
 `CityMapper.getLocation(layer)` returns the source origin for application data loaders.
 
-The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`. Shared constants and module-level state live in the single exported `state` object in [`src/state.js`](./src/state.js); per-instance state stays in its `WeakMap`.
+The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`. Each shared value has its own module in [`src/globals/`](./src/globals/), exporting one `const` matching the filename. Consumers import only the values they use, without a shared-state aggregator. Reassignable values use a dedicated `{ value }` cell; arrays, maps and other stable objects are exported directly. Associations with native instances contain data only, grouped by feature in dedicated `WeakMap`s.
+
+Global names describe their role concisely (for example, `shadowPipeline`,
+`roofBindGroup` and `cameraAngles`), without allocation prefixes, caller names or
+numeric suffixes. Import them without aliases unless a local name conflicts.
 
 Raster imagery blends coarse-to-fine on the terrain, retaining depth occlusion for 3D objects.
 
@@ -123,7 +131,7 @@ Leaflet versions with `node build/test.js --name "The plugin does not add attrib
 
 The source-style tests also reject object literals, array literals and `new`
 expressions inside every function in `src`, including default parameters and
-returned values. Module-level initialization in `src/state.js` is allowed.
+returned values. Module-level initialization in `src/globals/` is allowed.
 Necessary allocations require a separate comment immediately before the expression:
 `/* allocation: required -- Each caller owns its result. */`.
 The exception covers only that expression, not nested allocations or a whole
@@ -131,12 +139,12 @@ function; malformed and unused exceptions fail the check. Each exception must be
 reviewed and covered by a behavior test (for example, independent archive headers).
 Camera sky updates reuse a projection buffer owned by each time control.
 `projectCelestialBody` and `mix` accept an optional final output buffer; omitting
-it still returns an independent result. Atmosphere color stops live in `state`,
+it still returns an independent result. Atmosphere color stops live in their global module,
 while returned tints remain independent.
 Sun and Moon share date/location validation; lunar calculations do not build a
 discarded solar result. Simulation events retain their own date snapshots.
-Rendering and shadow passes reuse synchronous WebGPU descriptor scratch in
-`state`; GPU-resource references are cleared after submission to the API.
+Rendering and shadow passes reuse synchronous WebGPU descriptor scratch from
+`src/globals/`; GPU-resource references are cleared after submission to the API.
 Programs retain independent uniforms and vertex-buffer slot lists, with frozen
 shared vertex-attribute layouts. Raster request queues and emitted event payloads
 remain independent where listeners can reenter loading or retain a snapshot.
@@ -159,7 +167,7 @@ Leaflet package during tests; Leaflet 2 still loads from the CDN.
 ```text
 src/
   index.js           Public entry point and source registration
-  state.js           Single shared state object and constants
+  globals/           One shared constant or mutable cell per module
   camera/            Camera API, projection and animation
   controls/          Compass, dragging, touch and resizing
   core/              Leaflet layer integration, events, mutations and overlays

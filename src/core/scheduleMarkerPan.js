@@ -1,9 +1,11 @@
-import { state as sharedState } from '../state.js';
+import { pendingMarkerPan } from '../globals/pendingMarkerPan.js';
+import { markerPanFrame } from '../globals/markerPanFrame.js';
+
 
 import { runMarkerPanFrame } from './runMarkerPanFrame.js';
 
 export function scheduleMarkerPan(drag, event) {
-  sharedState.pendingMarkerPan.set(drag, event);
-  if (sharedState.markerPanFrame === null) sharedState.markerPanFrame = requestAnimationFrame(runMarkerPanFrame);
-  drag._panRequest = sharedState.markerPanFrame;
+  pendingMarkerPan.set(drag, event);
+  if (markerPanFrame.value === null) markerPanFrame.value = requestAnimationFrame(runMarkerPanFrame);
+  drag._panRequest = markerPanFrame.value;
 }

@@ -1,10 +1,11 @@
-import { state as sharedState } from '../state.js';
+import { markerMethods } from '../globals/markerMethods.js';
+
 import { markerCameraIconPoint } from './markerCameraIconPoint.js';
 
 import { displayPoint } from '../camera/displayPoint.js';
 
 export function markerSetPos(point) {
-  sharedState.markerMethods._setPos.call(this, displayPoint(this._map, point));
+  markerMethods.value._setPos.call(this, displayPoint(this._map, point));
   let i, element, key, direction, options, anchor;
   for (i = 0; i < 2; i++) {
     element = i ? this._shadow : this._icon;

@@ -1,12 +1,15 @@
-import { pluginState } from './pluginState.js';
+import { dragByHandler } from '../globals/dragByHandler.js';
+
+
 import { cameraMarkerOnDrag } from './cameraMarkerOnDrag.js';
 import { adjustCameraMarkerPan } from './adjustCameraMarkerPan.js';
 
 export function cameraMarkerDrag() {
-  if (!this.dragging || pluginState(this.dragging)._cameraDrag) return;
+  if (!this.dragging || dragByHandler.has(this.dragging)) return;
   const drag = this.dragging, original = drag._onDrag, adjustPan = drag._adjustPan;
-  pluginState(drag)._cameraOriginalOnDrag = original;
-  pluginState(drag)._cameraOriginalAdjustPan = adjustPan;
+  dragByHandler.set(drag, /* allocation: required -- Preserve each native drag handler's original callbacks for delegated behavior. */ {
+    _cameraOriginalOnDrag: original, _cameraOriginalAdjustPan: adjustPan,
+  });
   drag._onDrag = cameraMarkerOnDrag;
   drag._adjustPan = adjustCameraMarkerPan;
   // The handler may already be enabled and listening with its original method.
@@ -15,5 +18,4 @@ export function cameraMarkerDrag() {
     drag._draggable.off('drag', original, drag);
     drag._draggable.on('drag', drag._onDrag, drag);
   }
-  pluginState(drag)._cameraDrag = true;
 }

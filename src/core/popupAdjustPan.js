@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { popupPan } from '../globals/popupPan.js';
+
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
@@ -6,7 +7,7 @@ import { pointOf } from '../camera/pointOf.js';
 
 export function popupAdjustPan() {
   const map = this._map;
-  if (!mapGetPitch(map) && !mapGetBearing(map)) return sharedState.popupPan.call(this);
+  if (!mapGetPitch(map) && !mapGetBearing(map)) return popupPan.value.call(this);
   if (!this.options.autoPan) return;
   if (map._panAnim) map._panAnim.stop();
   if (this._autopanning) { this._autopanning = false; return; }

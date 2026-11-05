@@ -1,5 +1,10 @@
-import { state as sharedState } from '../state.js';
-import { pluginState } from '../core/pluginState.js';
+import { speed as sharedSpeed } from '../globals/speed.js';
+import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
+import { vehicles } from '../globals/vehicles.js';
+import { trafficShader } from '../globals/trafficShader.js';
+import { trafficByLayer } from '../globals/trafficByLayer.js';
+
+
 ﻿/**
  * Vehicles moving along GeoJSON lanes; a compute pass places them on the GPU every frame.
  * Source options:
@@ -24,8 +29,8 @@ import { tickTraffic } from './tickTraffic.js';
 import { updateTraffic } from './updateTraffic.js';
 import { updateTrafficTerrain } from './updateTrafficTerrain.js';
 
-export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = sharedState.speed, ...options } = sharedState.allocationTrafficEmptyOptions) {
-  const { model, lights, side: defaultSide } = sharedState.vehicles[vehicle];
+export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = sharedSpeed, ...options } = trafficEmptyOptions) {
+  const { model, lights, side: defaultSide } = vehicles[vehicle];
   side ??= defaultSide;
   init3D(layer, /* allocation: required -- Each traffic layer retains its own source and tooltip options. */ {
     tooltip,
@@ -47,11 +52,11 @@ export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed:
     lanesDirty: true, stale: false, loaded: undefined, file: undefined,
   };
   // Lane points are [x, z, ground, cumulative length]. Mirrors along() and place().
-  state.shader = sharedState.trafficShader;
+  state.shader = trafficShader;
   state.tick = tickTraffic.bind(null, state);
   state.update = updateTraffic.bind(null, state);
   state.terrain = updateTrafficTerrain.bind(null, state);
-  pluginState(layer)._beforeRaycast = placeTraffic.bind(null, state);
+  trafficByLayer.set(layer, state);
   layer.on('ready', readyTraffic.bind(null, state));
   layer.on('add', addTraffic.bind(null, state));
   layer.on('remove', removeTraffic.bind(null, state));

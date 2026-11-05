@@ -1,4 +1,5 @@
-import { state as sharedState } from '../state.js';
+import { nativeEventMaps } from '../globals/nativeEventMaps.js';
+
 
 export function removeNativeEvents(state) {
   const context = state._nativeEventContext;
@@ -12,5 +13,5 @@ export function removeNativeEvents(state) {
   state._nativeEventContext = null;
   if (context.states.size) return;
   context.restore();
-  sharedState.nativeEventMaps.delete(map);
+  nativeEventMaps.delete(map);
 }

@@ -1,4 +1,6 @@
-import { pluginState } from '../core/pluginState.js';
+import { sceneByLayer } from '../globals/sceneByLayer.js';
+
+
 import { update as updateScene } from '../scene/update.js';
 import { tripsAt } from './tripsAt.js';
 import { trafficNow } from './trafficNow.js';
@@ -12,7 +14,7 @@ import { locateTraffic } from './locateTraffic.js';
 export function tickTraffic(state) {
   state.frame = undefined;
   if (!state.ready || !state.layer._map) return;
-  if (!pluginState(state.layer).renderer) { state.frame = requestAnimationFrame(state.tick); return; }
+  if (!sceneByLayer.get(state.layer).renderer) { state.frame = requestAnimationFrame(state.tick); return; }
   if (state.mesh && !(state.mesh.geometry.attributes.position.buffer.usage & GPUBufferUsage.STORAGE)) {
     state.tripsKey = null;
     state.nextCheck = -Infinity;
