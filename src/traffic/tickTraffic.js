@@ -27,7 +27,7 @@ export function tickTraffic(state) {
     try {
       if (valid) state.trips = tripsAt(time, state.lanes, state.velocity);
       else state.trips.length = 0;
-      text = !valid ? 'Select a valid simulation date' : !state.loaded ? 'Loading…' :
+      text = !valid ? `${state.vehicle}: select a valid simulation date` : !state.loaded ? `${state.vehicle}: loading…` :
         `${state.trips.length} ${state.vehicle === 'boat' ? 'boats' : state.vehicle}`;
     } catch (error) { return failTraffic(state, error); }
     state.rebasedAt = ms;

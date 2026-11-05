@@ -9819,6 +9819,106 @@
     }
   }
 
+  // src/scene/placeEntry.js
+  init_L();
+  function placeEntry(map, layer, element) {
+    let input, entry, label, group;
+    for (input of map.getContainer().querySelectorAll(".leaflet-control-layers-selector")) {
+      entry = map._layers[input.layerId];
+      if (input.layerId === L.Util.stamp(layer) || entry instanceof L.LayerGroup && entry.hasLayer(layer)) {
+        label = input.closest("label");
+        if (element.classList.contains("layer-count")) {
+          if (!input.hasAttribute("aria-label")) input.setAttribute("aria-label", label.textContent.trim());
+          element.id = `leaflet-layer-count-${L.Util.stamp(layer)}`;
+          input.setAttribute("aria-describedby", element.id);
+          label.append(element);
+        } else if (element.classList.contains("traffic-status")) {
+          group = label.nextElementSibling;
+          if (!group?.classList.contains("traffic-status-group")) {
+            group = L.DomUtil.create("div", "traffic-status-group");
+            group.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;max-width:200px;margin:2px 0 6px 20px;";
+            group.setAttribute("role", "group");
+            group.setAttribute("aria-label", "Traffic counts");
+            label.after(group);
+          }
+          group.append(element);
+        } else label.after(element);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // src/scene/placeUnderEntry.js
+  function placeUnderEntry(state) {
+    const nested = placeEntry(state.map, state.layer, state.element);
+    const onPlace = state.onPlace;
+    onPlace?.(nested);
+    return nested;
+  }
+
+  // src/globals/pendingPlacements.js
+  var pendingPlacements = [];
+
+  // src/scene/runPlacements.js
+  function runPlacements() {
+    const state = pendingPlacements.shift();
+    if (state?.map.hasLayer(state.layer)) placeUnderEntry(state);
+  }
+
+  // src/scene/replaceEntry.js
+  function replaceEntry() {
+    pendingPlacements.push(this);
+    queueMicrotask(runPlacements);
+  }
+
+  // src/scene/removeEntry.js
+  function removeEntry() {
+    this.map.off("layeradd layerremove", replaceEntry, this);
+    const group = this.element.parentElement;
+    this.element.remove();
+    if (group?.classList.contains("traffic-status-group") && !group.childElementCount) group.remove();
+  }
+
+  // src/scene/underEntry.js
+  function underEntry(layer, element, onPlace) {
+    const state = (
+      /* alloc */
+      { map: layer._map, layer, element, onPlace }
+    );
+    state.map.on("layeradd layerremove", replaceEntry, state);
+    layer.once("remove", removeEntry, state);
+    return placeUnderEntry(state);
+  }
+
+  // src/scene/updateLayerCount.js
+  function updateLayerCount(event) {
+    const layer = event.target, scene = sceneByLayer.get(layer), status = scene._countStatus;
+    if (!layer._map) return;
+    if (event.type === "add") underEntry(layer, status);
+    let count = 0, pending = 0, error = event.error, area2;
+    if (Number.isFinite(event.loaded)) {
+      count = event.loaded;
+      pending = event.pending ?? 0;
+      error ||= event.errors?.[0];
+    } else {
+      for (area2 of scene._areas.values()) {
+        count += area2.buildings ?? 0;
+        if (!area2.done && !area2.error) pending++;
+        error ||= area2.error;
+      }
+    }
+    if (scene.modelUrl) count = scene.model ? 1 : 0;
+    const loading2 = pending || (scene.modelUrl ? !scene.model : !scene.header && !scene._geojson);
+    const formatted = count.toLocaleString("en-US");
+    const text = error ? "Error" : `${formatted}${loading2 ? "\u2026" : ""}`;
+    const title = error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
+    if (status.textContent !== text) status.textContent = text;
+    if (status.title !== title) status.title = title;
+    if (error && status.getAttribute("role") !== "alert") status.setAttribute("role", "alert");
+    else if (!error && status.hasAttribute("role")) status.removeAttribute("role");
+  }
+
   // src/scene/init3D.js
   function init3D(layer, options = sceneEmptyOptions) {
     sceneByLayer.get(layer)._3d = true;
@@ -9843,6 +9943,13 @@
     sceneByLayer.get(layer)._areas = /* alloc */
     /* @__PURE__ */ new Map();
     sceneByLayer.get(layer)._inflight = 0;
+    if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson || isModel) {
+      const status = L.DomUtil.create("small", "layer-count");
+      status.style.cssText = "float:right;margin-left:12px;color:#555;font-variant-numeric:tabular-nums";
+      sceneByLayer.get(layer)._countStatus = status;
+      layer.on("add error", updateLayerCount);
+      layer.on("ready progress", L.Util.throttle(updateLayerCount, 250, layer));
+    }
     sceneByLayer.get(layer)._added = Promise.withResolvers();
     sceneByLayer.get(layer).ready = Promise.resolve().then(ready3D.bind(null, layer));
     sceneByLayer.get(layer).ready.catch(noOperation);
@@ -11487,60 +11594,6 @@
     return state.container;
   }
 
-  // src/scene/placeEntry.js
-  init_L();
-  function placeEntry(map, layer, element) {
-    let input, entry;
-    for (input of map.getContainer().querySelectorAll(".leaflet-control-layers-selector")) {
-      entry = map._layers[input.layerId];
-      if (input.layerId === L.Util.stamp(layer) || entry instanceof L.LayerGroup && entry.hasLayer(layer)) {
-        input.closest("label").after(element);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // src/scene/placeUnderEntry.js
-  function placeUnderEntry(state) {
-    const nested = placeEntry(state.map, state.layer, state.element);
-    const onPlace = state.onPlace;
-    onPlace?.(nested);
-    return nested;
-  }
-
-  // src/globals/pendingPlacements.js
-  var pendingPlacements = [];
-
-  // src/scene/runPlacements.js
-  function runPlacements() {
-    const state = pendingPlacements.shift();
-    if (state?.map.hasLayer(state.layer)) placeUnderEntry(state);
-  }
-
-  // src/scene/replaceEntry.js
-  function replaceEntry() {
-    pendingPlacements.push(this);
-    queueMicrotask(runPlacements);
-  }
-
-  // src/scene/removeEntry.js
-  function removeEntry() {
-    this.map.off("layeradd layerremove", replaceEntry, this);
-    this.element.remove();
-  }
-
-  // src/scene/underEntry.js
-  function underEntry(layer, element, onPlace) {
-    const state = (
-      /* alloc */
-      { map: layer._map, layer, element, onPlace }
-    );
-    state.map.on("layeradd layerremove", replaceEntry, state);
-    layer.once("remove", removeEntry, state);
-    return placeUnderEntry(state);
-  }
-
   // src/sunlight/initialize.js
   init_L();
 
@@ -12387,7 +12440,7 @@
   // src/traffic/failTraffic.js
   function failTraffic(state, error) {
     state.error = error;
-    state.status.textContent = `Error: ${error.message}`;
+    state.status.textContent = `${state.vehicle}: Error: ${error.message}`;
     state.status.setAttribute("role", "alert");
     console.error("Traffic layer", error);
   }
@@ -12716,7 +12769,7 @@
       try {
         if (valid) state.trips = tripsAt(time, state.lanes, state.velocity);
         else state.trips.length = 0;
-        text = !valid ? "Select a valid simulation date" : !state.loaded ? "Loading\u2026" : `${state.trips.length} ${state.vehicle === "boat" ? "boats" : state.vehicle}`;
+        text = !valid ? `${state.vehicle}: select a valid simulation date` : !state.loaded ? `${state.vehicle}: loading\u2026` : `${state.trips.length} ${state.vehicle === "boat" ? "boats" : state.vehicle}`;
       } catch (error) {
         return failTraffic(state, error);
       }
@@ -12938,7 +12991,9 @@
       }
     );
     const status = L.DomUtil.create("small", "traffic-status");
-    status.style.cssText = "display:block;max-width:200px;margin:0 0 4px 20px;color:#555;";
+    status.style.cssText = "flex:0 1 auto;padding:1px 5px;border-radius:3px;background:#00000008;color:#555;";
+    status.title = vehicle;
+    status.textContent = `${vehicle}: loading\u2026`;
     const template = build(model(0)), stride = template.position.length, vertices = stride / 3;
     const params = (
       /* alloc */

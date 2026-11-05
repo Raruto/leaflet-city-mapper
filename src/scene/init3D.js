@@ -15,6 +15,7 @@ import { loadModel } from '../models/loadModel.js';
 import { get3DEvents } from './get3DEvents.js';
 import { ready3D } from './ready3D.js';
 import { noOperation } from '../utils/noOperation.js';
+import { updateLayerCount } from './updateLayerCount.js';
 
 export function init3D(layer, options = sceneEmptyOptions) {
   sceneByLayer.get(layer)._3d = true;
@@ -29,6 +30,13 @@ export function init3D(layer, options = sceneEmptyOptions) {
   }
   sceneByLayer.get(layer)._areas = /* alloc */ new Map();
   sceneByLayer.get(layer)._inflight = 0;
+  if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson || isModel) {
+    const status = L.DomUtil.create('small', 'layer-count');
+    status.style.cssText = 'float:right;margin-left:12px;color:#555;font-variant-numeric:tabular-nums';
+    sceneByLayer.get(layer)._countStatus = status;
+    layer.on('add error', updateLayerCount);
+    layer.on('ready progress', L.Util.throttle(updateLayerCount, 250, layer));
+  }
   sceneByLayer.get(layer)._added = Promise.withResolvers();
   sceneByLayer.get(layer).ready = Promise.resolve().then(ready3D.bind(null, layer));
   sceneByLayer.get(layer).ready.catch(noOperation);

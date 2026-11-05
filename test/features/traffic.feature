@@ -1,5 +1,10 @@
 Feature: Traffic lanes, flows and timetables
 
+  @coverage
+  Scenario: Traffic counts share a compact wrapping group
+    Given a leaflet map
+    Then traffic counts wrap together and clean up across layer toggles
+
   @unit
   Scenario: Traffic allocation cleanup preserves route geometry and result ownership
     Then traffic scratch preserves route vertices and independent lane and pose results

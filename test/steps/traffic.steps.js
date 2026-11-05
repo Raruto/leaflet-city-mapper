@@ -19,6 +19,53 @@ const [cruise] = JSON.parse(readFileSync(new URL('../../examples/data/seine-crui
 const cruises = date => scheduledTrips(date, cruise.properties.timetable);
 const route = cruise.geometry.coordinates;
 
+Then('traffic counts wrap together and clean up across layer toggles', async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    const url = `data:application/json,${encodeURIComponent(JSON.stringify({ type: 'FeatureCollection', features: [] }))}`;
+    const modes = ['car', 'bus', 'boat', 'bicycle', 'pedestrian', 'tram', 'metro'];
+    const traffic = modes.map(vehicle => new L.Layer({ source: { type: 'traffic', url, vehicle } }));
+    const group = new L.LayerGroup(traffic);
+    const control = new L.Control.Layers({}, { Traffic: group }, { collapsed: false }).addTo(map);
+    group.addTo(map);
+    await Promise.all(traffic.map(layer => nativeChecks.ready(layer)));
+    const deadline = performance.now() + 5000;
+    while (traffic.some(layer => !globals.trafficByLayer.get(layer)?.loaded)) {
+      if (performance.now() > deadline) throw new Error('Traffic did not load');
+      await new Promise(requestAnimationFrame);
+    }
+    const container = control.getContainer();
+    const box = container.querySelector('.traffic-status-group');
+    const statuses = [...box.children];
+    const rects = statuses.map(element => element.getBoundingClientRect());
+    const compact = new Set(rects.map(rect => rect.top)).size < modes.length;
+    const contained = rects.every(rect => rect.right <= box.getBoundingClientRect().right + 1);
+    const named = modes.every(mode => statuses.some(element => element.title === mode));
+    const extra = new L.LayerGroup();
+    control.addOverlay(extra, 'Extra');
+    extra.addTo(map);
+    await new Promise(queueMicrotask);
+    const rebuilt = container.querySelectorAll('.traffic-status-group').length === 1 &&
+      container.querySelectorAll('.traffic-status').length === modes.length;
+    group.remove();
+    await new Promise(queueMicrotask);
+    const removed = !container.querySelector('.traffic-status-group');
+    group.addTo(map);
+    await new Promise(queueMicrotask);
+    const restored = container.querySelectorAll('.traffic-status-group').length === 1 &&
+      container.querySelectorAll('.traffic-status').length === modes.length;
+    group.removeLayer(traffic[0]);
+    await new Promise(queueMicrotask);
+    const partial = container.querySelectorAll('.traffic-status').length === modes.length - 1;
+    group.remove();
+    extra.remove();
+    control.remove();
+    return { compact, contained, named, rebuilt, removed, restored, partial };
+  });
+  assert.deepEqual(result, { compact: true, contained: true, named: true, rebuilt: true,
+    removed: true, restored: true, partial: true });
+});
+
 Then('traffic scratch preserves route vertices and independent lane and pose results', function () {
   const points = [[0, 0, 10], [60, 0, 16]], lengths = [0, 60];
   const first = along(points, lengths, 15), second = along(points, lengths, 45), target = {};

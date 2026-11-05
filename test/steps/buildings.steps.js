@@ -5,6 +5,69 @@ import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { prepare3DChecks } from './3d.steps.js';
 
+Then('layer counts report loaded elements and survive toggling and failures', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    const data = { type: 'FeatureCollection', features: [
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon',
+        coordinates: [[[2.29, 48.85], [2.291, 48.85], [2.291, 48.851], [2.29, 48.85]]] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'Polygon',
+        coordinates: [[[2.292, 48.85], [2.293, 48.85], [2.293, 48.851], [2.292, 48.85]]] } },
+    ] };
+    const layer = new L.Layer({ source: { type: 'geojson', data, style: () => ({ top: 8 }) } });
+    const control = new L.Control.Layers({}, { Buildings: layer }, { collapsed: false }).addTo(map);
+    layer.addTo(map);
+    await nativeChecks.ready(layer);
+    const deadline = performance.now() + 10000;
+    while (globals.sceneByLayer.get(layer)._inflight || !layer._map.getContainer().querySelector('.layer-count') ||
+      globals.sceneByLayer.get(layer)._countStatus.textContent !== '2') {
+      if (performance.now() > deadline) throw new Error('Layer count did not settle');
+      await new Promise(requestAnimationFrame);
+    }
+    const count = control.getContainer().querySelector('.layer-count');
+    const initial = count.textContent;
+    const named = count.closest('label').querySelector('input').getAttribute('aria-label') === 'Buildings';
+    const description = count.title.includes('current area');
+    const extra = new L.LayerGroup();
+    control.addOverlay(extra, 'Extra');
+    map.addLayer(extra);
+    await new Promise(queueMicrotask);
+    const rebuilt = control.getContainer().querySelectorAll('.layer-count').length === 1;
+    layer.fire('error', { error: new Error('Test failure') });
+    const failed = count.textContent === 'Error' && count.title.includes('Test failure') && count.getAttribute('role') === 'alert';
+    layer.fire('progress');
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const recovered = count.textContent === '2' && !count.hasAttribute('role');
+    const mutations = [];
+    const observer = new MutationObserver(records => mutations.push(...records));
+    observer.observe(count, { childList: true, attributes: true });
+    for (let i = 0; i < 1000; i++) layer.fire('progress', { loaded: 2, pending: 0, errors: [] });
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const unchangedWrites = mutations.length;
+    for (let i = 0; i < 1000; i++) layer.fire('progress', { loaded: i + 3, pending: 0, errors: [] });
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const textWrites = mutations.filter(record => record.type === 'childList').length;
+    const throttled = textWrites > 0 && textWrites <= 2 && count.textContent === '1,002';
+    observer.disconnect();
+    layer.remove();
+    await new Promise(queueMicrotask);
+    const removed = !control.getContainer().querySelector('.layer-count');
+    layer.addTo(map);
+    const restoreDeadline = performance.now() + 10000;
+    while (globals.sceneByLayer.get(layer)._countStatus.textContent !== '2') {
+      if (performance.now() > restoreDeadline) throw new Error('Layer count did not recover');
+      await new Promise(requestAnimationFrame);
+    }
+    const restored = control.getContainer().querySelectorAll('.layer-count').length === 1;
+    layer.remove();
+    extra.remove();
+    control.remove();
+    return { initial, named, description, rebuilt, failed, recovered, unchangedWrites, throttled, removed, restored };
+  });
+  assert.deepEqual(result, { initial: '2', named: true, description: true, rebuilt: true,
+    failed: true, recovered: true, unchangedWrites: 0, throttled: true, removed: true, restored: true });
+});
+
 Then('source layers share load slots and start nearby blocks before distant ones', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;

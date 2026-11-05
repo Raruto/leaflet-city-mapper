@@ -1,5 +1,9 @@
 @coverage
 Feature: Building volumes from PMTiles
+  Scenario: Layer counts follow loaded geometry and control rebuilds
+    Given a leaflet map
+    Then layer counts report loaded elements and survive toggling and failures
+
   Scenario: Nearby source blocks share priority across layers
     Given a leaflet map
     Then source layers share load slots and start nearby blocks before distant ones

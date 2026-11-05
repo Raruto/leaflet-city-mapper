@@ -39,7 +39,9 @@ export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed:
     ...options,
   });
   const status = L.DomUtil.create('small', 'traffic-status');
-  status.style.cssText = 'display:block;max-width:200px;margin:0 0 4px 20px;color:#555;';
+  status.style.cssText = 'flex:0 1 auto;padding:1px 5px;border-radius:3px;background:#00000008;color:#555;';
+  status.title = vehicle;
+  status.textContent = `${vehicle}: loading…`;
   const template = build(model(0)), stride = template.position.length, vertices = stride / 3;
   const params = /* alloc */ new ArrayBuffer(16);
   const paramFloats = /* alloc */ new Float32Array(params);
