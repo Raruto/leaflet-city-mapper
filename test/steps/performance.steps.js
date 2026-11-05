@@ -279,3 +279,38 @@ Then('the PMTiles header decoder reuses one counter across its three loops', asy
     .flatMap(node => node.declarations.flatMap(declaration => bindingNames(declaration.id)));
   assert.equal(names.filter(name => counters.has(name)).length, 1);
 });
+
+function inspectStandaloneBlocks(node, parent, file, errors) {
+  if (!node || typeof node.type !== 'string') return;
+  if (node.type === 'BlockStatement' &&
+      ['Program', 'BlockStatement', 'SwitchCase', 'LabeledStatement'].includes(parent?.type)) {
+    errors.push(`${file}:${node.loc.start.line} standalone scope; reuse local variables before sequential loops instead of wrapping them in blocks`);
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) inspectStandaloneBlocks(child, node, file, errors);
+    } else if (value && typeof value.type === 'string') {
+      inspectStandaloneBlocks(value, node, file, errors);
+    }
+  }
+}
+
+Then('standalone scope checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    const errors = [];
+    inspectStandaloneBlocks(parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true }),
+      null, 'example.js', errors);
+    assert.equal(errors.length, Number(violations), source);
+  }
+});
+
+Then('source files contain no standalone block scopes', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    inspectStandaloneBlocks(parse(await readFile(file, 'utf8'),
+      { ecmaVersion: 'latest', sourceType: 'module', locations: true }), null, file, errors);
+  }
+  assert.equal(errors.length, 0, `${errors.length} standalone source scopes:\n${errors.join('\n')}`);
+});

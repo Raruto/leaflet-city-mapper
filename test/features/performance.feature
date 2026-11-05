@@ -127,3 +127,28 @@ Feature: Performance-oriented source style
   @unit
   Scenario: Sequential header loops reuse one local counter
     Then the PMTiles header decoder reuses one counter across its three loops
+
+  @unit
+  Scenario: Standalone scopes cannot bypass loop variable reuse
+    Then standalone scope checks handle these modules:
+      | source                                                                                              | violations |
+      | function f() { let i; for (i = 0; i < 2; i++) {} for (i = 0; i < 3; i++) {} }                         | 0          |
+      | function f() { { let i; for (i = 0; i < 2; i++) {} } }                                               | 1          |
+      | function f() { { let i; for (i = 0; i < 2; i++) {} } { let i; for (i = 0; i < 3; i++) {} } }         | 2          |
+      | { let i; for (i = 0; i < 2; i++) {} }                                                               | 1          |
+      | function f() { {} }                                                                                 | 1          |
+      | function f() { { {} } }                                                                             | 2          |
+      | function f() { scope: { let i; for (i = 0; i < 2; i++) {} } }                                         | 1          |
+      | function f() { if (ready) { {} } }                                                                  | 1          |
+      | function f() { if (ready) { run(); } else { stop(); } }                                              | 0          |
+      | function f() { while (ready) { run(); } do { run(); } while (ready); }                                | 0          |
+      | function f() { try { run(); } catch (error) { report(error); } finally { stop(); } }                  | 0          |
+      | function f() { switch (value) { case 1: { run(); break; } } }                                        | 1          |
+      | function f() { switch (value) { case 1: run(); break; } }                                            | 0          |
+      | function f() { let i; outer: for (i = 0; i < 2; i++) { if (ready) break outer; } }                    | 0          |
+      | class Example { method() { return {}; } static {} }                                                 | 0          |
+      | function f() { return '{ let i; for (i = 0; i < 2; i++) {} }'; /* {} */ }                            | 0          |
+
+  @unit
+  Scenario: Source files do not introduce standalone scopes
+    Then source files contain no standalone block scopes
