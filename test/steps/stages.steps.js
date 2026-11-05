@@ -619,7 +619,7 @@ Then('roof and uniform stages preserve GPU uploads and resource reuse', async fu
     const image = {};
     const tile = { coords: { x: 0, y: 0, z: 0 }, done: true, request: new AbortController(), image,
       texture: { texture: { width: 256, height: 256, createView: () => ({}) }, image, uploaded: null } };
-    const raster = { id: 1, _type: 'pmtiles', _rasterVersion: 1, _rasterTiles: new Map([['tile', tile]]),
+    const raster = { id: 1, kind: 'raster', _type: 'pmtiles', _rasterVersion: 1, _rasterTiles: new Map([['tile', tile]]),
       options: { opacity: 0.5, zIndex: 1 } };
     globals.sceneByLayer.set(raster, raster);
     const backend = {

@@ -12,7 +12,7 @@ export function local(output) {
   const p = crs.project(state.latlng), terrain = sceneByLayer.get(cameraByMap.get(map)._terrain3D)?._terrainReady && cameraByMap.get(map)._terrain3D;
   const ground = (terrain && getElevation(terrain, state.latlng)) || 0;
   output[0] = (p.x - origin.x) * metres;
-  output[1] = ground - sceneByLayer.get(layer).root.position[1];
+  output[1] = ground + (state.height ?? 0) - sceneByLayer.get(layer).root.position[1];
   output[2] = -(p.y - origin.y) * metres;
   return output;
 }

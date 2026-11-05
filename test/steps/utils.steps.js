@@ -4,9 +4,23 @@ import { mockLeaflet } from '../fixtures/leaflet.js';
 
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { Script } from 'node:vm';
 import { Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
+
+Then('every demo data file fits the GitHub upload size limit', async function () {
+  const directory = fileURLToPath(new URL('../../examples/data/', import.meta.url));
+  const limit = 100 * 1024 * 1024, oversized = [];
+  for (const name of await readdir(directory, { recursive: true })) {
+    const info = await stat(join(directory, name));
+    if (info.isFile() && info.size > limit) oversized.push(`${name}: ${info.size} bytes (limit ${limit})`);
+  }
+  assert.deepEqual(oversized, [], 'Demo data files must fit the GitHub 100 MiB per-file Git limit');
+});
+
 import { parseColor } from '../../src/utils/parseColor.js';
 import { triangulate } from '../../src/triangulation/triangulate.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
@@ -79,6 +93,34 @@ import { addBridges } from '../../src/geometry/addBridges.js';
 import { quad } from '../../src/geometry/quad.js';
 import { ring as lampRing } from '../../src/geometry/lampRing.js';
 import { ring as treeRing } from '../../src/geometry/treeRing.js';
+
+Then('the build generates readable and minified bundles and standalone compatibility files', async function () {
+  const load = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
+  const [minified, readable, bindings, minifiedBindings] = await Promise.all([
+    'dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
+    'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
+  ].map(load));
+  for (const source of [minified, readable, bindings, minifiedBindings]) assert.doesNotThrow(() => new Script(source));
+  assert.ok(readable.length > minified.length);
+  assert.ok(readable.split('\n').length > minified.split('\n').length * 10);
+  assert.ok(minifiedBindings.length < bindings.length);
+  for (const source of [bindings, minifiedBindings]) {
+    assert.ok(source.includes('.ol-city-tooltip'));
+    assert.ok(source.includes('openlayersBindings'));
+  }
+  for (const path of ['dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
+    'libs/openlayers-bindings.min.js']) {
+    const source = await load(path), map = JSON.parse(await load(`${path}.map`));
+    assert.ok(source.includes(`sourceMappingURL=${path.split('/').pop()}.map`));
+    assert.ok(map.sources.length > 0);
+    assert.equal(map.sources.length, map.sourcesContent.length);
+    assert.ok(map.sources.every(name => path.startsWith('dist/') ? name.startsWith('../src/') : !name.includes('examples/')));
+    if (path.startsWith('dist/')) {
+      assert.ok(map.sources.every(name => !name.includes('openlayers-bindings')));
+      assert.ok(map.sourcesContent.some(content => content.includes('/* wgsl */')));
+    }
+  }
+});
 
 Then('preallocated geometry arrays retain their shape and ownership', function () {
   for (const [ring, directions] of [[lampRing, globals.lampDirections], [treeRing, globals.ringDirections]]) {
@@ -869,6 +911,25 @@ const checks = {
     assert.match(textured.vertex, /fn elevation\(\)/);
     assert.match(textured.fragment, /input.localPosition/);
     assert.equal(textured.hasTerrain, true);
+    const walls = materialShaders({ wallTexture: true });
+    assert.deepEqual(walls.bindings, [{ name: 'roofTexture', texture: 3, sampler: 4 }]);
+    assert.match(walls.vertex, /true && abs\(input.normal.y\) < 0.5/);
+    assert.match(walls.vertex, /false && input.normal.y >= 0.5/);
+    for (const name of ['roofTexture', 'wallTexture']) {
+      for (const opacity of [false, true, 0, 0.25, 0.75, 1]) {
+        const shader = materialShaders({ [name]: opacity });
+        if (opacity) {
+          assert.ok(shader.vertex.includes(name === 'wallTexture'
+            ? `select(${Number(opacity).toFixed(8)}, 0.00000000`
+            : `select(0.00000000, ${Number(opacity).toFixed(8)}`));
+          assert.match(shader.fragment, /input.roof > 0.0/);
+        } else assert.deepEqual(shader.bindings, []);
+      }
+      for (const opacity of [-1, 1.1, NaN, Infinity, '0.5', null]) {
+        assert.throws(() => materialShaders({ [name]: opacity }),
+          new RegExp(`${name} must be a boolean or a finite number between 0 and 1`));
+      }
+    }
     assert.match(plain.fragment, /appearance\(input.position.xy\)/);
     const mesh = (id, depth, transparent = false) => ({ id, _sortDepth: depth, program: { transparent } });
     const far = mesh(1, 0.9), near = mesh(2, 0.1);

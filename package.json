@@ -11,7 +11,7 @@
     "build": "node build/build.js",
     "test": "node build/test.js",
     "pmtiles": "node build/pmtiles.js",
-    "version": "npm run build && git add -A dist"
+    "version": "npm run build && git add -A dist libs"
   },
   "repository": {
     "type": "git",
@@ -41,6 +41,7 @@
     "@cucumber/cucumber": "^10.3.1",
     "acorn": "^8.15.0",
     "esbuild": "^0.28.2",
-    "playwright": "^1.64.1"
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0"
   }
 }

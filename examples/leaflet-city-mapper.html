@@ -4,8 +4,7 @@
 		<title>leaflet-city-mapper.js</title>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
-		<script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"></script>
+		<script src="map-engine.js"></script>
 		<script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
 		<style>
 			html, body, #map {
@@ -40,7 +39,7 @@
 						url: 'data/paris-plan-ign.pmtiles',
 						maxZoom: 24,
 					},
-					attribution: '<a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_PLAN-IGN">Plan IGN</a> &copy; IGN &mdash; <a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Licence Ouverte Etalab 2.0</a>',
+					attribution: '&copy; <a href="https://www.ign.fr/">IGN</a> (<a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Etalab 2.0</a>)',
 				}),
 				// Offline archive built by `node build/pmtiles.js`.
 				'Orthophoto IGN': new L.Layer({
@@ -48,7 +47,7 @@
 						url: 'data/paris-orthophotos.pmtiles',
 						maxZoom: 24,
 					},
-					attribution: '<a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-ORTHO">Photographies aériennes IGN</a> &copy; IGN &mdash; <a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Licence Ouverte Etalab 2.0</a>',
+					attribution: '&copy; <a href="https://www.ign.fr/">IGN</a> (<a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Etalab 2.0</a>)',
 				}).addTo(map),
 			}, {
 				// Offline terrain tiles built from IGN's RGE ALTI WMTS (Float32 BIL).
@@ -61,7 +60,7 @@
 						center: [48.8582601, 2.29449985],
 						ariaLabel: 'IGN terrain with 3D map layers',
 					},
-					attribution: '<a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_RGE-ALTI">RGE ALTI</a>, <a href="https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-TOPO">BD TOPO</a> &copy; IGN &mdash; <a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Licence Ouverte Etalab 2.0</a>',
+					attribution: '&copy; <a href="https://www.ign.fr/">IGN</a> (<a href="https://ia.numerique.gouv.fr/licence-ouverte-open-licence/">Etalab 2.0</a>)',
 				}).addTo(map),
 				// Offline archive built by `node build/pmtiles.js`.
 				'Buildings': new L.Layer({
@@ -69,6 +68,7 @@
 						type: '3d',
 						url: 'data/paris-buildings.pmtiles',
 						roofTexture: true,
+						wallTexture: 0.75,
 						ariaLabel: '3D view of the Eiffel Tower and Paris buildings',
 						style({ properties: { h_et_max: storeys, nb_pl: floors, b_rdc: ground } }) {
 							if (!Number.isFinite(storeys) || storeys < 0 || ![0, 1].includes(ground) ||
@@ -88,7 +88,7 @@
 							return content;
 						},
 					},
-					attribution: '<a href="https://opendata.paris.fr/explore/dataset/volumesbatisparis/">Building volumes: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
+					attribution: '&copy; <a href="https://opendata.paris.fr/">Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
 				// Offline tree inventory; measurements are retained in the PMTiles GeoJSON.
 				'Trees': new L.Layer({
@@ -127,7 +127,7 @@
 							return content;
 						},
 					},
-					attribution: '<a href="https://opendata.paris.fr/explore/dataset/les-arbres/">Trees: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
+					attribution: '&copy; <a href="https://opendata.paris.fr/">Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 				}).addTo(map),
 				// OSM way 5013364 links to 3dmr=4; revision 3 is a CC0, metre-scale GLB.
 				// Register the four ground corners to OSM pillars 69034127/135/179/180.
@@ -226,7 +226,7 @@
 							type: 'traffic',
 							url: 'data/paris-traffic.js',
 						},
-						attribution: '<a href="https://opendata.paris.fr/explore/dataset/comptages-routiers-permanents/">Traffic counts: Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
+						attribution: '&copy; <a href="https://opendata.paris.fr/">Ville de Paris</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 					new L.Layer({
 						source: {
@@ -236,7 +236,7 @@
 							mobilityMode: 'bicycle',
 							speed: 4.2,
 						},
-						attribution: '<a href="https://opendata.paris.fr/explore/dataset/comptage-velo-donnees-compteurs/">Cycling counts: Ville de Paris</a>; <a href="https://opendata.paris.fr/explore/dataset/amenagements-cyclables/">paths: Ville de Paris / OpenStreetMap contributors</a> (ODbL)',
+						attribution: '&copy; <a href="https://opendata.paris.fr/">Ville de Paris</a> / <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 					new L.Layer({
 						source: {
@@ -246,7 +246,7 @@
 							mobilityMode: 'pedestrian',
 							speed: 1.4,
 						},
-						attribution: '<a href="https://opendata.paris.fr/explore/dataset/amenagements-cyclables/">Pedestrian/shared paths: Ville de Paris / OpenStreetMap contributors</a> (ODbL)',
+						attribution: '&copy; <a href="https://opendata.paris.fr/">Ville de Paris</a> / <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 					new L.Layer({
 						source: {
@@ -256,7 +256,7 @@
 							vehicle: 'bus',
 							speed: 5
 						},
-						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Bus routes: IDFM</a> (ODbL)',
+						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Transit routes: IDFM</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 					new L.Layer({
 						source: {
@@ -266,7 +266,7 @@
 							vehicle: 'tram',
 							speed: 7
 						},
-						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Tram routes: IDFM</a> (ODbL)',
+						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Transit routes: IDFM</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 					new L.Layer({
 						source: {
@@ -276,16 +276,16 @@
 							vehicle: 'metro',
 							speed: 10
 						},
-						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Metro routes: IDFM</a> (ODbL)',
+						attribution: '<a href="https://data.iledefrance-mobilites.fr/explore/dataset/traces-des-lignes-de-transport-en-commun-idfm/">Transit routes: IDFM</a> (<a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>)',
 					}),
 				]).addTo(map),
-				'Shadows': new L.Control.Time().layer.addTo(map),
+				'Time': new L.Control.Time().layer.addTo(map),
 			}, { collapsed: false }).addTo(map);
 
 			// Third-person walk from the map centre, W/S to run, A/D to turn, drag to look around, Esc to exit.
 			const walk = new L.Control.Walk().addTo(map);
 		</script>
 
-		<a href="https://github.com/Raruto/leaflet-city-mapper" class="view-on-github" style="position: fixed;bottom: 30px;left: calc(50% - 81px);z-index: 9999;"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
+		<a href="https://github.com/Raruto/leaflet-city-mapper" class="view-on-github"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
 	</body>
 </html>

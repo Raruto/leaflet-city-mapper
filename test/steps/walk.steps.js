@@ -252,8 +252,128 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   } finally {
     await this.page.keyboard.up('KeyS');
   }
+  const jumped = await this.page.evaluate(startLat => {
+    const walk = walkControl._walk;
+    cancelAnimationFrame(walk.frame);
+    let now = performance.now();
+    walk.last = now;
+    const advance = ticks => {
+      for (let i = 0; i < ticks; i++) {
+        walk.step(now += 100);
+        cancelAnimationFrame(walk.frame);
+      }
+    };
+    const press = repeat => document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'Space', key: ' ', repeat, bubbles: true, cancelable: true,
+    }));
+    const prevented = !press(false);
+    advance(10);
+    const first = walk.state.height, velocity = walk.verticalSpeed;
+    press(true);
+    const repeatUnaffected = walk.verticalSpeed === velocity;
+    advance(50);
+    const second = walk.state.height;
+    const input = document.body.appendChild(document.createElement('input'));
+    input.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true }));
+    const releasedInInput = !walk.keys.has('Space');
+    const textEvent = new KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true });
+    input.dispatchEvent(textEvent);
+    const textUnaffected = !textEvent.defaultPrevented && !walk.keys.has('Space');
+    input.remove();
+    advance(15);
+    const falling = walk.verticalSpeed < 0 && walk.state.height < second;
+    press(false);
+    advance(10);
+    const third = walk.state.height;
+    const feet = walk.meshes[0].position[1] + globals.sceneByLayer.get(walk.layer).root.position[1];
+    walk.state.latlng = new L.LatLng(startLat, walk.state.latlng.lng);
+    walk.keys.add('KeyW');
+    advance(10);
+    walk.keys.clear();
+    const landingLat = walk.state.latlng.lat;
+    advance(40);
+    const landed = walk.state.height === 0 && walk.verticalSpeed === 0 &&
+      Math.abs(walk.meshes[0].position[1] + globals.sceneByLayer.get(walk.layer).root.position[1]) < 0.001;
+    press(false);
+    advance(1);
+    const jumpedAgain = walk.state.height > 0;
+    window.dispatchEvent(new Event('blur'));
+    const blurred = !walk.keys.has('Space');
+    advance(15);
+    const landedAfterBlur = walk.state.height === 0;
+    press(false);
+    advance(1);
+    return { prevented, repeatUnaffected, releasedInInput, textUnaffected, first, second, third,
+      feet, falling, landed, jumpedAgain, blurred, landedAfterBlur, landingLat };
+  }, start.lat);
+  assert.equal(jumped.prevented, true, 'Space must not scroll the page or activate the Walk button');
+  assert.equal(jumped.repeatUnaffected, true);
+  assert.equal(jumped.releasedInInput, true);
+  assert.equal(jumped.textUnaffected, true);
+  assert.ok(Math.abs(jumped.first - 6) < 0.001 && Math.abs(jumped.second - 36) < 0.001,
+    `Holding Space continuously ascends at 6 m/s without repeat events: ${JSON.stringify(jumped)}`);
+  assert.ok(jumped.third > jumped.second, 'Holding Space again resumes ascent in mid-air');
+  assert.equal(jumped.falling, true, 'Releasing Space restores gravity');
+  assert.ok(Math.abs(jumped.feet - jumped.third) < 0.001, 'The rendered walker follows jump height');
+  assert.ok((jumped.landingLat - start.lat) * 111320 > 4.3, 'Airborne walker must pass over the 4 m wall');
+  assert.equal(jumped.landed, true, 'Gravity returns the walker exactly to ground');
+  assert.equal(jumped.jumpedAgain, true, 'Space still works after landing');
+  assert.equal(jumped.blurred, true, 'Losing window focus releases Space');
+  assert.equal(jumped.landedAfterBlur, true, 'Losing window focus restores gravity');
+  const rooftop = await this.page.evaluate(async () => {
+    const walk = walkControl._walk, state = globals.sceneByLayer.get(walk.layer);
+    const roof = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+    await nativeChecks.ready(roof);
+    const root = globals.sceneByLayer.get(roof).root;
+    const x = walk.meshes[0].position[0] + state.root.position[0] - root.position[0];
+    const z = walk.meshes[0].position[2] + state.root.position[2] - root.position[2];
+    const y = 8 - root.position[1];
+    nativeChecks.gpu.createMesh(roof, {
+      position: [x-2,y,z-2, x-2,y,z+2, x+2,y,z+2, x-2,y,z-2, x+2,y,z+2, x+2,y,z-2],
+      normal: Array(6).fill([0, 1, 0]).flat(), color: Array(18).fill(0.5),
+    });
+    let now = walk.last;
+    const advance = ticks => {
+      for (let i = 0; i < ticks; i++) { walk.step(now += 100); cancelAnimationFrame(walk.frame); }
+      nativeChecks.render.render(state._shared);
+    };
+    advance(30);
+    const cameraError = Math.abs(state.camera.target[1] - walk.state.height);
+    const p = new DOMPoint(0, 0, 0, 1);
+    const feetY = walk.meshes[0].position[1] + state.root.position[1];
+    p.x = state.camera.target[0]; p.y = feetY; p.z = state.camera.target[2];
+    const projected = p.matrixTransform(new DOMMatrix(state.camera.projectionViewMatrix));
+    const screenError = Math.abs(projected.y / projected.w);
+    walk.keys.delete('Space');
+    advance(40);
+    const landed = walk.state.height, velocity = walk.verticalSpeed;
+    advance(20);
+    const stable = walk.state.height;
+    walk.keys.add('Space'); advance(10);
+    const relaunched = walk.state.height > stable + 5;
+    walk.keys.delete('Space'); advance(40);
+    walk.keys.add('KeyW'); advance(15); walk.keys.clear(); advance(30);
+    const offRoof = walk.state.height;
+    roof.remove();
+    return { cameraError, screenError, landed, velocity, stable, relaunched, offRoof };
+  });
+  assert.ok(rooftop.cameraError < 0.001 && rooftop.screenError < 0.001,
+    `Camera follows vertical-only ascent: ${JSON.stringify(rooftop)}`);
+  assert.ok(Math.abs(rooftop.landed - 8) < 0.001 && Math.abs(rooftop.stable - 8) < 0.001,
+    `Walker lands on the roof and stays there: ${JSON.stringify(rooftop)}`);
+  assert.equal(rooftop.velocity, 0);
+  assert.equal(rooftop.relaunched, true, 'Space ascends from the roof');
+  assert.equal(rooftop.offRoof, 0, 'Walking off the roof falls back to terrain');
   await this.page.keyboard.press('Escape');
   assert.equal(await button.getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(await this.page.evaluate(() => ({
+    height: walkControl.walker.height, speed: walkControl._walk.verticalSpeed,
+  })), { height: 0, speed: 0 }, 'Exiting clears airborne state');
+  assert.equal(await this.page.evaluate(() => {
+    const state = globals.sceneByLayer.get(walkControl._walk.layer);
+    nativeChecks.render.render(state._shared);
+    return state.camera.target[1];
+  }), 0, 'Exiting restores the ground-level camera target');
   assert.deepEqual(errors, [], 'Keyboard movement must not throw during collision checks');
 });
 

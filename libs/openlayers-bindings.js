@@ -1,7 +1,108 @@
-// Parser-blocking loader: the following classic plugin script must see L immediately.
-window.installOpenLayersBindings = function () {
-  delete window.installOpenLayersBindings;
+// Leaflet-compatible classes backed by OpenLayers. Load after ol.js and before the plugin.
+(() => {
   if (!window.ol) throw new Error('Unable to load OpenLayers');
+
+  const style = document.createElement('style');
+  style.dataset.openlayersBindings = '';
+  style.textContent = `
+.openlayers-city-mapper {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+.ol-viewport {
+  position: absolute !important;
+  inset: 0;
+}
+.ol-overlaycontainer-stopevent { z-index: 1000 !important; }
+.ol-city-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: .5em;
+  pointer-events: none;
+}
+.ol-city-topleft { top: 5em; left: .5em; }
+.ol-city-topright { top: 10px; right: 10px; }
+.ol-city-bottomleft { bottom: .5em; left: .5em; }
+.ol-city-bottomright { bottom: 4em; right: .5em; }
+.ol-attribution {
+  text-align: justify;
+  border-radius: 0 !important;
+  left: 0;
+  right: 0 !important;
+  max-width: unset;
+  font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+  font-size: .75rem;
+  line-height: 1.5;
+}
+.ol-attribution a { color: #0078A8; }
+.ol-attribution * { text-shadow: none !important; }
+.ol-city-control {
+  position: static;
+  pointer-events: auto;
+  font: 13px/1.5 sans-serif;
+}
+.ol-city-rotate {
+  padding: 0;
+  border: 1px solid #0003;
+  border-radius: 4px;
+  background: #fff;
+  background-clip: padding-box;
+}
+.ol-city-rotate a {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 2px;
+  color: #000;
+  text-decoration: none;
+}
+.ol-city-rotate a:hover { background: #f4f4f4; }
+.ol-city-rotate a:focus-visible { outline: 2px solid #2675c9; }
+.ol-city-layers {
+  max-height: calc(100vh - 5em);
+  overflow: auto;
+  border-radius: 4px;
+}
+.ol-city-layers section { padding: .5em; background: var(--ol-background-color); }
+.ol-city-layers label { display: block; cursor: pointer; white-space: nowrap; }
+.ol-city-layers input { vertical-align: middle; }
+.ol-city-layers hr { border: 0; border-top: 1px solid #ccc; }
+.ol-city-layers .ol-control { background: transparent; }
+.ol-city-layers .sunlight-time button { width: auto; padding: 0 .4em; flex-shrink: 0; }
+.openlayers-city-mapper .leaflet-pane {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ol-zoom button { width: 30px; height: 30px; }
+.openlayers-city-mapper .leaflet-marker-icon,
+.openlayers-city-mapper .leaflet-marker-shadow {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.openlayers-city-mapper .leaflet-marker-icon { pointer-events: auto; cursor: pointer; }
+.openlayers-city-mapper .leaflet-div-icon { background: #fff; border: 1px solid #666; }
+.ol-city-popup {
+  padding: 10px;
+  background: white;
+  border: 1px solid #888;
+  border-radius: 4px;
+  font: 14px sans-serif;
+}
+.ol-city-popup button { float: right; margin-left: 12px; }
+.ol-city-tooltip {
+  position: absolute;
+  z-index: 1100;
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid #888;
+  pointer-events: none;
+}
+`;
+  document.head.appendChild(style);
 
   const L = window.L = { version: '1.9.4-openlayers', control: {} };
   let lastId = 0;
@@ -253,6 +354,7 @@ window.installOpenLayersBindings = function () {
     enable() { if (!this._enabled) { this._enabled = true; this.addHooks?.(); } return this; },
     disable() { if (this._enabled) { this._enabled = false; this.removeHooks?.(); } return this; },
     enabled() { return Boolean(this._enabled); },
+    moving() { return Boolean(this._moving); },
   });
   L.Layer = L.Evented.extend({
     initialize(options) { setOptions(this, options); },
@@ -281,8 +383,7 @@ window.installOpenLayersBindings = function () {
     onAdd(map) { this.eachLayer(map.addLayer, map); },
     onRemove(map) { this.eachLayer(map.removeLayer, map); },
   });
-  // ponytail: source-layer demo only; implement native layers when another example needs them.
-  // Keep the plugin's instanceof checks and extension hooks, rejecting unsupported constructors.
+  // Declare the hierarchy before the plugin installs its instanceof checks and hooks.
   for (const [name, parent] of [
     ['GridLayer', L.Layer], ['Marker', L.Layer], ['Path', L.Layer],
     ['Polyline', null], ['Polygon', null], ['CircleMarker', null], ['Circle', null],
@@ -292,7 +393,7 @@ window.installOpenLayersBindings = function () {
     const base = parent || ({ Polyline: L.Path, Polygon: L.Polyline, CircleMarker: L.Path,
       Circle: L.CircleMarker, VideoOverlay: L.ImageOverlay, SVGOverlay: L.ImageOverlay })[name];
     L[name] = base.extend({
-      initialize() { throw new Error(`L.${name} is not supported by the OpenLayers example bindings; use L.Layer with a source`); },
+      initialize() { throw new Error(`L.${name} is not supported by the OpenLayers bindings; use L.Layer with a source`); },
       getEvents() { return {}; },
     });
   }
@@ -408,16 +509,17 @@ window.installOpenLayersBindings = function () {
         if (event.type === 'pointerdown') {
           if (!this.dragging.enabled() || event.button !== 0 || !event.isPrimary || event.target.closest('.ol-control')) return;
           anchor = this.containerPointToLatLng(pixel(event)); pointerId = event.pointerId;
-          this._moved = false;
+          this._moved = this.dragging._moving = false;
           this._container.focus({ preventScroll: true });
           this._container.setPointerCapture(pointerId);
         } else if (event.pointerId === pointerId && event.type === 'pointermove' && this.dragging.enabled()) {
           const delta = this.project(anchor).subtract(this.project(this.containerPointToLatLng(pixel(event))));
-          if (Math.hypot(delta.x, delta.y) > 1) this._moved = true;
+          if (Math.hypot(delta.x, delta.y) > 1) this._moved = this.dragging._moving = true;
           this.setView(this.unproject(this.project(this.getCenter()).add(delta)), this.getZoom());
         } else if (event.pointerId === pointerId && event.type !== 'pointermove') {
           if (this._container.hasPointerCapture(pointerId)) this._container.releasePointerCapture(pointerId);
           anchor = null; pointerId = null;
+          this.dragging._moving = false;
         }
       };
       this._onKey = event => {
@@ -540,7 +642,7 @@ window.installOpenLayersBindings = function () {
     hasLayer(layer) { return Boolean(this._layers[stamp(layer)]); },
     eachLayer(fn, context) { for (const layer of Object.values(this._layers)) fn.call(context || this, layer); return this; },
     createPane(name, parent = this._container) { return this._panes[name] = L.DomUtil.create('div', `leaflet-pane leaflet-${name}`, parent); },
-    getPane(name) { return this._panes[name]; },
+    getPane(name = 'overlayPane') { return this._panes[name]; },
     addHandler(name, Handler) { this[name] = new Handler(this); this._handlers.push(this[name]); if (this.options[name]) this[name].enable(); return this; },
     invalidateSize() { this.ol.updateSize(); return this; },
     _draggableMoved() { return Boolean(this._moved); },
@@ -629,27 +731,398 @@ window.installOpenLayersBindings = function () {
     onRemove(map) { map.off('layeradd layerremove', this._update, this); },
   });
 
-  const style = L.DomUtil.create('style', '', document.head);
-  style.textContent = '.openlayers-city-mapper{position:relative;overflow:hidden;touch-action:none}' +
-    '.ol-viewport{position:absolute!important;inset:0}' +
-    '.ol-overlaycontainer-stopevent{z-index:1000!important}' +
-    '.ol-city-corner{position:absolute;display:flex;flex-direction:column;gap:.5em;pointer-events:none}' +
-    '.ol-city-topleft{top:5em;left:.5em}.ol-city-topright{top:10px;right:10px}' +
-    '.ol-city-bottomleft{bottom:.5em;left:.5em}.ol-city-bottomright{bottom:4em;right:.5em}' +
-    '.ol-attribution{text-align:justify;border-radius: 0 !important;left:0;right:0;right:0!important;max-width: unset;}.ol-attribution a {color: #0078A8;}.ol-attribution {  font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;  font-size: 12px;  font-size: 0.75rem;  line-height: 1.5; }.ol-attribution *{ text-shadow: none !important; }' +
-    '.ol-city-control{position:static;pointer-events:auto;font:13px/1.5 sans-serif}' +
-    '.ol-city-rotate{padding:0;border:1px solid #0003;border-radius:4px;background:#fff;background-clip:padding-box}' +
-    '.ol-city-rotate a{display:block;width:30px;height:30px;border-radius:2px;color:#000;text-decoration:none}' +
-    '.ol-city-rotate a:hover{background:#f4f4f4}.ol-city-rotate a:focus-visible{outline:2px solid #2675c9}' +
-    '.ol-city-layers{max-height:calc(100vh - 5em);overflow:auto;border-radius:4px}' +
-    '.ol-city-layers section{padding:.5em;background:var(--ol-background-color)}' +
-    '.ol-city-layers label{display:block;cursor:pointer;white-space:nowrap}' +
-    '.ol-city-layers input{vertical-align:middle}.ol-city-layers hr{border:0;border-top:1px solid #ccc}' +
-    '.ol-city-layers .ol-control{background:transparent}' +
-    '.ol-city-layers .sunlight-time button{width:auto;padding:0 .4em;flex-shrink:0}' +
-    '.openlayers-city-mapper .leaflet-pane{position:absolute;inset:0;pointer-events:none}'+
-    '.ol-zoom button {width: 30px;height: 30px;}';
-};
+  // Native layer contracts consumed by the plugin's WebGPU renderer.
+  const bounds = value => value instanceof L.LatLngBounds ? value : new L.LatLngBounds(value);
+  const coordinates = values => values.map(value => Array.isArray(value) && typeof value[0] !== 'number'
+    ? coordinates(value) : latLng(value));
+  const image = (url, options, className) => {
+    const element = document.createElement('img');
+    element.className = className;
+    if (options.crossOrigin) element.crossOrigin = options.crossOrigin === true ? '' : options.crossOrigin;
+    element.src = url;
+    element.draggable = false;
+    return element;
+  };
 
-document.write('<script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"><\/script>' +
-  '<script>installOpenLayersBindings();<\/script>');
+  L.Layer.include({
+    bindPopup(content) {
+      this._popupContent = content;
+      this.off('click', this.openPopup, this).on('click', this.openPopup, this);
+      this.once('remove', this.closePopup, this);
+      if (this instanceof L.LayerGroup) this.eachLayer(layer => layer.bindPopup(content));
+      return this;
+    },
+    openPopup(event) {
+      if (!this._map) return this;
+      this.closePopup();
+      const location = event?.latlng || this.getLatLng?.() || this.getBounds?.().getCenter();
+      if (!location) throw new Error('Popup requires a location');
+      const element = L.DomUtil.create('div', 'ol-city-popup leaflet-popup');
+      element.setAttribute('role', 'dialog');
+      const close = L.DomUtil.create('button', '', element);
+      close.type = 'button'; close.textContent = '\u00d7'; close.setAttribute('aria-label', 'Close popup');
+      close.onclick = () => this.closePopup();
+      const content = L.DomUtil.create('div', '', element);
+      const value = typeof this._popupContent === 'function' ? this._popupContent(this) : this._popupContent;
+      if (value instanceof Node) content.append(value); else content.innerHTML = value;
+      L.DomEvent.disableClickPropagation(element);
+      this._popupOverlay = new ol.Overlay({ element, positioning: 'bottom-center', offset: [0, -12] });
+      this._map.ol.addOverlay(this._popupOverlay);
+      this._popupLocation = latLng(location);
+      this._map.on('move zoom rotate pitch', this._positionPopup, this);
+      this._positionPopup();
+      return this;
+    },
+    _positionPopup() {
+      const screen = this._map.latLngToContainerPoint(this._popupLocation);
+      this._popupOverlay.setPosition(this._map.ol.getCoordinateFromPixelInternal([screen.x, screen.y]));
+    },
+    closePopup() {
+      if (this._popupOverlay) {
+        this._map?.off('move zoom rotate pitch', this._positionPopup, this);
+        this._map?.ol.removeOverlay(this._popupOverlay);
+        this._popupOverlay = null;
+      }
+      return this;
+    },
+    bindTooltip(content) {
+      this._tooltipContent = content;
+      this.on('mouseover', this._showTooltip, this).on('mouseout remove', this._hideTooltip, this);
+      if (this instanceof L.LayerGroup) this.eachLayer(layer => layer.bindTooltip(content));
+      return this;
+    },
+    _showTooltip(event) {
+      this._hideTooltip();
+      if (!this._map || !event.latlng) return;
+      const element = this._tooltipElement = L.DomUtil.create('div', 'ol-city-tooltip leaflet-tooltip', this._map.getContainer());
+      element.setAttribute('role', 'tooltip');
+      const value = typeof this._tooltipContent === 'function' ? this._tooltipContent(this) : this._tooltipContent;
+      if (value instanceof Node) element.append(value); else element.innerHTML = value;
+      const pixel = this._map.latLngToContainerPoint(event.latlng);
+      element.style.left = `${pixel.x + 12}px`; element.style.top = `${pixel.y + 12}px`;
+    },
+    _hideTooltip() { this._tooltipElement?.remove(); this._tooltipElement = null; },
+  });
+  L.LayerGroup.include({
+    getLayers() { return Object.values(this._layers); },
+    getBounds() {
+      const result = new L.LatLngBounds();
+      this.eachLayer(layer => result.extend(layer.getBounds?.() || layer.getLatLng()));
+      return result;
+    },
+  });
+  L.FeatureGroup = L.LayerGroup.extend({});
+
+  L.Path.include({
+    options: { pane: 'overlayPane', interactive: true, stroke: true, color: '#3388ff',
+      weight: 3, opacity: 1, lineCap: 'round', lineJoin: 'round', fill: false, fillOpacity: 0.2 },
+    initialize(options) { L.Util.setOptions(this, options); },
+    setStyle(options) { L.Util.setOptions(this, options); return this.redraw(); },
+    redraw() { return this; },
+    bringToFront() { return this; },
+    bringToBack() { return this; },
+  });
+  L.Polyline.include({
+    initialize(values, options) { L.Util.setOptions(this, options); this.setLatLngs(values); },
+    getLatLngs() { return this._latlngs; },
+    setLatLngs(values) { this._latlngs = coordinates(values); return this.redraw(); },
+    addLatLng(value) { this._latlngs.push(latLng(value)); return this.redraw(); },
+    getBounds() {
+      const result = new L.LatLngBounds();
+      const visit = values => { for (const value of values) Array.isArray(value) ? visit(value) : result.extend(value); };
+      visit(this._latlngs);
+      return result;
+    },
+    _project() {
+      this._rings = [];
+      const visit = values => {
+        if (!values.length) return;
+        if (Array.isArray(values[0])) values.forEach(visit);
+        else this._rings.push(values.map(value => this._map.latLngToLayerPoint(value)));
+      };
+      visit(this._latlngs);
+    },
+    closestLayerPoint(value) {
+      this._project();
+      const paths = this._rings.map(ring => ring.map(value => [value.x, value.y]));
+      const closest = new ol.geom.MultiLineString(paths).getClosestPoint([value.x, value.y]);
+      return point(closest);
+    },
+  });
+  L.Polyline.mergeOptions(L.Path.prototype.options);
+  L.Polygon.include({ initialize: L.Polyline.prototype.initialize });
+  L.Polygon.mergeOptions(L.Path.prototype.options);
+  L.Polygon.mergeOptions({ fill: true });
+  L.Rectangle = L.Polygon.extend({
+    initialize(value, options) { L.Util.setOptions(this, options); this.setBounds(value); },
+    setBounds(value) {
+      value = bounds(value);
+      return this.setLatLngs([value.getSouthWest(), value.getNorthWest(), value.getNorthEast(), value.getSouthEast()]);
+    },
+  });
+  L.CircleMarker.include({
+    options: { ...L.Path.prototype.options, fill: true, radius: 10 },
+    initialize(value, options) { L.Util.setOptions(this, options); this._latlng = latLng(value); },
+    getLatLng() { return this._latlng; },
+    setLatLng(value) { this._latlng = latLng(value); this.fire('move', { latlng: this._latlng }); return this.redraw(); },
+    getRadius() { return this.options.radius; },
+    setRadius(radius) { this.options.radius = radius; return this.redraw(); },
+  });
+  L.Circle.include({
+    initialize: L.CircleMarker.prototype.initialize,
+    _project() {
+      this._point = this._map.latLngToLayerPoint(this._latlng);
+      this._radius = this._radiusY = this.getRadius() * this._map.options.crs.scale(this._map.getZoom()) /
+        (2 * Math.PI * 6378137 * Math.cos(this._latlng.lat * Math.PI / 180));
+    },
+    getBounds() {
+      const north = this.getRadius() / 6378137 * 180 / Math.PI;
+      const east = north / Math.cos(this._latlng.lat * Math.PI / 180);
+      return new L.LatLngBounds([this._latlng.lat - north, this._latlng.lng - east],
+        [this._latlng.lat + north, this._latlng.lng + east]);
+    },
+  });
+  L.Circle.mergeOptions(L.CircleMarker.prototype.options);
+  L.GeoJSON = L.FeatureGroup.extend({
+    initialize(data, options) {
+      L.LayerGroup.prototype.initialize.call(this, [], options);
+      if (data) this.addData(data);
+    },
+    addData(data) {
+      const features = new ol.format.GeoJSON().readFeatures(data);
+      const convert = (geometry, feature) => {
+        const values = geometry.getCoordinates();
+        const locations = value => typeof value[0] === 'number' ? [value[1], value[0]] : value.map(locations);
+        switch (geometry.getType()) {
+          case 'Point': return this.options.pointToLayer
+            ? this.options.pointToLayer(feature, latLng(locations(values))) : new L.Marker(locations(values));
+          case 'MultiPoint': return new L.FeatureGroup(values.map(value => convert(new ol.geom.Point(value), feature)));
+          case 'LineString': case 'MultiLineString': return new L.Polyline(locations(values), this.options);
+          case 'Polygon': case 'MultiPolygon': return new L.Polygon(locations(values), this.options);
+          default: throw new Error(`Unsupported GeoJSON geometry: ${geometry.getType()}`);
+        }
+      };
+      for (const feature of features) {
+        const layer = convert(feature.getGeometry(), new ol.format.GeoJSON().writeFeatureObject(feature));
+        this.addLayer(layer);
+      }
+      return this;
+    },
+  });
+
+  L.GridLayer.include({
+    options: { pane: 'tilePane', tileSize: 256, opacity: 1, minZoom: 0, maxZoom: 24, updateInterval: 200 },
+    initialize(options) { L.Util.setOptions(this, options); this._tiles = {}; },
+    getTileSize() { return typeof this.options.tileSize === 'number'
+      ? new L.Point(this.options.tileSize, this.options.tileSize) : point(this.options.tileSize); },
+    getEvents() { return { moveend: this._onMoveEnd, zoomend: this._onMoveEnd, resize: this._onMoveEnd }; },
+    _initContainer() { this._container = L.DomUtil.create('div', '', this.getPane()); },
+    onAdd() { this._initContainer(); this._onMoveEnd(); },
+    onRemove() {
+      for (const tile of Object.values(this._tiles)) this.fire('tileunload', { tile: tile.el, coords: tile.coords });
+      this._tiles = {}; this._container?.remove();
+    },
+    _getTiledPixelBounds() {
+      return new L.Bounds(this._map.project(this._map.getBounds().getNorthWest(), this._tileZoom),
+        this._map.project(this._map.getBounds().getSouthEast(), this._tileZoom));
+    },
+    _onMoveEnd() {
+      if (!this._map) return;
+      this._tileZoom = Math.max(this.options.minZoom, Math.min(this.options.maxZoom, Math.round(this._map.getZoom())));
+      const size = this.getTileSize(), extent = this._getTiledPixelBounds(this._map.getCenter());
+      const min = extent.min.unscaleBy(size).floor(), max = extent.max.unscaleBy(size).floor();
+      const retained = new Set(), limit = 2 ** this._tileZoom;
+      for (let x = min.x; x <= max.x; x++) for (let y = min.y; y <= max.y; y++) {
+        if (y < 0 || y >= limit) continue;
+        const key = `${this._tileZoom}:${x}:${y}`;
+        retained.add(key);
+        if (this._tiles[key]) continue;
+        const coords = new L.Point(x, y); coords.z = this._tileZoom;
+        const tile = this._tiles[key] = { coords, current: true, loaded: 0 };
+        const done = (error, element) => {
+          if (this._tiles[key] !== tile) return;
+          tile.el = element;
+          if (error) { this.fire('tileerror', { error, tile: element, coords }); return; }
+          tile.loaded = Date.now();
+          this.fire('tileload', { tile: element, coords });
+          this.fire('load');
+        };
+        tile.el = this.createTile(coords, done);
+        if (this.createTile.length < 2) done(null, tile.el);
+      }
+      for (const [key, tile] of Object.entries(this._tiles)) {
+        if (retained.has(key)) continue;
+        delete this._tiles[key];
+        this.fire('tileunload', { tile: tile.el, coords: tile.coords });
+      }
+    },
+    _tileCoordsToNwSe(coords) {
+      const size = this.getTileSize(), nw = new L.Point(coords.x * size.x, coords.y * size.y);
+      return [this._map.unproject(nw, coords.z), this._map.unproject(nw.add(size), coords.z)];
+    },
+    setOpacity(opacity) { this.options.opacity = opacity; return this; },
+    setZIndex(zIndex) { this.options.zIndex = zIndex; return this; },
+    redraw() { if (this._map) { this.onRemove(); this._onMoveEnd(); } return this; },
+  });
+  L.TileLayer = L.GridLayer.extend({
+    initialize(url, options) {
+      L.GridLayer.prototype.initialize.call(this, options); this.setUrl(url);
+    },
+    setUrl(url) { this._url = url; this._source = new ol.source.XYZ({ url, crossOrigin: 'anonymous' }); return this.redraw(); },
+    createTile(coords, done) {
+      const url = this._source.getTileUrlFunction()([coords.z, coords.x, coords.y], 1, ol.proj.get('EPSG:3857'));
+      const tile = image(url, this.options, '');
+      tile.onload = () => done(null, tile);
+      tile.onerror = () => done(new Error(`Unable to load tile: ${url}`), tile);
+      return tile;
+    },
+  });
+  L.TileLayer.WMS = L.TileLayer.extend({
+    setUrl(url) {
+      this._url = url;
+      this._source = new ol.source.TileWMS({ url, crossOrigin: 'anonymous', params: {
+        LAYERS: this.options.layers, FORMAT: this.options.format || 'image/png',
+        TRANSPARENT: this.options.transparent || false,
+      } });
+      return this.redraw();
+    },
+  });
+  L.ImageOverlay.include({
+    options: { pane: 'overlayPane', opacity: 1, interactive: false },
+    initialize(url, value, options) { L.Util.setOptions(this, options); this._url = url; this._bounds = bounds(value); },
+    _initImage() {
+      this._image = image(this._url, this.options, '');
+      this._image.onload = () => this.fire('load');
+      this._image.onerror = () => this.fire('error', { error: new Error(`Unable to load image: ${this._url}`) });
+    },
+    getBounds() { return this._bounds; },
+    setBounds(value) { this._bounds = bounds(value); return this; },
+    setUrl(url) { this._url = url; if (this._image) this._image.src = url; return this; },
+    setOpacity(opacity) { this.options.opacity = opacity; return this; },
+    setZIndex(zIndex) { this.options.zIndex = zIndex; return this; },
+  });
+
+  L.Icon = L.Evented.extend({
+    initialize(options) { L.Util.setOptions(this, options); },
+    createIcon() { return this._create('icon'); },
+    createShadow() { return this.options.shadowUrl ? this._create('shadow') : null; },
+    _create(kind) {
+      const element = image(this.options[`${kind}Url`], this.options, `leaflet-marker-${kind}`);
+      const size = this.options[`${kind}Size`], anchor = this.options[`${kind}Anchor`] || this.options.iconAnchor;
+      if (size) { element.style.width = `${size[0]}px`; element.style.height = `${size[1]}px`; }
+      if (anchor) { element.style.marginLeft = `${-anchor[0]}px`; element.style.marginTop = `${-anchor[1]}px`; }
+      return element;
+    },
+  });
+  L.Icon.Default = L.Icon.extend({
+    options: {
+      iconUrl: 'https://unpkg.com/leaflet@1.9/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], shadowSize: [41, 41], shadowAnchor: [12, 41],
+    },
+  });
+  L.DivIcon = L.Icon.extend({
+    createIcon() {
+      const element = L.DomUtil.create('div', `leaflet-marker-icon ${this.options.className || ''}`);
+      if (this.options.html instanceof Node) element.append(this.options.html); else element.innerHTML = this.options.html || '';
+      const size = this.options.iconSize || [12, 12], anchor = this.options.iconAnchor || size.map(value => value / 2);
+      element.style.cssText = `width:${size[0]}px;height:${size[1]}px;margin-left:${-anchor[0]}px;margin-top:${-anchor[1]}px`;
+      return element;
+    },
+    createShadow() { return null; },
+  });
+  L.Marker.include({
+    options: { pane: 'markerPane', icon: new L.Icon.Default(), opacity: 1, interactive: true, zIndexOffset: 0 },
+    initialize(value, options) { L.Util.setOptions(this, options); this._latlng = latLng(value); },
+    getLatLng() { return this._latlng; },
+    setLatLng(value) { this._latlng = latLng(value); this.update(); return this.fire('move', { latlng: this._latlng }); },
+    setIcon(icon) { this.options.icon = icon; if (this._map) { this.onRemove(); this.onAdd(); } return this; },
+    getEvents() { return { zoom: this.update, viewreset: this.update }; },
+    onAdd() {
+      this._icon = this.options.icon.createIcon(); this._shadow = this.options.icon.createShadow();
+      this._icon.tabIndex = 0; this._icon.setAttribute('role', 'button');
+      this._icon.setAttribute('aria-label', this.options.title || 'Marker');
+      this._icon.title = this.options.title || '';
+      for (const element of [this._shadow, this._icon]) if (element) this.getPane().append(element);
+      this._initInteraction(); this.update();
+    },
+    onRemove() { this.dragging?.disable(); this._icon?.remove(); this._shadow?.remove(); },
+    update() { if (this._map && this._icon) this._setPos(this._map.latLngToLayerPoint(this._latlng)); return this; },
+    _setPos(value) {
+      for (const element of [this._icon, this._shadow]) if (element) L.DomUtil.setPosition(element, value);
+      this._zIndex = value.y + this.options.zIndexOffset; this._updateZIndex(0);
+    },
+    _updateZIndex(offset) { if (this._icon) this._icon.style.zIndex = this._zIndex + offset; },
+    setOpacity(opacity) { this.options.opacity = opacity; return this; },
+    setZIndexOffset(value) { this.options.zIndexOffset = value; return this.update(); },
+    _initInteraction() {
+      this._icon._cityLayer = this;
+      const drag = this.dragging = new L.Handler(this._map);
+      const icon = this._icon;
+      L.DomEvent.on(icon, 'pointerdown', event => {
+        this._map._moved = false;
+        event.stopPropagation();
+      });
+      L.DomEvent.on(icon, 'keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        L.DomEvent.stop(event);
+        this.fire('click', { latlng: this._latlng, originalEvent: event });
+      });
+      drag._marker = this;
+      drag._draggable = new L.Evented();
+      drag._onDrag = function () {
+        const marker = this._marker;
+        marker._latlng = marker._map.layerPointToLatLng(L.DomUtil.getPosition(marker._icon));
+        marker.fire('move', { latlng: marker._latlng }).fire('drag', { latlng: marker._latlng });
+      };
+      drag._adjustPan = function () {};
+      drag._draggable.on('drag', drag._onDrag, drag);
+      let pointer, anchor, origin, moved;
+      const handle = event => {
+        if (!drag.enabled()) return;
+        if (event.type === 'pointerdown') {
+          if (event.button !== 0) return;
+          event.preventDefault(); event.stopPropagation();
+          pointer = event.pointerId; anchor = [event.clientX, event.clientY];
+          origin = this._map.latLngToContainerPoint(this._latlng); moved = false;
+          icon.setPointerCapture(pointer);
+          this.fire('dragstart');
+        } else if (event.pointerId === pointer && event.type === 'pointermove') {
+          const value = new L.Point(origin.x + event.clientX - anchor[0], origin.y + event.clientY - anchor[1]);
+          L.DomUtil.setPosition(icon, value);
+          drag._draggable._newPos = value;
+          drag._draggable.fire('drag', { originalEvent: event });
+          moved = true;
+        } else if (event.pointerId === pointer) {
+          if (icon.hasPointerCapture(pointer)) icon.releasePointerCapture(pointer);
+          pointer = null; this.fire('dragend'); this._map._moved = moved;
+        }
+      };
+      drag.addHooks = () => L.DomEvent.on(icon, 'pointerdown pointermove pointerup pointercancel', handle);
+      drag.removeHooks = () => L.DomEvent.off(icon, 'pointerdown pointermove pointerup pointercancel', handle);
+      if (this.options.draggable) drag.enable();
+    },
+  });
+
+  L.Map.include({
+    _fireDOMEvent(event, type = event.type, targets) {
+      const rect = this.getContainer().getBoundingClientRect();
+      const pixel = new L.Point(event.clientX - rect.left, event.clientY - rect.top);
+      const location = this.containerPointToLatLng(pixel);
+      const layer = event.target.closest?.('.leaflet-marker-icon')?._cityLayer;
+      if (type === 'click' && this._draggableMoved(layer)) return;
+      for (const target of targets || (layer ? [layer] : [this])) {
+        target.fire(type, { originalEvent: event, latlng: location, containerPoint: pixel,
+          layerPoint: this.containerPointToLayerPoint(pixel) });
+      }
+    },
+  });
+  L.Map.addInitHook(function () {
+    for (const [name, order] of [['tilePane', 200], ['overlayPane', 400], ['markerPane', 600]]) {
+      this.createPane(name).style.zIndex = order;
+    }
+    const handler = event => this._fireDOMEvent(event);
+    L.DomEvent.on(this.getContainer(), 'click mousemove mouseout mouseover', handler);
+    this.once('unload', () => L.DomEvent.off(this.getContainer(), 'click mousemove mouseout mouseover', handler));
+  });
+})();

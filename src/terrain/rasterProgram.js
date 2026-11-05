@@ -45,6 +45,7 @@ export function rasterProgram(backend, texture) {
     terrain: state._dem,
     alphaMode: 'BLEND',
     depthWrite: true,
+    doubleSided: backend.options.doubleSided,
   });
   return state._rasterProgram;
 }

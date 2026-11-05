@@ -17,6 +17,7 @@ import { wrap } from '../utils/wrap.js';
 import { local } from './local.js';
 import { place } from './place.js';
 import { blocked } from './blocked.js';
+import { land } from './land.js';
 
 export function step(now) {
   const layer = this.layer, map = layer._map;
@@ -29,6 +30,17 @@ export function step(now) {
   if (!this.meshes) {
     this.meshes = /* alloc */ [];
     for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
+    changed = true;
+  }
+  const previousY = sceneByLayer.get(layer).root.position[1] +
+    local.call(this, this.local)[1] * sceneByLayer.get(layer).root.scale[1];
+  if (this.keys.has('Space')) {
+    this.verticalSpeed = 6;
+    this.state.height += this.verticalSpeed * dt;
+    changed = true;
+  } else if (this.verticalSpeed || this.state.height) {
+    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
+    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
     changed = true;
   }
   let forward = 0, turn = 0;
@@ -51,6 +63,7 @@ export function step(now) {
     this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
     changed = true;
   }
+  if (changed) land.call(this, previousY);
   if (forward || turn) {
     // The camera (looking along -bearing) swings back behind the walker.
     const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);

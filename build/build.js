@@ -77,11 +77,27 @@ const options = {
   }],
 };
 
+const builds = [
+  options,
+  {
+    ...options,
+    outfile: 'dist/leaflet-city-mapper-src.js',
+    minify: false,
+    plugins: [],
+  },
+  {
+    entryPoints: ['libs/openlayers-bindings.js'],
+    outfile: 'libs/openlayers-bindings.min.js',
+    minify: true,
+    sourcemap: true,
+  },
+];
+
 export async function build({ watch = false } = {}) {
-  if (!watch) return esbuildBuild(options);
-  const builder = await context(options);
-  await builder.watch();
-  return () => builder.dispose();
+  if (!watch) return Promise.all(builds.map(options => esbuildBuild(options)));
+  const builders = await Promise.all(builds.map(options => context(options)));
+  await Promise.all(builders.map(builder => builder.watch()));
+  return () => Promise.all(builders.map(builder => builder.dispose()));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

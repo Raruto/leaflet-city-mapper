@@ -44,8 +44,8 @@ import { layerCallInitHooks } from './core/layerCallInitHooks.js';
  *   Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
- * When `type` is omitted, inline FeatureCollections use 'geojson'; otherwise *.pmtiles URLs use
- * 'pmtiles' and other sources use '3d'.
+ * When `type` is omitted, inline FeatureCollections use 'geojson'; *.pmtiles URLs use
+ * 'pmtiles', *.tif/*.tiff URLs use 'cog', and other sources use '3d'.
  */
 
 layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
@@ -56,14 +56,16 @@ sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
  * Layers on one map share a canvas, scene and camera; each has its own root transform.
  *
  * @typedef {Object} Layer3DOptions Layer options; pane and attribution remain standard L.Layer options.
- * @property {string} [type] '3d', 'geojson', 'pmtiles', 'terrain' or 'traffic'.
+ * @property {string} [type] '3d', 'geojson', 'pmtiles', 'cog', 'terrain' or 'traffic'.
  * @property {number[]} [center] Local origin [lat,lng]; defaults to the first map center.
  * @property {number} [terrainOffset=0] Vertical offset in metres when terrain is enabled.
  * @property {boolean} [terrainConform=false] Fit lower model geometry to local terrain elevation.
  * @property {'OPAQUE'|'MASK'|'BLEND'} [alphaMode] Override every glTF material's alpha mode.
  * @property {number[]} [rotation] Model Euler rotation [x,y,z] in radians, YXZ order.
  * @property {number[]} [scale] Model scale [x,y,z].
- * @property {string} [url] GLB/glTF model URL or PMTiles archive URL.
+ * @property {string} [url] GLB/glTF model URL, PMTiles archive URL or supported COG URL.
+ * @property {boolean} [doubleSided=false] Show raster/terrain surfaces from below.
+ * @property {{x:number,y:number,radius:number,outside?:boolean}} [cutout] Raster screen-space circle in CSS pixels; outside keeps only the circle.
  * @property {function(Object): (ExtrusionStyle|null)} [style] Source styling; null skips a feature.
  * @property {function(PickedFeature): (Node|string)} [tooltip] Tooltip content; strings are text.
  * @property {string} [ariaLabel='3D scene'] Shared canvas accessible name.

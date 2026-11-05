@@ -323,14 +323,16 @@ Then('streamed geometry dissolves progressively while remaining opaque', { timeo
   assert.equal(result.opaque, true);
 });
 
-Then('roof imagery follows raster loading, background changes and renderer ownership', { timeout: 30000 }, async function () {
-  const result = await this.page.evaluate(async () => {
+Then('{string} imagery with wall opacity {string} follows raster loading, background changes and renderer ownership', { timeout: 30000 }, async function (surfaces, opacity) {
+  const result = await this.page.evaluate(async ({ surfaces, opacity }) => {
     const map = test3d.map, zoom = 17;
     const boundary = map.project(map.getCenter(), zoom).divideBy(256).floor().multiplyBy(256);
     map.setView(map.unproject(boundary, zoom), zoom, { animate: false });
     testOperations.setPitch(map, 0); testOperations.setBearing(map, 0);
     const owner = new L.Layer({ source: { type: '3d' } }).addTo(map);
-    const layer = new L.Layer({ source: { type: '3d', roofTexture: true } }).addTo(map);
+    const layer = new L.Layer({ source: { type: '3d',
+      roofTexture: surfaces === 'soft-roofs' ? Number(opacity) : surfaces !== 'walls',
+      wallTexture: surfaces === 'roofs' || surfaces === 'soft-roofs' ? false : opacity === 'default' ? true : Number(opacity) } }).addTo(map);
     await Promise.all([nativeChecks.ready(owner), nativeChecks.ready(layer)]);
     const ring = [[-60, -60], [60, -60], [60, 60], [-60, 60], [-60, -60]]
       .map(offset => map.unproject(boundary.add(offset), zoom)).map(p => [p.lng, p.lat]);
@@ -402,12 +404,15 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       const westRed = (boundaryX - 1) % 2 === 0;
       testOperations.setPitch(map, 55); testOperations.setBearing(map, 35);
       const rotated = await roof();
-      const wall = await sample([0, 60], 10);
+      const wall = [await sample([-30, 60], 10), await sample([30, 60], 10)];
+      const wallHigh = [await sample([-30, 60], 15), await sample([30, 60], 15)];
       nativeChecks.picking.setHighlight(layer, { mesh, ...mesh.extras.featureFaces[0] });
       const highlighted = await roof();
+      const highlightedWalls = [await sample([-30, 60], 10), await sample([30, 60], 10)];
       nativeChecks.picking.setHighlight(layer, null);
-      testOperations.setPitch(map, 0); testOperations.setBearing(map, 0);
       first.remove();
+      const emptyWalls = [await sample([-30, 60], 10), await sample([30, 60], 10)];
+      testOperations.setPitch(map, 0); testOperations.setBearing(map, 0);
       const empty = await roof();
       second.addTo(map);
       await loaded(second);
@@ -433,25 +438,34 @@ Then('roof imagery follows raster loading, background changes and renderer owner
       const transparent = await roof();
       testOperations.setOpacity(second, 1);
       const restored = await roof();
-      return { before, textured, westRed, rotated, wall, highlighted, empty, switched, stacked, reordered, zoomed, panned, transferred,
+      return { before, textured, westRed, rotated, wall, wallHigh, highlightedWalls, emptyWalls, highlighted, empty, switched, stacked, reordered, zoomed, panned, transferred,
         transparent, restored, reused, sameTexture, directCanvas };
     } finally {
       release(); first.remove(); second.remove();
       nativeChecks.sources.releaseArea(layer, area); layer.remove(); owner.remove();
     }
-  });
+  }, { surfaces, opacity });
   const green = pixel => pixel[1] > 100 && pixel[0] < 5 && pixel[2] < 5 && pixel[3] === 255;
   assert.ok(result.before.every(pixel => pixel[1] > 100 && pixel[0] < 5 && pixel[3] === 255),
     'Previously revealed buildings retain their styled roofs while a background loads');
   for (const name of ['empty', 'transparent']) assert.ok(result[name].every(green), `${name}: ${result[name]}`);
-  const imagery = (pixels, swapped) => pixels.forEach((pixel, i) => {
+  const imagery = (pixels, swapped, wall = false) => pixels.forEach((pixel, i) => {
     const red = (i === 0 ? result.westRed : !result.westRed) !== swapped;
-    assert.ok(pixel[red ? 0 : 2] > 100 && pixel[red ? 2 : 0] < 5 && pixel[1] < 5, JSON.stringify({ pixel, red }));
+    assert.ok(pixel[red ? 0 : 2] > 50 && pixel[red ? 2 : 0] < 5 &&
+      ((wall || surfaces === 'soft-roofs') && opacity !== '1' && opacity !== 'default'
+        ? pixel[1] > 30 : pixel[1] < 5), JSON.stringify({ pixel, red, wall }));
   });
-  imagery(result.textured, false); imagery(result.rotated, false);
-  imagery(result.stacked, false);
-  for (const name of ['switched', 'reordered', 'zoomed', 'panned', 'transferred', 'restored']) imagery(result[name], true);
-  assert.ok(green(result.wall), `Walls retain their style: ${result.wall}`);
+  for (const name of ['textured', 'rotated', 'stacked', 'switched', 'reordered', 'zoomed', 'panned', 'transferred', 'restored']) {
+    if (surfaces === 'walls') assert.ok(result[name].every(green), `Roofs retain their style: ${name}: ${result[name]}`);
+    else imagery(result[name], !['textured', 'rotated', 'stacked'].includes(name));
+  }
+  if (surfaces === 'roofs' || surfaces === 'soft-roofs' || opacity === '0') assert.ok(result.wall.every(green), `Walls retain their style: ${result.wall}`);
+  else {
+    imagery(result.wall, false, true);
+    imagery(result.wallHigh, false, true);
+  }
+  assert.ok(result.emptyWalls.every(green), `Walls without raster coverage retain their style: ${result.emptyWalls}`);
+  assert.ok(result.highlightedWalls.every(pixel => pixel[1] > pixel[0] && pixel[2] > pixel[0]), 'Highlight overrides wall imagery');
   assert.ok(result.highlighted.every(pixel => pixel[1] > pixel[0] && pixel[2] > pixel[0]), 'Highlight overrides imagery');
   assert.equal(result.reused, true);
   assert.equal(result.sameTexture, true);

@@ -22,11 +22,14 @@ const downloader = fetch => new Function('fetch', 'sleep',
   `${slice('async function download(', '// PMTiles v3 Hilbert')}; return download;`)(fetch, async () => {});
 const builder = outDir => new Function('outDir', 'tilesIn', 'open', 'stat', 'gzipSync', 'createWriteStream',
   'createReadStream', 'pipeline', 'rename', 'rm', 'fileURLToPath', 'console',
-  `${slice('function tileId(', 'async function build(')}\n${slice('async function build(', 'await mkdir(outDir')}\nreturn build;`)(
+  `${slice('function tileId(', 'async function build(')}
+   ${slice('async function build(', 'async function buildArchives(')}
+   ${slice('function createHeader(', 'function packColosseum(')}
+   return build;`)(
   outDir, () => [[1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]], open, stat, gzipSync,
   createWriteStream, createReadStream, pipeline, rename, rm, fileURLToPath, { log() {} });
 const archiveBuilder = (jobs, archives, build) => new Function('jobs', 'archives', 'build',
-  `${slice('async function buildArchives(', 'await mkdir(outDir')}\nreturn buildArchives;`)(jobs, archives, build);
+  `${slice('async function buildArchives(', 'const WORLD')}\nreturn buildArchives;`)(jobs, archives, build);
 
 const point = (coordinates, properties) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties });
 

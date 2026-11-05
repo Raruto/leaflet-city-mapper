@@ -3,12 +3,184 @@ import { readFile } from 'node:fs/promises';
 import { Given, Then } from '@cucumber/cucumber';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 
-Given('the OpenLayers example replaces only the Leaflet script and stylesheet', { timeout: 60000 }, async function () {
-  const [original, example] = await Promise.all(['leaflet-city-mapper.html', 'leaflet-city-mapper-openlayers.html']
-    .map(name => readFile(new URL(`../../examples/${name}`, import.meta.url), 'utf8')));
-  assert.equal(example.replaceAll('\r\n', '\n'), original.replaceAll('\r\n', '\n')
-    .replace('https://unpkg.com/leaflet@1.9/dist/leaflet-src.js', 'openlayers-bindings.js')
-    .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css', 'https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css'));
+async function assertEngineControl(page, openlayers) {
+  const control = page.locator('.map-engine-control');
+  const button = control.getByRole('button', { name: `Try it with ${openlayers ? 'Leaflet' : 'OpenLayers'}`, exact: true });
+  assert.equal(await button.textContent(), '');
+  assert.equal(await control.evaluate((element, openlayers) => {
+    const corner = openlayers ? '.ol-city-bottomleft' : '.leaflet-bottom.leaflet-left';
+    const rect = element.getBoundingClientRect(), mapRect = map.getContainer().getBoundingClientRect();
+    return Boolean(element.closest(corner)) && rect.left - mapRect.left < 20 &&
+      rect.top > mapRect.top + mapRect.height / 2;
+  }, openlayers), true);
+  assert.equal(await button.locator('img').getAttribute('src'), openlayers
+    ? 'https://leafletjs.com/docs/images/favicon.svg' : 'https://openlayers.org/theme/img/logo-dark.svg');
+  await page.waitForFunction(() => {
+    const icon = document.querySelector('.map-engine-control img');
+    return icon?.complete && icon.naturalWidth > 0;
+  });
+  const rect = await button.boundingBox();
+  assert.ok(rect.width >= 30 && rect.height >= 30);
+  assert.equal(await button.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), true, 'Engine control must not be covered by attribution or status text');
+  const overlap = await page.evaluate(async () => {
+    const container = map.getContainer(), width = container.style.width;
+    const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const check = () => {
+      const control = container.querySelector('.map-engine-control').getBoundingClientRect();
+      const attribution = container.querySelector('.leaflet-control-attribution,.ol-attribution')?.getBoundingClientRect();
+      if (!attribution) return false;
+      const ribbon = document.querySelector('.view-on-github')?.getBoundingClientRect();
+      const status = document.querySelector('#status')?.getBoundingClientRect();
+      return control.bottom + 5 > attribution.top ||
+        ribbon && ribbon.bottom > attribution.top || status && status.bottom > attribution.top;
+    };
+    try {
+      await settle();
+      const full = check();
+      container.style.width = '280px';
+      map.invalidateSize();
+      await settle();
+      return full || check();
+    } finally {
+      container.style.width = width;
+      map.invalidateSize();
+      await settle();
+    }
+  });
+  assert.equal(Boolean(overlap), false, 'Controls, GitHub link and status must stay above attribution, including in narrow maps');
+}
+
+async function assertParisAttributions(page) {
+  const footer = page.locator('.map-attribution-footer');
+  for (const name of ['IGN', 'Etalab 2.0', 'Transit routes: IDFM', 'OpenStreetMap contributors']) {
+    assert.equal(await footer.getByRole('link', { name, exact: true }).count(), 1, name);
+  }
+  assert.equal(await footer.getByRole('link', { name: 'Ville de Paris', exact: true }).count(), 2);
+}
+
+Given('the comparison page {string} is open', { timeout: 60000 }, async function (example) {
+  this.comparisonErrors = [];
+  this.comparisonLeafletRequests = [];
+  this.comparisonExample = example;
+  this.page.on('pageerror', error => this.comparisonErrors.push(error.message));
+  this.page.on('request', request => {
+    if (/\/leaflet@[^/]+\/dist\/.*\.(js|css)/.test(request.url())) this.comparisonLeafletRequests.push(request.url());
+  });
+  await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
+  const png = await this.page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#f0f0f0'; context.fillRect(0, 0, 256, 256);
+    return canvas.toDataURL().split(',')[1];
+  });
+  const tile = route => route.fulfill({ contentType: 'image/png', body: Buffer.from(png, 'base64') });
+  await this.context.route('https://tile.openstreetmap.org/**', tile);
+  await this.context.route('https://server.arcgisonline.com/**', tile);
+  await this.context.route('https://ows.terrestris.de/**', tile);
+  await this.page.goto(`${this.baseUrl}/examples/${example}?canvas&compare=1#scene`);
+  await this.page.waitForFunction(() => globalThis.map && !map.ol);
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('its button reloads the same scene on OpenLayers and back to Leaflet', { timeout: 120000 }, async function () {
+  await this.page.waitForFunction(() => document.querySelector('canvas.leaflet-3d'));
+  await assertEngineControl(this.page, false);
+  if (this.comparisonExample === 'leaflet-city-mapper.html') await assertParisAttributions(this.page);
+  this.comparisonLeafletRequests.length = 0;
+  await this.page.getByRole('button', { name: 'Try it with OpenLayers', exact: true }).click();
+  await this.page.waitForFunction(() => globalThis.map?.ol && document.querySelector('.ol-city-rotate'));
+  await assertEngineControl(this.page, true);
+  if (this.comparisonExample === 'leaflet-city-mapper.html') await assertParisAttributions(this.page);
+  const url = new URL(this.page.url());
+  assert.equal(url.pathname, `/examples/${this.comparisonExample}`);
+  assert.equal(url.searchParams.get('engine'), 'openlayers');
+  assert.equal(url.searchParams.has('canvas'), true);
+  assert.equal(url.searchParams.get('compare'), '1');
+  assert.equal(url.hash, '#scene');
+  assert.deepEqual(this.comparisonLeafletRequests, []);
+  await this.page.waitForFunction(() => {
+    const layers = Object.values(map._layers);
+    const native = layers.filter(layer => globals.sceneByLayer.get(layer)?._nativeGPU);
+    return document.querySelector('canvas.leaflet-3d') &&
+      native.every(layer => globals.sceneByLayer.get(layer)._nativeGPU.meshes?.size > 0);
+  });
+  if (this.comparisonExample.includes('-geojson')) {
+    await this.page.evaluate(() => testOperations.setPitch(map, 45));
+    await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
+      globals.sceneByLayer.get(layer)?._type === 'terrain' &&
+      globals.sceneByLayer.get(layer)._terrainReady && globals.sceneByLayer.get(layer)._rasterTiles.size > 0));
+    assert.equal(await this.page.evaluate(() => Object.values(map._layers).filter(layer =>
+      globals.sceneByLayer.get(layer)?._type === 'cog').length), 2);
+    await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 200, clientY: 200 });
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
+    assert.equal(await this.page.evaluate(() => map.getPitch()), 45);
+    await this.page.locator('#map').dispatchEvent('pointerleave');
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+  }
+  if (this.comparisonExample.includes('-native')) {
+    const counts = await this.page.evaluate(() => {
+      const native = Object.values(map._layers).map(layer => globals.sceneByLayer.get(layer)?._nativeGPU).filter(Boolean);
+      return { count: native.length, shadow: globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes.has('shadow') };
+    });
+    assert.ok(counts.count >= 16, JSON.stringify(counts));
+    assert.equal(counts.shadow, true);
+    await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).uncheck();
+    await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).check();
+    await this.page.waitForFunction(() => globals.sceneByLayer.get(nativeLayers.CircleMarker)._nativeGPU.meshes?.size > 0);
+    const circle = await this.page.evaluate(() => {
+      const pixel = map.latLngToContainerPoint(nativeLayers.CircleMarker.getLatLng());
+      const rect = map.getContainer().getBoundingClientRect();
+      return { x: rect.left + pixel.x, y: rect.top + pixel.y };
+    });
+    await this.page.mouse.move(circle.x, circle.y);
+    await this.page.locator('.ol-city-tooltip').waitFor();
+    assert.equal(await this.page.locator('.ol-city-tooltip').textContent(), 'CircleMarker');
+    await this.page.mouse.click(circle.x, circle.y);
+    assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+    await this.page.getByRole('button', { name: 'Close popup' }).click();
+    await this.page.evaluate(() => nativeLayers.Rectangle.openPopup());
+    assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+    await this.page.getByRole('button', { name: 'Close popup' }).click();
+    for (const title of ['Default icon and shadow', 'Marker']) {
+      await this.page.getByRole('button', { name: title, exact: true }).last().click();
+      assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+      await this.page.getByRole('button', { name: 'Close popup' }).click();
+    }
+    const marker = this.page.getByRole('button', { name: 'Drag this GPU marker' });
+    const before = await this.page.evaluate(() => nativeLayers.Marker.getLatLng());
+    const rect = await marker.boundingBox();
+    await this.page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.move(rect.x + rect.width / 2 + 40, rect.y + rect.height / 2 + 20, { steps: 4 });
+    await this.page.mouse.up();
+    assert.equal(await this.page.evaluate(value => !nativeLayers.Marker.getLatLng().equals(value), before), true);
+    await marker.focus();
+    await this.page.keyboard.press('Enter');
+    assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+    await this.page.getByRole('button', { name: 'Close popup' }).click();
+  }
+  assert.deepEqual(this.comparisonErrors, []);
+  await this.page.getByRole('button', { name: 'Try it with Leaflet', exact: true }).click();
+  await this.page.waitForFunction(() => globalThis.map && !map.ol && document.querySelector('canvas.leaflet-3d'));
+  const restored = new URL(this.page.url());
+  assert.equal(restored.searchParams.has('engine'), false);
+  assert.equal(restored.searchParams.has('canvas'), true);
+  assert.equal(restored.searchParams.get('compare'), '1');
+  assert.equal(restored.hash, '#scene');
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Given('the shared example can load OpenLayers', { timeout: 60000 }, async function () {
+  const [bindings, minifiedBindings, ...examples] = await Promise.all([
+    'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
+    'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-geojson.html',
+    'examples/leaflet-city-mapper-native.html',
+  ].map(name => readFile(new URL(`../../${name}`, import.meta.url), 'utf8')));
+  for (const example of examples) assert.ok(example.includes('<script src="map-engine.js"></script>'));
   this.openlayersErrors = [];
   this.leafletRequests = [];
   this.page.on('pageerror', error => this.openlayersErrors.push(error.message));
@@ -17,9 +189,35 @@ Given('the OpenLayers example replaces only the Leaflet script and stylesheet', 
   });
   await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
   await this.page.clock.install();
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-openlayers.html`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html?engine=openlayers`);
   assert.deepEqual(this.openlayersErrors, []);
   await this.page.waitForFunction(() => globalThis.map && document.querySelector('.ol-city-rotate'));
+  for (const source of [bindings, minifiedBindings]) {
+    const standalone = await this.page.evaluate(source => {
+      const frame = document.createElement('iframe');
+      frame.hidden = true;
+      document.body.append(frame);
+      try {
+        frame.contentWindow.ol = ol;
+        const script = frame.contentDocument.createElement('script');
+        script.textContent = source;
+        frame.contentDocument.head.append(script);
+        const classes = frame.contentWindow.L;
+        return {
+          classes: ['Map', 'Layer', 'TileLayer', 'Marker', 'Polygon', 'Circle', 'GeoJSON', 'Control']
+            .every(name => typeof classes?.[name] === 'function') && typeof classes?.Control.Layers === 'function',
+          noLoader: !frame.contentWindow.installOpenLayersBindings &&
+            !frame.contentDocument.querySelector('script[src], link'),
+          inlineStyles: frame.contentDocument.querySelectorAll('style[data-openlayers-bindings]').length === 1,
+        };
+      } finally {
+        frame.remove();
+      }
+    }, source);
+    assert.deepEqual(standalone, { classes: true, noLoader: true, inlineStyles: true });
+  }
+  assert.equal(await this.page.locator('link[href*="openlayers-bindings"][href$=".css"]').count(), 0);
+  assert.equal(await this.page.locator('style[data-openlayers-bindings]').count(), 1);
 });
 
 Then('OpenLayers drives the source layers and camera without Leaflet JavaScript', { timeout: 120000 }, async function () {
@@ -234,7 +432,6 @@ Then('the OpenLayers example preserves map and layer control interactions', { ti
   const beforeButton = await this.page.evaluate(() => map.getZoom());
   await this.page.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await this.page.waitForFunction(zoom => map.getZoom() > zoom && !map.ol.getView().getAnimating(), beforeButton);
-  await this.page.getByRole('button', { name: 'Attributions', exact: true }).click();
   assert.equal(await this.page.getByRole('link', { name: 'OpenLayers', exact: true }).isVisible(), true);
   const initial = await this.page.evaluate(() => ({ lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() }));
   await this.page.mouse.move(350, 350);

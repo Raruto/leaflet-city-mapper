@@ -40,7 +40,7 @@ import { gridlayerGetTiledPixelBounds } from '../core/gridlayerGetTiledPixelBoun
 mapMethods.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Map.prototype));
 
 L.Map.mergeOptions({
-  rotate: true, bearing: 0, pitch: 0, pitchMaxDistance: 3,
+  rotate: true, bearing: 0, pitch: 0, maxPitch: 85, pitchMaxDistance: 3,
   rotateControl: true, shiftKeyRotate: true, pitchDrag: true,
   touchRotate: false, touchPitch: false, compassBearing: false,
 });

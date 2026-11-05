@@ -69,6 +69,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
     fadeDuration: 250,
     fadeStart: tile.loadedAt,
     ground: true,
+    _rasterSource: layer,
   };
   tile.mesh.visible = false;
   setParent(mesh, sceneByLayer.get(backend).root);

@@ -25,7 +25,8 @@ export function layerInitialize(options = sceneEmptyOptions) {
     source: {
       type = options.source.data?.type === 'FeatureCollection'
         ? 'geojson'
-        : /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles' : '3d',
+        : /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles'
+        : /\.tiff?(?:[?#]|$)/i.test(options.source.url) ? 'cog' : '3d',
       ...source
     },
     ...core

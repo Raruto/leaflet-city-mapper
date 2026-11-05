@@ -6,10 +6,11 @@ import { sceneByLayer } from '../globals/sceneByLayer.js';
 /** Test the mesh's ground footprint against loaded imagery, including coarse parent tiles. */
 export function roofCoverage(mesh, backend, rasters) {
   const map = backend._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
-  let intersectsArchive = false;
+  let intersectsArchive = false, pending = false;
   let layer, zoom, origin, scale, minX, minY, maxX, maxY, i, x, y, z, px, py, nw, se, remaining, tile, size, left;
   let top, pieces, x0, y0, x1, y1, l, t, r, b;
   for (layer of rasters) {
+    if (!sceneByLayer.get(layer).header) { pending = true; continue; }
     zoom = sceneByLayer.get(layer)._tileZoom, origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
     scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
     minX = minY = Infinity; maxX = maxY = -Infinity;
@@ -55,5 +56,5 @@ export function roofCoverage(mesh, backend, rasters) {
       if (!remaining.length) return true;
     }
   }
-  return !intersectsArchive;
+  return !intersectsArchive && !pending;
 }

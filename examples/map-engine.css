@@ -1,0 +1,54 @@
+.map-engine-control {
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px #0006;
+}
+
+.map-engine-control button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: 2px;
+  background: white;
+  cursor: pointer;
+}
+
+.map-engine-control button:hover { background: #f4f4f4; }
+.map-engine-control button:focus-visible { outline: 2px solid #2675c9; }
+.map-engine-control img { display: block; width: 24px; height: 24px; }
+
+.map-attribution-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.map-attribution-footer .leaflet-control-attribution,
+.map-attribution-footer .ol-attribution {
+  position: static;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.leaflet-container .leaflet-bottom { bottom: var(--map-attribution-height, 0px); }
+.openlayers-city-mapper .ol-city-bottomleft,
+.openlayers-city-mapper .ol-city-bottomright { bottom: calc(var(--map-attribution-height, 0px) + 8px); }
+
+.view-on-github {
+  position: absolute;
+  bottom: calc(var(--map-attribution-height, 0px) + 10px);
+  left: calc(50% - 81px);
+  z-index: 1000;
+}
+
+#status { bottom: calc(var(--map-attribution-height, 0px) + 52px); }

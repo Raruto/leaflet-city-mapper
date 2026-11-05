@@ -16,6 +16,7 @@ export function start() {
   const map = this.layer._map;
   if (this.saved || !map) return;
   this.state.latlng = map.getCenter();
+  this.state.height = this.verticalSpeed = 0;
   // Zoom whose camera distance (1.5 viewport heights, as in scene/render.js) is about `distance` metres behind the walker.
   const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
   const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * earthCirc * Math.cos(this.state.latlng.lat * radians) / 256));

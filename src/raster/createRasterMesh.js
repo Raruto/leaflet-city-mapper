@@ -44,7 +44,7 @@ export function createRasterMesh(backend, tile) {
 
   if (!sceneByLayer.get(backend)._rasterProgram) {
     sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* alloc */ {
-      baseTexture: texture, unlit: true, alphaMode: 'BLEND',
+      baseTexture: texture, unlit: true, alphaMode: 'BLEND', doubleSided: backend.options.doubleSided,
     });
   }
   if (!sceneByLayer.get(backend)._rasterGeometry) sceneByLayer.get(backend)._rasterGeometry = createGeometry(device);
@@ -70,6 +70,7 @@ export function createRasterMesh(backend, tile) {
     program: sceneByLayer.get(backend)._rasterProgram, texture,
     opacity: backend.options.opacity, id: nextId.value++,
     renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
+    _rasterSource: backend,
   };
   setParent(tile.mesh, sceneByLayer.get(backend).root);
 }

@@ -12,7 +12,7 @@ export function project(map, point, inverse = false, limit = false) {
   if (inverse) {
     const far = size.y * map.options.pitchMaxDistance;
     const denominator = tilt * distance + rise * y;
-    let v = denominator > 0 ? y * distance / denominator : -far;
+    let v = denominator * tilt > 0 ? y * distance / denominator : -far;
     if (limit) v = Math.max(-far, Math.min(far, v));
     const u = x * (distance - rise * v) / distance;
     result.x = cos * u + sin * v + halfX;

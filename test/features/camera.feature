@@ -16,6 +16,10 @@ Feature: Standalone WebGPU camera with Leaflet as its only dependency
     Then camera orientation is accessible without dragging
     And camera mouse and touch gestures preserve Leaflet zoom and panning
 
+  Scenario: Opt-in camera inclination supports views below the ground
+    Given the instrumented city mapper plugin is loaded after Leaflet alone
+    Then an extended pitch orbits below ground without breaking navigation or controls
+
   Scenario: The compact compass retains its appearance and drag behavior
     Given the instrumented city mapper plugin is loaded after Leaflet alone
     Then the compass retains its drag sensitivity and bearing-only option

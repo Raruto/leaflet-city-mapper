@@ -13,6 +13,14 @@ Feature: Standalone GeoJSON sources
     Given the instrumented city mapper plugin is loaded after Leaflet alone
     Then GeoJSON reports invalid sources and cancels obsolete downloads
 
-  Scenario: The minimal GeoJSON example renders the Colosseum over OpenStreetMap
+  Scenario: The minimal GeoJSON example reveals archaeology through a local aerial lens
     Given the instrumented city mapper plugin is loaded after Leaflet alone
     Then the minimal GeoJSON example renders the Colosseum at different heights
+
+  Scenario: Reusable lens controls isolate maps and clean up their lifecycle
+    Given the instrumented city mapper plugin is loaded after Leaflet alone
+    Then lens controls preserve clipping options and remove their handlers
+
+  Scenario: Local Colosseum facade and main-road lighting follows the simulated night
+    Given the instrumented city mapper plugin is loaded after Leaflet alone
+    Then the Colosseum lighting JSON illuminates the facade and main roads only at night

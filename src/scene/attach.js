@@ -161,5 +161,5 @@ export async function attach(backend, map) {
   setParent(sceneByLayer.get(backend).root, sceneByLayer.get(shared).scene);
   traverse(sceneByLayer.get(backend).root, restoreObject, backend);
   update(shared);
-  if ((sceneByLayer.get(backend).header && sceneByLayer.get(backend)._type !== 'pmtiles') || sceneByLayer.get(backend)._geojson) updateArea(backend);
+  if ((sceneByLayer.get(backend).header && sceneByLayer.get(backend).kind !== 'raster') || sceneByLayer.get(backend)._geojson) updateArea(backend);
 }

@@ -1,5 +1,13 @@
 Feature: Standalone 3D utilities
   @unit
+  Scenario: Every demo data file fits the GitHub 100 MiB Git limit
+    Then every demo data file fits the GitHub upload size limit
+
+  @unit
+  Scenario: Build outputs keep readable and minified bundles separate from compatibility libraries
+    Then the build generates readable and minified bundles and standalone compatibility files
+
+  @unit
   Scenario: Shared numeric constants preserve projection, astronomy and lighting formulas
     Then precomputed constants match their original numeric formulas
 

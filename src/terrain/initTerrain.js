@@ -6,8 +6,9 @@ import { onTerrainAdd } from './onTerrainAdd.js';
 import { init3D } from '../scene/init3D.js';
 
 /**
- * Renders IGN Float32 DEM tiles and PMTiles raster basemaps in the shared WebGPU scene.
- * Source options: `url` (single-zoom Float32 PMTiles DEM); `bridges` (optional GeoJSON deck polygons with Z, see _addBridges).
+ * Renders Float32 DEM tiles and archived raster basemaps in the shared WebGPU scene.
+ * Source options: `url` (single-zoom Float32 PMTiles or supported COG DEM);
+ * `bridges` (optional GeoJSON deck polygons with Z, see _addBridges).
  */
 export function initTerrain(layer, options) {
   const terrainSource = options.url;

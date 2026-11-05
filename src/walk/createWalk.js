@@ -32,7 +32,7 @@ export function createWalk(control, {
   button.style.cssText = 'width:30px;height:30px;padding:0;border:0;border-radius:4px;background:#fff;font-size:18px;line-height:30px;cursor:pointer;';
   const hint = L.DomUtil.create('small', '', container);
   hint.style.cssText = 'display:none;padding:0 8px;color:#333;white-space:nowrap;';
-  hint.textContent = 'W/S: run · A/D: turn · drag: look around · Esc: exit';
+  hint.textContent = 'W/S: run · A/D: turn · hold Space: ascend · drag: look around · Esc: exit';
   L.DomEvent.disableClickPropagation(container);
 
   const context = /* alloc */ {
@@ -47,10 +47,11 @@ export function createWalk(control, {
     frame: null,
     last: undefined,
     swing: 0,
+    verticalSpeed: 0,
     saved: null,
     hitData: null,
     local: null,
-    state: control.walker = sceneByLayer.get(layer).walker = /* alloc */ { latlng: null, heading: 0, phase: 0 }
+    state: control.walker = sceneByLayer.get(layer).walker = /* alloc */ { latlng: null, heading: 0, phase: 0, height: 0 }
   }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);

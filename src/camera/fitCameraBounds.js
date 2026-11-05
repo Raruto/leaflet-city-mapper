@@ -14,9 +14,14 @@ export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   const min = pointOf(options.paddingTopLeft || options.padding || cameraZeroPadding).subtract(half);
   const max = half.subtract(pointOf(options.paddingBottomRight || options.padding || cameraZeroPadding));
   const [cos, sin, tilt, rise] = angles(map, cameraAngles);
+  if (tilt < 0) {
+    const y = min.y;
+    min.y = -max.y;
+    max.y = -y;
+  }
   const far = map.getSize().y * map.options.pitchMaxDistance;
-  const top = verticalGroundY(min.y, tilt, distance, rise, far);
-  const bottom = verticalGroundY(max.y, tilt, distance, rise, far);
+  const top = verticalGroundY(min.y, Math.abs(tilt), distance, rise, far);
+  const bottom = verticalGroundY(max.y, Math.abs(tilt), distance, rise, far);
   const origin = map.project(bounds.getNorthWest(), zoom).add(map.project(bounds.getSouthEast(), zoom)).divideBy(2);
   let low = Infinity, high = -Infinity;
   const leftSlope = min.x * rise / distance, rightSlope = max.x * rise / distance;

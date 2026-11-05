@@ -14,13 +14,19 @@ export async function finishRasterTile(backend, tile) {
     const result = await getZxy(backend.options.archive,
       tile.coords.z, tile.coords.x, tile.coords.y, tile.request.signal
     );
-    if (tile.request.signal.aborted) return;
+    if (tile.request.signal.aborted) {
+      result?.image?.close();
+      return;
+    }
     if (!result) throw /* alloc */ new Error(`Tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y} is not in the offline archive`);
     try {
-      blobParts[0] = result.data;
-      const blob = /* alloc */ new Blob(blobParts);
-      blobParts[0] = null;
-      tile.image = await createImageBitmap(blob);
+      if (result.image) tile.image = result.image;
+      else {
+        blobParts[0] = result.data;
+        const blob = /* alloc */ new Blob(blobParts);
+        blobParts[0] = null;
+        tile.image = await createImageBitmap(blob);
+      }
     } catch {
       blobParts[0] = null;
       throw /* alloc */ new Error(`Unable to decode tile ${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`);

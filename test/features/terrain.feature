@@ -20,9 +20,19 @@ Feature: Terrain and raster imagery
     Given a leaflet map
     Then streamed geometry dissolves progressively while remaining opaque
 
-  Scenario: Building roofs use geographically aligned raster imagery and retain styled walls
+  Scenario Outline: Building surfaces use geographically aligned raster imagery independently
     Given a leaflet map
-    Then roof imagery follows raster loading, background changes and renderer ownership
+    Then "<surfaces>" imagery with wall opacity "<opacity>" follows raster loading, background changes and renderer ownership
+
+    Examples:
+      | surfaces | opacity |
+      | roofs    | default |
+      | walls    | default |
+      | both     | default |
+      | both     | 0       |
+      | both     | 0.25    |
+      | both     | 1       |
+      | soft-roofs | 0.25  |
 
   Scenario Outline: Terrain deforms raster tiles and keeps buildings and the camera at their ground elevation
     Given a leaflet map

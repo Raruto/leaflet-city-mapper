@@ -16,7 +16,7 @@ Then('camera projection preserves its formulas without intermediate point instan
   const previous = mockLeaflet({ Point });
   try {
     for (const [width, height] of [[600, 400], [0, 0]]) {
-      for (const [pitch, bearing] of [[0, 0], [30, 70], [85, -145]]) {
+      for (const [pitch, bearing] of [[0, 0], [30, 70], [85, -145], [90, 0], [120, 70], [180, -145]]) {
         const map = { getSize: () => ({ x: width, y: height }), options: { pitchMaxDistance: 3 } };
         globals.cameraByMap.set(map, { _cameraPitch: pitch, _cameraBearing: bearing });
         for (const input of [[30, 20], { x: 300, y: 200 }, { x: -100, y: -10000 }]) {
@@ -28,7 +28,7 @@ Then('camera projection preserves its formulas without intermediate point instan
             let expectedX = input.x ?? input[0], expectedY = input.y ?? input[1];
             if (distance && inverse) {
               const denominator = tilt * distance + rise * y, far = height * 3;
-              let v = denominator > 0 ? y * distance / denominator : -far;
+              let v = denominator * tilt > 0 ? y * distance / denominator : -far;
               if (limit) v = Math.max(-far, Math.min(far, v));
               const u = x * (distance - rise * v) / distance;
               expectedX = cos * u + sin * v + width / 2;
@@ -236,6 +236,66 @@ Then('camera orientation is accessible without dragging', { timeout: 30000 }, as
       noPanel: !control.querySelector('details,input'), transforms: arrow.style.transform.includes('rotateX') };
   });
   assert.deepEqual(icon, { compact: true, svg: true, noPanel: true, transforms: true });
+});
+
+Then('an extended pitch orbits below ground without breaking navigation or controls', { timeout: 30000 }, async function () {
+  await createMap(this.page, { maxPitch: 180 });
+  const result = await this.page.evaluate(() => {
+    const map = cameraMap, errors = [];
+    for (const pitch of [85, 89, 90, 91, 120, 180]) {
+      for (const bearing of [0, 35, 270]) {
+        cityMapperTestOperations.mapSetPitchAndBearing(map, pitch, bearing);
+        const bounds = map.getBounds();
+        if (!bounds.contains(map.getCenter())) throw new Error(`Ground bounds lost center at ${pitch}`);
+        const arrow = globals.cameraByMap.get(map).rotateControl._arrow;
+        if (!arrow.style.transform || /NaN|Infinity/.test(arrow.style.transform)) throw new Error('Invalid compass transform');
+        if (pitch === 91 && globals.cameraByMap.get(map)._pitchSky.style.bottom !== '0px') throw new Error('Sky must be below the ground');
+        for (const offset of [[0, 0], [20, 10], [-30, -15]]) {
+          const ground = map.project(map.getCenter()).add(offset).subtract(map.getPixelOrigin());
+          const screen = map.layerPointToContainerPoint(ground);
+          if (pitch !== 90) errors.push(map.containerPointToLayerPoint(screen).distanceTo(ground));
+        }
+      }
+    }
+    cityMapperTestOperations.mapSetPitchAndBearing(map, 120, 35);
+    const screen = new L.Point(420, 290), anchor = map.containerPointToLatLng(screen);
+    map.setZoomAround(screen, 17, { animate: false });
+    const zoomError = map.latLngToContainerPoint(anchor).distanceTo(screen);
+    const old = map.getCenter(), half = map.getSize().divideBy(2), offset = new L.Point(30, 40);
+    map.panBy(offset, { animate: false });
+    const panError = map.latLngToContainerPoint(old).distanceTo(half.subtract(offset));
+    const bounds = new L.LatLngBounds([48.84, 2.27], [48.88, 2.32]);
+    let fitError = 0;
+    for (const pitch of [95, 120, 180]) {
+      cityMapperTestOperations.mapSetPitchAndBearing(map, pitch, 35);
+      map.fitBounds(bounds, { paddingTopLeft: [40, 30], paddingBottomRight: [20, 50], animate: false });
+      for (const corner of [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]) {
+        const p = map.latLngToContainerPoint(corner);
+        fitError = Math.max(fitError, 40 - p.x, p.x - 580, 30 - p.y, p.y - 350);
+      }
+    }
+    let invalid = 0;
+    for (const maxPitch of [-1, 181, NaN, Infinity, '180']) {
+      map.options.maxPitch = maxPitch;
+      try { testOperations.setPitch(map, 100); } catch (error) { if (error instanceof TypeError) invalid++; }
+    }
+    map.options.maxPitch = 180;
+    testOperations.setPitch(map, 80);
+    return { error: Math.max(...errors), zoomError, panError, fitError, invalid };
+  });
+  for (const key of ['error', 'zoomError', 'panError', 'fitError']) assert.ok(result[key] < 2, `${key}: ${result[key]}px`);
+  assert.equal(result.invalid, 5);
+  const box = await this.page.locator('.leaflet-container').boundingBox();
+  await this.page.mouse.move(box.x + 300, box.y + 250);
+  await this.page.mouse.down({ button: 'right' });
+  await this.page.mouse.move(box.x + 300, box.y + 150, { steps: 4 });
+  await this.page.mouse.up({ button: 'right' });
+  assert.equal(await this.page.evaluate(() => testOperations.getPitch(cameraMap)), 130);
+  await this.page.getByRole('button', { name: 'Reset bearing and pitch', exact: true }).press('ArrowUp');
+  assert.equal(await this.page.evaluate(() => testOperations.getPitch(cameraMap)), 135);
+  await this.page.evaluate(() => cityMapperTestOperations.mapAnimateCamera(cameraMap, 200, 0, { animate: true, duration: 0.1 }));
+  await this.page.waitForFunction(() => !globals.cameraByMap.get(cameraMap)._cameraAnimation);
+  assert.equal(await this.page.evaluate(() => testOperations.getPitch(cameraMap)), 180);
 });
 
 Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { timeout: 30000 }, async function () {

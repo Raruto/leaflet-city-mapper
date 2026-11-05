@@ -42,6 +42,7 @@ export { cameraTouchStates } from '../../src/globals/cameraTouchStates.js';
 export { cameraZeroPadding } from '../../src/globals/cameraZeroPadding.js';
 export { closestMethods } from '../../src/globals/closestMethods.js';
 export { colliders } from '../../src/globals/colliders.js';
+export { cogTags } from '../../src/globals/cogTags.js';
 export { colorLayout } from '../../src/globals/colorLayout.js';
 export { coreEventTypes } from '../../src/globals/coreEventTypes.js';
 export { coreMatrixKeys } from '../../src/globals/coreMatrixKeys.js';

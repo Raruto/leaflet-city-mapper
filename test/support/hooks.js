@@ -109,6 +109,18 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     const file = new URL(route.request().url()).pathname.split('/dist/')[1];
     return route.fulfill({ path: fileURLToPath(new URL(`../../node_modules/leaflet/dist/${file}`, import.meta.url)) });
   });
+  if (process.env.LEAFLET_VERSION === '2') {
+    await this.context.route('**/map-engine.js', async route => {
+      const response = await route.fetch();
+      const body = (await response.text())
+        .replace('https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
+          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js');
+      await route.fulfill({ response, body: body.replace(
+        'document.addEventListener', String.raw`if (!openlayers) document.write('<script>globalThis.L = globalThis.leaflet;<\/script>');
+document.addEventListener`
+      ) });
+    });
+  }
   await this.context.route(/\.html(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
@@ -135,8 +147,8 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     if (initialize && !initialize._testArchive) {
       L.Layer.prototype.initialize = Object.assign(function (options = {}) {
         const source = options.source;
-        if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' &&
-          !/\\.(glb|gltf)(?:[?#]|$)/i.test(source.url) && !source.archive) {
+        if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' && source.type !== 'cog' &&
+          !/\\.(glb|gltf|tif|tiff)(?:[?#]|$)/i.test(source.url) && !source.archive) {
           const url = new URL(source.url, document.baseURI).href;
           options = { ...options, source: { ...source, archive: {
             getHeader: async () => ['buildings', 'trees', 'streetlights'].some(name => url.endsWith('/paris-' + name + '.pmtiles'))

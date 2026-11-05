@@ -20,14 +20,15 @@ export async function loadTerrain(backend) {
   const controller = sceneByLayer.get(backend)._terrainController = /* alloc */ new AbortController();
   let x, y, i, layer;
   try {
-    if (!sceneByLayer.get(backend).terrainSource) throw /* alloc */ new Error('Terrain layer requires a PMTiles elevation archive');
+    if (!sceneByLayer.get(backend).terrainSource) throw /* alloc */ new Error('Terrain layer requires a PMTiles or COG elevation archive');
     const archive = sceneByLayer.get(backend)._terrainArchive = createLayer(/* alloc */ { source: /* alloc */ {
-      type: 'pmtiles', url: sceneByLayer.get(backend).terrainSource, archive: backend.options.archive,
+      type: backend.options.asset !== undefined || /\.tiff?(?:[?#]|$)/i.test(sceneByLayer.get(backend).terrainSource) ? 'cog' : 'pmtiles',
+      url: sceneByLayer.get(backend).terrainSource, archive: backend.options.archive, asset: backend.options.asset,
     } });
     await sceneByLayer.get(archive).ready;
     const header = sceneByLayer.get(archive).header;
     if (header.tileType !== 0 || header.minZoom !== header.maxZoom) {
-      throw /* alloc */ new Error('Expected a single-zoom Float32 PMTiles terrain archive');
+      throw /* alloc */ new Error('Expected a single-zoom Float32 terrain archive');
     }
     sceneByLayer.get(backend)._terrainZoom = header.maxZoom;
     const map = backend._map;

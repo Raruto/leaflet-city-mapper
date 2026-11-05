@@ -20,7 +20,7 @@ export function runCameraAnimations(now) {
       ? Math.min(1, (now - animation.start) / (animation.duration * 1000)) : 1;
     eased = 1 - (1 - progress) ** 3;
     try {
-      mapSetPitchAndBearing(map, animation.fromPitch + (Math.max(0, Math.min(85, animation.pitch)) - animation.fromPitch) * eased, animation.fromBearing + animation.delta * eased);
+      mapSetPitchAndBearing(map, animation.fromPitch + (Math.max(0, Math.min(map.options.maxPitch, animation.pitch)) - animation.fromPitch) * eased, animation.fromBearing + animation.delta * eased);
       if (progress < 1 && cameraByMap.get(map)._cameraAnimation === animation) scheduleCameraAnimation(map, animation);
       else if (cameraByMap.get(map)._cameraAnimation === animation) cameraByMap.get(map)._cameraAnimation = null;
     } catch (error) {

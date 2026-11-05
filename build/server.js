@@ -23,6 +23,8 @@ const types = {
   '.svg': 'image/svg+xml',
   '.tcx': 'application/vnd.garmin.tcx+xml',
   '.txt': 'text/plain; charset=utf-8',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
   '.webp': 'image/webp',
   '.xml': 'text/xml; charset=utf-8',
 };

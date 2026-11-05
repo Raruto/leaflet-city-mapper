@@ -16,7 +16,7 @@ Feature: Third-person walk mode
     Given a leaflet map
     Then Time state stays map-owned across control replacement
 
-  Scenario: Keyboard movement checks scene obstacles without breaking the walk loop
+  Scenario: Keyboard movement checks obstacles and holding Space ascends over them
     Given a leaflet map
     Then keyboard walking moves toward a wall, stops at it and can move away
 

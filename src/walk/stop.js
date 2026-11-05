@@ -10,6 +10,7 @@ export function stop() {
   const map = this.layer._map;
   cancelAnimationFrame(this.frame);
   this.keys.clear(); this.dragging = false;
+  this.state.height = this.verticalSpeed = 0;
   L.DomEvent.off(document, 'keydown keyup', this.onKey);
   L.DomEvent.off(window, 'blur', this.onBlur);
   let mesh, name;

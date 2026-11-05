@@ -45,7 +45,8 @@ export function attachAreaMesh(context) {
       geometry: meshGeometry,
       program: createProgram(backend, /* alloc */ {
         instanced: Boolean(data.instanceOffsets),
-        vertexColors: true, roofTexture: Boolean(backend.options.roofTexture),
+        vertexColors: true, roofTexture: backend.options.roofTexture,
+        wallTexture: backend.options.wallTexture,
         nightLight: Boolean(backend.options.nightLight),
         alphaMode: backend.options.nightLight ? 'BLEND' : undefined,
         doubleSided: Boolean(backend.options.nightLight),

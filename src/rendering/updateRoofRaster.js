@@ -12,11 +12,11 @@ export function updateRoofRaster(backend, now) {
   let hasRoofTexture = false;
   let layer;
   for (layer of sceneByLayer.get(backend)._layers) {
-    if (layer.options.roofTexture) { hasRoofTexture = true; break; }
+    if (layer.options.roofTexture || layer.options.wallTexture) { hasRoofTexture = true; break; }
   }
   if (hasRoofTexture) {
     for (layer of Object.values(map._layers)) {
-      if (sceneByLayer.get(layer)._type === 'pmtiles' && sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
+      if (sceneByLayer.get(layer).kind === 'raster' && sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
     }
     const signatures = roofSignatures;
     signatures.length = 0;

@@ -95,7 +95,7 @@ export function createProgram(backend, material = defaultMaterial) {
   if (material.metalTexture) uniforms.metalTexture = /* alloc */ { value: material.metalTexture };
   if (material.emissiveTexture) uniforms.emissiveTexture = /* alloc */ { value: material.emissiveTexture };
   if (material.occlusionTexture) uniforms.occlusionTexture = /* alloc */ { value: material.occlusionTexture };
-  if (material.roofTexture) uniforms.roofTexture = /* alloc */ { value: null };
+  if (material.roofTexture || material.wallTexture) uniforms.roofTexture = /* alloc */ { value: null };
   return /* alloc */ {
     device: sceneByLayer.get(backend).renderer.device,
     vertex,

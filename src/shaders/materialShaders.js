@@ -7,7 +7,17 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
   const hasMetal = Boolean(material.metalTexture);
   const hasEmissive = Boolean(material.emissiveTexture);
   const hasOcclusion = Boolean(material.occlusionTexture);
-  const hasRoof = Boolean(material.roofTexture);
+  const hasRoof = Boolean(material.roofTexture || material.wallTexture);
+  let name, value;
+  for (name of /* alloc */ ['roofTexture', 'wallTexture']) {
+    value = material[name];
+    if (value !== undefined && typeof value !== 'boolean' &&
+      (!Number.isFinite(value) || value < 0 || value > 1)) {
+      throw /* alloc */ new Error(`${name} must be a boolean or a finite number between 0 and 1`);
+    }
+  }
+  const roofOpacity = Number(material.roofTexture ?? 0);
+  const wallOpacity = Number(material.wallTexture ?? 0);
   const hasTerrain = Boolean(material.terrain);
   const textured = hasBase || hasMetal || hasEmissive || hasOcclusion || material.nightLight;
   const vertex = /* wgsl */ `
@@ -18,6 +28,7 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       emissive: vec4<f32>,
       terrain: vec4<f32>,
       highlight: vec4<f32>,
+      cutout: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,
@@ -73,7 +84,8 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       ${textured ? 'output.uv = input.uv;' : ''}
       ${hasRoof ? /* wgsl */ `
         output.roofUv = (frame.roofMatrix * world).xz;
-        output.roof = select(0.0, 1.0, input.normal.y >= 0.5 && !highlighted);
+        output.roof = select(0.0, select(${wallOpacity.toFixed(8)}, ${roofOpacity.toFixed(8)}, input.normal.y >= 0.5), ((${Boolean(material.roofTexture)} && input.normal.y >= 0.5) ||
+          (${Boolean(material.wallTexture)} && abs(input.normal.y) < 0.5)) && !highlighted);
       ` : ''}
       output.position = frame.projectionMatrix * viewPosition;
       return output;
@@ -93,6 +105,7 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       emissive: vec4<f32>,
       terrain: vec4<f32>,
       highlight: vec4<f32>,
+      cutout: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,
@@ -172,6 +185,8 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       if (u.highlight.w < 1.0 && noise >= u.highlight.w) { discard; }
     }
     @fragment fn fragmentMain(input: FragmentInput, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
+      let cutoutDistance = distance(input.position.xy, u.cutout.xy);
+      if (select((cutoutDistance < u.cutout.z), (cutoutDistance >= u.cutout.z), u.cutout.w > 0.0)) { discard; }
       ${material.nightLight ? /* wgsl */ `
         if (input.uv.x <= 2.0) {
         let radial = max(0.0, 1.0 - dot(input.uv, input.uv));
@@ -196,10 +211,10 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       var base = ${material.vertexColors ? 'toLinear(min(input.color, vec3<f32>(1.0)))' : 'input.color'} *
         ${material.baseTexture?.srgb ? 'texel.rgb' : 'toLinear(texel.rgb)'};
       ${hasRoof ? /* wgsl */ `
-        if (input.roof > 0.5 && all(input.roofUv >= vec2<f32>(0.0)) &&
+        if (input.roof > 0.0 && all(input.roofUv >= vec2<f32>(0.0)) &&
           all(input.roofUv <= vec2<f32>(1.0))) {
           let roof = textureSampleLevel(roofTexture, roofTextureSampler, input.roofUv, 0.0);
-          base = mix(base, toLinear(roof.rgb), roof.a);
+          base = mix(base, toLinear(roof.rgb), roof.a * input.roof);
         }
       ` : ''}
       let mr = ${hasMetal ? 'textureSample(metalTexture, metalTextureSampler, input.uv)' : 'vec4<f32>(1.0)'};

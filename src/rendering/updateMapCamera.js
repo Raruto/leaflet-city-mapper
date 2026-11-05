@@ -4,6 +4,7 @@ import { earthCirc } from '../globals/earthCirc.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { mapMethods } from '../globals/mapMethods.js';
+import { walkByMap } from '../globals/walkByMap.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
@@ -22,7 +23,9 @@ export function updateMapCamera(backend, size) {
   const distance = size.y * 1.5 / pixelsPerMeter;
   const targetX = (size.x / 2 - origin.x) / pixelsPerMeter;
   // CSS zoom keeps the logical view's ground plane until zoomend.
-  const targetY = (cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, map.getCenter()): undefined) ?? 0;
+  const walker = walkByMap.get(map)?.control?._walk;
+  const targetY = ((cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, map.getCenter()): undefined) ?? 0) +
+    (walker?.saved ? walker.state.height : 0);
   const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
   const pitch = mapGetPitch(map) * radians;
   const bearing = mapGetBearing(map) * radians;
