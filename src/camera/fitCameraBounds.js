@@ -13,19 +13,20 @@ export function fitCameraBounds(map, bounds, options = {}) {
   const bottom = verticalGroundY(max.y, tilt, distance, rise, far);
   const origin = map.project(bounds.getNorthWest(), zoom).add(map.project(bounds.getSouthEast(), zoom)).divideBy(2);
   const points = [];
-  for (const latlng of [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]) {
-    const p = map.project(latlng, zoom).subtract(origin);
+  let latlng, p, point;
+  for (latlng of [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]) {
+    p = map.project(latlng, zoom).subtract(origin);
     points.push(new L.Point(cos * p.x - sin * p.y, sin * p.x + cos * p.y));
   }
   let low = Infinity, high = -Infinity;
-  for (const point of points) {
+  for (point of points) {
     low = Math.min(low, point.y);
     high = Math.max(high, point.y);
   }
   const leftSlope = min.x * rise / distance, rightSlope = max.x * rise / distance;
   const slope = rightSlope - leftSlope;
   let left = Infinity, right = -Infinity;
-  for (const point of points) {
+  for (point of points) {
     left = Math.min(left, point.x + leftSlope * point.y);
     right = Math.max(right, point.x + rightSlope * point.y);
   }

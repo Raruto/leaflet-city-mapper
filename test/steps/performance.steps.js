@@ -266,3 +266,16 @@ Then('source loops declare no variables in their headers or bodies', async funct
   }
   assert.equal(errors.length, 0, `${errors.length} declarations inside source loops:\n${errors.join('\n')}`);
 });
+
+Then('the PMTiles header decoder reuses one counter across its three loops', async function () {
+  const ast = parse(await readFile('src/archives/decodeHeader.js', 'utf8'),
+    { ecmaVersion: 'latest', sourceType: 'module' });
+  const body = ast.body.find(node => node.type === 'ExportNamedDeclaration').declaration.body.body;
+  const loops = body.filter(node => node.type === 'ForStatement');
+  assert.equal(loops.length, 3, 'Sequential loops must not be wrapped in separate declaration blocks');
+  const counters = new Set(loops.map(loop => loop.init.left.name));
+  assert.equal(counters.size, 1, 'Sequential loops must share one counter');
+  const names = body.filter(node => node.type === 'VariableDeclaration')
+    .flatMap(node => node.declarations.flatMap(declaration => bindingNames(declaration.id)));
+  assert.equal(names.filter(name => counters.has(name)).length, 1);
+});

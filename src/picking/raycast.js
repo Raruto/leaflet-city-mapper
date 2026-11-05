@@ -25,7 +25,8 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   // Unproject the mouse (-1..1) into a world-space ray from the camera.
   const inverseCamera = new DOMMatrix(backend.camera.projectionViewMatrix).inverse();
   const inverseCameraValues = inverseCamera.toFloat64Array();
-  for (const value of inverseCameraValues) {
+  let value, object;
+  for (value of inverseCameraValues) {
     if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
   }
   backend.raycaster.origin[0] = backend.camera.position[0];
@@ -50,7 +51,7 @@ export function raycast(backend, event, objects = backend.root.children, recursi
   backend.raycaster.direction[1] /= rayLength;
   backend.raycaster.direction[2] /= rayLength;
   const meshes = [];
-  for (const object of objects) {
+  for (object of objects) {
     if (recursive) traverse(object, collectVisibleMesh, meshes);
     else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
   }

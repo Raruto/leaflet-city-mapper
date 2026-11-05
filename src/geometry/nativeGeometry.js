@@ -11,9 +11,10 @@ export function nativeGeometry(source, map, point) {
   const values = Array.isArray(options.dashArray) ? options.dashArray :
     String(options.dashArray || '').trim().split(/[ ,]+/);
   const dash = [];
-  for (const value of values) dash.push(Number(value));
+  let value, index, i;
+  for (value of values) dash.push(Number(value));
   let allZero = true;
-  for (const value of dash) {
+  for (value of dash) {
     if (!Number.isFinite(value) || value < 0) throw new Error('Invalid Leaflet dashArray');
     if (value !== 0) allZero = false;
   }
@@ -35,11 +36,11 @@ export function nativeGeometry(source, map, point) {
     const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(Math.max(radius, radiusY)))));
     if (dash.length) {
       const points = [];
-      for (let index = 0; index < count; index++) points.push(circleAt(center, radius, radiusY, count, index));
+      for (index = 0; index < count; index++) points.push(circleAt(center, radius, radiusY, count, index));
       line(context, points, true);
     }
     else if (options.stroke && width > 0) {
-      for (let i = 0; i < count; i++) {
+      for (i = 0; i < count; i++) {
         triangle(point, stroke, circleAt(center, radius, radiusY, count, i, width / 2),
           circleAt(center, radius, radiusY, count, i, -width / 2), circleAt(center, radius, radiusY, count, i + 1, width / 2));
         triangle(point, stroke, circleAt(center, radius, radiusY, count, i + 1, width / 2),

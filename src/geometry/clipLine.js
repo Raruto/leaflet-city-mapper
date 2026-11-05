@@ -5,9 +5,10 @@ import { clipSegment } from './clipSegment.js';
 export function clipLine(line, bounds) {
   const pieces = [];
   let current;
-  for (let i = 1; i < line.length; i++) {
+  let i, segment;
+  for (i = 1; i < line.length; i++) {
     if (samePoint(line[i - 1], line[i])) continue;
-    const segment = clipSegment(line[i - 1], line[i], bounds);
+    segment = clipSegment(line[i - 1], line[i], bounds);
     if (!segment) {
       current = null;
       continue;

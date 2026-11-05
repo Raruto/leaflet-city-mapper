@@ -63,8 +63,9 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
 
   const textures = mesh._textures ||= [];
   textures.length = 0;
-  for (const binding of program.bindings) {
-    const texture = uniforms[binding.name]?.value;
+  let binding, texture, i, attribute;
+  for (binding of program.bindings) {
+    texture = uniforms[binding.name]?.value;
     if (!texture) throw new Error(`Missing Layer3D texture: ${binding.name}`);
     if (texture.uploaded !== texture.image) {
       device.queue.copyExternalImageToTexture(
@@ -78,7 +79,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   }
   let bindingsChanged = !mesh.bindGroup || mesh.boundBuffer !== renderer.uniformBuffer ||
     textures.length !== mesh.boundTextures.length;
-  for (let i = 0; !bindingsChanged && i < textures.length; i++) {
+  for (i = 0; !bindingsChanged && i < textures.length; i++) {
     if (textures[i].texture !== mesh.boundTextures[i][0] ||
       textures[i].sampler !== mesh.boundTextures[i][1]) bindingsChanged = true;
   }
@@ -91,8 +92,8 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
     mesh.boundBuffer = renderer.uniformBuffer;
     const boundTextures = mesh.boundTextures ||= [];
     boundTextures.length = textures.length;
-    for (let i = 0; i < textures.length; i++) {
-      const binding = program.bindings[i], texture = textures[i];
+    for (i = 0; i < textures.length; i++) {
+      binding = program.bindings[i], texture = textures[i];
       entries.push({ binding: binding.texture, resource: texture.texture.createView() });
       entries.push({ binding: binding.sampler, resource: texture.sampler });
       boundTextures[i] ||= [];
@@ -112,7 +113,7 @@ export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
   if (geometry.attributes.uv) pass.setVertexBuffer(3, geometry.attributes.uv.buffer);
   const instances = geometry.attributes.instanceOffset;
   if (instances) pass.setVertexBuffer(4, instances.buffer);
-  for (const attribute of Object.values(geometry.attributes)) {
+  for (attribute of Object.values(geometry.attributes)) {
     if (!attribute.needsUpdate) continue;
     device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
     attribute.needsUpdate = false;

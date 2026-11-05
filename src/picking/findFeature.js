@@ -10,9 +10,10 @@ export function findFeature(backend, event) {
   if (!backend.root || !backend.camera) {
     return null;
   }
-  for (const hit of raycast(backend, event, backend.root.children, Boolean(backend.model))) {
+  let hit, object, ranges, low, high, middle, range;
+  for (hit of raycast(backend, event, backend.root.children, Boolean(backend.model))) {
     if (backend.model) {
-      let object = hit.object;
+      object = hit.object;
       while (object && object !== backend.model) {
         object = object.parent;
       }
@@ -23,15 +24,14 @@ export function findFeature(backend, event) {
         };
       }
     }
-    const ranges = hit.object.extras?.featureFaces;
+    ranges = hit.object.extras?.featureFaces;
     if (!ranges) {
       continue;
     }
-    let low = 0,
-       high = ranges.length - 1;
+    low = 0, high = ranges.length - 1;
     while (low <= high) {
-      const middle = (low + high) >> 1;
-      const range = ranges[middle];
+      middle = (low + high) >> 1;
+      range = ranges[middle];
       if (hit.faceIndex < range.faceStart) {
         high = middle - 1;
       } else if (hit.faceIndex >= range.faceEnd) {

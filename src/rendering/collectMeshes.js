@@ -29,7 +29,8 @@ export function collectMeshes(mesh, sunlight, projection, frustum, frustumLength
       frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
     if (mesh._visibleInFrame) candidates.push(mesh);
   }
-  for (const child of mesh.children) {
+  let child;
+  for (child of mesh.children) {
     collectMeshes(child, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
   }
 }

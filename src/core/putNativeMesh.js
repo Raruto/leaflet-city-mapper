@@ -7,7 +7,8 @@ export function putNativeMesh(state, key, position, color, opacity, texture, uv)
   if (!position.length) return;
   let mesh = meshes.get(key);
   const normal = [];
-  for (let index = 0; index < position.length; index++) normal.push(index % 3 === 1 ? 1 : 0);
+  let index;
+  for (index = 0; index < position.length; index++) normal.push(index % 3 === 1 ? 1 : 0);
   const data = { position, normal, ...(uv ? { uv } : {}) };
   if (!mesh || mesh.geometry.attributes.position.data.length !== position.length ||
     mesh.program.uniforms.baseTexture?.value !== texture) {

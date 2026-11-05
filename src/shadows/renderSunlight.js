@@ -34,11 +34,12 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   }
   drawShadowMeshes(backend, encoder, meshes);
   const snapshots = new Map();
-  for (const mesh of meshes) {
-    snapshots.set(mesh, {
-      world: mesh._worldMatrixVersion, geometry: mesh.geometry,
-      start: mesh.geometry.drawRange.start, count: mesh.geometry.drawRange.count,
-      appearance: mesh._appearance ?? 1,
+  let mesh2;
+  for (mesh2 of meshes) {
+    snapshots.set(mesh2, {
+      world: mesh2._worldMatrixVersion, geometry: mesh2.geometry,
+      start: mesh2.geometry.drawRange.start, count: mesh2.geometry.drawRange.count,
+      appearance: mesh2._appearance ?? 1,
     });
   }
   sun.cache = { direction: [...sunlight.direction], meshes: snapshots };

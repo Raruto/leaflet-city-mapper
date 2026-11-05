@@ -16,15 +16,16 @@ export function disposeNativeLayer() {
   if (state.marker) map.off('move zoom rotate pitch resize viewreset', updateNativeLayerView, state);
   removeNativeEvents(state);
   state.refresh = state.reorder = null;
-  for (const [name, methods] of state.methods) {
+  let name, methods, mesh, texture, image;
+  for ([name, methods] of state.methods) {
     if (methods.own) Object.defineProperty(source, name, methods.own);
     else delete source[name];
   }
-  for (const mesh of meshes.values()) disposeMesh(backend, mesh);
+  for (mesh of meshes.values()) disposeMesh(backend, mesh);
   meshes.clear();
-  for (const texture of textures.values()) destroyTexture(backend, texture.texture);
+  for (texture of textures.values()) destroyTexture(backend, texture.texture);
   textures.clear();
-  for (const image of images) {
+  for (image of images) {
     image.removeEventListener('load', nativeImageRefresh);
     image.removeEventListener('error', nativeImageError);
     removeImageState(image, state);

@@ -12,13 +12,14 @@ export function start() {
   const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
   const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * 40075016.68557849 * Math.cos(this.state.latlng.lat * Math.PI / 180) / 256));
   const handlers = [];
-  for (const name of ['dragging', 'keyboard', 'doubleClickZoom', 'boxZoom']) {
+  let name;
+  for (name of ['dragging', 'keyboard', 'doubleClickZoom', 'boxZoom']) {
     if (map[name]?.enabled()) handlers.push(name);
   }
   this.saved = {
     zoom: map.getZoom(), pitch: map.getPitch(), scrollWheelZoom: map.options.scrollWheelZoom, handlers
   };
-  for (const name of this.saved.handlers) map[name].disable();
+  for (name of this.saved.handlers) map[name].disable();
   // Wheel zoom moves the camera closer or farther, keeping the walker centred.
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom && 'center';
   this.state.heading = -map.getBearing() * Math.PI / 180;

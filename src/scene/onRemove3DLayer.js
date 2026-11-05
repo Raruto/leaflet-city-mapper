@@ -20,7 +20,8 @@ export function onRemove3DLayer(backend, map) {
     L.DomEvent.off(backend.container, backend._pointerEvents, backend);
     backend.container = null;
   }
-  for (const area of backend._areas.values()) releaseArea(backend, area);
+  let area, key, layer, animation;
+  for (area of backend._areas.values()) releaseArea(backend, area);
   backend._areas.clear();
   backend._tooltip?.remove();
   backend._tooltip = null;
@@ -38,11 +39,11 @@ export function onRemove3DLayer(backend, map) {
     if (backend._layers.size) {
       // Keep the original scene origin and GPU resources when ownership changes.
       const next = backend._layers.values().next().value;
-      for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_zoomTransitions', '_zoomView', '_cursor', '_roofRaster']) {
+      for (key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_zoomTransitions', '_zoomView', '_cursor', '_roofRaster']) {
         next[key] = backend[key];
         delete backend[key];
       }
-      for (const layer of next._layers) layer._shared = next;
+      for (layer of next._layers) layer._shared = next;
       cityMapper.renderers.set(map, next);
       map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, next);
       map.on('zoomstart', startZoom.startZoom, next);
@@ -52,7 +53,7 @@ export function onRemove3DLayer(backend, map) {
     } else {
       if (backend._roofRaster) destroyTexture.destroyTexture(backend, backend._roofRaster.texture.texture);
       backend._roofRaster = null;
-      for (const animation of backend._zoomTransitions?.keys() || []) animation.play();
+      for (animation of backend._zoomTransitions?.keys() || []) animation.play();
       backend._zoomTransitions = null;
       backend._zoomView = null;
       delete map._cameraView;
@@ -61,7 +62,7 @@ export function onRemove3DLayer(backend, map) {
       renderer.canvas.remove();
       releaseRenderer(renderer, backend);
       cityMapper.renderers.delete(map);
-      for (const key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete backend[key];
+      for (key of ['_layers', '_sceneOrigin', '_size', '_zoomLevel', '_cursor']) delete backend[key];
     }
   } else update(shared);
   backend._shared = backend.renderer = backend.scene = backend.camera = null;

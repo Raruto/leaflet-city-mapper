@@ -19,9 +19,10 @@ export function composeRoofAtlas(backend, tiles, zoom, min, size, width, height)
   });
   atlasPass.setPipeline(renderer.roofBlit.pipeline);
   tiles.sort(compareRoofTiles);
-  for (const [i, { tile, layer }] of tiles.entries()) {
-    const { coords, image } = tile;
-    const source = tile.texture;
+  let i, tile, layer, coords, image, source, tileSize, offset, x, y;
+  for ([i, { tile, layer }] of tiles.entries()) {
+    ({ coords, image } = tile);
+    source = tile.texture;
     if (source.uploaded !== source.image) {
       device.queue.copyExternalImageToTexture({ source: image }, { texture: source.texture },
         [source.texture.width, source.texture.height]);
@@ -29,9 +30,9 @@ export function composeRoofAtlas(backend, tiles, zoom, min, size, width, height)
     }
 
     opacities[i * 64] = layer.options.opacity;
-    const tileSize = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
-    const offset = new L.Point(coords.x, coords.y).scaleBy(tileSize).subtract(min);
-    const x = offset.x * width / size.x, y = offset.y * height / size.y;
+    tileSize = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
+    offset = new L.Point(coords.x, coords.y).scaleBy(tileSize).subtract(min);
+    x = offset.x * width / size.x, y = offset.y * height / size.y;
     atlasPass.setViewport(x, y, Math.min(tileSize.x * width / size.x, width - x),
       Math.min(tileSize.y * height / size.y, height - y), 0, 1);
     atlasPass.setBindGroup(0, device.createBindGroup({

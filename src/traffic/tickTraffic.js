@@ -18,6 +18,7 @@ export function tickTraffic(state) {
   }
   const { live, time } = trafficNow(state), ms = time?.getTime(), valid = Number.isFinite(ms);
   let changed = false;
+  let trip, x, y, z, dx, dz, lx, ly, lz, light;
   if (!live || !valid || !(ms >= state.rebasedAt && ms < state.nextCheck)) {
     let text;
     try {
@@ -28,7 +29,7 @@ export function tickTraffic(state) {
     state.rebasedAt = ms;
     state.nextCheck = ms + 1000;
     const ids = [];
-    for (const trip of state.trips) ids.push(trip.id);
+    for (trip of state.trips) ids.push(trip.id);
     const key = ids.join();
     changed = key !== state.tripsKey || (state.outline && !state.route && state.lanes.length);
     if (state.outline && !state.route && state.lanes.length) drawTrafficRoute(state);
@@ -43,9 +44,9 @@ export function tickTraffic(state) {
   if (state.mesh && state.lights && (!live || !(performance.now() - state.litAt < 100))) {
     state.litAt = performance.now();
     const lights = [];
-    for (const trip of state.trips) {
-      const { x, y, z, dx, dz } = locateTraffic(state, trip);
-      for (const { position: [lx, ly, lz], ...light } of state.lights) {
+    for (trip of state.trips) {
+      ({ x, y, z, dx, dz } = locateTraffic(state, trip));
+      for ({ position: [lx, ly, lz], ...light } of state.lights) {
         lights.push({ ...light, position: [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz] });
       }
     }

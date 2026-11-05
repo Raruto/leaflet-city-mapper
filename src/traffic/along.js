@@ -2,8 +2,9 @@
 
 export function along(points, lengths, s) {
   let i = 1, end = lengths.length - 1;
+  let middle;
   while (i < end) {
-    const middle = i + Math.floor((end - i) / 2);
+    middle = i + Math.floor((end - i) / 2);
     if (lengths[middle] < s) i = middle + 1;
     else end = middle;
   }

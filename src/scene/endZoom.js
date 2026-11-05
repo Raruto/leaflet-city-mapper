@@ -4,7 +4,8 @@ import { update } from './update.js';
 
 export function endZoom() {
   const backend = this;
-  for (const animation of backend._zoomTransitions?.keys() || []) animation.finish();
+  let animation;
+  for (animation of backend._zoomTransitions?.keys() || []) animation.finish();
   backend._zoomTransitions = null;
   backend._zoomView = null;
   delete backend._map._cameraView;

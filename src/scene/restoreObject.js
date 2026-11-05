@@ -1,21 +1,22 @@
 import { createProgram } from '../rendering/createProgram.js';
 
 export function restoreObject(backend, shared, object) {
+  let name, attribute, data, size, count, normalized, key, texture;
   if (object.geometry && object.geometry.device !== shared.renderer.device) {
     const geometry = object.geometry;
     const material = object.program._layerMaterial;
     const attributes = {};
-    for (const name of ['position', 'normal', 'color', 'uv', 'index', 'instanceOffset']) {
-      const attribute = geometry.attributes[name];
+    for (name of ['position', 'normal', 'color', 'uv', 'index', 'instanceOffset']) {
+      attribute = geometry.attributes[name];
       if (!attribute) continue;
-      const { data, size, count, normalized } = attribute;
+      ({ data, size, count, normalized } = attribute);
       attributes[name] = { data: data.slice(0, count * size), size, normalized };
     }
     const device = shared.renderer.device;
     if (attributes.index?.data instanceof Uint8Array) {
       attributes.index.data = Uint16Array.from(attributes.index.data);
     }
-    for (const [name, attribute] of Object.entries(attributes)) {
+    for ([name, attribute] of Object.entries(attributes)) {
       attribute.size ||= 1;
       attribute.count = attribute.data.length / attribute.size;
       attribute.indexFormat = attribute.data instanceof Uint32Array ? 'uint32' : 'uint16';
@@ -32,11 +33,11 @@ export function restoreObject(backend, shared, object) {
       attributes,
       drawRange: { start: 0, count: attributes.index?.count || attributes.position.count },
     };
-    for (const attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
+    for (attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
     object.bindGroup = null;
     object.boundTextures = [];
-    for (const key of ['baseTexture', 'metalTexture', 'emissiveTexture', 'occlusionTexture']) {
-      const texture = material[key];
+    for (key of ['baseTexture', 'metalTexture', 'emissiveTexture', 'occlusionTexture']) {
+      texture = material[key];
       if (!texture || texture.device === device) continue;
       material[key] = {
         ...texture,

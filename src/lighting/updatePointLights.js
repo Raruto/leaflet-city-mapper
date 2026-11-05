@@ -6,7 +6,8 @@ import { collectLightMeshes } from './collectLightMeshes.js';
 export function updatePointLights(backend) {
   const { device, sunlight: sun } = backend.renderer;
   const fixed = [], moving = [];
-  for (const layer of backend._layers) {
+  let layer;
+  for (layer of backend._layers) {
     if (!layer.options.nightLight || !layer.root.visible) continue;
     collectLightMeshes(layer.root, fixed, moving);
   }

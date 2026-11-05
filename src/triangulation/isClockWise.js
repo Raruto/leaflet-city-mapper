@@ -4,8 +4,9 @@
 
 export function isClockWise(points) {
   let area = 0;
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i], b = points[(i + 1) % points.length];
+  let i, a, b;
+  for (i = 0; i < points.length; i++) {
+    a = points[i], b = points[(i + 1) % points.length];
     area += a.x * b.y - b.x * a.y;
   }
   return area < 0;

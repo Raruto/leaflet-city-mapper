@@ -50,9 +50,10 @@ export async function addRasterTile(backend, layer, coords, tile) {
     });
   }
   let attributes = backend._terrainGrids.get(divisions);
+  let name, attribute;
   if (!attributes) {
     attributes = terrainGrid(divisions);
-    for (const [name, attribute] of Object.entries(attributes)) {
+    for ([name, attribute] of Object.entries(attributes)) {
       attribute.size ||= 1;
       attribute.count = attribute.data.length / attribute.size;
       attribute.indexFormat = 'uint16';

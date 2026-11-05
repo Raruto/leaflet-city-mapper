@@ -19,20 +19,21 @@ export async function getZxy(backend, z, x, y, signal) {
   }
   let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
   const visited = new Set();
-  for (let depth = 0; depth < 4; depth++) {
+  let depth, key, pending, entries, low, high, mid, entry, data;
+  for (depth = 0; depth < 4; depth++) {
     if (visited.has(offset)) {
       throw new Error('Cyclic PMTiles directory');
     }
     visited.add(offset);
-    const key = `${offset}:${length}`;
+    key = `${offset}:${length}`;
     if (!backend._directories.has(key)) {
       if (backend._directories.size >= 32) {
         backend._directories.delete(backend._directories.keys().next().value);
       }
       backend._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
     }
-    const pending = backend._directories.get(key);
-    let entries;
+    pending = backend._directories.get(key);
+    entries = void 0;
     try {
       entries = await pending;
     } catch (error) {
@@ -40,16 +41,16 @@ export async function getZxy(backend, z, x, y, signal) {
       throw error;
     }
     signal?.throwIfAborted();
-    let low = 0, high = entries.length - 1;
+    low = 0, high = entries.length - 1;
     while (low <= high) {
-      const mid = (low + high) >> 1;
+      mid = (low + high) >> 1;
       if (entries[mid].tileId <= id) {
         low = mid + 1;
       } else {
         high = mid - 1;
       }
     }
-    const entry = entries[high];
+    entry = entries[high];
     if (!entry) {
       return;
     }
@@ -60,7 +61,7 @@ export async function getZxy(backend, z, x, y, signal) {
       if (entry.offset + entry.length > header.tileDataLength) {
         throw new Error('PMTiles tile outside data section');
       }
-      const data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
+      data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
       signal?.throwIfAborted();
       return { data };
     }

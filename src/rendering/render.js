@@ -30,7 +30,8 @@ export function render(backend) {
   updateMapCamera(backend, size);
   updateWorldMatrix(backend.scene);
   let sceneChanged = false;
-  for (const layer of backend._layers) {
+  let layer;
+  for (layer of backend._layers) {
     if (!layer._beforeRender) continue;
     layer._beforeRender();
     sceneChanged = true;
@@ -49,7 +50,7 @@ export function render(backend) {
   drawSceneMeshes(backend, encoder, meshes);
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
   renderer.device.queue.submit([encoder.finish()]);
-  for (const layer of backend._layers) {
+  for (layer of backend._layers) {
     if (layer._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
   }
   if (map._animatingZoom || appearing) update(backend);

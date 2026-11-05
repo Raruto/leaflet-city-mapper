@@ -8,7 +8,8 @@ export function terrainElevation(point, tiles) {
   const fx = x - x0, fy = y - y0;
   const values = [sample(tiles, x0, y0), sample(tiles, x0 + 1, y0), sample(tiles, x0, y0 + 1), sample(tiles, x0 + 1, y0 + 1)];
   let valid = 0, first = null;
-  for (const value of values) {
+  let value;
+  for (value of values) {
     if (!Number.isFinite(value)) continue;
     if (!valid) first = value;
     valid++;

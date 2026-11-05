@@ -7,7 +7,8 @@ export function disposeMesh(backend, mesh) {
   }
   setParent(mesh, null);
   update(backend);
-  for (const attribute of Object.values(mesh.geometry.attributes)) {
+  let attribute;
+  for (attribute of Object.values(mesh.geometry.attributes)) {
     attribute.buffer.destroy();
   }
 }

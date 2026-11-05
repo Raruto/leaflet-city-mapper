@@ -23,14 +23,15 @@ export function pump(backend, map = backend._map) {
   const shared = map && cityMapper.renderers.get(map);
   if (!shared) return;
   const layers = [];
-  for (const layer of shared._layers) {
+  let layer, area, center, areaBackend;
+  for (layer of shared._layers) {
     if (Number.isFinite(layer._inflight) && layer._areas && (layer.url || layer._geojson)) layers.push(layer);
   }
   const pending = [];
-  for (const layer of layers) {
-    for (const area of layer._areas.values()) {
+  for (layer of layers) {
+    for (area of layer._areas.values()) {
       if (area.started || area.request.signal.aborted) continue;
-      const center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
+      center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
       pending.push({
         layer, area,
         distance: center
@@ -40,8 +41,8 @@ export function pump(backend, map = backend._map) {
   }
   pending.sort(compareDistance);
   let inflight = 0;
-  for (const layer of layers) inflight += layer._inflight;
-  for (const { layer: areaBackend, area } of pending) {
+  for (layer of layers) inflight += layer._inflight;
+  for ({ layer: areaBackend, area } of pending) {
     if (inflight >= 4) break;
     if (areaBackend._inflight >= 2) continue;
     area.started = true;
@@ -49,5 +50,5 @@ export function pump(backend, map = backend._map) {
     inflight++;
     buildArea(areaBackend, area, map);
   }
-  for (const layer of layers) updateStatus(layer);
+  for (layer of layers) updateStatus(layer);
 }

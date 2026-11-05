@@ -183,6 +183,32 @@ const checks = {
     view.setUint8(100, 4);
     assert.equal(decodeHeader(data).rootDirectoryOffset, 127);
     assert.equal(decodeHeader(data).minZoom, 4);
+    const headerData = data.slice(0), headerView = new DataView(headerData);
+    const expectedHeader = {};
+    for (const [i, name] of [
+      'rootDirectoryOffset', 'rootDirectoryLength', 'jsonMetadataOffset', 'jsonMetadataLength',
+      'leafDirectoryOffset', 'leafDirectoryLength', 'tileDataOffset', 'tileDataLength',
+      'numAddressedTiles', 'numTileEntries', 'numTileContents',
+    ].entries()) {
+      expectedHeader[name] = 1000 + i;
+      headerView.setBigUint64(8 + i * 8, BigInt(expectedHeader[name]), true);
+    }
+    for (const [i, name] of [
+      'clustered', 'internalCompression', 'tileCompression', 'tileType', 'minZoom', 'maxZoom',
+    ].entries()) {
+      expectedHeader[name] = i + 1;
+      headerView.setUint8(96 + i, expectedHeader[name]);
+    }
+    for (const [i, name] of ['minLon', 'minLat', 'maxLon', 'maxLat'].entries()) {
+      expectedHeader[name] = i - 2;
+      headerView.setInt32(102 + i * 4, expectedHeader[name] * 1e7, true);
+    }
+    headerView.setUint8(118, 12);
+    headerView.setInt32(119, 23456789, true);
+    headerView.setInt32(123, 487654321, true);
+    Object.assign(expectedHeader, { centerZoom: 12, centerLon: 2.3456789, centerLat: 48.7654321 });
+    assert.deepEqual(decodeHeader(headerData), expectedHeader);
+    assert.deepEqual(decodeHeader(headerData), expectedHeader, 'Repeated calls must reset all reused counters');
     assert.equal(await decompress(data, 1), data);
     assert.equal(new TextDecoder().decode(await decompress(gzipSync('utility'), 2)), 'utility');
     await assert.rejects(decompress(data, 3), /Unsupported PMTiles compression/);

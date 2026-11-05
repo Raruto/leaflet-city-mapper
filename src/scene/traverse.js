@@ -2,5 +2,6 @@
 
 export function traverse(node, callback, context) {
   if (callback(node, context)) return;
-  for (const child of node.children) traverse(child, callback, context);
+  let child;
+  for (child of node.children) traverse(child, callback, context);
 }

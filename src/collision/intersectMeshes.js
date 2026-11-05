@@ -11,26 +11,30 @@ export function intersectMeshes(ray, meshes, night = 0) {
   a = [0, 0, 0],
   b = [0, 0, 0],
   c = [0, 0, 0];
-  for (const mesh of meshes) {
+  let mesh, inverse, inverseValues, value, localOrigin, origin, localDirection, direction;
+  let directionLength, near, far, i, a2, b2, position, index, instanceOffset, vertices, closest;
+  let faceIndex, vertex, offset, x, y, z, ai, bi, ci, e, f, p, det, t, u, q, v, uv, ids, x2, y2;
+  let distance, point, worldPoint;
+  for (mesh of meshes) {
     // Test in mesh-local space; compare distances only after returning to shared world space.
-    const inverse = new DOMMatrix(mesh.worldMatrix).inverse();
-    const inverseValues = inverse.toFloat64Array();
-    for (const value of inverseValues) {
+    inverse = new DOMMatrix(mesh.worldMatrix).inverse();
+    inverseValues = inverse.toFloat64Array();
+    for (value of inverseValues) {
       if (!Number.isFinite(value)) throw new Error('Singular 3D transform');
     }
-    const localOrigin = new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
-    const origin = [
+    localOrigin = new DOMPoint(...ray.origin, 1).matrixTransform(inverse);
+    origin = [
       localOrigin.x / localOrigin.w,
       localOrigin.y / localOrigin.w,
       localOrigin.z / localOrigin.w
     ];
-    const localDirection = new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
-    const direction = [
+    localDirection = new DOMPoint(...ray.direction, 0).matrixTransform(inverse);
+    direction = [
       localDirection.x,
       localDirection.y,
       localDirection.z
     ];
-    const directionLength = Math.hypot(...direction) || 1;
+    directionLength = Math.hypot(...direction) || 1;
     direction[0] /= directionLength;
     direction[1] /= directionLength;
     direction[2] /= directionLength;
@@ -38,34 +42,34 @@ export function intersectMeshes(ray, meshes, night = 0) {
     if (!mesh.geometry.bounds) {
       computeBounds(mesh.geometry);
     }
-    let near = 0, far = Infinity;
-    for (let i = 0; i < 3; i++) {
+    near = 0, far = Infinity;
+    for (i = 0; i < 3; i++) {
       if (Math.abs(direction[i]) < 1e-12) {
         if (origin[i] < mesh.geometry.bounds.min[i] || origin[i] > mesh.geometry.bounds.max[i]) {
           far = -Infinity;
           break;
         }
       } else {
-        const a = (mesh.geometry.bounds.min[i] - origin[i]) / direction[i], b = (mesh.geometry.bounds.max[i] - origin[i]) / direction[i];
-        near = Math.max(near, Math.min(a, b));
-        far = Math.min(far, Math.max(a, b));
+        a2 = (mesh.geometry.bounds.min[i] - origin[i]) / direction[i], b2 = (mesh.geometry.bounds.max[i] - origin[i]) / direction[i];
+        near = Math.max(near, Math.min(a2, b2));
+        far = Math.min(far, Math.max(a2, b2));
       }
     }
     if (far < near) {
       continue;
     }
-    const { position, index, instanceOffset } = mesh.geometry.attributes;
-    const vertices = index?.count || position.count;
-    let closest = Infinity, faceIndex;
-    for (let i = 0; i < vertices * (instanceOffset?.count ?? 1); i += 3) {
-      const vertex = instanceOffset ? i % vertices : i;
-      const offset = instanceOffset ? Math.floor(i / vertices) * instanceOffset.size : 0;
-      const x = instanceOffset?.data[offset] ?? 0;
-      const y = instanceOffset?.data[offset + 1] ?? 0;
-      const z = instanceOffset?.data[offset + 2] ?? 0;
-      const ai = (index ? index.data[vertex] : vertex) * position.size;
-      const bi = (index ? index.data[vertex + 1] : vertex + 1) * position.size;
-      const ci = (index ? index.data[vertex + 2] : vertex + 2) * position.size;
+    ({ position, index, instanceOffset } = mesh.geometry.attributes);
+    vertices = index?.count || position.count;
+    closest = Infinity, faceIndex = void 0;
+    for (i = 0; i < vertices * (instanceOffset?.count ?? 1); i += 3) {
+      vertex = instanceOffset ? i % vertices : i;
+      offset = instanceOffset ? Math.floor(i / vertices) * instanceOffset.size : 0;
+      x = instanceOffset?.data[offset] ?? 0;
+      y = instanceOffset?.data[offset + 1] ?? 0;
+      z = instanceOffset?.data[offset + 2] ?? 0;
+      ai = (index ? index.data[vertex] : vertex) * position.size;
+      bi = (index ? index.data[vertex + 1] : vertex + 1) * position.size;
+      ci = (index ? index.data[vertex + 2] : vertex + 2) * position.size;
       a[0] = position.data[ai];
       a[1] = position.data[ai + 1];
       a[2] = position.data[ai + 2];
@@ -81,42 +85,39 @@ export function intersectMeshes(ray, meshes, night = 0) {
         c[0] = Math.fround(c[0] + x); c[1] = Math.fround(c[1] + y); c[2] = Math.fround(c[2] + z);
       }
       // Moller-Trumbore: barycentric triangle coordinates and local ray distance.
-      const e = sub(b, a),
-            f = sub(c, a),
-            p = cross(direction, f),
-            det = dot(e, p);
+      e = sub(b, a), f = sub(c, a), p = cross(direction, f), det = dot(e, p);
       if (mesh.program.cullMode === 'none' || mesh.program.cullFace === null
         ? Math.abs(det) < 1e-9 : det < 1e-9) {
         continue;
       }
-      const t = sub(origin, a), u = dot(t, p) / det;
+      t = sub(origin, a), u = dot(t, p) / det;
       if (u < 0 || u > 1) {
         continue;
       }
-      const q = cross(t, e), v = dot(direction, q) / det;
+      q = cross(t, e), v = dot(direction, q) / det;
       if (v < 0 || u + v > 1) {
         continue;
       }
       if (mesh.program.nightLight) {
-        const uv = mesh.geometry.attributes.uv.data;
-        const ids = index ? [index.data[i], index.data[i + 1], index.data[i + 2]] : [i, i + 1, i + 2];
-        const x = uv[ids[0] * 2] * (1 - u - v) + uv[ids[1] * 2] * u + uv[ids[2] * 2] * v;
-        const y = uv[ids[0] * 2 + 1] * (1 - u - v) + uv[ids[1] * 2 + 1] * u + uv[ids[2] * 2 + 1] * v;
-        if (x <= 2 && (!night || x * x + y * y > 0.9)) continue;
+        uv = mesh.geometry.attributes.uv.data;
+        ids = index ? [index.data[i], index.data[i + 1], index.data[i + 2]] : [i, i + 1, i + 2];
+        x2 = uv[ids[0] * 2] * (1 - u - v) + uv[ids[1] * 2] * u + uv[ids[2] * 2] * v;
+        y2 = uv[ids[0] * 2 + 1] * (1 - u - v) + uv[ids[1] * 2 + 1] * u + uv[ids[2] * 2 + 1] * v;
+        if (x2 <= 2 && (!night || x2 * x2 + y2 * y2 > 0.9)) continue;
       }
-      const distance = dot(f, q) / det;
+      distance = dot(f, q) / det;
       if (distance > 0 && distance < closest) {
         closest = distance; faceIndex = i / 3;
       }
     }
     if (faceIndex === undefined) continue;
-    const point = new DOMPoint(
+    point = new DOMPoint(
       direction[0] * closest + origin[0],
       direction[1] * closest + origin[1],
       direction[2] * closest + origin[2],
       1
     ).matrixTransform(new DOMMatrix(mesh.worldMatrix));
-    const worldPoint = [point.x / point.w, point.y / point.w, point.z / point.w];
+    worldPoint = [point.x / point.w, point.y / point.w, point.z / point.w];
     hits.push({
       faceIndex,
       object: mesh,

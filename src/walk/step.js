@@ -15,20 +15,21 @@ export function step(now) {
   this.last = now;
   if (!layer.renderer) return;
   let changed = false;
+  let part, key, i;
   if (!this.meshes) {
     this.meshes = [];
-    for (const [part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
+    for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
     changed = true;
   }
   let forward = 0, turn = 0;
-  for (const key of this.keys) { forward += moves[key]?.[0] || 0; turn += moves[key]?.[1] || 0; }
+  for (key of this.keys) { forward += moves[key]?.[0] || 0; turn += moves[key]?.[1] || 0; }
   forward = Math.sign(forward); turn = Math.sign(turn);
   if (turn) { this.state.heading = wrap(this.state.heading + turn * 2.5 * dt); changed = true; }
   if (forward) {
     const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng, { position, scale } = layer.root;
     let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
     const feet = local.call(this);
-    for (let i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
+    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
     // World x is east, z south; keep 0.3 m from walls and slide along the one in the way.
     const wall = blocked.call(this, east, north, feet);
     if (wall) {

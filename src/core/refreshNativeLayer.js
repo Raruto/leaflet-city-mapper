@@ -10,14 +10,15 @@ export function refreshNativeLayer(state = this) {
   state.failed = false;
   state.hide();
   const activeImages = [state.source._icon, state.source._shadow, state.source._image];
-  for (const image of state.images) {
+  let image;
+  for (image of state.images) {
     if (activeImages.includes(image)) continue;
     image.removeEventListener('load', nativeImageRefresh);
     image.removeEventListener('error', nativeImageError);
     removeImageState(image, state);
     state.images.delete(image);
   }
-  for (const image of activeImages) {
+  for (image of activeImages) {
     if (!(image instanceof HTMLImageElement) || state.images.has(image)) continue;
     state.images.add(image);
     addImageState(image, state);

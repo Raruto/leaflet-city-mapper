@@ -20,7 +20,8 @@ export function attachAreaMesh(context) {
   };
   if (data.instanceOffsets) attributes.instanceOffset = { size: 4, data: data.instanceOffsets };
   if (backend.options.nightLight) attributes.uv = { size: 2, data: new Float32Array(context.uvs) };
-  for (const [name, attribute] of Object.entries(attributes)) {
+  let name, attribute;
+  for ([name, attribute] of Object.entries(attributes)) {
     attribute.count = attribute.data.length / attribute.size;
     attribute.buffer = device.createBuffer({
       size: Math.max(4, attribute.data.byteLength),

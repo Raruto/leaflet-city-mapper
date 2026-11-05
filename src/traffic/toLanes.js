@@ -3,11 +3,12 @@
 
 export function toLanes({ features = [] }) {
   const lanes = [];
-  for (const { geometry, properties } of features) {
-    const lines = geometry?.type === 'LineString' ? [geometry.coordinates] : geometry?.type === 'MultiLineString' ? geometry.coordinates : [];
-    for (const line of lines) {
-      const latlngs = [];
-      for (const [lng, lat] of line) latlngs.push([lat, lng]);
+  let geometry, properties, lines, line, latlngs, lng, lat;
+  for ({ geometry, properties } of features) {
+    lines = geometry?.type === 'LineString' ? [geometry.coordinates] : geometry?.type === 'MultiLineString' ? geometry.coordinates : [];
+    for (line of lines) {
+      latlngs = [];
+      for ([lng, lat] of line) latlngs.push([lat, lng]);
       lanes.push({ latlngs, properties: properties ?? {}, elevation: properties?.elevation });
     }
   }

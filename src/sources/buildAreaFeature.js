@@ -30,7 +30,8 @@ export function buildAreaFeature(context, feature) {
   const baseColor = parseColor(color);
   const vertexStart = context.positions.length / 3;
   if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
-  for (const rings of polygons || []) buildAreaPolygon(context, rings, top, bottom, baseColor);
+  let rings;
+  for (rings of polygons || []) buildAreaPolygon(context, rings, top, bottom, baseColor);
   const vertexEnd = context.positions.length / 3;
   context.featureFaces.push({
     id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),

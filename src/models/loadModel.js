@@ -21,26 +21,27 @@ export async function loadModel(backend) {
   const description = decodeModel(data);
   const directory = new URL('.', url).href;
   const bufferRequests = [];
-  for (const buffer of description.buffers || []) bufferRequests.push(loadBuffer(buffer, directory));
+  let buffer, image, material, index, resource, attribute, node;
+  for (buffer of description.buffers || []) bufferRequests.push(loadBuffer(buffer, directory));
   await Promise.all(bufferRequests);
   await backend._added.promise;
   const imageRequests = [];
-  for (const image of description.images || []) imageRequests.push(loadImage(description, directory, image));
+  for (image of description.images || []) imageRequests.push(loadImage(description, directory, image));
   const images = await Promise.all(imageRequests);
   await backend._map?._terrain3D?._terrainPromise;
   const context = { backend, description, images, textures: new Map(), materials: [], active: new Set(), resources: [] };
   // Convert glTF materials directly to the shader's retained CPU styles.
-  for (const material of description.materials || []) context.materials.push(materialFor(context, material));
+  for (material of description.materials || []) context.materials.push(materialFor(context, material));
   const scene = description.scenes?.[description.scene || 0];
   if (!scene) throw new Error('Missing glTF scene');
   const nodes = [];
   try {
-    for (const index of scene.nodes) nodes.push(modelNode(context, index));
+    for (index of scene.nodes) nodes.push(modelNode(context, index));
   } catch (error) {
     // Parsing can fail after earlier primitives allocated buffers/programs.
-    for (const resource of context.resources) {
+    for (resource of context.resources) {
       if (resource.attributes) {
-        for (const attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
+        for (attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
       } else {
         resource.pipelineCache.clear();
       }
@@ -53,7 +54,7 @@ export async function loadModel(backend) {
     extras: description.extras || {},
   };
   if (!nodes.length) throw new Error('Expected a glTF model with a non-empty scene');
-  for (const node of nodes) setParent(node, model);
+  for (node of nodes) setParent(node, model);
   backend.model = model;
   if (backend.options.rotation) {
     const [x, y = x, z = x] = backend.options.rotation;

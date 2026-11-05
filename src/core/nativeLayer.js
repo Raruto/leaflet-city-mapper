@@ -62,10 +62,11 @@ export async function nativeLayer(state) {
   map.on('zoomend', refreshNativeEvent, state);
   if (state.marker) map.on('move zoom rotate pitch resize viewreset', updateNativeLayerView, state);
   nativeEvents(state);
-  for (const name of ['setLatLng', 'setLatLngs', 'addLatLng', 'setRadius', 'setStyle', 'redraw',
+  let name, own, original;
+  for (name of ['setLatLng', 'setLatLngs', 'addLatLng', 'setRadius', 'setStyle', 'redraw',
     'setIcon', 'setUrl', 'setBounds', 'setOpacity', 'setZIndex', 'setZIndexOffset', 'bringToFront', 'bringToBack']) {
     if (typeof source[name] !== 'function') continue;
-    const own = Object.getOwnPropertyDescriptor(source, name), original = source[name];
+    own = Object.getOwnPropertyDescriptor(source, name), original = source[name];
     state.methods.set(name, { own, original });
     state.originalMethods.set(name, original);
     source[name] = nativeMethodHandlers[name];

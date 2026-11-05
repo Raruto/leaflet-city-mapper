@@ -4,7 +4,8 @@ import { updateGridOpacity } from './updateGridOpacity.js';
 export function runGridFades() {
   indexState.gridFadeFrame = null;
   const layers = [...indexState.pendingGridFades];
-  for (const [layer, version] of layers) {
+  let layer, version;
+  for ([layer, version] of layers) {
     if (indexState.pendingGridFades.get(layer) !== version) continue;
     indexState.pendingGridFades.delete(layer);
     layer._fadeFrame = null;

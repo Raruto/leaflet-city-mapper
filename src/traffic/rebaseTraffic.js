@@ -13,15 +13,16 @@ export function rebaseTraffic(state) {
     };
     state.lanesDirty = true;
   }
+  let lane, i, point, trip, binding;
   if (state.lanesDirty) {
     let count = 0;
-    for (const lane of state.lanes) count += lane.points.length;
+    for (lane of state.lanes) count += lane.points.length;
     const data = new Float32Array(count * 4);
     let offset = 0;
-    for (const lane of state.lanes) {
+    for (lane of state.lanes) {
       lane.start = offset / 4;
-      for (let i = 0; i < lane.points.length; i++) {
-        const point = lane.points[i];
+      for (i = 0; i < lane.points.length; i++) {
+        point = lane.points[i];
         data[offset++] = point[0];
         data[offset++] = point[1];
         data[offset++] = point[2];
@@ -33,8 +34,8 @@ export function rebaseTraffic(state) {
     state.lanesDirty = false;
   }
   const data = new Float32Array(state.trips.length * 4), index = new Uint32Array(data.buffer);
-  for (let i = 0; i < state.trips.length; i++) {
-    const trip = state.trips[i];
+  for (i = 0; i < state.trips.length; i++) {
+    trip = state.trips[i];
     index[i * 4] = trip.lane.start;
     index[i * 4 + 1] = trip.lane.points.length;
     data[i * 4 + 2] = trip.distance;
@@ -49,7 +50,7 @@ export function rebaseTraffic(state) {
   const { position, normal } = state.mesh.geometry.attributes;
   const buffers = [state.gpu.params, state.gpu.template, state.gpu.points, state.gpu.vehicles, position.buffer, normal.buffer];
   const entries = [];
-  for (let binding = 0; binding < buffers.length; binding++) entries.push({ binding, resource: { buffer: buffers[binding] } });
+  for (binding = 0; binding < buffers.length; binding++) entries.push({ binding, resource: { buffer: buffers[binding] } });
   state.gpu.bindGroup = device.createBindGroup({
     layout: state.gpu.pipeline.getBindGroupLayout(0),
     entries,

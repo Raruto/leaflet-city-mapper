@@ -5,7 +5,8 @@ export function renderPendingUpdates() {
   const updates = [...pendingUpdates];
   pendingUpdates.clear();
   let failure;
-  for (const backend of updates) {
+  let backend;
+  for (backend of updates) {
     backend._frame = null;
     if (backend._shared !== backend || !backend.renderer) continue;
     try {

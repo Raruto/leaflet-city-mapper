@@ -10,7 +10,8 @@ export function stop() {
   this.keys.clear(); this.drag = null;
   L.DomEvent.off(document, 'keydown keyup', this.onKey);
   L.DomEvent.off(window, 'blur', this.onBlur);
-  for (const mesh of this.meshes || []) disposeMesh.disposeMesh(this.layer, mesh);
+  let mesh, name;
+  for (mesh of this.meshes || []) disposeMesh.disposeMesh(this.layer, mesh);
   this.meshes = null;
   this.button.setAttribute('aria-pressed', 'false');
   this.button.style.background = '#fff';
@@ -19,7 +20,7 @@ export function stop() {
   L.DomEvent.off(map.getContainer(), 'pointerdown pointermove pointerup pointercancel', this.onPointer);
   map.off('terrainchange', this.onTerrain);
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom;
-  for (const name of this.saved.handlers) map[name].enable();
+  for (name of this.saved.handlers) map[name].enable();
   map.setView(this.state.latlng, this.saved.zoom, { animate: false });
   map.setPitch(this.saved.pitch);
   this.saved = null;

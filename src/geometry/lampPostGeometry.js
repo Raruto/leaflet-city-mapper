@@ -9,11 +9,12 @@ export function lampPostGeometry(point, style, addTriangle) {
     throw new Error('Invalid lamp pole radius');
   }
   const center = { ...point, uv: [3, 3] };
-  for (const [r, low, high] of [[radius, 0, style.top], [radius * 2.5, style.top - 0.25, style.top + 0.15]]) {
-    const points = ring(point, r);
-    for (let i = 0; i < 6; i++) {
-      const a = points[i], b = points[(i + 1) % 6], angle = (i + 0.5) * Math.PI / 3;
-      const nx = Math.cos(angle), nz = -Math.sin(angle);
+  let r, low, high, points, i, a, b, angle, nx, nz;
+  for ([r, low, high] of [[radius, 0, style.top], [radius * 2.5, style.top - 0.25, style.top + 0.15]]) {
+    points = ring(point, r);
+    for (i = 0; i < 6; i++) {
+      a = points[i], b = points[(i + 1) % 6], angle = (i + 0.5) * Math.PI / 3;
+      nx = Math.cos(angle), nz = -Math.sin(angle);
       addTriangle(a, low, b, low, b, high, nx, 0, nz, color);
       addTriangle(a, low, b, high, a, high, nx, 0, nz, color);
       addTriangle(center, high, a, high, b, high, 0, 1, 0, color);

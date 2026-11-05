@@ -7,7 +7,8 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   const map = backend._map, renderer = backend.renderer;
   const tiles = [];
   let zoom = -Infinity;
-  for (const layer of rasters) for (const tile of layer._rasterTiles.values()) {
+  let layer, tile, coords, size2;
+  for (layer of rasters) for (tile of layer._rasterTiles.values()) {
     if (tile.done && !tile.request.signal.aborted && tile.image) {
       tiles.push({ tile, layer });
       zoom = Math.max(zoom, tile.coords.z);
@@ -15,10 +16,10 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   }
   if (!tiles.length) zoom = map.getZoom();
   const bounds = new L.Bounds();
-  for (const { tile: { coords }, layer } of tiles) {
-    const size = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
-    bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size));
-    bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size));
+  for ({ tile: { coords }, layer } of tiles) {
+    size2 = getRasterTileSize().multiplyBy(map.getZoomScale(zoom, coords.z));
+    bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size2));
+    bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size2));
   }
   const min = bounds.min || map.project(backend._sceneOrigin, zoom);
   const size = bounds.isValid() ? bounds.getSize() : new L.Point(1, 1);

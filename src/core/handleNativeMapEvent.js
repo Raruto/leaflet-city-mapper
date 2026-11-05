@@ -23,11 +23,12 @@ export function handleNativeMapEvent(event, type = event.type, targets) {
     return fireDOMEvent.call(this, event, type, targets);
   }
   const hits = [];
+  let candidate, source2, backend;
   if (type !== context.out) {
-    for (const candidate of context.states) {
-      const { source, backend } = candidate;
-      if (source instanceof L.Marker || source.options.interactive === false ||
-        !(source instanceof L.Path) && !source.options.interactive) continue;
+    for (candidate of context.states) {
+      ({ source: source2, backend } = candidate);
+      if (source2 instanceof L.Marker || source2.options.interactive === false ||
+        !(source2 instanceof L.Path) && !source2.options.interactive) continue;
       hits.push(...raycast(backend, event, candidate.meshes.values(), false));
     }
   }

@@ -27,9 +27,10 @@ export function updateRasterTiles(backend) {
     : map.project([backend.header.minLat, backend.header.maxLon], zoom).divideBy(TILE_SIZE).floor();
   const center = map.project(map.getCenter(), zoom).divideBy(TILE_SIZE).floor();
   const wanted = new Map();
-  for (let x = Math.max(0, northWest.x, archiveNorthWest.x, center.x - TILE_RADIUS);
+  let x, y, key, coords, parent, tile;
+  for (x = Math.max(0, northWest.x, archiveNorthWest.x, center.x - TILE_RADIUS);
     x <= Math.min(2 ** zoom - 1, southEast.x, archiveSouthEast.x, center.x + TILE_RADIUS); x++) {
-    for (let y = Math.max(0, northWest.y, archiveNorthWest.y, center.y - TILE_RADIUS);
+    for (y = Math.max(0, northWest.y, archiveNorthWest.y, center.y - TILE_RADIUS);
       y <= Math.min(2 ** zoom - 1, southEast.y, archiveSouthEast.y, center.y + TILE_RADIUS); y++) {
       wanted.set(`${zoom}/${x}/${y}`, { z: zoom, x, y });
     }
@@ -38,19 +39,19 @@ export function updateRasterTiles(backend) {
   const coverage = new Map();
   const parentZoom = Math.max(backend.header.minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
   if (parentZoom < zoom) {
-    for (const [key, coords] of wanted) {
+    for ([key, coords] of wanted) {
       if (backend._rasterTiles.get(key)?.done) continue;
-      const parent = { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
+      parent = { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
       coverage.set(`${parent.z}/${parent.x}/${parent.y}`, parent);
     }
   }
   const required = new Map([...coverage, ...wanted]);
-  for (const [key, tile] of backend._rasterTiles) {
+  for ([key, tile] of backend._rasterTiles) {
     if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
   }
-  for (const [key, coords] of required) {
+  for ([key, coords] of required) {
     if (backend._rasterTiles.has(key)) continue;
-    const tile = { coords, request: new AbortController(), done: false };
+    tile = { coords, request: new AbortController(), done: false };
     backend._rasterTiles.set(key, tile);
   }
   pumpRasterTiles(backend);

@@ -2,5 +2,6 @@ import { cameraControlsState } from '../constants/cameraControlsState.js';
 import { endCameraTouch } from './endCameraTouch.js';
 
 export function endAllCameraTouches() {
-  for (const state of cameraControlsState.cameraTouchStates) endCameraTouch(state);
+  let state;
+  for (state of cameraControlsState.cameraTouchStates) endCameraTouch(state);
 }

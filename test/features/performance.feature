@@ -123,3 +123,7 @@ Feature: Performance-oriented source style
   @unit
   Scenario: Source loops contain no variable declarations
     Then source loops declare no variables in their headers or bodies
+
+  @unit
+  Scenario: Sequential header loops reuse one local counter
+    Then the PMTiles header decoder reuses one counter across its three loops

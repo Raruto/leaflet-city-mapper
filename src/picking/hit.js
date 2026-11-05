@@ -14,7 +14,8 @@ import { hitMesh } from './hitMesh.js';
 export function hit(layer, x, y, z, dx, dz, reach) {
   updateWorldMatrix(layer.scene);
   const data = { x, y, z, dx, dz, reach, best: reach, found: null };
-  for (const other of layer._shared._layers) {
+  let other;
+  for (other of layer._shared._layers) {
     if (shouldSkipOther(other, layer)) continue;
     traverse(other.root, hitMesh, data);
   }

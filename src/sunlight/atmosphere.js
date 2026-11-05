@@ -14,7 +14,8 @@ export function atmosphere(altitude) {
     [25, [53, 144, 213], [223, 238, 250], [1, 1, 1]],
   ];
   let upper = -1;
-  for (let i = 0; i < stops.length; i++) {
+  let i;
+  for (i = 0; i < stops.length; i++) {
     if (stops[i][0] >= altitude) { upper = i; break; }
   }
   const b = stops[upper < 0 ? stops.length - 1 : upper],

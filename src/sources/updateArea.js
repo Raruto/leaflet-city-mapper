@@ -22,12 +22,13 @@ export function updateArea(backend) {
   const archiveNW = backend._map.project([backend.header.maxLat, backend.header.minLon], z).divideBy(256).floor();
   const archiveSE = backend._map.project([backend.header.minLat, backend.header.maxLon], z).divideBy(256).floor();
   const wanted = new Map();
-  for (let x = Math.max(0, nw.x - 1, archiveNW.x); x <= Math.min(2 ** z - 1, se.x + 1, archiveSE.x); x++) {
-    for (let y = Math.max(0, nw.y - 1, archiveNW.y); y <= Math.min(2 ** z - 1, se.y + 1, archiveSE.y); y++) {
+  let x, y, key, area, coords;
+  for (x = Math.max(0, nw.x - 1, archiveNW.x); x <= Math.min(2 ** z - 1, se.x + 1, archiveSE.x); x++) {
+    for (y = Math.max(0, nw.y - 1, archiveNW.y); y <= Math.min(2 ** z - 1, se.y + 1, archiveSE.y); y++) {
       wanted.set(`${x}/${y}`, { z, x, y });
     }
   }
-  for (const [key, area] of backend._areas) {
+  for ([key, area] of backend._areas) {
     if (!wanted.has(key)) {
       releaseArea(backend, area);
       backend._areas.delete(key);
@@ -35,9 +36,9 @@ export function updateArea(backend) {
   }
   // Load the nearest new blocks first without rebuilding retained geometry.
   const areas = [];
-  for (const [key, coords] of wanted) areas.push([key, coords, center]);
+  for ([key, coords] of wanted) areas.push([key, coords, center]);
   areas.sort(compareAreaDistance);
-  for (const [key, coords] of areas) {
+  for ([key, coords] of areas) {
     if (!backend._areas.has(key)) backend._areas.set(key, { coords, request: new AbortController() });
   }
   pump(backend);

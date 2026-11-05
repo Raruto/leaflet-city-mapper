@@ -18,12 +18,13 @@ export function markerQuadCorners(state, key, image) {
   const screenCorners = [[left, top], [left + width, top],
     [left, top + height], [left + width, top + height]];
   const corners = [];
-  for (const [pointX, pointY] of screenCorners) {
-    const offset = source._cameraIconPoint(pointX - center.x, pointY - center.y);
-    const x = center.x + offset.x, y = center.y + offset.y;
-    const p = new DOMPoint(x / size.x * 2 - 1,
+  let pointX, pointY, offset, x, y, p, result;
+  for ([pointX, pointY] of screenCorners) {
+    offset = source._cameraIconPoint(pointX - center.x, pointY - center.y);
+    x = center.x + offset.x, y = center.y + offset.y;
+    p = new DOMPoint(x / size.x * 2 - 1,
       1 - y / size.y * 2, clip.z / clip.w, 1).matrixTransform(inverse);
-    const result = new DOMPoint(p.x / p.w, p.y / p.w, p.z / p.w, 1).matrixTransform(toLocal);
+    result = new DOMPoint(p.x / p.w, p.y / p.w, p.z / p.w, 1).matrixTransform(toLocal);
     corners.push([result.x, result.y, result.z]);
   }
   return corners;

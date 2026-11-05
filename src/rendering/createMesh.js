@@ -12,10 +12,11 @@ import { update } from '../scene/update.js';
 
 export function createMesh(backend, data, material = {}, usage = 0, program) {
   const { device } = backend.renderer, attributes = {};
-  for (const [name, values] of Object.entries(data)) {
-    const array = new Float32Array(values);
-    const size = name === 'uv' ? 2 : 3;
-    const buffer = device.createBuffer({ size: Math.max(4, array.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | usage });
+  let name, values, array, size, buffer;
+  for ([name, values] of Object.entries(data)) {
+    array = new Float32Array(values);
+    size = name === 'uv' ? 2 : 3;
+    buffer = device.createBuffer({ size: Math.max(4, array.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | usage });
     device.queue.writeBuffer(buffer, 0, array);
     attributes[name] = { size, data: array, count: array.length / size, buffer };
   }

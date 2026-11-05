@@ -6,8 +6,9 @@ export function tileId(z, x, y) {
   let id = (4 ** z - 1) / 3;
   const n = 2 ** z;
   // Same cumulative Hilbert ordering used by build/pmtiles.js.
-  for (let s = n / 2; s >= 1; s /= 2) {
-    const rx = (x & s) ? 1 : 0, ry = (y & s) ? 1 : 0;
+  let s, rx, ry;
+  for (s = n / 2; s >= 1; s /= 2) {
+    rx = (x & s) ? 1 : 0, ry = (y & s) ? 1 : 0;
     id += s * s * ((3 * rx) ^ ry);
     if (!ry) {
       if (rx) { x = n - 1 - x; y = n - 1 - y; }

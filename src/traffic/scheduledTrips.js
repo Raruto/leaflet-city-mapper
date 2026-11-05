@@ -16,19 +16,20 @@ export function scheduledTrips(date, { timeZone, duration, services }) {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   });
   const parts = {};
-  for (const part of clock.formatToParts(time)) {
+  let part, from, to, every, months, weekdays, departure;
+  for (part of clock.formatToParts(time)) {
     if (part.type !== 'literal') parts[part.type] = Number(part.value);
   }
   const minute = parts.hour * 60 + parts.minute + (parts.second + time.getUTCMilliseconds() / 1000) / 60;
   const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
   const departures = [];
-  for (const { from, to, every = Infinity, months, weekdays } of services) {
+  for ({ from, to, every = Infinity, months, weekdays } of services) {
     if (months?.includes(parts.month) === false || weekdays?.includes(weekday) === false) continue;
-    for (let departure = clockMinutes(from); departure <= clockMinutes(to); departure += every) departures.push(departure);
+    for (departure = clockMinutes(from); departure <= clockMinutes(to); departure += every) departures.push(departure);
   }
   departures.sort(compareDepartures);
   const trips = [];
-  for (const departure of departures) {
+  for (departure of departures) {
     if (minute >= departure && minute < departure + duration) trips.push({
       id: `${parts.year}-${parts.month}-${parts.day}-${departure}`,
       departure: `${String(Math.floor(departure / 60)).padStart(2, '0')}:${String(departure % 60).padStart(2, '0')}`,

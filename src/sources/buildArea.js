@@ -5,6 +5,7 @@ import { sourceAreaContext } from './sourceAreaContext.js';
 import { pump } from './pump.js';
 
 export async function buildArea(backend, area, map) {
+  let feature;
   try {
     await new Promise(requestAnimationFrame);
     await map._terrain3D?._terrainPromise;
@@ -19,7 +20,7 @@ export async function buildArea(backend, area, map) {
     }
     const context = sourceAreaContext(backend, area, map);
     let deadline = performance.now() + 4;
-    for (const feature of data.features) {
+    for (feature of data.features) {
       if (area.request.signal.aborted) return;
       if (performance.now() >= deadline) {
         await new Promise(requestAnimationFrame);

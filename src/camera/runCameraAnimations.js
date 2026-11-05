@@ -6,12 +6,13 @@ export function runCameraAnimations(now) {
   const pending = [...mapCameraState.cameraAnimations];
   mapCameraState.cameraAnimations.clear();
   let failure;
-  for (const [map, animation] of pending) {
+  let map, animation, progress, eased;
+  for ([map, animation] of pending) {
     map._cameraFrame = null;
     if (map._cameraAnimation !== animation) continue;
-    const progress = animation.duration
+    progress = animation.duration
       ? Math.min(1, (now - animation.start) / (animation.duration * 1000)) : 1;
-    const eased = 1 - (1 - progress) ** 3;
+    eased = 1 - (1 - progress) ** 3;
     try {
       map._setPitchAndBearing(
         animation.fromPitch + (Math.max(0, Math.min(85, animation.pitch)) - animation.fromPitch) * eased,

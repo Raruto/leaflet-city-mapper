@@ -10,14 +10,15 @@ export function drawShadowMeshes(backend, encoder, meshes) {
   let pipeline = sun.pipeline;
   pass.setPipeline(pipeline);
   pass.setBindGroup(1, sun.depthBindGroup);
-  for (const mesh of meshes) {
-    const instances = mesh.geometry.attributes.instanceOffset;
-    const nextPipeline = instances ? sun.instancePipeline : sun.pipeline;
+  let mesh, instances, nextPipeline, offset, attribute, index, range;
+  for (mesh of meshes) {
+    instances = mesh.geometry.attributes.instanceOffset;
+    nextPipeline = instances ? sun.instancePipeline : sun.pipeline;
     if (nextPipeline !== pipeline) {
       pipeline = nextPipeline;
       pass.setPipeline(pipeline);
     }
-    const offset = renderer.uniformSlot++ * 256;
+    offset = renderer.uniformSlot++ * 256;
     renderer.uniformData.set(mesh.worldMatrix, offset / 4);
     renderer.uniformData[offset / 4 + 35] = mesh._appearance ?? 1;
     if (mesh._shadowBuffer !== renderer.uniformBuffer) {
@@ -28,7 +29,7 @@ export function drawShadowMeshes(backend, encoder, meshes) {
         ]
       });
     }
-    for (const attribute of Object.values(mesh.geometry.attributes)) {
+    for (attribute of Object.values(mesh.geometry.attributes)) {
       if (attribute.needsUpdate) {
         device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
         attribute.needsUpdate = false;
@@ -37,7 +38,7 @@ export function drawShadowMeshes(backend, encoder, meshes) {
     pass.setBindGroup(0, mesh._shadowBindGroup, [offset]);
     pass.setVertexBuffer(0, mesh.geometry.attributes.position.buffer);
     if (instances) pass.setVertexBuffer(1, instances.buffer);
-    const index = mesh.geometry.attributes.index, range = mesh.geometry.drawRange;
+    index = mesh.geometry.attributes.index, range = mesh.geometry.drawRange;
     if (index) {
       pass.setIndexBuffer(index.buffer, index.indexFormat);
       pass.drawIndexed(range.count, instances?.count ?? 1, range.start, 0, 0);

@@ -10,11 +10,12 @@ export function collectFrameMeshes(backend, sunlight, sceneChanged) {
     new Float64Array(4), new Float64Array(4), new Float64Array(4),
   ];
   const frustumLengths = renderer.frustumLengths ||= new Float64Array(6);
-  for (let i = 0; i < 6; i++) {
-    const axis = Math.floor(i / 2);
-    const plane = frustum[i];
-    for (let j = 0; j < 4; j++) {
-      const offset = j * 4;
+  let i, axis, plane, j, offset;
+  for (i = 0; i < 6; i++) {
+    axis = Math.floor(i / 2);
+    plane = frustum[i];
+    for (j = 0; j < 4; j++) {
+      offset = j * 4;
       plane[j] = i === 4 ? projection[offset + 2]
         : i % 2 ? projection[offset + 3] - projection[offset + axis]
         : projection[offset + 3] + projection[offset + axis];

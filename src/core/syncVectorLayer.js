@@ -14,12 +14,13 @@ export function syncVectorLayer(state) {
     nativeLayerState.geometryPixelStates.pop();
   }
   const { fill, stroke } = geometry;
-  for (const [key, positions, color, opacity] of [
+  let key, positions, color, opacity, r, g, b;
+  for ([key, positions, color, opacity] of [
     ['fill', fill, source.options.fillColor || source.options.color, source.options.fillOpacity],
     ['stroke', stroke, source.options.color, source.options.opacity],
   ]) {
     if (!positions.length) continue;
-    const { r, g, b } = parseColor(color);
+    ({ r, g, b } = parseColor(color));
     putNativeMesh(state, key, positions, [r, g, b], opacity ?? 1);
   }
 }

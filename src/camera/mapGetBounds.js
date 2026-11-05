@@ -5,8 +5,9 @@ import { animationPoint } from './animationPoint.js';
 export function mapGetBounds() {
   if (!this.getPitch() && !this.getBearing()) return mapCameraState.mapMethods.getBounds.call(this);
   const footprint = groundBounds(this), bounds = new L.LatLngBounds();
-  for (const point of [footprint.min, footprint.max]) {
-    const raw = mapCameraState.mapMethods.containerPointToLayerPoint.call(this, animationPoint(this, point, true));
+  let point, raw;
+  for (point of [footprint.min, footprint.max]) {
+    raw = mapCameraState.mapMethods.containerPointToLayerPoint.call(this, animationPoint(this, point, true));
     bounds.extend(this.layerPointToLatLng(raw));
   }
   return bounds;

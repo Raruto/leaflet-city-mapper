@@ -6,5 +6,6 @@ export function rendererDeviceLost([info, device]) {
   const owner = cityMapper.renderers.get(map);
   if (!owner || owner.renderer?.device !== device) return;
   const error = new Error(`WebGPU device lost: ${info.message || info.reason}`);
-  for (const layer of owner._layers) layer.fire('error', { error });
+  let layer;
+  for (layer of owner._layers) layer.fire('error', { error });
 }

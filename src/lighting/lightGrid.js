@@ -3,12 +3,13 @@ import { visitCells } from './visitCells.js';
 /** Pack world-space point lights into the shader's spatial grid. */
 export function lightGrid(packed, maxBytes) {
   let count = 0;
-  for (const values of packed) count += values.length / 8;
+  let values, i, value, key;
+  for (values of packed) count += values.length / 8;
   const cellSize = 32;
   let data = new Float32Array(8);
   if (count) {
     let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
-    for (const values of packed) for (let i = 0; i < values.length; i += 8) {
+    for (values of packed) for (i = 0; i < values.length; i += 8) {
       minX = Math.min(minX, values[i] - values[i + 3]);
       maxX = Math.max(maxX, values[i] + values[i + 3]);
       minZ = Math.min(minZ, values[i + 2] - values[i + 3]);
@@ -21,7 +22,7 @@ export function lightGrid(packed, maxBytes) {
             next = new Uint32Array(columns * rows);
     visitCells(packed, minX, minZ, cellSize, columns, counts);
     let entries = 0;
-    for (const value of counts) entries += value;
+    for (value of counts) entries += value;
     const length = (2 + columns * rows + entries * 2) * 4;
     if (length * 4 > maxBytes) {
       throw new Error('Streetlight grid exceeds GPU storage limit');
@@ -29,7 +30,7 @@ export function lightGrid(packed, maxBytes) {
     data = new Float32Array(length);
     data.set([minX, minZ, cellSize, columns, rows, count, 0, 0]);
     let offset = 2 + columns * rows;
-    for (let key = 0; key < counts.length; key++) if (counts[key]) {
+    for (key = 0; key < counts.length; key++) if (counts[key]) {
       data[(2 + key) * 4] = next[key] = offset;
       data[(2 + key) * 4 + 1] = counts[key];
       offset += counts[key] * 2;

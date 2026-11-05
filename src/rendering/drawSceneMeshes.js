@@ -18,17 +18,18 @@ export function drawSceneMeshes(backend, encoder, meshes) {
   });
   pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
   pass.setBindGroup(1, renderer.sunlight.bindGroup);
-  for (const mesh of meshes) {
-    const world = mesh.worldMatrix;
+  let mesh, world, uniforms, determinant, frontFace, program;
+  for (mesh of meshes) {
+    world = mesh.worldMatrix;
     if (mesh.texture) {
       mesh.program.uniforms.baseTexture.value = mesh.texture;
       mesh.program.uniforms.opacity.value = mesh.opacity;
     }
-    const uniforms = mesh.program.uniforms;
+    uniforms = mesh.program.uniforms;
     if (uniforms.roofTexture) uniforms.roofTexture.value = backend._roofRaster?.texture || renderer.roofFallbackTexture;
     if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion ||
         mesh._worldMatrixVersion === undefined) {
-      const determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
+      determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
         world[4] * (world[1] * world[10] - world[2] * world[9]) +
         world[8] * (world[1] * world[6] - world[2] * world[5]);
       if (!Number.isFinite(determinant) || determinant === 0) {
@@ -37,8 +38,8 @@ export function drawSceneMeshes(backend, encoder, meshes) {
       mesh._frontFace = determinant < 0 ? 'cw' : 'ccw';
       mesh._frontFaceWorldVersion = mesh._worldMatrixVersion;
     }
-    const frontFace = mesh._frontFace;
-    const program = mesh.program;
+    frontFace = mesh._frontFace;
+    program = mesh.program;
     if (program.transparent && program._layerMaterial.doubleSided && !mesh._nativeSource) {
       drawGeometry(backend, mesh, pass, 'front', frontFace);
       drawGeometry(backend, mesh, pass, 'back', frontFace);

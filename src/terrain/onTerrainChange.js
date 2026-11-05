@@ -5,7 +5,8 @@ import { updateArea } from "../sources/updateArea.js";
 
 export function onTerrainChange(layer) {
   if (!layer._map) return;
-  for (const area of layer._areas.values()) {
+  let area;
+  for (area of layer._areas.values()) {
     releaseArea(layer, area);
   }
   layer._areas.clear();

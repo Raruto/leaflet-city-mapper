@@ -150,10 +150,11 @@ export async function attach(backend, map) {
   shared._layers.add(backend);
   setParent(backend.root, shared.scene);
   const pendingObjects = [backend.root];
+  let object, i;
   while (pendingObjects.length) {
-    const object = pendingObjects.pop();
+    object = pendingObjects.pop();
     restoreObject(backend, shared, object);
-    for (let i = object.children.length - 1; i >= 0; i--) pendingObjects.push(object.children[i]);
+    for (i = object.children.length - 1; i >= 0; i--) pendingObjects.push(object.children[i]);
   }
   update(shared);
   if ((backend.header && backend._type !== 'pmtiles') || backend._geojson) updateArea(backend);

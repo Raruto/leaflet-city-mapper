@@ -14,9 +14,10 @@ export function showFeature(backend, feature, event) {
     tooltip.hidden = true;
   }
   const shared = backend._shared;
+  let layer;
   if (shared) {
     let visible = false;
-    for (const layer of shared._layers) {
+    for (layer of shared._layers) {
       if (layer._tooltip && !layer._tooltip.hidden) {
         visible = true;
         break;

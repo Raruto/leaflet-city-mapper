@@ -42,7 +42,8 @@ export function createProgram(backend, material = {}) {
     });
   }
 
-  for (const texture of shaders.bindings) {
+  let texture;
+  for (texture of shaders.bindings) {
     bindGroupEntries.push({
       binding: texture.texture,
       visibility: GPUShaderStage.FRAGMENT,

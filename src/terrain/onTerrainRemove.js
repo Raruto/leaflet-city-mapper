@@ -12,9 +12,10 @@ export function onTerrainRemove(layer, map) {
   layer._terrainLoading = false;
   layer._terrainReady = false;
   map.eachLayer(clearLayerTerrain);
-  for (const tile of layer._rasterTiles.keys()) removeRasterTile(layer, tile);
+  let tile, l, grid, attribute;
+  for (tile of layer._rasterTiles.keys()) removeRasterTile(layer, tile);
   if (map._terrain3D === layer) delete map._terrain3D;
-  for (const l of Object.values(map._layers)) {
+  for (l of Object.values(map._layers)) {
     conformModelToTerrain(l, null);
     setTerrainHeight(l);
   }
@@ -29,8 +30,8 @@ export function onTerrainRemove(layer, map) {
   layer._rasterProgram = null;
   if (layer._dem) destroyTexture(layer, layer._dem.texture);
   layer._dem = null;
-  for (const grid of layer._terrainGrids?.values() || []) {
-    for (const attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
+  for (grid of layer._terrainGrids?.values() || []) {
+    for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
   layer._terrainGrids = null;
   layer._bridges = null;

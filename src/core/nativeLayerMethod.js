@@ -3,11 +3,12 @@ import { refreshNativeLayer } from './refreshNativeLayer.js';
 export function nativeLayerMethod(name, source, args) {
   const state = source._nativeGPU, original = state.originalMethods.get(name);
   const result = original.apply(source, args);
+  let layer, zIndex;
   if ((name === 'bringToFront' || name === 'bringToBack') && source instanceof L.GridLayer) {
     let extreme = name === 'bringToFront' ? -Infinity : Infinity;
-    for (const layer of Object.values(state.map._layers)) {
+    for (layer of Object.values(state.map._layers)) {
       if (layer === source || !(layer instanceof L.GridLayer) || layer.getPane() !== source.getPane()) continue;
-      const zIndex = layer.options.zIndex || 0;
+      zIndex = layer.options.zIndex || 0;
       extreme = name === 'bringToFront' ? Math.max(extreme, zIndex) : Math.min(extreme, zIndex);
     }
     const edge = name === 'bringToFront' ? extreme + 1 : extreme - 1;

@@ -18,43 +18,45 @@ export function modelNode(context, index) {
     name: spec.name
   };
   group.matrix = nodeMatrix(spec);
+  let primitive, attributes, semantic, name, vertexCount, attribute, index2, i, normals, style, program;
+  let device, geometry, mesh, child;
   if (spec.mesh !== undefined) {
-    for (const primitive of description.meshes[spec.mesh].primitives) {
-      const attributes = {};
-      for (const [semantic, name] of [['POSITION', 'position'], ['NORMAL', 'normal'], ['TEXCOORD_0', 'uv']]) {
+    for (primitive of description.meshes[spec.mesh].primitives) {
+      attributes = {};
+      for ([semantic, name] of [['POSITION', 'position'], ['NORMAL', 'normal'], ['TEXCOORD_0', 'uv']]) {
         if (primitive.attributes[semantic] !== undefined) attributes[name] = readAccessor(description, primitive.attributes[semantic]);
       }
       if (!attributes.position) throw new Error('glTF mesh has no positions');
-      const vertexCount = attributes.position.data.length / 3;
+      vertexCount = attributes.position.data.length / 3;
       if (attributes.position.size !== 3 || vertexCount < 3) throw new Error('Invalid glTF vertex attributes');
-      for (const attribute of Object.values(attributes)) {
+      for (attribute of Object.values(attributes)) {
         if (attribute.data.length / attribute.size !== vertexCount) throw new Error('Invalid glTF vertex attributes');
       }
       if (primitive.indices !== undefined) {
-        const index = readAccessor(description, primitive.indices);
-        attributes.index = { size: 1, data: index.indices };
-        if (!(index.indices instanceof Uint8Array || index.indices instanceof Uint16Array || index.indices instanceof Uint32Array) ||
-          index.size !== 1 || index.indices.length % 3) throw new Error('Invalid glTF triangle indices');
-        for (const i of index.indices) {
+        index2 = readAccessor(description, primitive.indices);
+        attributes.index = { size: 1, data: index2.indices };
+        if (!(index2.indices instanceof Uint8Array || index2.indices instanceof Uint16Array || index2.indices instanceof Uint32Array) ||
+          index2.size !== 1 || index2.indices.length % 3) throw new Error('Invalid glTF triangle indices');
+        for (i of index2.indices) {
           if (i >= vertexCount) throw new Error('Invalid glTF triangle indices');
         }
       }
       if (!attributes.index && vertexCount % 3) throw new Error('Incomplete glTF triangle');
       if (!attributes.normal) {
-        const normals = vertexNormals(attributes.position.data, attributes.index?.data);
+        normals = vertexNormals(attributes.position.data, attributes.index?.data);
         attributes.normal = { size: 3, data: normals };
       }
-      const style = materials[primitive.material] || { color: [1, 1, 1], metallic: 1 };
+      style = materials[primitive.material] || { color: [1, 1, 1], metallic: 1 };
       if ((style.baseTexture || style.metalTexture || style.emissiveTexture || style.occlusionTexture) && !attributes.uv) {
         throw new Error('Textured model mesh requires UV coordinates');
       }
-      const program = createProgram(backend, style);
+      program = createProgram(backend, style);
       resources.push(program);
-      const device = backend.renderer.device;
+      device = backend.renderer.device;
       if (attributes.index?.data instanceof Uint8Array) {
         attributes.index.data = Uint16Array.from(attributes.index.data);
       }
-      for (const [name, attribute] of Object.entries(attributes)) {
+      for ([name, attribute] of Object.entries(attributes)) {
         attribute.size ||= 1;
         attribute.count = attribute.data.length / attribute.size;
         attribute.indexFormat = attribute.data instanceof Uint32Array ? 'uint32' : 'uint16';
@@ -66,13 +68,13 @@ export function modelNode(context, index) {
         });
         device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
       }
-      const geometry = {
+      geometry = {
         device,
         attributes,
         drawRange: { start: 0, count: attributes.index?.count || attributes.position.count },
       };
       resources.push(geometry);
-      const mesh = {
+      mesh = {
         ...emptyNode(),
         device,
         geometry,
@@ -85,7 +87,7 @@ export function modelNode(context, index) {
       setParent(mesh, group);
     }
   }
-  for (const child of spec.children || []) setParent(modelNode(context, child), group);
+  for (child of spec.children || []) setParent(modelNode(context, child), group);
   active.delete(index);
   return group;
 }

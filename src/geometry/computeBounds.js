@@ -2,7 +2,8 @@
 
 export function computeBounds(geometry) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], data = geometry.attributes.position.data;
-  for (let i = 0; i < data.length; i++) {
+  let i;
+  for (i = 0; i < data.length; i++) {
     min[i % 3] = Math.min(min[i % 3], data[i]);
     max[i % 3] = Math.max(max[i % 3], data[i]);
   }
@@ -21,9 +22,9 @@ export function computeBounds(geometry) {
     }
   }
   const center = [];
-  for (let i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
+  for (i = 0; i < min.length; i++) center.push((min[i] + max[i]) / 2);
   let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : 0;
-  for (let i = 0; !instances && i < data.length; i += 3) {
+  for (i = 0; !instances && i < data.length; i += 3) {
     radius = Math.max(radius, Math.hypot(
       data[i] - center[0], data[i + 1] - center[1], data[i + 2] - center[2]
     ));

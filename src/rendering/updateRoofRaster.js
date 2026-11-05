@@ -5,16 +5,17 @@ export function updateRoofRaster(backend, now) {
   const map = backend._map;
   const rasters = [];
   let hasRoofTexture = false;
-  for (const layer of backend._layers) {
+  let layer;
+  for (layer of backend._layers) {
     if (layer.options.roofTexture) { hasRoofTexture = true; break; }
   }
   if (hasRoofTexture) {
-    for (const layer of Object.values(map._layers)) {
+    for (layer of Object.values(map._layers)) {
       if (layer._type === 'pmtiles' && layer._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
     }
     const signatures = [];
     let loading = false;
-    for (const layer of rasters) {
+    for (layer of rasters) {
       signatures.push(`${L.Util.stamp(layer)}:${layer._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`);
       loading ||= Boolean(layer._loadingTiles);
     }

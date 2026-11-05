@@ -7,7 +7,8 @@
  */
 
 export function setVertexColor(mesh, start, end, color) {
-  for (let i = start; i < end; i++) {
+  let i;
+  for (i = start; i < end; i++) {
     mesh.geometry.attributes.color.data.set([color.r, color.g, color.b], i * 3);
   }
   mesh.geometry.attributes.color.needsUpdate = true;
