@@ -1,6 +1,6 @@
 import './scene/camera/mapCamera.js';
 import { init3D } from './scene/lifecycle/init3D.js';
-import { initNativeGPU } from './scene/leaflet-core/initNativeGPU.js';
+import { initNativeGPU } from './scene/core/initNativeGPU.js';
 import { initRaster } from './pmtiles/initRaster.js';
 import { setGeoJSONData } from './scene/sources/setGeoJSONData.js';
 import { initTerrain } from './terrain/initTerrain.js';
@@ -8,7 +8,7 @@ import './sunlight/initSunlight.js';
 import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
 import { indexState } from './scene/layers/constants/indexState.js';
-import { initializeNativeLayer } from './scene/leaflet-core/initializeNativeLayer.js';
+import { initializeNativeLayer } from './scene/core/initializeNativeLayer.js';
 import { layerLayerAdd } from './scene/layers/layerLayerAdd.js';
 import { layerInitialize } from './scene/layers/layerInitialize.js';
 
@@ -24,7 +24,7 @@ import { layerInitialize } from './scene/layers/layerInitialize.js';
  *
  * Folder layout:
  * - scene/layers/: source routing; initializers live in their domain folders.
- * - scene/leaflet-core/: Leaflet layer integration; scene/camera/: camera and controls.
+ * - scene/core/: Leaflet layer integration; scene/camera/: camera and controls.
  * - scene/lifecycle/, sources/, picking/ and graph/: scene updates and interaction.
  * - rendering/: WebGPU pipelines, shaders, meshes, textures and lighting.
  * - geometry/, model/ and pmtiles/: mesh operations, glTF loading and archive/raster operations.

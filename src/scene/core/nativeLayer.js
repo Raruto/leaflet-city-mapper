@@ -2,7 +2,7 @@ import { nativeMethodHandlers } from './constants/nativeMethodHandlers.js';
 import { createMesh } from '../../rendering/meshes/createMesh.js';
 import { destroyTexture } from '../../rendering/textures/destroyTexture.js';
 import { disposeMesh } from '../../rendering/meshes/disposeMesh.js';
-import { nativeGeometry } from '../../geometry/leaflet-core/nativeGeometry.js';
+import { nativeGeometry } from '../../geometry/core/nativeGeometry.js';
 import { nativeEvents } from './events/nativeEvents.js';
 import { removeNativeEvents } from './events/removeNativeEvents.js';
 import { parseColor } from '../../utils/parseColor.js';

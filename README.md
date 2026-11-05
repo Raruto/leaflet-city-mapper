@@ -99,7 +99,7 @@ Modules are grouped by feature, with direct imports rather than barrel re-export
 src/
   scene/
     camera/          Camera API, projection, animation, controls and gestures
-    leaflet-core/    Leaflet layer integration with the shared WebGPU scene
+    core/            Leaflet layer integration with the shared WebGPU scene
       events/        Leaflet event forwarding
       methods/       Layer mutation hooks
       markers/       Marker geometry, positioning and dragging
@@ -115,7 +115,7 @@ src/
     graph/           Scene nodes, transforms and placement
   rendering/         Pipelines, shaders, meshes, textures and lighting
   geometry/          Triangulation, collision, trees, lights, bridges and primitives
-    leaflet-core/    Geometry generation for Leaflet vector layers
+    core/            Geometry generation for Leaflet vector layers
   model/             glTF loading, decoding and materials
   pmtiles/           Archive access and raster tile lifecycle
   traffic/           Vehicles, routes, scheduling, simulation, loading and rendering

@@ -1,5 +1,5 @@
 import { nativeLayerState } from '../constants/nativeLayerState.js';
-import { nativeGeometry } from '../../../geometry/leaflet-core/nativeGeometry.js';
+import { nativeGeometry } from '../../../geometry/core/nativeGeometry.js';
 import { localPixelForGeometry } from '../meshes/localPixelForGeometry.js';
 import { parseColor } from '../../../utils/parseColor.js';
 import { putNativeMesh } from '../meshes/putNativeMesh.js';

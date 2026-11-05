@@ -1,5 +1,5 @@
 import { indexState } from './constants/indexState.js';
-import { initNativeGPU } from '../leaflet-core/initNativeGPU.js';
+import { initNativeGPU } from '../core/initNativeGPU.js';
 
 export function layerLayerAdd(event) {
   const native = !this._3d && (
