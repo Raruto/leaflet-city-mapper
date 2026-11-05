@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { tiledBounds } from '../globals/tiledBounds.js';
 
 import { mapGetBearing } from '../camera/mapGetBearing.js';

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { mapSetPitch } from '../camera/mapSetPitch.js';
 import * as disposeMesh from '../rendering/disposeMesh.js';
 import { onKey } from './onKey.js';

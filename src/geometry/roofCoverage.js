@@ -1,3 +1,5 @@
+import { radians } from '../globals/radians.js';
+import { earthCirc } from '../globals/earthCirc.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
@@ -9,7 +11,7 @@ export function roofCoverage(mesh, backend, rasters) {
   let top, pieces, x0, y0, x1, y1, l, t, r, b;
   for (layer of rasters) {
     zoom = sceneByLayer.get(layer)._tileZoom, origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
-    scale = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * Math.PI / 180));
+    scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
     minX = minY = Infinity; maxX = maxY = -Infinity;
     for (i = 0; i < 8; i++) {
       x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];

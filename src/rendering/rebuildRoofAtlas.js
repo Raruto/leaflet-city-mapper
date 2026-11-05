@@ -1,3 +1,5 @@
+import { radians } from '../globals/radians.js';
+import { earthCirc } from '../globals/earthCirc.js';
 import { roofTexture } from '../globals/roofTexture.js';
 import { roofSampler } from '../globals/roofSampler.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
@@ -37,7 +39,7 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   // ponytail: cap at 4096 px; virtual textures if wide views need native detail.
   const scale = Math.min(1, 4096 / Math.max(size.x, size.y));
   const width = Math.max(1, Math.ceil(size.x * scale)), height = Math.max(1, Math.ceil(size.y * scale));
-  const pixels = map.options.crs.scale(zoom) / (40075016.68557849 * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * Math.PI / 180));
+  const pixels = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
   const roof = /* allocation: required -- Observers may retain the prior atlas metadata while this backend publishes a replacement. */ {
     matrix: /* allocation: required -- Each published atlas snapshot owns its projection matrix. */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     texture: sceneByLayer.get(backend)._roofRaster?.texture,

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { nativeEventMaps } from '../globals/nativeEventMaps.js';
 import { renderers } from '../globals/renderers.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';

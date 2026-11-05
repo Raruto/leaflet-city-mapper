@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { triangulate } from '../triangulation/triangulate.js';
 import { disk } from './disk.js';
 import { circleAt } from './circleAt.js';

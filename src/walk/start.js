@@ -1,3 +1,6 @@
+import { radians } from '../globals/radians.js';
+import { earthCirc } from '../globals/earthCirc.js';
+import { L } from '../globals/L.js';
 import { sceneWalkHandlers } from '../globals/sceneWalkHandlers.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
@@ -15,7 +18,7 @@ export function start() {
   this.state.latlng = map.getCenter();
   // Zoom whose camera distance (1.5 viewport heights, as in scene/render.js) is about `distance` metres behind the walker.
   const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
-  const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * 40075016.68557849 * Math.cos(this.state.latlng.lat * Math.PI / 180) / 256));
+  const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * earthCirc * Math.cos(this.state.latlng.lat * radians) / 256));
   let name;
   this.saved = /* allocation: required -- Preserve each active walk session's map settings. */ {
     zoom: map.getZoom(), pitch: mapGetPitch(map), scrollWheelZoom: map.options.scrollWheelZoom,
@@ -27,7 +30,7 @@ export function start() {
   for (name of this.saved.handlers) map[name].disable();
   // Wheel zoom moves the camera closer or farther, keeping the walker centred.
   map.options.scrollWheelZoom = this.saved.scrollWheelZoom && 'center';
-  this.state.heading = -mapGetBearing(map) * Math.PI / 180;
+  this.state.heading = -mapGetBearing(map) * radians;
   map.setView(this.state.latlng, zoom, /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
   mapSetPitch(map, 75);
   L.DomEvent.on(document, 'keydown keyup', this.onKey);

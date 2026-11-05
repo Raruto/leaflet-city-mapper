@@ -50,10 +50,11 @@ Then('native instance data is isolated in explicit feature associations', async 
     const independent = new Set(records).size === layers.length && camera[0] !== camera[1] &&
       testOperations.getPitch(maps[0]) === 35 && testOperations.getPitch(maps[1]) === 0;
     for (const map of maps) map.remove();
-    return { functions, independent, genericAccessor: 'pluginState' in globalThis ||
+    return { functions, independent, leafletBinding: globals.L === L &&
+      (await import('/src/globals/L.js')).L === L, genericAccessor: 'pluginState' in globalThis ||
       'instanceStates' in globals };
   });
-  assert.deepEqual(result, { functions: [], independent: true, genericAccessor: false });
+  assert.deepEqual(result, { functions: [], independent: true, leafletBinding: true, genericAccessor: false });
 });
 
 Then('every local source in the city example is available', async function () {

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { nativeEventMaps } from '../globals/nativeEventMaps.js';
 
 

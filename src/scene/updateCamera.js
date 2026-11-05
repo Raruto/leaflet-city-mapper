@@ -1,3 +1,4 @@
+import { halfRadians } from '../globals/halfRadians.js';
 /** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 
 export function updateCamera(camera) {
@@ -33,7 +34,7 @@ export function updateCamera(camera) {
   for (value of viewMatrix) {
     if (!Number.isFinite(value)) throw /* allocation: required -- Preserve the failure stack for a singular camera transform. */ new Error('Singular 3D transform');
   }
-  const f = 1 / Math.tan(camera.fov * Math.PI / 360), n = camera.near, r = camera.far;
+  const f = 1 / Math.tan(camera.fov * halfRadians), n = camera.near, r = camera.far;
   projectionMatrix[0] = f / camera.aspect, projectionMatrix[1] = 0, projectionMatrix[2] = 0, projectionMatrix[3] = 0;
   projectionMatrix[4] = 0, projectionMatrix[5] = f, projectionMatrix[6] = 0, projectionMatrix[7] = 0;
   projectionMatrix[8] = 0, projectionMatrix[9] = 0, projectionMatrix[10] = r / (n - r), projectionMatrix[11] = -1;

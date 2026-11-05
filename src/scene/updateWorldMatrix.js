@@ -1,3 +1,5 @@
+import { degrees } from '../globals/degrees.js';
+
 /** Compose parent*local matrices; a node.matrix overrides its position/rotation/scale. */
 
 export function updateWorldMatrix(node) {
@@ -28,7 +30,6 @@ export function updateWorldMatrix(node) {
   let local, world;
   if (node.matrix) local = node.matrix;
   else {
-    const degrees = 180 / Math.PI;
     const matrix = node._localTransform ||= /* allocation: required -- Retain one transform scratch matrix per node. */ new DOMMatrix();
     matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;
     matrix.m21 = 0, matrix.m22 = 1, matrix.m23 = 0, matrix.m24 = 0;

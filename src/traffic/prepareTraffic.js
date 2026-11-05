@@ -1,3 +1,5 @@
+import { radians } from '../globals/radians.js';
+import { L } from '../globals/L.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
@@ -7,7 +9,7 @@ import { groundTraffic } from './groundTraffic.js';
 export function prepareTraffic(state) {
   const { layer, lanes } = state;
   const crs = layer._map.options.crs, origin = crs.project(sceneByLayer.get(layer).location);
-  const metres = Math.cos(sceneByLayer.get(layer).location.lat * Math.PI / 180);
+  const metres = Math.cos(sceneByLayer.get(layer).location.lat * radians);
   let lane, lat, lng, point, i;
   for (lane of lanes) {
     lane.points = /* allocation: required -- Each lane retains independently mutable local-space coordinates. */ [];

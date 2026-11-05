@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
 
 

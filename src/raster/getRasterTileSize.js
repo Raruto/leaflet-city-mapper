@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
 
 

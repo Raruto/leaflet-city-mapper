@@ -1,3 +1,4 @@
+import { lightScale } from '../globals/lightScale.js';
 
 /** World-space [x, y, z, radius, r, g, b, intensity] for one mesh's point lights. */
 export function worldLights(lights, m) {
@@ -18,7 +19,7 @@ export function worldLights(lights, m) {
     values[i * 8 + 4] = color[0];
     values[i * 8 + 5] = color[1];
     values[i * 8 + 6] = color[2];
-    values[i * 8 + 7] = flux / (4 * Math.PI) * 0.03;
+    values[i * 8 + 7] = flux * lightScale;
   }
   return values;
 }

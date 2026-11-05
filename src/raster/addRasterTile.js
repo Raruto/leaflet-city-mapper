@@ -1,3 +1,4 @@
+import { radians } from '../globals/radians.js';
 import { demTexture } from '../globals/demTexture.js';
 import { demTarget } from '../globals/demTarget.js';
 import { demLayout } from '../globals/demLayout.js';
@@ -27,7 +28,7 @@ export async function addRasterTile(backend, layer, coords, tile) {
   // Match DEM pixel spacing, capped at 64 subdivisions per tile.
   const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - sceneByLayer.get(backend)._terrainZoom)));
   const map = backend._map, crs = map.options.crs;
-  const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180);
+  const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
   // Tile pixels map linearly to projected metres: one scaled unit grid per tile, elevation in the vertex shader.
   const scale = crs.scale(coords.z), terrainScale = 2 ** (sceneByLayer.get(backend)._terrainZoom - coords.z);
   const point = rasterPoint;

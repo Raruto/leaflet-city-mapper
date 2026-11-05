@@ -36,7 +36,7 @@ For example, here is how you can load a `geojson` object:
 const buildings = new L.Layer({
   source: {
     type: 'geojson',
-    url: GeoJSON,
+    data: GeoJSON,
     style: ({ properties }) => ({ top: properties.height, color: properties.color }),
     tooltip: ({ properties }) => `${properties.name}: ${properties.height} m`,
   },
@@ -99,6 +99,13 @@ Leaflet versions with `node build/test.js --name "The plugin does not add attrib
 The source-style tests also reject object literals, array literals and `new`
 expressions inside every function in `src`, including default parameters and
 returned values. Module-level initialization in `src/globals/` is allowed.
+Source modules import the Leaflet namespace explicitly from `src/globals/L.js`;
+only that binding reads `globalThis.L`, after Leaflet has loaded. An AST-based
+test rejects implicit `L` references and direct global access elsewhere in `src`.
+Invariant numeric factors, the fixed camera field of view, astronomical
+obliquity and lamp ring directions are also precomputed in dedicated global
+modules instead of recalculated per frame or vertex. Latitude-, zoom- and
+camera-dependent calculations remain dynamic.
 Necessary allocations require a separate comment immediately before the expression:
 `/* allocation: required -- Each caller owns its result. */`.
 The exception covers only that expression, not nested allocations or a whole

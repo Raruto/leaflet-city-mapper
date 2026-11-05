@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 export function hideTargets(state) {
   const { source } = state;
   const htmlIcon = source instanceof L.Marker && source.options.icon instanceof L.DivIcon;

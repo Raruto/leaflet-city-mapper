@@ -1,3 +1,4 @@
+import { degrees } from '../globals/degrees.js';
 import { dragStates } from '../globals/dragStates.js';
 
 import { mapStopPitchBearingAnimation } from '../camera/mapStopPitchBearingAnimation.js';
@@ -18,7 +19,7 @@ export function cameraDragMove(event) {
     if (Math.abs(state.drag.cy - state.drag.y) > 100) {
       const angle = Math.atan2(event.clientY - state.drag.cy, event.clientX - state.drag.cx) -
         Math.atan2(event.clientY - state.drag.cy, state.drag.x - state.drag.cx);
-      bearing = Math.atan2(Math.sin(angle), Math.cos(angle)) * 180 / Math.PI;
+      bearing = Math.atan2(Math.sin(angle), Math.cos(angle)) * degrees;
     } else bearing *= event.clientY < state.drag.cy ? 1 : -1;
   }
   mapSetPitchAndBearing(state.map, mapGetPitch(state.map) - y * state.sensitivity[1], mapGetBearing(state.map) + bearing);

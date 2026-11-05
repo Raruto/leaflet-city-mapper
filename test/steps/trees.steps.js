@@ -67,7 +67,9 @@ Then('tree points preserve dimensions, terrain elevation, picking and validation
         terrainTiles.set(`${x}/${y}`, new Float32Array(256 * 256).fill(50));
       }
     }
-    globals.cameraByMap.get(map)._terrain3D = { _map: map, _terrainReady: true, _terrainZoom: zoom, _terrainTiles: terrainTiles };
+    const terrain = { _map: map };
+    globals.sceneByLayer.set(terrain, { _terrainReady: true, _terrainZoom: zoom, _terrainTiles: terrainTiles });
+    globals.cameraByMap.get(map)._terrain3D = terrain;
     const errors = [];
     layer.on('error', ({ error }) => errors.push(error.message));
     try {

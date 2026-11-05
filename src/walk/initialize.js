@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { createWalk } from './createWalk.js';
 
 export function initialize(options) {

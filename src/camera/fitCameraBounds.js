@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
 import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
 import { cameraAngles } from '../globals/cameraAngles.js';

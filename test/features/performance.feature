@@ -1,5 +1,43 @@
 Feature: Performance-oriented source style
   @unit
+  Scenario: Leaflet binding checks reject implicit globals and alternate global access
+    Then Leaflet binding checks handle these modules:
+      | file                   | source                                                                                         | violations |
+      | src/core/example.js    | function example() { return new L.Layer(); }                                                    | 1          |
+      | src/core/example.js    | typeof L;                                                                                      | 1          |
+      | src/core/example.js    | L?.Map;                                                                                        | 1          |
+      | src/core/example.js    | object[L];                                                                                     | 1          |
+      | src/core/example.js    | import { L } from '../globals/L.js'; function example() { return new L.Layer(); }                | 0          |
+      | src/index.js           | import { L } from './globals/L.js'; L.Map.include({});                                           | 0          |
+      | src\core\example.js    | import { L } from '../globals/L.js'; L.Map.include({});                                          | 0          |
+      | src/core/example.js    | import { L as Leaflet } from '../globals/L.js'; new Leaflet.Layer();                             | 0          |
+      | src/core/example.js    | import { L } from './other.js'; new L.Layer();                                                   | 2          |
+      | src/core/example.js    | import L from '../globals/L.js'; new L.Layer();                                                  | 2          |
+      | src/core/example.js    | import * as L from '../globals/L.js'; new L.Layer();                                             | 2          |
+      | src/core/example.js    | function example(L) { return L.Map; }                                                           | 2          |
+      | src/core/example.js    | import { L } from '../globals/L.js'; function example(L) { return L.Map; }                       | 1          |
+      | src/core/example.js    | import { L } from '../globals/L.js'; function example({ L }) { return L.Map; }                   | 1          |
+      | src/core/example.js    | import { L } from '../globals/L.js'; function example(...L) { return L; }                        | 1          |
+      | src/core/example.js    | globalThis.L.Map.include({});                                                                   | 1          |
+      | src/core/example.js    | window['L'].Map.include({});                                                                    | 1          |
+      | src/core/example.js    | window?.['L']?.Map;                                                                             | 1          |
+      | src/core/example.js    | self.L.Map.include({});                                                                         | 1          |
+      | src/core/example.js    | globalThis.window.L.Map.include({});                                                            | 1          |
+      | src/core/example.js    | const root = globalThis; root.L.Map.include({});                                                | 1          |
+      | src/core/example.js    | const { L: Leaflet } = window;                                                                  | 1          |
+      | src/core/example.js    | Reflect.get(globalThis, 'L').Map.include({});                                                   | 1          |
+      | src/core/example.js    | import { L } from '../globals/L.js'; globalThis.L.Map.include({});                               | 1          |
+      | src/globals/example.js | export const leaflet = globalThis.L;                                                           | 1          |
+      | src/globals/L.js       | export const L = globalThis.L;                                                                  | 0          |
+      | src/core/example.js    | const text = 'L.Map and window.L'; /* L.Layer */                                                | 0          |
+      | src/core/example.js    | const options = { L: 3 }; object.L;                                                             | 0          |
+      | src/core/example.js    | function example() { return { L }; }                                                           | 1          |
+
+  @unit
+  Scenario: Source modules import their Leaflet namespace explicitly
+    Then source modules access Leaflet only through its explicit global binding
+
+  @unit
   Scenario: Local allocation checks distinguish explicit allocations from primitive calculations
     Then local allocation checks handle these modules:
       | source                                                                               | violations |

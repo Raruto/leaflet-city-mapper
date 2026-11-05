@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { triangle } from './nativeTriangle.js';
 import { disk } from './disk.js';
 

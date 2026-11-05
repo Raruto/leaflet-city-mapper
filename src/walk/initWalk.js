@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { initialize } from './initialize.js';
 import { onAdd } from './onAdd.js';
 import { onRemove } from './onRemove.js';

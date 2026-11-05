@@ -1,4 +1,5 @@
 import * as globals from '../fixtures/globals.js';
+import { mockLeaflet } from '../fixtures/leaflet.js';
 
 
 import assert from 'node:assert/strict';
@@ -167,7 +168,6 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
 });
 
 Then('operation contexts isolate nested geometry and source mesh attachment', function () {
-  const previous = globalThis.L;
   class LatLng {
     constructor(lat, lng) { Object.assign(this, { lat, lng }); }
   }
@@ -177,7 +177,7 @@ Then('operation contexts isolate nested geometry and source mesh attachment', fu
       return [[[new LatLng(0, 0), new LatLng(0, 2), new LatLng(2, 0)]]];
     }
   }
-  globalThis.L = { LatLng, Polygon, CircleMarker: class {} };
+  const previous = mockLeaflet({ LatLng, Polygon, CircleMarker: class {} });
   try {
     const source = new Polygon();
     const point = value => [value.x, 0, value.y];
@@ -209,8 +209,7 @@ Then('operation contexts isolate nested geometry and source mesh attachment', fu
     assert.deepEqual(firstArea, { mesh: null, buildings: 0, skipped: 2, done: true });
     assert.deepEqual(secondArea, { mesh: null, buildings: 0, skipped: 5, done: true });
   } finally {
-    if (previous === undefined) delete globalThis.L;
-    else globalThis.L = previous;
+    mockLeaflet(previous);
   }
 });
 
@@ -258,9 +257,9 @@ Then('shared helpers preserve math, callbacks and control cleanup', async functi
 });
 
 Then('source stages preserve features, errors and load completion', async function () {
-  const previous = { L: globalThis.L, requestAnimationFrame: globalThis.requestAnimationFrame,
+  const previous = { requestAnimationFrame: globalThis.requestAnimationFrame,
     GPUBufferUsage: globalThis.GPUBufferUsage, GPUShaderStage: globalThis.GPUShaderStage };
-  globalThis.L = { LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } };
+  const previousLeaflet = mockLeaflet({ LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } });
   globalThis.requestAnimationFrame = callback => setImmediate(callback);
   globalThis.GPUBufferUsage = { VERTEX: 1, COPY_DST: 2 };
   globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
@@ -371,6 +370,7 @@ Then('source stages preserve features, errors and load completion', async functi
     assert.equal(globals.sceneByLayer.get(backend)._inflight, 0);
     assert.equal(errors.length, 1, 'Cancelled loads must not emit errors');
   } finally {
+    mockLeaflet(previousLeaflet);
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete globalThis[name];
       else globalThis[name] = value;
@@ -441,7 +441,7 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
 });
 
 Then('roof and uniform stages preserve GPU uploads and resource reuse', async function () {
-  const previous = Object.fromEntries(['L', 'DOMMatrix', 'DOMPoint', 'GPUBufferUsage', 'GPUTextureUsage']
+  const previous = Object.fromEntries(['DOMMatrix', 'DOMPoint', 'GPUBufferUsage', 'GPUTextureUsage']
     .map(name => [name, globalThis[name]]));
   const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   globalThis.DOMMatrix = class {
@@ -464,14 +464,14 @@ Then('roof and uniform stages preserve GPU uploads and resource reuse', async fu
     scaleBy(point) { return new Point(this.x * point.x, this.y * point.y); }
     subtract(point) { return new Point(this.x - point.x, this.y - point.y); }
   }
-  globalThis.L = { Point, Util: { stamp: layer => layer.id }, Bounds: class {
+  const previousLeaflet = mockLeaflet({ Point, Util: { stamp: layer => layer.id }, Bounds: class {
     extend(point) {
       this.min = new Point(Math.min(this.min?.x ?? Infinity, point.x), Math.min(this.min?.y ?? Infinity, point.y));
       this.max = new Point(Math.max(this.max?.x ?? -Infinity, point.x), Math.max(this.max?.y ?? -Infinity, point.y));
     }
     isValid() { return Boolean(this.min && this.max); }
     getSize() { return this.max.subtract(this.min); }
-  } };
+  } });
   globalThis.GPUBufferUsage = { UNIFORM: 1, COPY_DST: 2 };
   globalThis.GPUTextureUsage = { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 };
   try {
@@ -552,6 +552,7 @@ Then('roof and uniform stages preserve GPU uploads and resource reuse', async fu
     await Promise.resolve();
     assert.equal(destroyed.length, 1);
   } finally {
+    mockLeaflet(previousLeaflet);
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete globalThis[name];
       else globalThis[name] = value;

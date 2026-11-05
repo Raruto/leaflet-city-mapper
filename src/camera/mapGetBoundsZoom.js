@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { mapMethods } from '../globals/mapMethods.js';
 import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
 

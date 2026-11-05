@@ -1,3 +1,4 @@
+import { radians } from '../globals/radians.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
@@ -13,7 +14,7 @@ import { local } from './bridgeLocal.js';
 
 export function addBridges(backend, geojson) {
   const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
-  const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180);
+  const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
   const base = sceneByLayer.get(backend).root.position[1];
   const position = /* allocation: required -- The bridge mesh retains its own position buffer. */ [];
   const normal = /* allocation: required -- The bridge mesh retains its own normal buffer. */ [];

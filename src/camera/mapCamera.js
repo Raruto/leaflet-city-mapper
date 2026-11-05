@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { mapMethods } from '../globals/mapMethods.js';
 import { markerMethods } from '../globals/markerMethods.js';
 import { popupEvents } from '../globals/popupEvents.js';

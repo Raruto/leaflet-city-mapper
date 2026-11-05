@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 export function mapUpdateCameraOverlays(map) {
   let layer;
   for (layer of Object.values(map._layers)) {

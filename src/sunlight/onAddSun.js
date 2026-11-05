@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 import { sunlightByControl } from '../globals/sunlightByControl.js';
 

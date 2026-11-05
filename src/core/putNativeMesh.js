@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
 import { createMesh } from '../rendering/createMesh.js';
 import { styleNativeMesh } from './styleNativeMesh.js';

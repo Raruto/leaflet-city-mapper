@@ -1,3 +1,6 @@
+import { degrees } from '../globals/degrees.js';
+import { radians } from '../globals/radians.js';
+import { L } from '../globals/L.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { limbs } from '../globals/limbs.js';
 import { parts } from '../globals/parts.js';
@@ -44,14 +47,14 @@ export function step(now) {
       east -= into * wall[0]; north += into * wall[1];
       if (blocked.call(this, east, north, feet)) east = north = 0;
     }
-    this.state.latlng = /* allocation: required -- Preserve independently observable walker positions. */ new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * Math.PI / 180)));
+    this.state.latlng = /* allocation: required -- Preserve independently observable walker positions. */ new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
     this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
     changed = true;
   }
   if (forward || turn) {
     // The camera (looking along -bearing) swings back behind the walker.
-    const bearing = mapGetBearing(map) * Math.PI / 180, behind = wrap(-this.state.heading - bearing);
-    if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * 180 / Math.PI);
+    const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
+    if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
     map.setView(this.state.latlng, map.getZoom(), /* allocation: required -- Leaflet mutates and retains its per-call options. */ { animate: false });
   }
   const target = forward ? 0.9 : 0;

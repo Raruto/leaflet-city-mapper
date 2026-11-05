@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { polygon } from './polygon.js';
 
 export function visit(context, coordinates, closed) {

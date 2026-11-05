@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 export function remove() {
   if (this._map?.hasLayer(this.layer)) {
     this._map.removeLayer(this.layer);

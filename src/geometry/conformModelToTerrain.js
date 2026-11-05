@@ -1,3 +1,5 @@
+import { radians } from '../globals/radians.js';
+import { L } from '../globals/L.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { HEIGHT } from '../globals/HEIGHT.js';
 
@@ -35,7 +37,7 @@ export function conformModelToTerrain(layer, terrain) {
   updateWorldMatrix(sceneByLayer.get(layer).root);
   const map = layer._map, crs = map.options.crs;
   const origin = crs.project(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin);
-  const metres = Math.cos(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin.lat * Math.PI / 180);
+  const metres = Math.cos(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin.lat * radians);
   const pixelScale = crs.scale(sceneByLayer.get(terrain)._terrainZoom);
 
   for (mesh of meshes) {

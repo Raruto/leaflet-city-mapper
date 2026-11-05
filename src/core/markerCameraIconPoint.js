@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
 
 import { mapGetBearing } from '../camera/mapGetBearing.js';

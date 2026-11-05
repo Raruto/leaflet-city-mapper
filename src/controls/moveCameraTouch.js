@@ -1,3 +1,4 @@
+import { degrees } from '../globals/degrees.js';
 import { touchByContainer } from '../globals/touchByContainer.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 
@@ -11,7 +12,7 @@ export function moveCameraTouch(event) {
   const rect = container.getBoundingClientRect(), middle = touch.currentMiddle;
   middle.x = (a.clientX + b.clientX) / 2 - rect.left;
   middle.y = (a.clientY + b.clientY) / 2 - rect.top;
-  const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * 180 / Math.PI;
+  const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * degrees;
   mapSetPitchAndBearing(map, cameraByMap.get(map).touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, cameraByMap.get(map).touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
   const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
   if (distance < 1) return;

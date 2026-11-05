@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { underEntry } from '../scene/underEntry.js';
 import { styleTimeControl } from './styleTimeControl.js';
 

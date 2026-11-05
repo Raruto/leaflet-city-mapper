@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { mapMethods } from '../globals/mapMethods.js';
 
 import { mapGetPitch } from './mapGetPitch.js';

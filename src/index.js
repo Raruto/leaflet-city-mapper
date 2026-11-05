@@ -1,3 +1,4 @@
+import { L } from './globals/L.js';
 import { layerProto } from './globals/layerProto.js';
 import { layerCallInitHooks as sharedLayerCallInitHooks } from './globals/layerCallInitHooks.js';
 import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';

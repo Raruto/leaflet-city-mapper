@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { Compass } from '../globals/Compass.js';
 import { ContainerResize } from '../globals/ContainerResize.js';
 import { PitchDrag } from '../globals/PitchDrag.js';

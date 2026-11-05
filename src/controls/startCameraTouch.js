@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { touchByContainer } from '../globals/touchByContainer.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 

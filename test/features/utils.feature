@@ -1,5 +1,9 @@
 Feature: Standalone 3D utilities
   @unit
+  Scenario: Shared numeric constants preserve projection, astronomy and lighting formulas
+    Then precomputed constants match their original numeric formulas
+
+  @unit
   Scenario Outline: Scene computations do not require a Leaflet layer or GPU
     Then the standalone 3D "<domain>" utilities preserve their results and errors
 

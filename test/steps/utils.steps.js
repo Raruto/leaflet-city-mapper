@@ -1,4 +1,5 @@
 import * as globals from '../fixtures/globals.js';
+import { mockLeaflet } from '../fixtures/leaflet.js';
 
 
 import assert from 'node:assert/strict';
@@ -76,6 +77,32 @@ import { metroModel } from '../../src/vehicles/metroModel.js';
 import { sortHits } from '../../src/collision/sortHits.js';
 import { addBridges } from '../../src/geometry/addBridges.js';
 import { quad } from '../../src/geometry/quad.js';
+
+Then('precomputed constants match their original numeric formulas', function () {
+  assert.equal(globals.radians, Math.PI / 180);
+  assert.equal(globals.degrees, 180 / Math.PI);
+  assert.equal(globals.halfRadians, Math.PI / 360);
+  assert.equal(globals.tau, 2 * Math.PI);
+  assert.equal(globals.earthCirc, 40075016.68557849);
+  assert.ok(Math.abs(globals.cameraFov - 2 * Math.atan(1 / 3) * 180 / Math.PI) < 1e-12);
+  assert.equal(globals.sinObliquity, Math.sin(23.4397 * Math.PI / 180));
+  assert.equal(globals.cosObliquity, Math.cos(23.4397 * Math.PI / 180));
+  for (const angle of [-720, -180, -90, -1, 0, 1, 45, 90, 180, 360, 720]) {
+    assert.ok(Math.abs(angle * globals.radians - angle * Math.PI / 180) < 1e-12);
+    assert.ok(Math.abs(angle * globals.degrees - angle * 180 / Math.PI) < 1e-10);
+  }
+  for (const flux of [0, 1, 4 * Math.PI, 1000, 100000]) {
+    const expected = flux / (4 * Math.PI) * 0.03;
+    assert.ok(Math.abs(flux * globals.lightScale - expected) <= Math.max(1, expected) * 1e-15);
+  }
+  assert.equal(globals.lampDirections.length, 6);
+  for (const [i, direction] of globals.lampDirections.entries()) {
+    assert.deepEqual(direction, {
+      x: Math.cos(i * Math.PI / 3), y: Math.sin(i * Math.PI / 3),
+      nx: Math.cos((i + 0.5) * Math.PI / 3), nz: -Math.sin((i + 0.5) * Math.PI / 3),
+    });
+  }
+});
 
 const checks = {
   'roof-coverage'() {
@@ -240,10 +267,10 @@ const checks = {
       assert.ok(firstMesh.position.every(Number.isFinite));
       assert.ok(firstMesh.normal.every(Number.isFinite));
     }
-    const originals = new Map(['L', 'GPUBufferUsage', 'GPUShaderStage'].map(name =>
+    const originals = new Map(['GPUBufferUsage', 'GPUShaderStage'].map(name =>
       [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+    const previousLeaflet = mockLeaflet({ LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } });
     try {
-      globalThis.L = { LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } };
       globalThis.GPUBufferUsage = { VERTEX: 1, COPY_DST: 2 };
       globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
       const makeBackend = () => ({
@@ -281,6 +308,7 @@ const checks = {
           'Bridge top, underside and walls retain winding consistent with their normals');
       }
     } finally {
+      mockLeaflet(previousLeaflet);
       for (const [name, descriptor] of originals) {
         if (descriptor) Object.defineProperty(globalThis, name, descriptor);
         else delete globalThis[name];

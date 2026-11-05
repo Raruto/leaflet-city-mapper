@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { onAddSun } from './onAddSun.js';
 import { underEntry } from '../scene/underEntry.js';
 import { initialize } from './initialize.js';

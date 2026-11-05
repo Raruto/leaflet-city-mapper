@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { removeLayer as sharedRemoveLayer } from '../globals/removeLayer.js';
 

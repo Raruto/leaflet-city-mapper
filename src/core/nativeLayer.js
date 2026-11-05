@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { cameraByMap } from '../globals/cameraByMap.js';
 import { nativeMethodHandlers } from '../globals/nativeMethodHandlers.js';
 import { nativeRenderByLayer } from '../globals/nativeRenderByLayer.js';

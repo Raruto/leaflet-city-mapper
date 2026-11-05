@@ -1,3 +1,4 @@
+import { radians } from '../globals/radians.js';
 import { rasterTexture } from '../globals/rasterTexture.js';
 import { rasterSampler } from '../globals/rasterSampler.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
@@ -50,7 +51,7 @@ export function createRasterMesh(backend, tile) {
   const { coords } = tile;
   const crs = backend._map.options.crs;
   const origin = crs.project(sceneByLayer.get(backend).location);
-  const metres = Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180);
+  const metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
   const scale = crs.scale(coords.z);
   const point = rasterPoint;
   point.x = coords.x * TILE_SIZE; point.y = coords.y * TILE_SIZE;

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { dragByHandler } from '../globals/dragByHandler.js';
 
 import { mapGetPitch } from '../camera/mapGetPitch.js';

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { cameraDragSensitivity } from '../globals/cameraDragSensitivity.js';
 import { cameraBearingSensitivity } from '../globals/cameraBearingSensitivity.js';
 import { rotateButtonClick } from './rotateButtonClick.js';

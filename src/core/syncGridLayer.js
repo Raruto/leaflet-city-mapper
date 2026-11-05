@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { coreWhite } from '../globals/coreWhite.js';
 
 import { styleNativeMesh } from './styleNativeMesh.js';

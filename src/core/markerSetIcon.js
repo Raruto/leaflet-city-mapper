@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { markerMethods } from '../globals/markerMethods.js';
 
 

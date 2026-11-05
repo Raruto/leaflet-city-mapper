@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 export function placeEntry(map, layer, element) {
   let input, entry;
   for (input of map.getContainer().querySelectorAll('.leaflet-control-layers-selector')) {

@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { buildAreaPoint } from './buildAreaPoint.js';
 import { buildAreaPolygon } from './buildAreaPolygon.js';
 import { parseColor } from '../utils/parseColor.js';

@@ -1,3 +1,4 @@
+import { radians } from '../globals/radians.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
@@ -5,7 +6,7 @@ export function sourceAreaContext(backend, area, map) {
   const crs = map.options.crs, origin = crs.project(sceneByLayer.get(backend).location);
   return /* allocation: required -- Isolate geometry accumulation for each concurrent area build. */ {
     backend, area, map, crs, origin,
-    metres: Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180),
+    metres: Math.cos(sceneByLayer.get(backend).location.lat * radians),
     positions: /* allocation: required -- Keep this build's vertex positions independent. */ [],
     normals: /* allocation: required -- Keep this build's vertex normals independent. */ [],
     colors: /* allocation: required -- Keep this build's vertex colors independent. */ [],

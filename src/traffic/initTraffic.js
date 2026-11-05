@@ -1,3 +1,4 @@
+import { L } from '../globals/L.js';
 import { speed as sharedSpeed } from '../globals/speed.js';
 import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
 import { vehicles } from '../globals/vehicles.js';

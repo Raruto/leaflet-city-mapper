@@ -1,12 +1,117 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { relative, sep } from 'node:path';
+import { posix, relative, sep } from 'node:path';
 import { Then } from '@cucumber/cucumber';
 import { parse } from 'acorn';
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 const ITERATORS = new Set(['forEach', 'map', 'filter', 'reduce', 'reduceRight', 'some', 'every', 'find', 'findIndex', 'findLast', 'findLastIndex', 'flatMap']);
 const LOOPS = new Set(['ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'DoWhileStatement']);
+
+function globalObject(node, aliases) {
+  return node?.type === 'Identifier' && aliases.has(node.name) ||
+    node?.type === 'MemberExpression' && globalObject(node.object, aliases) &&
+    ['globalThis', 'window', 'self'].includes(memberKey(node));
+}
+
+function memberKey(node) {
+  return node.computed ? node.property.type === 'Literal' ? node.property.value : undefined : node.property.name;
+}
+
+function inspectLeafletBindings(node, parent, imported, bridge, aliases, errors) {
+  if (!node || typeof node.type !== 'string') return;
+  if (node.type === 'ImportDeclaration') return;
+  if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && globalObject(node.init, aliases)) {
+    aliases.add(node.id.name);
+  }
+  if (node.type === 'MemberExpression' && memberKey(node) === 'L' && globalObject(node.object, aliases) && !bridge) {
+    errors.set(node.property.start, `line ${node.loc.start.line}: global Leaflet access must use an import from src/globals/L.js`);
+  }
+  if ((node.type === 'VariableDeclarator' || node.type === 'AssignmentExpression') &&
+      globalObject(node.init || node.right, aliases)) {
+    const pattern = node.id || node.left;
+    if (pattern.type === 'ObjectPattern' && !bridge) {
+      for (const property of pattern.properties) {
+        if (property.type === 'Property' && (property.key.name || property.key.value) === 'L') {
+          errors.set(property.key.start, `line ${property.loc.start.line}: destructured global Leaflet must use src/globals/L.js`);
+        }
+      }
+    }
+  }
+  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' &&
+      node.callee.object.name === 'Reflect' && memberKey(node.callee) === 'get' &&
+      globalObject(node.arguments[0], aliases) && node.arguments[1]?.value === 'L' && !bridge) {
+    errors.set(node.start, `line ${node.loc.start.line}: reflected global Leaflet must use src/globals/L.js`);
+  }
+  if (!bridge) {
+    const patterns = node.type === 'VariableDeclarator' ? [node.id] :
+      FUNCTIONS.has(node.type) ? node.params : node.type === 'CatchClause' ? [node.param] : [];
+    for (const pattern of patterns) {
+      if (pattern?.type !== 'Identifier' && bindingNames(pattern).includes('L')) {
+        errors.set(pattern.start, `line ${pattern.loc.start.line}: local bindings cannot shadow the Leaflet import`);
+      }
+    }
+  }
+  if (node.type === 'Identifier' && node.name === 'L') {
+    const property = parent?.type === 'MemberExpression' && parent.property === node && !parent.computed ||
+      ['Property', 'MethodDefinition', 'PropertyDefinition'].includes(parent?.type) &&
+        parent.key === node && !parent.computed && !parent.shorthand;
+    const declaration = parent?.type === 'VariableDeclarator' && parent.id === node ||
+      FUNCTIONS.has(parent?.type) && (parent.id === node || parent.params.includes(node)) ||
+      parent?.type === 'CatchClause' && parent.param === node ||
+      ['ClassDeclaration', 'ClassExpression'].includes(parent?.type) && parent.id === node;
+    if (!property && !bridge && (!imported || declaration)) {
+      errors.set(node.start, `line ${node.loc.start.line}: L must be imported from src/globals/L.js, not global or locally redefined`);
+    }
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) inspectLeafletBindings(child, node, imported, bridge, aliases, errors);
+    } else if (value && typeof value.type === 'string') {
+      inspectLeafletBindings(value, node, imported, bridge, aliases, errors);
+    }
+  }
+}
+
+function leafletBindingErrors(source, file) {
+  file = file.replaceAll('\\', '/');
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  let imported = false;
+  const errors = new Map(), aliases = new Set(['globalThis', 'window', 'self']);
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration') continue;
+    for (const specifier of node.specifiers) {
+      if (specifier.local.name !== 'L') continue;
+      if (specifier.type === 'ImportSpecifier' && specifier.imported.name === 'L' &&
+          posix.normalize(posix.join(posix.dirname(file), node.source.value)) === 'src/globals/L.js') {
+        imported = true;
+      } else {
+        errors.set(specifier.start, `line ${specifier.loc.start.line}: L must come from the dedicated Leaflet binding`);
+      }
+    }
+  }
+  inspectLeafletBindings(ast, null, imported, file === 'src/globals/L.js', aliases, errors);
+  return [...errors.values()];
+}
+
+Then('Leaflet binding checks handle these modules:', function (table) {
+  for (const { file, source, violations } of table.hashes()) {
+    assert.equal(leafletBindingErrors(source, file).length, Number(violations), `${file}: ${source}`);
+  }
+});
+
+Then('source modules access Leaflet only through its explicit global binding', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    const sourcePath = relative(process.cwd(), file).split(sep).join('/');
+    for (const error of leafletBindingErrors(await readFile(file, 'utf8'), sourcePath)) {
+      errors.push(`${sourcePath}: ${error}`);
+    }
+  }
+  assert.deepEqual(errors, []);
+});
 
 function lineOf(source, offset) {
   let line = 1;

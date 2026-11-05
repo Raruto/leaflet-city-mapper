@@ -1,3 +1,4 @@
+import { radians } from '../globals/radians.js';
 import { renderers } from '../globals/renderers.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { rendererDevices } from '../globals/rendererDevices.js';
@@ -144,14 +145,14 @@ export async function attach(backend, map) {
   }
   const origin = map.options.crs.project(sceneByLayer.get(shared)._sceneOrigin);
   const point = map.options.crs.project(sceneByLayer.get(backend).location);
-  const metres = Math.cos(sceneByLayer.get(shared)._sceneOrigin.lat * Math.PI / 180);
+  const metres = Math.cos(sceneByLayer.get(shared)._sceneOrigin.lat * radians);
   sceneByLayer.get(backend)._terrainBaseY ??= sceneByLayer.get(backend).root.position[1];
   sceneByLayer.get(backend).root.position[0] = (point.x - origin.x) * metres;
   sceneByLayer.get(backend).root.position[1] = sceneByLayer.get(backend)._terrainBaseY;
   sceneByLayer.get(backend).root.position[2] = -(point.y - origin.y) * metres;
   setTerrainHeight(backend);
   // Each group's metres are measured at its own latitude, not the shared camera origin.
-  sceneByLayer.get(backend).root.scale.fill(metres / Math.cos(sceneByLayer.get(backend).location.lat * Math.PI / 180));
+  sceneByLayer.get(backend).root.scale.fill(metres / Math.cos(sceneByLayer.get(backend).location.lat * radians));
   sceneByLayer.get(backend)._shared = shared;
   sceneByLayer.get(backend).renderer = sceneByLayer.get(shared).renderer;
   sceneByLayer.get(backend).scene = sceneByLayer.get(shared).scene;

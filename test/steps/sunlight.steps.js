@@ -148,7 +148,7 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(initial.date, initial.time.slice(0, 10));
   assert.equal(initial.minute, Number(initial.time.slice(11, 13)) * 60 + Number(initial.time.slice(14, 16)));
   assert.equal(initial.inLayers, true);
-  assert.equal(globals.sceneByLayer.get(initial).control, true);
+  assert.equal(initial.control, true);
   assert.equal(initial.nestedStyle, true);
   assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Eiffel Tower',
     'Streetlights', 'Traffic', 'Shadows']);
