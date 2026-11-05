@@ -13,7 +13,7 @@ import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 import { getElevation } from "../terrain/getElevation.js";
 import { pumpState } from '../constants/pumpState.js';
-import { comparePending } from './comparePending.js';
+import { compareDistance } from '../utils/compareDistance.js';
 import { buildArea } from './buildArea.js';
 
 pumpState.triangleContexts = [];
@@ -38,7 +38,7 @@ export function pump(backend, map = backend._map) {
       });
     }
   }
-  pending.sort(comparePending);
+  pending.sort(compareDistance);
   let inflight = 0;
   for (const layer of layers) inflight += layer._inflight;
   for (const { layer: areaBackend, area } of pending) {

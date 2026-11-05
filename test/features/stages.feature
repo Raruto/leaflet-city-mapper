@@ -1,5 +1,9 @@
 Feature: Decomposed rendering and source stages
   @unit
+  Scenario: Shared helpers preserve math, callbacks and control cleanup
+    Then shared helpers preserve math, callbacks and control cleanup
+
+  @unit
   Scenario: Source stages retain geometry, validation and cancellation
     Then source stages preserve features, errors and load completion
 

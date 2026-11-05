@@ -1,4 +1,4 @@
-import { cross } from './cross.js';
+import { cross } from '../geometry/cross.js';
 
 /** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 

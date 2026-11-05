@@ -12,7 +12,7 @@ import { updateArea } from '../sources/updateArea.js';
 import { setTerrainHeight } from '../terrain/setTerrainHeight.js';
 import { resizeSunlight } from '../shadows/resizeSunlight.js';
 import { attachState } from '../constants/attachState.js';
-import { attachIgnorePromiseRejection } from './attachIgnorePromiseRejection.js';
+import { noOperation } from '../utils/noOperation.js';
 import { failAttachment } from './failAttachment.js';
 import { requestAdapter } from './requestAdapter.js';
 import { requestDevice } from './requestDevice.js';
@@ -37,7 +37,7 @@ export async function attach(backend, map) {
   if (!shared) {
     shared = backend;
     backend._rendererReady = Promise.withResolvers();
-    backend._rendererReady.promise.catch(attachIgnorePromiseRejection);
+    backend._rendererReady.promise.catch(noOperation);
     cityMapper.renderers.set(map, shared);
     const canvas = document.createElement('canvas');
     if (!navigator.gpu) {

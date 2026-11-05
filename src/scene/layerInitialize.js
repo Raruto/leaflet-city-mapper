@@ -1,7 +1,6 @@
 import { indexState } from '../constants/indexState.js';
 import { init3D } from './init3D.js';
-import { noOperation } from './noOperation.js';
-import { ignorePromiseRejection } from './ignorePromiseRejection.js';
+import { noOperation } from '../utils/noOperation.js';
 import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
 
@@ -32,8 +31,8 @@ export function layerInitialize(options = {}) {
   // ponytail: type methods (setOpacity, add, ...) exist only once `ready` resolves.
   const task = { layer: this, type, settings, ready: null };
   indexState.pendingInitializations.push(task);
-  indexState.loading = indexState.loading.catch(ignorePromiseRejection).then(resolveNextInitialization);
+  indexState.loading = indexState.loading.catch(noOperation).then(resolveNextInitialization);
   const ready = this.ready = indexState.loading.then(initializeLayer);
   task.ready = ready;
-  ready.catch(ignorePromiseRejection);
+  ready.catch(noOperation);
 }

@@ -1,4 +1,4 @@
-import { noOperation } from '../scene/noOperation.js';
+import { noOperation } from '../utils/noOperation.js';
 import { emptyEvents } from '../scene/emptyEvents.js';
 import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';
 import { bringNativeLayerToFront } from './bringNativeLayerToFront.js';

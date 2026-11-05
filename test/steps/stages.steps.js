@@ -11,6 +11,54 @@ import { updateRoofRaster } from '../../src/rendering/updateRoofRaster.js';
 import { shadowCacheMatches } from '../../src/shadows/shadowCacheMatches.js';
 import { shadowBounds } from '../../src/shadows/shadowBounds.js';
 import { drawShadowMeshes } from '../../src/shadows/drawShadowMeshes.js';
+import { cross } from '../../src/geometry/cross.js';
+import { compareDistance } from '../../src/utils/compareDistance.js';
+import { noOperation } from '../../src/utils/noOperation.js';
+import { notifyCameraTouchChange } from '../../src/controls/notifyCameraTouchChange.js';
+import { rotateOnRemove } from '../../src/controls/rotateOnRemove.js';
+import { cameraControlsState } from '../../src/constants/cameraControlsState.js';
+
+Then('shared helpers preserve math, callbacks and control cleanup', async function () {
+  assert.deepEqual(cross([1, 2, 3], [4, 5, 6]), [-3, 6, -3]);
+  assert.deepEqual(cross([1, 0, 0], [0, 1, 0]), [0, 0, 1]);
+  const entries = [{ distance: 4, id: 'far' }, { distance: 1, id: 'first' },
+    { distance: 1, id: 'second' }, { distance: 0, id: 'near' }];
+  assert.deepEqual(entries.sort(compareDistance).map(entry => entry.id), ['near', 'first', 'second', 'far']);
+  assert.equal(noOperation(new Error('Already reported')), undefined);
+  const error = new Error('Original rejection');
+  const rejected = Promise.reject(error);
+  await rejected.catch(noOperation);
+  await assert.rejects(rejected, value => value === error);
+  const events = [];
+  const map = { fire(event) { events.push([this, event]); } };
+  notifyCameraTouchChange.call({ _map: map });
+  assert.deepEqual(events, [[map, 'cameratouchchange']]);
+
+  const previousWindow = globalThis.window;
+  const previousState = { ...cameraControlsState };
+  try {
+    const removed = [], blur = [], detached = [];
+    globalThis.window = { removeEventListener: (...args) => blur.push(args) };
+    const element = { removeEventListener: (...args) => removed.push(args) };
+    const dragState = { element, drag: null };
+    cameraControlsState.cameraDrags = new Set([dragState]);
+    cameraControlsState.dragStates = new WeakMap([[element, dragState]]);
+    const control = { _dragState: dragState, _refresh: noOperation };
+    rotateOnRemove.call(control, { off: (...args) => detached.push(args) });
+    assert.deepEqual(detached, [['rotate pitch', noOperation, control]]);
+    assert.deepEqual(removed.map(args => args[0]), [
+      'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'lostpointercapture', 'click', 'contextmenu',
+    ]);
+    assert.equal(cameraControlsState.cameraDrags.size, 0);
+    assert.equal(cameraControlsState.dragStates.has(element), false);
+    assert.equal(blur[0][0], 'blur');
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    for (const key of Object.keys(cameraControlsState)) delete cameraControlsState[key];
+    Object.assign(cameraControlsState, previousState);
+  }
+});
 
 Then('source stages preserve features, errors and load completion', async function () {
   const previous = { L: globalThis.L, requestAnimationFrame: globalThis.requestAnimationFrame,

@@ -15,8 +15,6 @@ import { compassAddHooks } from './compassAddHooks.js';
 import { compassRemoveHooks } from './compassRemoveHooks.js';
 import { containerResizeAddHooks } from './containerResizeAddHooks.js';
 import { containerResizeRemoveHooks } from './containerResizeRemoveHooks.js';
-import { touchModeAddHooks } from './touchModeAddHooks.js';
-import { touchModeRemoveHooks } from './touchModeRemoveHooks.js';
 import { startCameraTouch } from './startCameraTouch.js';
 import { moveCameraTouch } from './moveCameraTouch.js';
 import { endCameraTouchEvent } from './endCameraTouchEvent.js';

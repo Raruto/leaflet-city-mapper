@@ -3,7 +3,7 @@ import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { getElevation } from './getElevation.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
 import { update } from '../scene/update.js';
-import { compareTerrainTiles } from './compareTerrainTiles.js';
+import { compareDistance } from '../utils/compareDistance.js';
 import { loadTerrainTiles } from './loadTerrainTiles.js';
 import { readBridges } from './readBridges.js';
 
@@ -33,7 +33,7 @@ export async function loadTerrain(backend) {
         tiles.push({ z: backend._terrainZoom, x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) });
       }
     }
-    tiles.sort(compareTerrainTiles);
+    tiles.sort(compareDistance);
     const state = { backend, archive, controller, tiles, next: 0 };
     const workers = [];
     for (let i = 0; i < Math.min(4, tiles.length); i++) workers.push(loadTerrainTiles(state));

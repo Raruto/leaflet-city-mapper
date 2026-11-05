@@ -3,7 +3,7 @@ import { constrainCameraToBounds } from './constrainCameraToBounds.js';
 import { cleanupCameraMap } from './cleanupCameraMap.js';
 import { cameraMapReady } from './cameraMapReady.js';
 import { loadCameraControls } from '../controls/loadCameraControls.js';
-import { ignoreCameraControlsError } from '../controls/ignoreCameraControlsError.js';
+import { noOperation } from '../utils/noOperation.js';
 
 export function initializeCameraMap() {
   if (!document.getElementById('leaflet-camera-zoom-style')) {
@@ -20,6 +20,6 @@ export function initializeCameraMap() {
   this.whenReady(cameraMapReady, this);
   if (this.options.rotate || this.options.trackContainerMutation) {
     this.cameraReady = loadCameraControls(this);
-    this.cameraReady.catch(ignoreCameraControlsError);
+    this.cameraReady.catch(noOperation);
   }
 }

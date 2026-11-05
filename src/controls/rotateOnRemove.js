@@ -1,6 +1,6 @@
-import { removeRotateDrag } from './removeRotateDrag.js';
+import { pitchDragRemoveHooks } from './pitchDragRemoveHooks.js';
 
 export function rotateOnRemove(map) {
   map.off('rotate pitch', this._refresh, this);
-  removeRotateDrag.call(this);
+  pitchDragRemoveHooks.call(this);
 }
