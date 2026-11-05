@@ -2,26 +2,53 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 
+Then('maps and markers expose only the approved plugin methods', async function () {
+  const result = await this.page.evaluate(() => {
+    const map = new L.Map(document.body.appendChild(document.createElement('div')), {
+      rotate: false, pitch: 35, bearing: 70,
+    });
+    const marker = new L.Marker([0, 0]);
+    const chainable = marker.setRotation(Math.PI / 2) === marker;
+    let invalid;
+    try { marker.setRotation(NaN); } catch (error) { invalid = error.message; }
+    const result = {
+      pitch: map.getPitch(), bearing: map.getBearing(), rotation: marker.options.rotation,
+      chainable, invalid,
+      privateLayer: !('ready' in L.Layer) && !('setData' in L.Layer) &&
+        !('ready' in L.Layer.prototype) && !('setData' in L.Layer.prototype),
+      privateMap: !('resetNorthPitch' in map) && !('setPitch' in map) && !('setBearing' in map),
+      noGlobal: !('CityMapper' in globalThis),
+    };
+    map.remove();
+    return result;
+  });
+  assert.deepEqual(result, {
+    pitch: 35, bearing: 70, rotation: Math.PI / 2, chainable: true,
+    invalid: 'Marker rotation must be finite',
+    privateLayer: true, privateMap: true, noGlobal: true,
+  });
+});
+
 Then('native instance data is isolated in explicit feature associations', async function () {
   const result = await this.page.evaluate(async () => {
     const layers = [];
     for (const type of ['3d', 'geojson', 'pmtiles', 'terrain', 'traffic']) {
-      const layer = CityMapper.layer({ source: {
+      const layer = new L.Layer({ source: {
         type, data: { type: 'FeatureCollection', features: [] },
         archive: { getHeader: async () => ({ maxZoom: 19 }) },
       } });
-      await CityMapper.ready(layer);
+      await testOperations.ready(layer);
       layers.push(layer);
     }
     const maps = [new L.Map(document.body.appendChild(document.createElement('div')), { rotate: false }),
       new L.Map(document.body.appendChild(document.createElement('div')), { rotate: false })];
-    CityMapper.setPitch(maps[0], 35);
+    testOperations.setPitch(maps[0], 35);
     const records = layers.map(layer => globals.sceneByLayer.get(layer));
     const camera = maps.map(map => globals.cameraByMap.get(map));
     const functions = records.concat(camera).flatMap(record =>
       Object.entries(record).filter(([, value]) => typeof value === 'function').map(([key]) => key));
     const independent = new Set(records).size === layers.length && camera[0] !== camera[1] &&
-      CityMapper.getPitch(maps[0]) === 35 && CityMapper.getPitch(maps[1]) === 0;
+      testOperations.getPitch(maps[0]) === 35 && testOperations.getPitch(maps[1]) === 0;
     for (const map of maps) map.remove();
     return { functions, independent, genericAccessor: 'pluginState' in globalThis ||
       'instanceStates' in globals };
@@ -62,6 +89,12 @@ async function loadLeaflet(world) {
       : 'https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
   });
   if (leaflet2) await world.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
+  await world.page.evaluate(() => {
+    globalThis.waitLayer = layer => new Promise((resolve, reject) => {
+      layer.once('ready', () => resolve(layer));
+      layer.once('error', ({ error }) => reject(error));
+    });
+  });
 }
 
 async function loadPlugin(world, instrumented) {
@@ -70,7 +103,8 @@ async function loadPlugin(world, instrumented) {
     contentType: 'text/javascript', body: world.pluginBundle,
   }));
   await world.page.addScriptTag({ url: `${world.baseUrl}/dist/leaflet-city-mapper.js` });
-  await world.page.waitForFunction(() => typeof CityMapper.layer === 'function');
+  await world.page.waitForFunction(() => typeof L.Map.prototype.getPitch === 'function');
+  assert.equal(await world.page.evaluate(() => 'CityMapper' in globalThis), false);
 }
 
 Given('the city mapper plugin is loaded after Leaflet alone', { timeout: 30000 }, async function () {
@@ -119,7 +153,7 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
       Tooltip: () => new L.Tooltip(),
     };
     for (const type of ['3d', 'geojson', 'pmtiles', 'terrain', 'traffic']) {
-      factories[`Layer(${type})`] = () => (globalThis.CityMapper ? CityMapper.layer : options => new L.Layer(options))({ source: {
+      factories[`Layer(${type})`] = () => new L.Layer({ source: {
         type,
         data: { type: 'FeatureCollection', features: [] },
         archive: { getHeader: async () => ({ maxZoom: 19 }) },
@@ -132,7 +166,7 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
         instance.on('attribute-check', Object.prototype.valueOf);
         instance.fire('attribute-check');
         instance.off('attribute-check', Object.prototype.valueOf);
-        if (globalThis.CityMapper) await CityMapper.ready(instance);
+        if (name.startsWith('Layer(') && typeof L.Map.prototype.getPitch === 'function') await waitLayer(instance);
         entries.push([`L.${name} instance`, attributes(instance)]);
         if (instance instanceof L.Map) instance.remove();
       }
@@ -141,7 +175,17 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
     const additions = async before => {
       const baseline = new Map(before);
       return (await snapshot()).flatMap(([name, keys]) =>
-        [...keys].filter(key => !baseline.get(name).has(key)).map(key => `${name}: ${String(key)}`));
+        [...keys].filter(key => {
+          if (baseline.get(name).has(key)) return false;
+          const type = name.slice(2).split(/[ .(]/)[0];
+          const prototype = L[type]?.prototype;
+          const layer = prototype === L.Layer.prototype || prototype instanceof L.Layer;
+          const map = prototype === L.Map.prototype || prototype instanceof L.Map;
+          const marker = prototype === L.Marker.prototype || prototype instanceof L.Marker;
+          return !(key === 'initialize' && layer ||
+            ['getPitch', 'getBearing'].includes(key) && map ||
+            key === 'setRotation' && marker);
+        }).map(key => `${name}: ${String(key)}`));
     };
     globalThis.leafletAttributeCheck = { snapshot, additions };
   });
@@ -164,15 +208,15 @@ Then('each source initializes from the single bundle', async function () {
   const specialized = ['terrain', 'traffic'];
   for (const [index, type] of ['pmtiles', 'geojson', ...specialized].entries()) {
     await this.page.evaluate(async type => {
-      const layer = CityMapper.layer({ source: {
+      const layer = new L.Layer({ source: {
         type,
         url: 'fixture.pmtiles',
         ...(type === 'pmtiles' ? { archive: { getHeader: async () => ({ maxZoom: 19 }) } } : {}),
         ...(type === 'geojson' ? { data: { type: 'FeatureCollection', features: [] } } : {}),
       } });
-      await CityMapper.ready(layer);
-      if (type === 'geojson' && CityMapper.setData(layer, { type: 'FeatureCollection', features: [] }) !== layer) {
-        throw new Error('setData must remain chainable');
+      await waitLayer(layer);
+      if ('ready' in layer || 'setData' in layer || 'ready' in L.Layer || 'setData' in L.Layer) {
+        throw new Error('Readiness and source data must not expose additional Layer APIs');
       }
     }, type);
     assert.deepEqual(this.sourceRequests, ['/dist/leaflet-city-mapper.js']);
@@ -185,15 +229,16 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
       !Object.hasOwn(L.Layer, '_renderers') && !Object.hasOwn(L.Layer, '_nextId') &&
       ['_init3D', '_initRaster', '_initNativeGPU'].every(name => !(name in L.Layer.prototype));
     const archive = { getHeader: async () => ({ maxZoom: 19 }) };
-    const first = CityMapper.layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
-    const second = CityMapper.layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
-    const pending = CityMapper.ready(first) instanceof Promise && CityMapper.ready(second) instanceof Promise;
+    const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
+    const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
+    const firstReady = waitLayer(first), secondReady = waitLayer(second);
+    const pending = firstReady instanceof Promise && secondReady instanceof Promise;
     const firstPrototype = Object.getPrototypeOf(first);
-    await Promise.all([CityMapper.ready(first), CityMapper.ready(second)]);
-    const warm = CityMapper.layer({ source: { type: 'pmtiles', url: 'warm.pmtiles', archive } });
-    await CityMapper.ready(warm);
+    await Promise.all([firstReady, secondReady]);
+    const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles', archive } });
+    await waitLayer(warm);
     const plain = new L.Layer();
-    const configured = CityMapper.layer({ attribution: 'Plain layer' });
+    const configured = new L.Layer({ attribution: 'Plain layer' });
     const Inherited = L.Layer.extend({});
     const inherited = new Inherited({ source: { type: 'application-specific' } });
     let initializations = 0;
@@ -209,19 +254,19 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     return {
       lazy, pending,
       routed: first instanceof L.Layer && !(first instanceof L.TileLayer) && !(first instanceof L.GridLayer) &&
-        (await CityMapper.getHeader(second)).maxZoom === 19,
+        second.options.maxNativeZoom === 19,
       samePrototype: firstPrototype === L.Layer.prototype && Object.getPrototypeOf(first) === firstPrototype &&
         first.constructor === L.Layer && warm.constructor === L.Layer,
       externalMethods: !('onAdd' in first) && !('getHeader' in first) && !('ready' in first) &&
         first.options !== second.options,
       settings: first.options.maxZoom,
       sourceRemoved: first.options.source === undefined,
-      header: (await CityMapper.getHeader(first)).maxZoom,
+      header: first.options.maxNativeZoom,
       custom: custom instanceof Custom && custom.options.source.type === 'application-specific',
       initializations,
       marker: marker instanceof L.Marker && marker.getLatLng().equals([55, 10]),
-      pitch: typeof CityMapper.getPitch === 'function' && !('getPitch' in L.Map.prototype),
-      warm: (await CityMapper.getHeader(warm)).maxZoom === 19,
+      pitch: typeof L.Map.prototype.getPitch === 'function',
+      warm: warm.options.maxNativeZoom === 19,
       plain: plain instanceof L.Layer && !plain.ready,
       configured: configured.options.attribution === 'Plain layer',
       inherited: inherited instanceof Inherited && !inherited.ready,
@@ -236,14 +281,15 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
 
 Then('an unknown source rejects readiness and subsequent sources still initialize', async function () {
   const result = await this.page.evaluate(async () => {
-    const invalid = CityMapper.layer({ source: { type: 'unknown' } });
-    const valid = CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+    const invalid = new L.Layer({ source: { type: 'unknown' } });
+    const valid = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
       archive: { getHeader: async () => ({ maxZoom: 19 }) } } });
     let emitted;
     invalid.on('error', ({ error }) => { emitted = error; });
-    const error = await CityMapper.ready(invalid).then(() => null, error => error);
-    await CityMapper.ready(valid);
-    return { error: error?.message, emitted: emitted === error, header: (await CityMapper.getHeader(valid)).maxZoom };
+    const validReady = waitLayer(valid);
+    const error = await waitLayer(invalid).then(() => null, error => error);
+    await validReady;
+    return { error: error?.message, emitted: emitted === error, header: valid.options.maxNativeZoom };
   });
   assert.deepEqual(result, { error: 'Unknown layer type: unknown', emitted: true, header: 19 });
 });

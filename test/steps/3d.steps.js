@@ -171,7 +171,7 @@ export async function prepare3DChecks(page) {
         return result;
       },
       ready(layer) {
-        return CityMapper.ready(layer);
+        return testOperations.ready(layer);
       },
       async loadBlock(layer, area, features) {
         while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame);
@@ -241,8 +241,8 @@ Given('a leaflet map', { timeout: 30000 }, async function () {
       <script src="../dist/leaflet-city-mapper.js"></script>
       <script>
         Promise.all([
-          CityMapper.ready(CityMapper.layer({ source: { type: 'terrain' } })),
-          CityMapper.ready(CityMapper.layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+          testOperations.ready(new L.Layer({ source: { type: 'terrain' } })),
+          testOperations.ready(new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
             archive: { getHeader: async () => ({ maxZoom: 19 }) } } })),
         ]).then(() => window.test3d = { map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30
@@ -260,7 +260,7 @@ const openEiffelExample = async function () {
   await this.page.setViewportSize({ width: 800, height: 600 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
-  await this.page.waitForFunction(() => window.map && typeof CityMapper.getPitch === 'function');
+  await this.page.waitForFunction(() => window.map && typeof testOperations.getPitch === 'function');
   await this.page.waitForFunction(() => layers._layers.some(entry => entry.name === 'Shadows'));
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   // Test-only shortcuts; the example keeps its layers inside the layers control.
@@ -285,7 +285,7 @@ const openEiffelExample = async function () {
       viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
       preferCanvas: map.options.preferCanvas,
       classicScriptsOnly: [...document.scripts].every(script => !script.type),
-      globalLibraries: typeof CityMapper.layer === 'function' &&
+      globalLibraries: typeof L.Layer === 'function' && !('CityMapper' in globalThis) &&
         !('_init3D' in L.Layer.prototype) && !('_initRaster' in L.Layer.prototype),
       vectorLayers: Object.values(map._layers).filter(layer => layer instanceof L.Path).length,
       backgrounds: [...document.querySelectorAll('.leaflet-control-layers-base label')].map(label => label.textContent.trim()),

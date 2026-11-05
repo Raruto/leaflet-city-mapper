@@ -42,7 +42,7 @@ Then('configured models preserve external assets and can be detached and reattac
   }));
   const result = await this.page.evaluate(async () => {
     const url = new URL('manual/model.gltf', document.baseURI).href;
-    const layer = CityMapper.layer({ source: { type: '3d', url: url } });
+    const layer = new L.Layer({ source: { type: '3d', url: url } });
     let ready = false;
     const loaded = nativeChecks.ready(layer).then(() => { ready = true; });
     await new Promise(requestAnimationFrame);
@@ -84,7 +84,7 @@ Then('configured models preserve external assets and can be detached and reattac
     contentType: 'application/json', body: JSON.stringify(description),
   }));
   const missingUV = await this.page.evaluate(async () => {
-    const layer = CityMapper.layer({ source: { type: '3d', url: 'manual/no-uv.gltf' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: '3d', url: 'manual/no-uv.gltf' } }).addTo(test3d.map);
     const error = await nativeChecks.ready(layer).then(() => null, error => error);
     const result = error?.message === 'Textured model mesh requires UV coordinates' &&
       !globals.sceneByLayer.get(layer).model && globals.sceneByLayer.get(layer).root.children.length === 0;
@@ -99,7 +99,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     contentType: 'application/json', body: new URL(route.request().url()).searchParams.get('fixture'),
   }));
   const result = await this.page.evaluate(async () => {
-    const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
     const square = (x, y, size) => [{ x, y }, { x: x + size, y },
       { x: x + size, y: y + size }, { x, y: y + size }];
@@ -152,7 +152,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     }];
     const url = new URL('accessors.gltf', document.baseURI);
     url.searchParams.set('fixture', JSON.stringify(description));
-    const configured = CityMapper.layer({ source: { type: '3d', url: url.href } }).addTo(test3d.map);
+    const configured = new L.Layer({ source: { type: '3d', url: url.href } }).addTo(test3d.map);
     await nativeChecks.ready(configured);
     const model = globals.sceneByLayer.get(configured).model;
     const [first, second] = model.children.map(node => node.children[0]);
@@ -179,7 +179,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
 Then('a configured 3D model loads with its transforms and attribution', { timeout: 60000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = CityMapper.layer({ source: { type: '3d',
+    const layer = new L.Layer({ source: { type: '3d',
       center: [48.8582601, 2.29449985],
       url: '../examples/data/eiffel-tower.glb',
       rotation: [0, 0.8, 0],
@@ -266,9 +266,9 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       normal: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
       color: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1],
     }, nativeChecks.gpu.createProgram(layer, { vertexColors: true, alphaMode: 'MASK', doubleSided: true }));
-    const pitch = CityMapper.getPitch(map), bearing = CityMapper.getBearing(map);
+    const pitch = testOperations.getPitch(map), bearing = testOperations.getBearing(map);
     globals.sceneByLayer.get(layer).model.visible = false;
-    CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0); map.setView(globals.sceneByLayer.get(layer).location, 17, { animate: false });
+    testOperations.setPitch(map, 0); testOperations.setBearing(map, 0); map.setView(globals.sceneByLayer.get(layer).location, 17, { animate: false });
     nativeChecks.graph.setParent(probe, globals.sceneByLayer.get(layer).root);
     nativeChecks.render.update(layer);
     const sample = () => nativeChecks.pixels(layer,
@@ -285,7 +285,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       firstPixel[0] > firstPixel[2] && firstPixel[3] === 255;
     nativeChecks.gpu.disposeMesh(layer, probe);
     globals.sceneByLayer.get(layer).model.visible = true;
-    CityMapper.setPitch(map, pitch); CityMapper.setBearing(map, bearing);
+    testOperations.setPitch(map, pitch); testOperations.setBearing(map, bearing);
     nativeChecks.render.render(globals.sceneByLayer.get(layer)._shared);
     const container = map.getContainer();
     const rect = container.getBoundingClientRect();
@@ -373,7 +373,7 @@ When('I load a configured 3D model with {string}', async function (failure) {
     status, body, contentType: 'application/octet-stream',
   }));
   this.invalid3d = await this.page.evaluate(async () => {
-    const layer = CityMapper.layer({ source: { type: '3d', url: 'invalid-model.glb' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: '3d', url: 'invalid-model.glb' } }).addTo(test3d.map);
     let emitted;
     layer.on('error', event => { emitted = event.error; });
     const error = await nativeChecks.ready(layer).then(() => null, error => error);
@@ -430,7 +430,7 @@ When('I hover and click the Eiffel Tower in the 3D example', { timeout: 60000 },
         const metres = Math.cos(globals.sceneByLayer.get(globals.sceneByLayer.get(tower)._shared)._sceneOrigin.lat * Math.PI / 180);
         target = { ...candidate, center: crs.unproject(new L.Point(
           origin.x + hit.point[0] / metres, origin.y - hit.point[2] / metres)),
-        zoom: map.getZoom(), bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map) };
+        zoom: map.getZoom(), bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map) };
         break;
       }
     });
@@ -459,7 +459,7 @@ When('I hover and click the Eiffel Tower in the 3D example', { timeout: 60000 },
     const tower = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer).model).layer;
     return { zoom: map.getZoom(), center: map.getCenter(), movements: window.exampleClickMovements,
       clicked: globals.sceneByLayer.get(tower).hoveredFeature?.model === globals.sceneByLayer.get(tower).model,
-      bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
+      bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map),
       canvases: document.querySelectorAll('.leaflet-3d').length };
   });
   this.exampleTowerCenter = beforeClick;
@@ -495,7 +495,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer).model && globals.sceneByLayer.get(layer).renderer),
   null, { timeout: 45000 });
   await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._terrainReady);
-  await this.page.waitForFunction(() => map.getZoom() === 15 && Math.abs(CityMapper.getPitch(map) - 45) < 0.01);
+  await this.page.waitForFunction(() => map.getZoom() === 15 && Math.abs(testOperations.getPitch(map) - 45) < 0.01);
   this.eiffel = await this.page.evaluate(async () => {
     let tower, eiffel;
     map.eachLayer(layer => {
@@ -561,8 +561,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     });
     for (const [zoom, pitch, bearing] of [[17, 0, 0], [17, 45, 30], [18, 60, 135], [16, 80, 270]]) {
       map.setView(globals.sceneByLayer.get(tower).location, zoom, { animate: false });
-      CityMapper.setPitch(map, pitch);
-      CityMapper.setBearing(map, bearing);
+      testOperations.setPitch(map, pitch);
+      testOperations.setBearing(map, bearing);
       map.panBy([35, -20], { animate: false });
       await new Promise(requestAnimationFrame);
       const scale = map.options.crs.scale(zoom) /
@@ -619,8 +619,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
       return result;
     };
     map.setView(globals.sceneByLayer.get(tower).location, 16, { animate: false });
-    CityMapper.setPitch(map, 45);
-    CityMapper.setBearing(map, 30);
+    testOperations.setPitch(map, 45);
+    testOperations.setBearing(map, 30);
     map.panBy([70, -35], { animate: false });
     for (const zoom of [17, 16, 17, 16]) {
       await new Promise(requestAnimationFrame);
@@ -632,8 +632,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     delete queue.writeBuffer;
 
     map.setView(globals.sceneByLayer.get(tower).location, 17, { animate: false });
-    CityMapper.setPitch(map, 60);
-    CityMapper.setBearing(map, 30);
+    testOperations.setPitch(map, 60);
+    testOperations.setBearing(map, 30);
     await new Promise(requestAnimationFrame);
     const renderer = globals.sceneByLayer.get(tower).renderer;
     const pixels = await nativeChecks.pixels(tower);

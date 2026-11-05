@@ -8,9 +8,9 @@ import { prepare3DChecks } from './3d.steps.js';
 Then('source layers share load slots and start nearby blocks before distant ones', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    CityMapper.setPitch(map, 80);
-    const layers = Array.from({ length: 3 }, () => CityMapper.layer({ source: { type: '3d' } }).addTo(map));
-    const ground = CityMapper.layer({ source: { type: 'pmtiles', url: 'priority-ground.pmtiles', archive: {
+    testOperations.setPitch(map, 80);
+    const layers = Array.from({ length: 3 }, () => new L.Layer({ source: { type: '3d' } }).addTo(map));
+    const ground = new L.Layer({ source: { type: 'pmtiles', url: 'priority-ground.pmtiles', archive: {
       getHeader: async () => ({ minZoom: 16, maxZoom: 16, minLat: -80, maxLat: -79, minLon: -170, maxLon: -169 }),
       getZxy: async () => { throw new Error('Out-of-view ground should not be requested'); },
     } } }).addTo(map);
@@ -55,7 +55,7 @@ Then('source layers share load slots and start nearby blocks before distant ones
 Then('cancelled building downloads recover without errors or stale meshes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = CityMapper.layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
+    const layer = new L.Layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
     await nativeChecks.ready(layer);
     const idle = async () => {
       const deadline = performance.now() + 3000;
@@ -120,7 +120,7 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
 Then('building blocks cover pitched views and retain overlapping areas', async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = CityMapper.layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
+    const layer = new L.Layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
     await nativeChecks.ready(layer);
     const idle = async () => { while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame); };
     await idle();
@@ -149,9 +149,9 @@ Then('building blocks cover pitched views and retain overlapping areas', async f
           coords.x >= archiveNW.x && coords.x <= archiveSE.x &&
           coords.y >= archiveNW.y && coords.y <= archiveSE.y) });
     };
-    await verify(() => CityMapper.setPitch(map, 75));
-    await verify(() => CityMapper.setBearing(map, 270));
-    await verify(() => CityMapper.setBearing(map, 90));
+    await verify(() => testOperations.setPitch(map, 75));
+    await verify(() => testOperations.setBearing(map, 270));
+    await verify(() => testOperations.setBearing(map, 90));
     await verify(() => {
       map.getContainer().style.width = '1000px';
       map.getContainer().style.height = '600px';
@@ -174,7 +174,7 @@ Then('building blocks cover pitched views and retain overlapping areas', async f
 
 Then('a source block with {string} reports {string} without attaching a mesh', async function (invalid, message) {
   const result = await this.page.evaluate(async invalid => {
-    const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
     layer.options.style = () => ({ top: 10 });
     const anchor = globals.sceneByLayer.get(layer).location, west = anchor.lng, south = anchor.lat;
@@ -416,12 +416,12 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
   this.hoverHighlight = interaction.before === null &&
     highlightedColor.highlight?.[0] === interaction.vertexStart;
   const viewBeforeClick = await this.page.evaluate(() => ({
-    center: map.getCenter(), zoom: map.getZoom(), bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map)
+    center: map.getCenter(), zoom: map.getZoom(), bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map)
   }));
   await this.page.mouse.click(interaction.position.clientX, interaction.position.clientY);
   await this.page.evaluate(() => new Promise(requestAnimationFrame));
   assert.deepEqual(await this.page.evaluate(() => ({
-    center: map.getCenter(), zoom: map.getZoom(), bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map)
+    center: map.getCenter(), zoom: map.getZoom(), bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map)
   })), viewBeforeClick, 'Clicking a building must not change the map view');
   await this.page.evaluate(() => {
     for (const type of ['mouseout', 'mouseleave']) {
@@ -507,8 +507,8 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   const requestsBeforeCameraChanges = this.buildingRequests.length;
   await this.page.evaluate(() => {
     map.setZoom(13, { animate: false });
-    CityMapper.setPitch(map, 70);
-    CityMapper.setBearing(map, 120);
+    testOperations.setPitch(map, 70);
+    testOperations.setBearing(map, 120);
   });
   await status('2 Paris building volumes loaded');
   this.retainedAtLowZoom = await meshes() === 1;

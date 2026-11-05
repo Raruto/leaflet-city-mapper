@@ -6,7 +6,7 @@ import { Then } from '@cucumber/cucumber';
 
 Then('shadow maps are reused until geometry, appearance or sunlight changes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const map = test3d.map, layer = CityMapper.layer({ source: { type: '3d' } }).addTo(map);
+    const map = test3d.map, layer = new L.Layer({ source: { type: '3d' } }).addTo(map);
     await nativeChecks.ready(layer);
     const mesh = nativeChecks.gpu.createMesh(layer, { position: [-20,0,-20,20,0,-20,0,20,20],
       normal: [0,1,0,0,1,0,0,1,0], color: [1,0,0,1,0,0,1,0,0] });
@@ -88,16 +88,16 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     const night = await brightness();
     const nightSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
     const nightTint = Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59));
-    CityMapper.setPitch(map, 85);
+    testOperations.setPitch(map, 85);
     const skyApplied = getComputedStyle(globals.cameraByMap.get(map)._pitchSky).backgroundImage === nightSky;
     select(300);
-    CityMapper.setBearing(map, -globals.cameraByMap.get(map)._sunlight.azimuth);
+    testOperations.setBearing(map, -globals.cameraByMap.get(map)._sunlight.azimuth);
     const sun = globals.cameraByMap.get(map)._pitchSky.querySelector('.sunlight-sun');
     const sunVisible = !sun.hidden;
     const sunPosition = [sun.style.left, sun.style.top];
     select(315);
     const sunMoved = sun.style.left !== sunPosition[0] || sun.style.top !== sunPosition[1];
-    CityMapper.setBearing(map, CityMapper.getBearing(map) + 180);
+    testOperations.setBearing(map, testOperations.getBearing(map) + 180);
     const sunBehind = sun.hidden;
     // Find a low lunar altitude, then face it; the moon is not always opposite the sun.
     let moonMinute;
@@ -106,13 +106,13 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
       if (globals.cameraByMap.get(map)._sunlight.moon.altitude > 1 && globals.cameraByMap.get(map)._sunlight.moon.altitude < 10) { moonMinute = minute; break; }
     }
     if (moonMinute === undefined) throw new Error('No lunar rise/set found on the test date');
-    CityMapper.setBearing(map, -globals.cameraByMap.get(map)._sunlight.moon.azimuth);
+    testOperations.setBearing(map, -globals.cameraByMap.get(map)._sunlight.moon.azimuth);
     const moon = globals.cameraByMap.get(map)._pitchSky.querySelector('.sunlight-moon');
     const moonVisible = !moon.hidden;
     const moonPosition = [moon.style.left, moon.style.top];
     select((moonMinute + 15) % 1440);
     const moonMoved = moon.style.left !== moonPosition[0] || moon.style.top !== moonPosition[1];
-    CityMapper.setPitch(map, 0);
+    testOperations.setPitch(map, 0);
     const hiddenAtZeroPitch = sun.hidden && moon.hidden;
     map.removeLayer(sunlightOverlay);
     nativeChecks.render.render(owner);

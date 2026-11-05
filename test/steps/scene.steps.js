@@ -6,7 +6,7 @@ import { Then, When } from '@cucumber/cucumber';
 
 Then('layer-owned objects preserve values and visibility without engine classes', async function () {
   const result = await this.page.evaluate(async () => {
-    const layer = CityMapper.layer({ source: { type: '3d' } });
+    const layer = new L.Layer({ source: { type: '3d' } });
     await nativeChecks.ready(layer);
     layer.addTo(test3d.map);
     await globals.sceneByLayer.get(layer)._added.promise;
@@ -93,8 +93,8 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const initial = map.getCenter();
-    const beforeReady = CityMapper.layer({ source: { type: '3d', ariaLabel: 'Automatic origin' } }).addTo(map);
-    const afterReady = CityMapper.layer({ source: { type: '3d' } });
+    const beforeReady = new L.Layer({ source: { type: '3d', ariaLabel: 'Automatic origin' } }).addTo(map);
+    const afterReady = new L.Layer({ source: { type: '3d' } });
     await Promise.all([beforeReady, afterReady].map(nativeChecks.ready));
     const deferred = globals.sceneByLayer.get(afterReady).location == null && !globals.sceneByLayer.get(afterReady).renderer;
     afterReady.addTo(map);
@@ -113,7 +113,7 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
     beforeReady.remove();
     afterReady.remove();
     const center = [48.858, 2.295];
-    const explicit = CityMapper.layer({ source: { type: '3d', center } });
+    const explicit = new L.Layer({ source: { type: '3d', center } });
     await nativeChecks.ready(explicit);
     center[0] = 0;
     const explicitPreserved = globals.sceneByLayer.get(explicit).location.equals([48.858, 2.295]);
@@ -126,13 +126,13 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
   this.shared3d = await this.page.evaluate(async () => {
     const { map } = test3d;
     const control = new L.Control.Layers().addTo(map);
-    const pending = CityMapper.layer({ source: { type: '3d', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
+    const pending = new L.Layer({ source: { type: '3d', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
     pending.remove();
     await nativeChecks.ready(pending);
     const pendingRemoved = !document.querySelector('.leaflet-3d');
-    const first = CityMapper.layer({ source: { type: '3d', center: [48.8582601, 2.29449985] } }).addTo(map);
+    const first = new L.Layer({ source: { type: '3d', center: [48.8582601, 2.29449985] } }).addTo(map);
     control.addOverlay(first, 'First 3D layer');
-    const second = CityMapper.layer({ source: { type: '3d', center: [48.8602, 2.298] } }).addTo(map);
+    const second = new L.Layer({ source: { type: '3d', center: [48.8602, 2.298] } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
     const backend = first;
     const object = nativeChecks.group();
@@ -177,8 +177,8 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     await globals.sceneByLayer.get(first)._added.promise;
     const movedOwner = globals.sceneByLayer.get(first)._shared === first && globals.sceneByLayer.get(first).renderer !== renderer &&
       globals.sceneByLayer.get(second)._shared === second && globals.sceneByLayer.get(second).renderer === renderer;
-    CityMapper.setBearing(otherMap, 70);
-    CityMapper.setBearing(map, 65);
+    testOperations.setBearing(otherMap, 70);
+    testOperations.setBearing(map, 65);
     await new Promise(requestAnimationFrame);
     const independentUpdates = globals.sceneByLayer.get(first)._sceneOrigin === globals.sceneByLayer.get(first).location &&
       globals.sceneByLayer.get(second).camera.projectionViewMatrix.some((value, index) => Math.abs(value - matrix[index]) > 1e-6);
@@ -196,7 +196,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     checkbox().click();
     await globals.sceneByLayer.get(first)._added.promise;
     const checkboxEnabled = map.hasLayer(first) && globals.sceneByLayer.get(first).renderer === renderer;
-    const other = await nativeChecks.ready(CityMapper.layer({ source: {
+    const other = await nativeChecks.ready(new L.Layer({ source: {
       type: '3d', center: [globals.sceneByLayer.get(second).location.lat, globals.sceneByLayer.get(second).location.lng],
     } }).addTo(otherMap));
     const isolated = globals.sceneByLayer.get(other).renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
@@ -232,7 +232,7 @@ Then('an unavailable WebGPU adapter emits an error and shows a warning without l
       value: { requestAdapter: async () => null },
     });
     try {
-      const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
+      const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
       let emitted;
       layer.on('error', event => { emitted = event.error; });
       const error = await nativeChecks.ready(layer).then(() => null, error => error);
@@ -260,7 +260,7 @@ When('I select the {string} background in the 3D example', async function (backg
     window.exampleSceneBefore = {
       overlays, renderer: globals.sceneByLayer.get(overlays[0]).renderer, canvas: globals.sceneByLayer.get(overlays[0]).renderer.canvas,
       model: globals.sceneByLayer.get(overlays.find(layer => globals.sceneByLayer.get(layer).model)).model,
-      center: map.getCenter(), zoom: map.getZoom(), bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
+      center: map.getCenter(), zoom: map.getZoom(), bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map),
     };
   });
   await this.page.getByRole('radio', { name: background, exact: true }).check();
@@ -280,12 +280,12 @@ Then('only the {string} background is active and the 3D scene is unchanged', asy
     return {
       enabled: overlays.length === 4 && overlays.every(layer => map.hasLayer(layer)) &&
         layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers().every(layer => map.hasLayer(layer)),
-      shared: overlays.every(layer => globals.sceneByLayer.get(layer).renderer === globals.sceneByLayer.get(before).renderer),
+      shared: overlays.every(layer => globals.sceneByLayer.get(layer).renderer === before.renderer),
       canvas: document.querySelectorAll('.leaflet-3d').length === 1 &&
         before.canvas.isConnected && globals.sceneByLayer.get(tower).renderer.canvas === before.canvas,
-      model: globals.sceneByLayer.get(tower).model === globals.sceneByLayer.get(before).model && globals.sceneByLayer.get(tower).model.parent === globals.sceneByLayer.get(tower).root,
+      model: globals.sceneByLayer.get(tower).model === before.model && globals.sceneByLayer.get(tower).model.parent === globals.sceneByLayer.get(tower).root,
       camera: map.getCenter().equals(before.center) && map.getZoom() === before.zoom &&
-        CityMapper.getBearing(map) === before.bearing && CityMapper.getPitch(map) === before.pitch,
+        testOperations.getBearing(map) === before.bearing && testOperations.getPitch(map) === before.pitch,
     };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
@@ -340,7 +340,7 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   const towerRestored = await this.page.evaluate(() => {
     const before = window.exampleOverlayBefore;
     const tower = before.tower;
-    return map.hasLayer(tower) && globals.sceneByLayer.get(tower).model === globals.sceneByLayer.get(before).model &&
+    return map.hasLayer(tower) && globals.sceneByLayer.get(tower).model === before.model &&
       globals.sceneByLayer.get(tower).renderer.canvas !== before.canvas && globals.sceneByLayer.get(tower).renderer.canvas.isConnected &&
       map.attributionControl.getContainer().textContent.includes('CC0 model:') &&
       globals.sceneByLayer.get(tower)._tooltip.hidden;

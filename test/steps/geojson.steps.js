@@ -23,7 +23,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const map = new L.Map(container, { center: [41.89, 12.49], zoom: 18, rotate: true, pitch: 45 });
     const data = await (await fetch('/buildings.geojson')).json();
     const errors = [];
-    const layer = CityMapper.layer({ source: {
+    const layer = new L.Layer({ source: {
       ...(input === 'inline' ? { data } : { type: 'geojson', url: '/buildings.geojson' }),
       style: feature => ({ top: feature.properties.height }),
       tooltip: feature => feature.id,
@@ -47,8 +47,8 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const identity = face.id === 'office' && face.properties.height === 25;
     const geometry = mesh.geometry.attributes.position.count > 0;
     map.panTo([41.9, 12.5], { animate: false });
-    CityMapper.setBearing(map, 90);
-    CityMapper.setPitch(map, 60);
+    testOperations.setBearing(map, 90);
+    testOperations.setPitch(map, 60);
     const retained = globals.sceneByLayer.get(layer)._areas.get('geojson') === area;
     const previousArea = area;
     const terrainUpdate = new Promise(resolve => {
@@ -65,11 +65,11 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const terrainUpdated = await terrainUpdate;
     area = globals.sceneByLayer.get(layer)._areas.get('geojson');
     done = completed();
-    CityMapper.setData(layer, { type: 'FeatureCollection', features: [] });
+    testOperations.setData(layer, { type: 'FeatureCollection', features: [] });
     const empty = await done;
     const released = area.request.signal.aborted && !globals.sceneByLayer.get(layer).root.children.includes(mesh);
     done = completed();
-    CityMapper.setData(layer, data);
+    testOperations.setData(layer, data);
     const replaced = await done;
     layer.remove();
     const removed = globals.sceneByLayer.get(layer)._areas.size === 0;
@@ -102,7 +102,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       { url: '/missing.geojson' }, { url: '/broken.geojson' },
       { data: { type: 'FeatureCollection', features: [] }, style: null },
     ]) {
-      const layer = CityMapper.layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
+      const layer = new L.Layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
       const failed = new Promise(resolve => layer.once('error', ({ error }) => resolve(error.message)));
       layer.addTo(map);
       failures.push(await failed);
@@ -120,7 +120,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
         reject(signal.reason);
       }, { once: true });
     });
-    const layer = CityMapper.layer({ source: {
+    const layer = new L.Layer({ source: {
       type: 'geojson', url: '/slow.geojson', style: () => ({ top: 10 }),
     } });
     const errors = [];
@@ -130,7 +130,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
     const completed = new Promise(resolve => layer.on('progress', event => {
       if (!event.pending) resolve(event.loaded);
     }));
-    CityMapper.setData(layer, { type: 'FeatureCollection', features: [] });
+    testOperations.setData(layer, { type: 'FeatureCollection', features: [] });
     const loaded = await completed;
     globalThis.fetch = fetchSource;
     layer.remove();
@@ -203,7 +203,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   await this.page.waitForFunction(() => {
     const layers = Object.values(map._layers);
     return layers.some(layer => layer instanceof L.TileLayer &&
-      layer._url === 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' && !CityMapper.isLoading(layer) &&
+      layer._url === 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' && !testOperations.isLoading(layer) &&
       Object.values(layer._tiles).some(tile => tile.loaded));
   });
   assert.equal(await this.page.locator('canvas.leaflet-3d').count(), 1);

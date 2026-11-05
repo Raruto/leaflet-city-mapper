@@ -131,9 +131,9 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `const initialize = CityMapper.layer;
+  const pmtilesMock = `const initialize = L.Layer.prototype.initialize;
     if (initialize && !initialize._testArchive) {
-      CityMapper.layer = Object.assign(function (options = {}) {
+      L.Layer.prototype.initialize = Object.assign(function (options = {}) {
         const source = options.source;
         if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' &&
           !/\\.(glb|gltf)(?:[?#]|$)/i.test(source.url) && !source.archive) {

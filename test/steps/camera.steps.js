@@ -130,16 +130,16 @@ Then('camera coordinates round-trip and native overlays remain aligned', { timeo
     const bounds = map.getBounds().contains(map.getCenter());
     marker.options.rotateWithView = marker.options.keepUpright = true;
     marker.options.scale = 2;
-    CityMapper.setRotation(marker, Math.PI);
+    testOperations.setRotation(marker, Math.PI);
     const direction = globalThis.cityMapperTestOperations.markerCameraIconPoint(marker, 1, 0);
     const markerRotation = direction.x > 0 && Math.abs(Math.hypot(direction.x, direction.y) - 2) < 1e-10 &&
       marker._icon.style.transform.includes('scale(2)');
     let invalid = 0;
     for (const value of [NaN, Infinity, '30']) {
-      try { CityMapper.setBearing(map, value); } catch (error) { if (error instanceof TypeError) invalid++; }
+      try { testOperations.setBearing(map, value); } catch (error) { if (error instanceof TypeError) invalid++; }
     }
-    CityMapper.setPitch(CityMapper.setBearing(map, -450), 100);
-    const clamped = CityMapper.getBearing(map) === 270 && CityMapper.getPitch(map) === 85;
+    testOperations.setPitch(testOperations.setBearing(map, -450), 100);
+    const clamped = testOperations.getBearing(map) === 270 && testOperations.getPitch(map) === 85;
     const scripts = [...document.scripts].every(script => !script.src.includes('leaflet-rotate'));
     map.remove();
     return { error: Math.max(...errors), aligned, popupAligned, noCSSRotation: !/rotate|matrix3d|perspective/.test(paneTransform),
@@ -159,7 +159,7 @@ Then('camera orientation is accessible without dragging', { timeout: 30000 }, as
   await button.focus();
   await this.page.keyboard.press('ArrowRight');
   await this.page.keyboard.press('ArrowUp');
-  assert.deepEqual(await this.page.evaluate(() => [CityMapper.getBearing(cameraMap), CityMapper.getPitch(cameraMap)]), [5, 5]);
+  assert.deepEqual(await this.page.evaluate(() => [testOperations.getBearing(cameraMap), testOperations.getPitch(cameraMap)]), [5, 5]);
   await this.page.keyboard.press('Shift+ArrowRight');
   await this.page.keyboard.press('Shift+ArrowRight');
   await this.page.keyboard.press('ArrowRight');
@@ -167,19 +167,19 @@ Then('camera orientation is accessible without dragging', { timeout: 30000 }, as
   await this.page.keyboard.press('Shift+ArrowUp');
   await this.page.keyboard.press('Shift+ArrowUp');
   await this.page.keyboard.press('ArrowUp');
-  assert.deepEqual(await this.page.evaluate(() => [CityMapper.getBearing(cameraMap), CityMapper.getPitch(cameraMap)]), [45, 40]);
+  assert.deepEqual(await this.page.evaluate(() => [testOperations.getBearing(cameraMap), testOperations.getPitch(cameraMap)]), [45, 40]);
   await this.page.emulateMedia({ reducedMotion: 'reduce' });
   await button.press('Enter');
-  assert.deepEqual(await this.page.evaluate(() => [CityMapper.getBearing(cameraMap), CityMapper.getPitch(cameraMap)]), [0, 0]);
+  assert.deepEqual(await this.page.evaluate(() => [testOperations.getBearing(cameraMap), testOperations.getPitch(cameraMap)]), [0, 0]);
   const input = await this.page.evaluate(() => {
     const input = document.createElement('input');
     input.type = 'text'; input.setAttribute('aria-label', 'Map search');
     cameraMap.getContainer().append(input);
     input.focus();
-    return CityMapper.getBearing(cameraMap);
+    return testOperations.getBearing(cameraMap);
   });
   await this.page.keyboard.press('ArrowRight');
-  assert.equal(await this.page.evaluate(() => CityMapper.getBearing(cameraMap)), input);
+  assert.equal(await this.page.evaluate(() => testOperations.getBearing(cameraMap)), input);
   const icon = await this.page.evaluate(() => {
     const control = globals.cameraByMap.get(cameraMap).rotateControl.getContainer(), arrow = control.querySelector('.leaflet-control-rotate-arrow');
     return { compact: control.getBoundingClientRect().width <= 40, svg: arrow.style.backgroundImage.includes('svg'),
@@ -200,12 +200,12 @@ Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { time
   await this.page.keyboard.down('Shift');
   await this.page.mouse.wheel(0, 100);
   await this.page.keyboard.up('Shift');
-  assert.equal(await this.page.evaluate(() => CityMapper.getBearing(cameraMap)), 5);
+  assert.equal(await this.page.evaluate(() => testOperations.getBearing(cameraMap)), 5);
   await this.page.mouse.down({ button: 'right' });
   await this.page.mouse.move(mapBox.x + 60, mapBox.y - 40, { steps: 4 });
   await this.page.mouse.up({ button: 'right' });
   const result = await this.page.evaluate(() => {
-    const map = cameraMap, before = { bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map), zoom: map.getZoom() };
+    const map = cameraMap, before = { bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map), zoom: map.getZoom() };
     const element = map.getContainer(), r = element.getBoundingClientRect();
     const send = (type, points) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
@@ -217,7 +217,7 @@ Then('camera mouse and touch gestures preserve Leaflet zoom and panning', { time
     send('touchmove', [[200, 150], [400, 100]]);
     send('touchstart', [[200, 150], [400, 100], [450, 200]]);
     send('touchend', []);
-    const touched = CityMapper.getBearing(map) !== before.bearing && CityMapper.getPitch(map) > before.pitch &&
+    const touched = testOperations.getBearing(map) !== before.bearing && testOperations.getPitch(map) > before.pitch &&
       map.getZoom() > before.zoom;
     const restored = map.dragging.enabled() && map.options.zoomSnap === 1;
     globals.cameraByMap.get(map).touchRotate.disable(); globals.cameraByMap.get(map).touchPitch.disable();
@@ -241,15 +241,15 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
   await this.page.mouse.down();
   await this.page.mouse.move(rect.x + rect.width / 2 + 50, rect.y + rect.height / 2 + 10, { steps: 4 });
   await this.page.mouse.up();
-  assert.ok(Math.abs(await this.page.evaluate(() => CityMapper.getBearing(cameraMap)) - 40) < 0.001);
+  assert.ok(Math.abs(await this.page.evaluate(() => testOperations.getBearing(cameraMap)) - 40) < 0.001);
   // Upward movement tilts; start far enough down that the pointer remains inside the viewport.
-  await this.page.evaluate(() => CityMapper.setPitch(cameraMap, 30));
+  await this.page.evaluate(() => testOperations.setPitch(cameraMap, 30));
   const rect2 = await control.boundingBox();
   await this.page.mouse.move(rect2.x + rect2.width / 2, rect2.y + rect2.height / 2);
   await this.page.mouse.down();
   await this.page.mouse.move(rect2.x + rect2.width / 2, rect2.y + rect2.height / 2 + 20, { steps: 4 });
   await this.page.mouse.up();
-  const [bearing, pitch] = await this.page.evaluate(() => [CityMapper.getBearing(cameraMap), CityMapper.getPitch(cameraMap)]);
+  const [bearing, pitch] = await this.page.evaluate(() => [testOperations.getBearing(cameraMap), testOperations.getPitch(cameraMap)]);
   assert.ok(Math.abs(bearing - 40) < 0.001);
   assert.ok(Math.abs(pitch - 20) < 0.001);
   const settings = await this.page.evaluate(() => {
@@ -257,9 +257,9 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
     globals.cameraByMap.get(map).rotateControl.remove();
     globalThis.cityMapperTestOperations.mapSetPitchAndBearing(map, 30, 40);
     globals.cameraByMap.get(map).rotateControl = new L.Control.Rotate({ visualizePitch: false }).addTo(map);
-    CityMapper.setBearing(map, 0);
+    testOperations.setBearing(map, 0);
     const hiddenAtNorth = globals.cameraByMap.get(map).rotateControl.getContainer().style.display === 'none';
-    CityMapper.setBearing(map, 20);
+    testOperations.setBearing(map, 20);
     const visible = globals.cameraByMap.get(map).rotateControl.getContainer().style.display !== 'none';
     const arrow = globals.cameraByMap.get(map).rotateControl.getContainer().querySelector('.leaflet-control-rotate-arrow');
     return { hiddenAtNorth, visible, flat: arrow.style.transform.includes('rotateX(0deg)') };
@@ -267,7 +267,7 @@ Then('the compass retains its drag sensitivity and bearing-only option', { timeo
   assert.deepEqual(settings, { hiddenAtNorth: true, visible: true, flat: true });
   await this.page.emulateMedia({ reducedMotion: 'reduce' });
   await this.page.getByRole('button', { name: 'Reset bearing to north', exact: true }).click();
-  assert.deepEqual(await this.page.evaluate(() => [CityMapper.getBearing(cameraMap), CityMapper.getPitch(cameraMap)]), [0, 30]);
+  assert.deepEqual(await this.page.evaluate(() => [testOperations.getBearing(cameraMap), testOperations.getPitch(cameraMap)]), [0, 30]);
   await this.page.evaluate(() => cameraMap.remove());
 });
 
@@ -288,9 +288,9 @@ Then('compass permissions, landscape headings and camera cleanup are preserved',
         window.dispatchEvent(event);
       };
       send({ alpha: 120, absolute: false });
-      relative = CityMapper.getBearing(map);
+      relative = testOperations.getBearing(map);
       send({ webkitCompassHeading: 15, absolute: false });
-      webkit = CityMapper.getBearing(map);
+      webkit = testOperations.getBearing(map);
       globals.cameraByMap.get(map).compassBearing.disable();
       window.DeviceOrientationEvent.requestPermission = async () => 'denied';
       const error = new Promise(resolve => map.once('error', event => resolve(event.error.message)));

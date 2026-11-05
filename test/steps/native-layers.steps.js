@@ -183,11 +183,11 @@ Then('native rendering avoids DOM geometry reads and pan-time path rebuilds', as
         if (tileBuffers.has(buffer)) tileUploads++;
         return write.call(this, buffer, ...args);
       };
-      CityMapper.setOpacity(tiles, 0.7);
+      testOperations.setOpacity(tiles, 0.7);
       tiles.fire('tileload');
       nativeChecks.render.render(owner);
       const sharedTileProgram = new Set(tileMeshes.map(mesh => mesh.program)).size === 1;
-      CityMapper.setOpacity(tiles, 1);
+      testOperations.setOpacity(tiles, 1);
       return { layouts, uploads, createdBuffers, retained, compactCircle, marker: globals.sceneByLayer.get(backend).root.children.length > 0,
         sharedTileProgram, tileUploads, errors: nativeErrors };
     } finally {
@@ -207,7 +207,7 @@ Then('native rendering avoids DOM geometry reads and pan-time path rebuilds', as
 Then('native popups and tooltips remain above the GPU canvas', async function () {
   const result = await this.page.evaluate(async () => {
     const layer = nativeLayers.Rectangle;
-    CityMapper.setBearing(map, 30); CityMapper.setPitch(map, 35);
+    testOperations.setBearing(map, 30); testOperations.setPitch(map, 35);
     const owner = globals.renderers.get(map);
     nativeChecks.render.render(owner);
     const crs = map.options.crs, latlng = nativeLayers.CircleMarker.getLatLng(),
@@ -237,7 +237,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
       .some(element => tooltip.contains(element));
     tooltip.style.pointerEvents = previous;
     layer.closeTooltip();
-    CityMapper.setPitch(map, 80);
+    testOperations.setPitch(map, 80);
     await new Promise(requestAnimationFrame);
     const sky = globals.cameraByMap.get(map)._pitchSky, bounds = map.getContainer().getBoundingClientRect();
     const skyVisible = sky && getComputedStyle(sky).display !== 'none' && sky.clientHeight > 0;
@@ -249,7 +249,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
       bounds.top + sky.clientHeight / 2) === canvas;
     canvas.style.pointerEvents = canvasPointer;
     sky.style.pointerEvents = skyPointer;
-    CityMapper.setBearing(map, 0); CityMapper.setPitch(map, 0);
+    testOperations.setBearing(map, 0); testOperations.setPitch(map, 0);
     return { visible, tipVisible, below, aboveSky, unclipped, cameraAligned,
       untransformed: canvas.parentNode.parentNode === map.getContainer() };
   });
@@ -265,12 +265,12 @@ Then('native layer changes, interactions and removal preserve Leaflet behavior',
     const first = globals.sceneByLayer.get(path)._nativeGPU.meshes.get('fill');
     const previous = [...first.geometry.attributes.position.data];
     path.setBounds([[48.858, 2.300], [48.861, 2.306]]).setStyle({ fillColor: '#0080ff', fillOpacity: 0.8 });
-    CityMapper.setOpacity(marker.setLatLng([48.860, 2.2945]), 0.5);
+    testOperations.setOpacity(marker.setLatLng([48.860, 2.2945]), 0.5);
     nativeLayers.CircleMarker.setRadius(25);
     const circle = nativeLayers.Circle;
     const before = circle.getBounds();
     map.setView([48.8585, 2.2948], 16, { animate: false });
-    CityMapper.setBearing(map, 30); CityMapper.setPitch(map, 35);
+    testOperations.setBearing(map, 30); testOperations.setPitch(map, 35);
     const circleBounds = before.equals(circle.getBounds(), 0.00001);
     await new Promise(requestAnimationFrame);
     nativeChecks.render.render(globals.sceneByLayer.get(backend)._shared);
@@ -300,7 +300,7 @@ Then('native layer changes, interactions and removal preserve Leaflet behavior',
     const context = canvas.getContext('2d');
     context.fillStyle = '#2020ff'; context.fillRect(0, 0, 32, 32);
     const url = canvas.toDataURL(), loaded = new Promise(resolve => overlay.once('load', resolve));
-    CityMapper.setOpacity(overlay.setUrl(url), 0.4);
+    testOperations.setOpacity(overlay.setUrl(url), 0.4);
     await loaded;
     nativeChecks.render.render(globals.sceneByLayer.get(globals.sceneByLayer.get(overlay)._nativeGPU.backend)._shared);
     const imageChanged = globals.sceneByLayer.get(overlay)._nativeGPU.meshes.get('image').program.uniforms.baseTexture.value.url === url &&
@@ -314,7 +314,7 @@ Then('native layer changes, interactions and removal preserve Leaflet behavior',
   assert.deepEqual(result.style, [0, 128 / 255, 1]);
   assert.equal(result.markerOpacity, 0.5);
   assert.deepEqual(result.errors, []);
-  await this.page.evaluate(() => { CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0); });
+  await this.page.evaluate(() => { testOperations.setPitch(map, 0); testOperations.setBearing(map, 0); });
   const point = await this.page.evaluate(() => {
     const p = map.latLngToContainerPoint(nativeLayers.CircleMarker.getLatLng());
     const rect = map.getContainer().getBoundingClientRect();
@@ -414,7 +414,7 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
     nativeChecks.render.render(owner);
   });
   await this.page.waitForFunction(() => Object.values(nativeLayers).filter(layer => layer instanceof L.GridLayer)
-    .every(layer => !CityMapper.isLoading(layer) && Object.values(layer._tiles).every(tile => !tile.current || tile.active)));
+    .every(layer => !testOperations.isLoading(layer) && Object.values(layer._tiles).every(tile => !tile.current || tile.active)));
   const result = await this.page.evaluate(async () => {
     const owner = globals.renderers.get(map), marker = nativeLayers.Marker;
     const distance = () => Math.hypot(...globals.sceneByLayer.get(owner).camera.position.map((value, i) => value - globals.sceneByLayer.get(owner).camera.target[i]));
@@ -475,11 +475,11 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     const shadowMarker = nativeLayers['Marker (default icon)'];
     shadowMarker.options.keepUpright = true;
     shadowMarker.options.scale = 2;
-    CityMapper.setRotation(shadowMarker, Math.PI);
+    shadowMarker.setRotation(Math.PI);
     const upright = globalThis.cityMapperTestOperations.markerCameraIconPoint(shadowMarker, 1, 0).x > 0;
     const shadowScaled = shadowMarker._shadow.style.transform.includes('scale(2)');
     const grid = nativeLayers.GridLayer;
-    CityMapper.setZIndex(nativeLayers.TileLayer, 20);
+    testOperations.setZIndex(nativeLayers.TileLayer, 20);
     grid.bringToFront();
     const front = grid.options.zIndex > 20;
     grid.bringToBack();

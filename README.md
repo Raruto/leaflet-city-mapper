@@ -17,7 +17,7 @@ _For a working example see one of the following demos:_
 
 ## How to use
 
-Load Leaflet (the only runtime dependency), then this plugin:
+Just load Leaflet before this plugin:
 
 
 ```html
@@ -25,15 +25,15 @@ Load Leaflet (the only runtime dependency), then this plugin:
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
 ```
-Create a native `L.Layer` through the plugin's factory:
+And then create a native `L.Layer`:
 
 ```js
-CityMapper.layer({ source: { /* source options */ } })
+new L.Layer({ source: { /* source options */ } })
 ```
-For example, here you can use a `geojson` object, like this:
+For example, here is how you can load a `geojson` object:
 
 ```js
-const buildings = CityMapper.layer({
+const buildings = new L.Layer({
   source: {
     type: 'geojson',
     url: GeoJSON,
@@ -42,42 +42,6 @@ const buildings = CityMapper.layer({
   },
 }).addTo(map);
 ```
-
-Plugin operations are standalone functions; native Leaflet instances and
-prototypes receive no additional attributes. Internal data lives in dedicated
-`WeakMap`s in `src/globals/`, imported directly (for example,
-`cameraByMap.get(map)` and `sceneByLayer.get(layer)`). Operations are
-standalone functions, not methods stored alongside instance data; there is no
-generic per-instance state accessor.
-This replaces the previous `new L.Layer({ source: ... })`, `layer.ready`,
-`layer.setData(...)` and `map.setPitch(...)` API:
-
-```js
-await CityMapper.ready(buildings);
-CityMapper.setData(buildings, featureCollection);
-CityMapper.setPitch(map, 45);
-CityMapper.setBearing(map, 90, { animate: true });
-CityMapper.getPitch(map);
-CityMapper.getBearing(map);
-CityMapper.resetNorthPitch(map);
-CityMapper.setRotation(marker, Math.PI / 2);
-```
-
-`CityMapper.ready(map)` waits for camera controls. PMTiles layers also expose
-`CityMapper.getHeader(layer)`, `getZxy(layer, z, x, y, signal)`,
-`getTileSize(layer)`, `isLoading(layer)`, `setOpacity(layer, opacity)` and
-`setZIndex(layer, zIndex)`. Mutating operations return the native layer or map;
-chain Leaflet methods normally, but call subsequent plugin operations separately.
-Existing native methods are still overridden where needed for GPU integration.
-`CityMapper.getLocation(layer)` returns the source origin for application data loaders.
-
-The build produces a single self-contained [`dist/leaflet-city-mapper.js`](./dist/leaflet-city-mapper.js) bundle; Leaflet remains an external dependency. Vector/raster and feature initializers run on demand, while shared scene, rendering, geometry, glTF and PMTiles source lives in focused folders under `src/`. Each shared value has its own module in [`src/globals/`](./src/globals/), exporting one `const` matching the filename. Consumers import only the values they use, without a shared-state aggregator. Reassignable values use a dedicated `{ value }` cell; arrays, maps and other stable objects are exported directly. Associations with native instances contain data only, grouped by feature in dedicated `WeakMap`s.
-
-Global names describe their role concisely (for example, `shadowPipeline`,
-`roofBindGroup` and `cameraAngles`), without allocation prefixes, caller names or
-numeric suffixes. Import them without aliases unless a local name conflicts.
-
-Raster imagery blends coarse-to-fine on the terrain, retaining depth occlusion for 3D objects.
 
 ### Time and walk controls
 
@@ -126,7 +90,10 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 The plugin integration tests compare native Leaflet prototypes and freshly constructed
 instances (including source layers after initialization and native event dispatch) before and after loading the
 bundle. Added methods or properties fail the check, including non-enumerable and symbol
-keys; overriding existing attributes is allowed. Run this check on both supported
+keys, except for the source constructor's `initialize`, `Map.getPitch`,
+`Map.getBearing` and `Marker.setRotation`. Overriding existing attributes is allowed.
+The tests also reject a `CityMapper` global, public layer readiness/data methods,
+and a public map reset method. Run the attribute check on both supported
 Leaflet versions with `node build/test.js --name "The plugin does not add attributes"`.
 
 The source-style tests also reject object literals, array literals and `new`

@@ -62,12 +62,12 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
 
     const control = new L.Control.Walk({ speed: 6 }).addTo(map);
     await nativeChecks.ready(control._walk.layer);
-    const before = { zoom: map.getZoom(), pitch: CityMapper.getPitch(map), dragging: map.dragging.enabled() };
+    const before = { zoom: map.getZoom(), pitch: testOperations.getPitch(map), dragging: map.dragging.enabled() };
     control.getContainer().querySelector('button').click();
     const walking = control instanceof L.Control && !!control.walker.latlng && !map.dragging.enabled();
     control.remove();
     const walkRemoved = !map.hasLayer(control._walk.layer) && !control.getContainer().isConnected &&
-      map.getZoom() === before.zoom && CityMapper.getPitch(map) === before.pitch &&
+      map.getZoom() === before.zoom && testOperations.getPitch(map) === before.pitch &&
       map.dragging.enabled() === before.dragging && !control._walk.meshes;
     control.addTo(map);
     await globals.sceneByLayer.get(control._walk.layer)._added.promise;
@@ -85,8 +85,8 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.evaluate(async () => {
     const map = test3d.map;
-    CityMapper.setBearing(map, 0);
-    const wall = CityMapper.layer({ source: { type: '3d' } }).addTo(map);
+    testOperations.setBearing(map, 0);
+    const wall = new L.Layer({ source: { type: '3d' } }).addTo(map);
     await nativeChecks.ready(wall);
     nativeChecks.gpu.createMesh(wall, {
       position: [-10, 0, -4, 10, 0, -4, 10, 4, -4, -10, 0, -4, 10, 4, -4, -10, 4, -4],
@@ -149,7 +149,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   });
   // Pont d'Iéna deck, about 9 m above the DEM's riverbed.
   await this.page.evaluate(() => map.setView([48.8597, 2.2924], 17, { animate: false }));
-  const before = await this.page.evaluate(() => ({ zoom: map.getZoom(), pitch: CityMapper.getPitch(map) }));
+  const before = await this.page.evaluate(() => ({ zoom: map.getZoom(), pitch: testOperations.getPitch(map) }));
   const button = this.page.getByRole('button', { name: 'Walk', exact: true });
   // Not in the layers control: a map button outside it.
   assert.equal(await this.page.locator('.leaflet-control-layers').getByText('Walk', { exact: true }).count(), 0);
@@ -162,7 +162,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   const state = () => this.page.evaluate(() => {
     const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk'), [body] = globals.sceneByLayer.get(walk).root.children;
     return {
-      ...globals.sceneByLayer.get(walk).walker.latlng, heading: globals.sceneByLayer.get(walk).walker.heading, bearing: CityMapper.getBearing(map), pitch: CityMapper.getPitch(map),
+      ...globals.sceneByLayer.get(walk).walker.latlng, heading: globals.sceneByLayer.get(walk).walker.heading, bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map),
       dragging: map.dragging.enabled(), center: map.getCenter(),
       feet: body.position[1] + globals.sceneByLayer.get(walk).root.position[1], deck: nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, globals.sceneByLayer.get(walk).walker.latlng),
     };
@@ -201,7 +201,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await this.page.keyboard.up('KeyD');
   await this.page.waitForFunction(() => {
     const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
-    return Math.abs(((-globals.sceneByLayer.get(walk).walker.heading * 180 / Math.PI - CityMapper.getBearing(map)) % 360 + 540) % 360 - 180) < 5;
+    return Math.abs(((-globals.sceneByLayer.get(walk).walker.heading * 180 / Math.PI - testOperations.getBearing(map)) % 360 + 540) % 360 - 180) < 5;
   });
   await this.page.keyboard.up('KeyW');
   const turned = await state();
@@ -236,7 +236,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
 
   await this.page.keyboard.press('Escape');
   const after = await this.page.evaluate(() => ({
-    dragging: map.dragging.enabled(), zoom: map.getZoom(), pitch: CityMapper.getPitch(map),
+    dragging: map.dragging.enabled(), zoom: map.getZoom(), pitch: testOperations.getPitch(map),
     meshes: globals.sceneByLayer.get(Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk')).root.children.length,
   }));
   assert.deepEqual(after, { dragging: true, zoom: before.zoom, pitch: before.pitch, meshes: 0 });

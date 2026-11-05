@@ -12,7 +12,10 @@ import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
 
 export function layerInitialize(options = sceneEmptyOptions) {
-  if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options.source) {
+  if (!sceneByLayer.has(this)) {
+    sceneByLayer.set(this, /* allocation: required -- Native construction owns independent scene data before init hooks run. */ {});
+  }
+  if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options?.source) {
     if (layerProto.value.initialize) return layerProto.value.initialize.apply(this, arguments);
     L.Util.setOptions(this, options);
     return;

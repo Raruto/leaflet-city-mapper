@@ -1,4 +1,8 @@
 Feature: Separate plugin integration
+  Scenario: Only the approved convenience methods are exposed on Leaflet
+    Given the city mapper plugin is loaded after Leaflet alone
+    Then maps and markers expose only the approved plugin methods
+
   Scenario: Global instance associations contain data instead of plugin methods
     Given the instrumented city mapper plugin is loaded after Leaflet alone
     Then native instance data is isolated in explicit feature associations

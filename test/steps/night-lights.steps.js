@@ -63,7 +63,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
     const owner = globals.renderers.get(map);
     return globals.sceneByLayer.get(owner)?._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
       !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
-        ? CityMapper.isLoading(layer) : layer.isLoading?.()) &&
+        ? testOperations.isLoading(layer) : layer.isLoading?.()) &&
       [...globals.sceneByLayer.get(owner)._layers].every(layer => !globals.sceneByLayer.get(layer)._3d || !globals.sceneByLayer.get(layer).url || (globals.sceneByLayer.get(layer)._inflight === 0 &&
         [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done || area.error)));
   }, null, { timeout: 60000 });

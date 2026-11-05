@@ -57,14 +57,13 @@ Then('traffic scratch preserves route vertices and independent lane and pose res
 });
 
 Then('HTTP traffic loaders refresh per map and distinguish measured from assumed flows', async function () {
-  const original = globalThis.fetch, originalAPI = globalThis.CityMapper, requests = [];
-  globalThis.CityMapper = { getLocation };
+  const original = globalThis.fetch, requests = [];
   globalThis.fetch = mockTrafficFetch.bind(null, requests);
   const signal = new AbortController().signal;
   const time = new Date('2026-11-04T12:00:00Z');
   try {
     for (const mode of ['car', 'bicycle', 'pedestrian', 'bus', 'tram', 'metro']) {
-      const layer = { location: { lat: 48.858, lng: 2.295 }, options: { mobilityMode: mode, transitMode: mode } };
+      const layer = { options: { center: [48.858, 2.295], mobilityMode: mode, transitMode: mode } };
       globals.sceneByLayer.set(layer, layer);
       const load = mode === 'car' ? parisTraffic : ['bicycle', 'pedestrian'].includes(mode) ? parisMobility : parisTransit;
       const first = await load(time, layer, signal);
@@ -80,7 +79,7 @@ Then('HTTP traffic loaders refresh per map and distinguish measured from assumed
     }
     assert.ok(requests.every(isFreshTrafficRequest));
     const before = requests.length;
-    const later = { location: { lat: 48.858, lng: 2.295 }, options: {} };
+    const later = { options: { center: [48.858, 2.295] } };
     globals.sceneByLayer.set(later, later);
     await parisTraffic(new Date('2026-11-04T13:00:00Z'), later, signal);
     assert.ok(requests.length > before);
@@ -91,8 +90,6 @@ Then('HTTP traffic loaders refresh per map and distinguish measured from assumed
     await assert.rejects(parisTransit(time, { options: { transitMode: 'bus' } }, aborted), /abort/i);
   } finally {
     globalThis.fetch = original;
-    if (originalAPI === undefined) delete globalThis.CityMapper;
-    else globalThis.CityMapper = originalAPI;
   }
 });
 
@@ -128,7 +125,7 @@ Then('cycling counts are only assigned to nearby paths and preserve zero or miss
 
 Then('all traffic models match CPU poses on GPU workgroup boundaries', { timeout: 60000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const layer = CityMapper.layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
     await globals.sceneByLayer.get(layer).ready;
     await globals.sceneByLayer.get(layer)._added.promise;
     try {
@@ -460,7 +457,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
     }
     globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)._bridges = bridges;
     const riverCoverage = covered / cruiseDistance;
-    CityMapper.setPitch(map, 0); CityMapper.setBearing(map, 0); map.fitBounds(cruiseRoute, { animate: false });
+    testOperations.setPitch(map, 0); testOperations.setBearing(map, 0); map.fitBounds(cruiseRoute, { animate: false });
     const overview = await capture();
     route.visible = false;
     const overviewNoRoute = await capture();
@@ -470,7 +467,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
         Math.abs(overview[i + 2] - overviewNoRoute[i + 2]) > 15) overviewRoutePixels++;
     }
     route.visible = true;
-    CityMapper.setPitch(map, 45); CityMapper.setBearing(map, 25); map.setView(cruisePosition(scheduledTrips('2026-11-02T10:00:00Z', cruise.properties.timetable)[0].progress), 19, { animate: false });
+    testOperations.setPitch(map, 45); testOperations.setBearing(map, 25); map.setView(cruisePosition(scheduledTrips('2026-11-02T10:00:00Z', cruise.properties.timetable)[0].progress), 19, { animate: false });
     const visible = await capture();
     boats().visible = false;
     const noBoats = await capture();

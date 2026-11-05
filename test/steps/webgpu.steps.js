@@ -120,7 +120,7 @@ const waitForWebGPUScene = page => page.waitForFunction(() => {
   const owner = globals.renderers.get(map);
   return globals.sceneByLayer.get(owner)?.renderer?.device && globals.sceneByLayer.get(owner)._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
     !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
-      ? CityMapper.isLoading(layer) : layer.isLoading?.());
+      ? testOperations.isLoading(layer) : layer.isLoading?.());
 }, null, { timeout: 50000 });
 
 When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, async function () {
@@ -322,7 +322,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       const zoom = Math.max(...tiles.map(({ tile }) => tile.coords.z));
       const bounds = new L.Bounds();
       for (const { tile: { coords }, layer } of tiles) {
-        const size = CityMapper.getTileSize(layer).multiplyBy(map.getZoomScale(zoom, coords.z));
+        const size = testOperations.getTileSize(layer).multiplyBy(map.getZoomScale(zoom, coords.z));
         bounds.extend(new L.Point(coords.x, coords.y).scaleBy(size));
         bounds.extend(new L.Point(coords.x + 1, coords.y + 1).scaleBy(size));
       }
@@ -354,7 +354,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
         const contrast = Math.max(...expected.flatMap(a => expected.map(b => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]))));
         if (!best || contrast > best.contrast) best = { tile: item, expected, contrast };
       }
-      const tileSize = CityMapper.getTileSize(best.tile.layer);
+      const tileSize = testOperations.getTileSize(best.tile.layer);
       const offset = new L.Point(best.tile.tile.coords.x, best.tile.tile.coords.y).scaleBy(tileSize).subtract(bounds.min);
       const x = Math.ceil(offset.x * scaleX), y = Math.ceil(offset.y * scaleY);
       const width = Math.floor((offset.x + tileSize.x) * scaleX) - x;
