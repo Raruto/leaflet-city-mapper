@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Leaflet City Mapper - Colosseum GeoJSON</title>
+  <title>leaflet-city-mapper.js</title>
   <script src="map-engine.js"></script>
   <script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
   <script src="../libs/leaflet-lens.js"></script>
@@ -38,7 +38,7 @@
         url: 'data/colosseum.pmtiles',
         asset: 'elevation',
       },
-      attribution: 'Elevation: <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen Terrain Tiles</a>, produced using Copernicus data and information funded by the European Union &mdash; EU-DEM layers',
+      attribution: 'Elevation: <a href="https://registry.opendata.aws/terrain-tiles/" title="Produced using Copernicus data and information funded by the European Union">Mapzen Terrain Tiles</a> (Copernicus EU-DEM)',
     }).addTo(map);
     const ancient = new L.Layer({
       source: {
@@ -47,7 +47,7 @@
         asset: 'archaeology',
       },
       maxZoom: 19,
-      attribution: 'Lanciani, Forma Urbis Romae &mdash; <a href="https://www.archeositarproject.it/webgis/">SITAR / SSABAP Roma</a>, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>',
+      attribution: 'Lanciani, Forma Urbis Romae &mdash; <a href="https://www.archeositarproject.it/webgis/">SITAR / SSABAP Roma</a> (<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>)',
     }).addTo(map);
     const modern = new L.Layer({
       source: {
@@ -56,7 +56,7 @@
         asset: 'orthophoto',
       },
       maxZoom: 19,
-      attribution: 'Ortofoto CGR 2002/03 &mdash; <a href="https://geoportale.regione.lazio.it/catalogue/#/dataset/765">Regione Lazio</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> (cropped/reprojected)',
+      attribution: 'Ortofoto CGR 2002/03 &mdash; <a href="https://geoportale.regione.lazio.it/catalogue/#/dataset/765" title="Cropped and reprojected for this demo">Regione Lazio</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)',
     }).addTo(map);
     new L.Control.Layers({}, {
       'Colosseum (3D)': new L.Layer({
@@ -85,7 +85,7 @@
         }),
         tooltip: ({ properties }) => `${properties.name} (illustrative, not surveyed)`,
       },
-      attribution: 'Colosseum lighting: illustrative reconstruction, not surveyed',
+      attribution: '<span title="Illustrative reconstruction, not surveyed">Lightings are illustrative.</span>',
     }).addTo(map);
 
     new L.Control.Time().layer.addTo(map);
