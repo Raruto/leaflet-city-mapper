@@ -115,11 +115,9 @@ async function loadLeaflet(world) {
   await world.page.goto(world.baseUrl);
   await world.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
   const leaflet2 = process.env.LEAFLET_VERSION === '2';
-  await world.page.addScriptTag({
-    url: leaflet2
-      ? 'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js'
-      : 'https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
-  });
+  await world.page.addScriptTag({ url: leaflet2
+    ? 'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js'
+    : 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js' });
   if (leaflet2) await world.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
   await world.page.evaluate(() => {
     globalThis.waitLayer = layer => new Promise((resolve, reject) => {

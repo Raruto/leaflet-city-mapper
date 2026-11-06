@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import { After, AfterAll, Before, BeforeAll, setDefaultTimeout } from '@cucumber/cucumber';
+import { After, AfterAll, Before, BeforeAll, Status, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium, firefox } from 'playwright';
 import { build } from 'esbuild';
 import { startServer } from '../../build/server.js';
+import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
+import { dependencyFile, prepareDependencies } from '../fixtures/dependencies.js';
 
 setDefaultTimeout(10000);
 
@@ -47,7 +48,8 @@ let browser;
 let baseUrl;
 let pluginBundle;
 
-BeforeAll({ timeout: 60000 }, async () => {
+BeforeAll({ timeout: 900000 }, async () => {
+  await prepareDependencies();
   const result = await build({
     entryPoints: ['test/fixtures/plugin.js'],
     bundle: true,
@@ -70,7 +72,8 @@ async function getBrowser() {
   const launchOptions = engine === chromium && process.platform === 'linux' && process.env.CI
     ? {
       ...options,
-      args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--disable-vulkan-surface'],
+      channel: options.channel || 'chromium',
+      args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan', '--use-angle=vulkan', '--disable-vulkan-surface'],
     }
     : options;
   browser = await engine.launch(launchOptions);
@@ -105,9 +108,11 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   await getBrowser();
   this.baseUrl = baseUrl;
   this.context = await browser.newContext();
-  await this.context.route(/^https:\/\/unpkg\.com\/leaflet@1\.9(?:\.4)?\/dist\/(?:leaflet-src\.js|leaflet\.css|images\/[\w-]+\.png)$/, route => {
-    const file = new URL(route.request().url()).pathname.split('/dist/')[1];
-    return route.fulfill({ path: fileURLToPath(new URL(`../../node_modules/leaflet/dist/${file}`, import.meta.url)) });
+  await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
+  await this.context.route(/^https:\/\/(?:unpkg\.com\/leaflet@|cdn\.jsdelivr\.net\/npm\/ol@)/, route => {
+    const path = dependencyFile(route.request().url());
+    if (!path) throw new Error(`Unprepared test dependency: ${route.request().url()}`);
+    return route.fulfill({ path });
   });
   await this.context.route('**/libs/leaflet.js', async route => {
     const response = await route.fetch();
@@ -184,9 +189,17 @@ document.addEventListener`
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
   this.page = await this.context.newPage();
+  this.browserErrors = [];
+  this.page.on('pageerror', error => this.browserErrors.push(error.message));
+  this.page.on('console', message => {
+    if (message.type() === 'error') this.browserErrors.push(message.text());
+  });
 });
 
-After({ tags: 'not @unit' }, async function () {
+After({ tags: 'not @unit' }, async function ({ result }) {
+  if (result?.status === Status.FAILED && this.browserErrors?.length) {
+    console.error('Browser errors:', this.browserErrors.join('\n'));
+  }
   await this.context?.close();
 });
 

@@ -140,7 +140,7 @@ Then('local archaeological COGs load by range and displace the ground', { timeou
     if (/arcgisonline\.com|archeositarproject\.it|geoportale\.regione\.lazio\.it|elevation-tiles-prod/.test(request.url())) remote.push(request.url());
   });
   this.page.on('pageerror', error => errors.push(error.message));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
   const imagery = await openCog(`${this.baseUrl}/examples/data/colosseum.pmtiles`, 'archaeology');
   const header = await imagery.getHeader();
   const orthophoto = await openCog(`${this.baseUrl}/examples/data/colosseum.pmtiles`, 'orthophoto');

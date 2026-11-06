@@ -417,18 +417,17 @@ Then('the OpenLayers compass preserves the plugin appearance and gestures', { ti
 });
 
 Then('the OpenLayers example preserves map and layer control interactions', { timeout: 60000 }, async function () {
-  const labels = this.page.locator('.ol-city-layers label');
-  const traffic = labels.filter({ hasText: /^ Traffic$/ }).locator('input');
-  const shadows = labels.filter({ hasText: /^ Time$/ }).locator('input');
-  const trees = labels.filter({ hasText: /^ Trees$/ }).locator('input');
+  const traffic = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
+  const shadows = this.page.getByRole('checkbox', { name: 'Time', exact: true });
+  const trees = this.page.getByRole('checkbox', { name: 'Trees', exact: true });
   for (const checkbox of [traffic, shadows, trees]) {
     await checkbox.uncheck();
     assert.equal(await checkbox.isChecked(), false);
     await checkbox.check();
     assert.equal(await checkbox.isChecked(), true);
   }
-  await labels.filter({ hasText: /^ Plan IGN$/ }).locator('input').check();
-  await labels.filter({ hasText: /^ Orthophoto IGN$/ }).locator('input').check();
+  await this.page.getByRole('radio', { name: 'Plan IGN', exact: true }).check();
+  await this.page.getByRole('radio', { name: 'Orthophoto IGN', exact: true }).check();
   const beforeButton = await this.page.evaluate(() => map.getZoom());
   await this.page.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await this.page.waitForFunction(zoom => map.getZoom() > zoom && !map.ol.getView().getAnimating(), beforeButton);

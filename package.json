@@ -35,7 +35,8 @@
   },
   "homepage": "https://github.com/Raruto/leaflet-city-mapper#readme",
   "peerDependencies": {
-    "leaflet": "^1.9.3 || ^2.0.0-alpha.1"
+    "leaflet": "^1.9.3 || ^2.0.0-alpha.1",
+    "ol": "^10.6.1"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^10.3.1",

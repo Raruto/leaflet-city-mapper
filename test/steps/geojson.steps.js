@@ -398,7 +398,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 60000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.locator('#map').dispatchEvent('pointerleave');
   await this.page.waitForFunction(() => {

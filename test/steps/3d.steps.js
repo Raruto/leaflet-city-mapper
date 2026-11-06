@@ -88,18 +88,24 @@ export async function prepare3DChecks(page) {
       },
       async pixels(layer, x = 0, y = 0, width = globals.sceneByLayer.get(layer).renderer.canvas.width, height = globals.sceneByLayer.get(layer).renderer.canvas.height) {
         const { device, context, format, canvas } = globals.sceneByLayer.get(layer).renderer;
-        context.configure({
-          device, format, alphaMode: 'premultiplied',
+        const texture = device.createTexture({
+          size: [canvas.width, canvas.height], format,
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         });
-        render.render(globals.sceneByLayer.get(layer)._shared);
+        const getCurrentTexture = context.getCurrentTexture;
+        context.getCurrentTexture = () => texture;
+        try {
+          render.render(globals.sceneByLayer.get(layer)._shared);
+        } finally {
+          context.getCurrentTexture = getCurrentTexture;
+        }
         const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
         const buffer = device.createBuffer({
           size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
         });
         const encoder = device.createCommandEncoder();
         encoder.copyTextureToBuffer(
-          { texture: context.getCurrentTexture(), origin: [x, canvas.height - y - height] },
+          { texture, origin: [x, canvas.height - y - height] },
           { buffer, bytesPerRow }, [width, height],
         );
         device.queue.submit([encoder.finish()]);
@@ -116,6 +122,7 @@ export async function prepare3DChecks(page) {
         }
         buffer.unmap();
         buffer.destroy();
+        texture.destroy();
         return pixels;
       },
       async terrainHeights(terrain, vertices) {
