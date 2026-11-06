@@ -2,6 +2,37 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 
+Given('the example {string} is loaded without the package CDN', { timeout: 30000 }, async function (example) {
+  this.exampleErrors = [];
+  this.packageRequests = [];
+  this.page.on('pageerror', error => this.exampleErrors.push(error.message));
+  await this.context.route('https://unpkg.com/leaflet-city-mapper*/**', route => {
+    this.packageRequests.push(route.request().url());
+    return route.abort();
+  });
+  await this.page.goto(`${this.baseUrl}/examples/${example}.html`, { waitUntil: 'load' });
+});
+
+Then('the example exposes its map and test operations for the selected Leaflet version', async function () {
+  assert.deepEqual(this.packageRequests, [], 'Example scripts must use the local checkout, not the published package');
+  assert.deepEqual(this.exampleErrors, []);
+  const result = await this.page.evaluate(() => ({
+    map: globalThis.map instanceof L.Map,
+    layers: typeof globalThis.layers,
+    ready: typeof globalThis.testOperations?.ready,
+    version: L.version,
+    localScripts: [...document.scripts].filter(script => script.src.includes('leaflet-city-mapper') ||
+      script.src.includes('/libs/')).every(script => new URL(script.src).origin === location.origin),
+    lens: typeof L.Control.Lens,
+  }));
+  assert.equal(result.map, true);
+  assert.equal(result.ready, 'function');
+  assert.equal(result.localScripts, true);
+  assert.ok(result.version.startsWith(`${process.env.LEAFLET_VERSION || '1'}.`), result.version);
+  if (this.page.url().includes('-geojson.html')) assert.equal(result.lens, 'function');
+  else assert.equal(result.layers, 'object');
+});
+
 Then('maps and markers expose only the approved plugin methods', async function () {
   const result = await this.page.evaluate(() => {
     const map = new L.Map(document.body.appendChild(document.createElement('div')), {

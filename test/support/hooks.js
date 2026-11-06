@@ -109,24 +109,28 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     const file = new URL(route.request().url()).pathname.split('/dist/')[1];
     return route.fulfill({ path: fileURLToPath(new URL(`../../node_modules/leaflet/dist/${file}`, import.meta.url)) });
   });
-  if (process.env.LEAFLET_VERSION === '2') {
-    await this.context.route('**/map-engine.js', async route => {
-      const response = await route.fetch();
-      const body = (await response.text())
+  await this.context.route('**/libs/leaflet.js', async route => {
+    const response = await route.fetch();
+    let body = (await response.text())
+      .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, `${baseUrl}/`);
+    if (process.env.LEAFLET_VERSION === '2') {
+      body = body
         .replace('https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
-          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js');
-      await route.fulfill({ response, body: body.replace(
+          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js')
+        .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css',
+          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet.css')
+        .replace(
         'document.addEventListener', String.raw`if (!openlayers) document.write('<script>globalThis.L = globalThis.leaflet;<\/script>');
 document.addEventListener`
-      ) });
-    });
-  }
+        );
+    }
+    await route.fulfill({ response, body });
+  });
   await this.context.route(/\.html(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
     let body = (await response.text())
-      .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/dist\/leaflet-city-mapper\.js/g,
-        `${baseUrl}/dist/leaflet-city-mapper.js`)
+      .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, `${baseUrl}/`)
       .replace(/\bconst (map|esri|osm|layers|markers|path|circle|polygon|rectangle) =/g, 'const $1 = window.$1 =');
     if (version === '2') {
       body = body

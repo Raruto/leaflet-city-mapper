@@ -26,3 +26,13 @@ Feature: Separate plugin integration
   Scenario: The city example references existing local assets
     Given the city mapper plugin is loaded after Leaflet alone
     Then every local source in the city example is available
+
+  Scenario Outline: Examples initialize without the published package
+    Given the example "<example>" is loaded without the package CDN
+    Then the example exposes its map and test operations for the selected Leaflet version
+
+    Examples:
+      | example                      |
+      | leaflet-city-mapper          |
+      | leaflet-city-mapper-geojson  |
+      | leaflet-city-mapper-native   |
