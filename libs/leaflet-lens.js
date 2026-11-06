@@ -4,7 +4,7 @@
   if (!L?.Control) throw new Error('Leaflet must be loaded before leaflet-lens.js');
 
   L.Control.Lens = L.Control.extend({
-    options: { position: 'topright', radius: 100, enabled: true },
+    options: { position: 'topright', radius: 150, enabled: true },
 
     initialize(outerLayer, innerLayer, options) {
       L.Util.setOptions(this, options);
