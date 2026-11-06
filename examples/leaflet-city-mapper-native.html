@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>leaflet-city-mapper.js</title>
-  <script src="map-engine.js"></script>
-  <script src="https://unpkg.com/leaflet-city-mapper@0.0.3/dist/leaflet-city-mapper.js"></script>
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.4/libs/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.4/dist/leaflet-city-mapper.js"></script>
   <style>
     html, body, #map { height: 100%; margin: 0; }
   </style>
@@ -45,62 +45,106 @@
         return canvas;
       },
     });
-    const nativeLayers = window.nativeLayers = {
-      TileLayer: new L.TileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+    const layers = {
+      'TileLayer': new L.TileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
       }),
       'TileLayer.WMS': new L.TileLayer.WMS('https://ows.terrestris.de/osm/service', {
-        layers: 'OSM-WMS', format: 'image/png', transparent: true, opacity: 0.15,
+        layers: 'OSM-WMS',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.15,
         attribution: 'WMS: terrestris / OpenStreetMap',
       }),
-      GridLayer: new CanvasGrid({ opacity: 0.5 }),
-      ImageOverlay: new L.ImageOverlay(image('#168080', 'ImageOverlay'),
-        [[48.855, 2.282], [48.858, 2.287]], { opacity: 0.8, interactive: true }),
-      Marker: new L.Marker([48.861, 2.2945], { icon, draggable: true, title: 'Drag this GPU marker' }),
-      'Marker (default icon)': new L.Marker([48.858, 2.291], { title: 'Default icon and shadow' }),
-      Polyline: new L.Polyline([[48.864, 2.282], [48.866, 2.287], [48.863, 2.291]], {
-        color: '#b020d0', weight: 6, dashArray: '14 7',
+      'GridLayer': new CanvasGrid({ opacity: 0.5 }),
+      'ImageOverlay': new L.ImageOverlay(image('#168080', 'ImageOverlay'),
+        [[48.855, 2.282], [48.858, 2.287]], {
+          opacity: 0.8,
+          interactive: true
+        }),
+      'Marker': new L.Marker([48.861, 2.2945], {
+        icon,
+        draggable: true,
+        title: 'Drag this GPU marker'
       }),
-      MultiPolyline: new L.Polyline([
+      'Marker (default icon)': new L.Marker([48.858, 2.291], {
+        title: 'Default icon and shadow'
+      }),
+      'Polyline': new L.Polyline([[48.864, 2.282], [48.866, 2.287], [48.863, 2.291]], {
+        color: '#b020d0',
+        weight: 6,
+        dashArray: '14 7',
+      }),
+      'MultiPolyline': new L.Polyline([
         [[48.852, 2.295], [48.854, 2.298]],
         [[48.852, 2.298], [48.854, 2.301]],
-      ], { color: '#3030c0', weight: 5, lineCap: 'square' }),
+      ], {
+        color: '#3030c0',
+        weight: 5,
+        lineCap: 'square'
+      }),
       'Polygon (hole)': new L.Polygon([
         [[48.860, 2.281], [48.863, 2.281], [48.863, 2.287], [48.860, 2.287]],
         [[48.861, 2.283], [48.862, 2.283], [48.862, 2.285], [48.861, 2.285]],
-      ], { color: '#c05010', fillOpacity: 0.7 }),
-      MultiPolygon: new L.Polygon([
+      ], {
+        color: '#c05010',
+        fillOpacity: 0.7
+      }),
+      'MultiPolygon': new L.Polygon([
         [[[48.851, 2.284], [48.853, 2.284], [48.853, 2.287]]],
         [[[48.851, 2.289], [48.853, 2.289], [48.853, 2.292]]],
-      ], { color: '#a05090', fillOpacity: 0.7, lineJoin: 'miter' }),
-      Rectangle: new L.Rectangle([[48.859, 2.300], [48.862, 2.306]], {
-        color: '#d02020', fillOpacity: 0.7, lineJoin: 'bevel',
+      ], {
+        color: '#a05090',
+        fillOpacity: 0.7,
+        lineJoin: 'miter'
+       }),
+      'Rectangle': new L.Rectangle([[48.859, 2.300], [48.862, 2.306]], {
+        color: '#d02020',
+        fillOpacity: 0.7,
+        lineJoin: 'bevel',
       }),
-      Circle: new L.Circle([48.8555, 2.304], { radius: 150, color: '#2060c0', fillOpacity: 0.7 }),
-      CircleMarker: new L.CircleMarker([48.857, 2.2945], { radius: 18, color: '#008020', fillOpacity: 1 }),
-      GeoJSON: new L.GeoJSON({
+      'Circle': new L.Circle([48.8555, 2.304], {
+        radius: 150,
+        color: '#2060c0',
+        fillOpacity: 0.7
+      }),
+      'CircleMarker': new L.CircleMarker([48.857, 2.2945], {
+        radius: 18,
+        color: '#008020',
+        fillOpacity: 1
+      }),
+      'GeoJSON': new L.GeoJSON({
         type: 'FeatureCollection', features: [
           { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [2.302, 48.865] } },
-          { type: 'Feature', properties: {}, geometry: { type: 'LineString',
-            coordinates: [[2.298, 48.864], [2.301, 48.862]] } },
-        ],
+          { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [[2.298, 48.864], [2.301, 48.862]] } }],
       }, { pointToLayer: (_, latlng) => new L.Marker(latlng, { icon }) }),
       LayerGroup: new L.LayerGroup([new L.CircleMarker([48.854, 2.290], {
-        radius: 12, color: '#704000', fillOpacity: 1,
+        radius: 12,
+        color: '#704000',
+        fillOpacity: 1,
       })]),
       FeatureGroup: new L.FeatureGroup([new L.CircleMarker([48.865, 2.295], {
-        radius: 12, color: '#107080', fillOpacity: 1,
+        radius: 12,
+        color: '#107080',
+        fillOpacity: 1,
       })]),
     };
-    for (const [name, layer] of Object.entries(nativeLayers)) {
+    for (const [name, layer] of Object.entries(layers)) {
       layer.bindPopup(name);
       layer.bindTooltip(name);
       layer.addTo(map);
     }
-    const htmlMarker = new L.Marker([48.8583, 2.310], {
-      icon: new L.DivIcon({ html: '<strong>HTML</strong>', className: 'leaflet-div-icon', iconSize: [50, 24] }),
-    }).bindPopup('DivIcon: kept in the DOM').addTo(map);
-    new L.Control.Layers({}, { ...nativeLayers, 'DivIcon (DOM)': htmlMarker }, { collapsed: false }).addTo(map);
+    new L.Control.Layers({}, {
+      ...layers,
+      'DivIcon (DOM)': new L.Marker([48.8583, 2.310], {
+        icon: new L.DivIcon({
+          html: '<strong>HTML</strong>',
+          className: 'leaflet-div-icon',
+          iconSize: [50, 24]
+        }),
+      }).bindPopup('DivIcon: kept in the DOM').addTo(map)
+    }, { collapsed: false }).addTo(map);
   </script>
 </body>
 </html>
