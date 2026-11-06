@@ -1,4 +1,5 @@
-import { degrees } from '../globals/degrees.js';
+import { worldMatrixChanged } from './worldMatrixChanged.js';
+import { composeLocalTransform } from './composeLocalTransform.js';
 
 /** Compose parent*local matrices; a node.matrix overrides its position/rotation/scale. */
 
@@ -8,41 +9,15 @@ export function updateWorldMatrix(node) {
   const matrixMode = Boolean(node.matrix);
   let changed = node._worldParent !== parent || node._parentWorldVersion !== parentVersion ||
     node._worldMatrixMode !== matrixMode;
-  let i, value, child;
-  if (node.matrix) {
-    const state = node._matrixState ||= /* alloc */ new Float64Array(16);
-    for (i = 0; i < 16; i++) {
-      if (state[i] !== node.matrix[i]) changed = true;
-      state[i] = node.matrix[i];
-    }
-  } else {
-    const state = node._transformState ||= /* alloc */ new Float64Array(9);
-    for (i = 0; i < 9; i++) {
-      value = i < 3 ? node.position[i] : i < 6 ? node.rotation[i - 3] : node.scale[i - 6];
-      if (state[i] !== value) changed = true;
-      state[i] = value;
-    }
-  }
+  let child;
+  changed = worldMatrixChanged(node, changed);
   if (!changed) {
     for (child of node.children) updateWorldMatrix(child);
     return;
   }
   let local, world;
   if (node.matrix) local = node.matrix;
-  else {
-    const matrix = node._localTransform ||= /* alloc */ new DOMMatrix();
-    matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;
-    matrix.m21 = 0, matrix.m22 = 1, matrix.m23 = 0, matrix.m24 = 0;
-    matrix.m31 = 0, matrix.m32 = 0, matrix.m33 = 1, matrix.m34 = 0;
-    matrix.m41 = 0, matrix.m42 = 0, matrix.m43 = 0, matrix.m44 = 1;
-    matrix.translateSelf(node.position[0], node.position[1], node.position[2]);
-    // Node rotations use YXZ, as did the previous renderer.
-    matrix.rotateAxisAngleSelf(0, 1, 0, node.rotation[1] * degrees);
-    matrix.rotateAxisAngleSelf(1, 0, 0, node.rotation[0] * degrees);
-    matrix.rotateAxisAngleSelf(0, 0, 1, node.rotation[2] * degrees);
-    matrix.scaleSelf(node.scale[0], node.scale[1], node.scale[2]);
-    local = matrix;
-  }
+  else local = composeLocalTransform(node);
   world = node._worldTransform ||= /* alloc */ new DOMMatrix();
   if (local instanceof DOMMatrix) {
     world.m11 = local.m11, world.m12 = local.m12, world.m13 = local.m13, world.m14 = local.m14;

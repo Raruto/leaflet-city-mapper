@@ -4,16 +4,13 @@ import { roundProfile } from '../globals/roundProfile.js';
 import { parseColor } from "../utils/parseColor.js";
 import { ring } from './treeRing.js';
 import { surface } from './surface.js';
+import { validateTree } from './validateTree.js';
 
 /** Low-poly tree, sharing the source block's buffers, picking and terrain offset. */
 
 export function treeGeometry(point, style, addTriangle) {
   const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = 'round' } = style;
-  if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) ||
-    trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top ||
-    crownShape !== 'round' && crownShape !== 'cone') {
-    throw /* alloc */ new Error('Invalid tree dimensions or crown shape');
-  }
+  validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);
   const trunk = parseColor(style.trunkColor ?? 0x72513a);
   const crown = parseColor(style.color ?? 0x4f823b);
   surface(point, addTriangle, trunkRadius, bottom, trunkRadius, crownBottom + (top - crownBottom) * 0.25, trunk);

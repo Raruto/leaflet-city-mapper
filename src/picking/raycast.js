@@ -8,6 +8,7 @@ import { updateCamera } from '../scene/updateCamera.js';
 import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
 import { collectVisibleMesh } from './collectVisibleMesh.js';
 import { placeTraffic } from '../traffic/placeTraffic.js';
+import { validateCameraInverse } from './validateCameraInverse.js';
 
 /** Raycasting, hover/click highlight and tooltips. */
 /**
@@ -43,16 +44,7 @@ export function raycast(backend, event, objects = sceneByLayer.get(backend).root
   const endZ = inverseCamera.m13 * x + inverseCamera.m23 * y + inverseCamera.m43;
   const endW = inverseCamera.m14 * x + inverseCamera.m24 * y + inverseCamera.m44;
   let object;
-  if (!Number.isFinite(inverseCamera.m11) || !Number.isFinite(inverseCamera.m12) ||
-      !Number.isFinite(inverseCamera.m13) || !Number.isFinite(inverseCamera.m14) ||
-      !Number.isFinite(inverseCamera.m21) || !Number.isFinite(inverseCamera.m22) ||
-      !Number.isFinite(inverseCamera.m23) || !Number.isFinite(inverseCamera.m24) ||
-      !Number.isFinite(inverseCamera.m31) || !Number.isFinite(inverseCamera.m32) ||
-      !Number.isFinite(inverseCamera.m33) || !Number.isFinite(inverseCamera.m34) ||
-      !Number.isFinite(inverseCamera.m41) || !Number.isFinite(inverseCamera.m42) ||
-      !Number.isFinite(inverseCamera.m43) || !Number.isFinite(inverseCamera.m44)) {
-    throw /* alloc */ new Error('Singular 3D transform');
-  }
+  validateCameraInverse(inverseCamera);
   sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
   sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];
   sceneByLayer.get(backend).raycaster.origin[2] = sceneByLayer.get(backend).camera.position[2];

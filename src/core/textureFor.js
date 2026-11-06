@@ -4,6 +4,7 @@ import { coreSampler } from '../globals/coreSampler.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
 import { destroyTexture } from '../rendering/destroyTexture.js';
 import { uploadCanvasTexture } from './uploadCanvasTexture.js';
+import { uploadNativeImage } from './uploadNativeImage.js';
 
 
 export function textureFor(state, key, image) {
@@ -37,17 +38,7 @@ export function textureFor(state, key, image) {
       texture.pending = true;
       uploadCanvasTexture(state, key, texture, image, device, width, height);
     } else {
-      try {
-        device.queue.copyExternalImageToTexture(
-          /* alloc */ { source: image },
-          /* alloc */ { texture: texture.texture },
-          /* alloc */ [width, height]);
-      } catch (error) {
-        texture.texture.destroy();
-        textures.delete(key);
-        throw error;
-      }
-      texture.uploaded = image;
+      uploadNativeImage(state, key, texture, image, device, width, height);
     }
   }
   texture.used = true;

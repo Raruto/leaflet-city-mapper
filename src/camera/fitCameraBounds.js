@@ -27,10 +27,10 @@ export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   const leftSlope = min.x * rise / distance, rightSlope = max.x * rise / distance;
   const slope = rightSlope - leftSlope;
   let left = Infinity, right = -Infinity;
+  const corners = /* alloc */ [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()];
   let i, latlng, p, x, y;
   for (i = 0; i < 4; i++) {
-    latlng = i === 0 ? bounds.getNorthWest() : i === 1 ? bounds.getNorthEast()
-      : i === 2 ? bounds.getSouthWest() : bounds.getSouthEast();
+    latlng = corners[i];
     p = map.project(latlng, zoom).subtract(origin);
     x = cos * p.x - sin * p.y;
     y = sin * p.x + cos * p.y;

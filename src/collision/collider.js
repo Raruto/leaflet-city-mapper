@@ -1,5 +1,6 @@
 import { colliders } from '../globals/colliders.js';
-import { CELL } from '../globals/CELL.js';
+import { transformTriangle } from './transformTriangle.js';
+import { indexTriangle } from './indexTriangle.js';
 
 
 export function collider(mesh) {
@@ -13,19 +14,14 @@ export function collider(mesh) {
   const cells = /* alloc */ new Map();
   const v = /* alloc */ [];
 
-  let i, first, k, j, x, y, z, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t, ix, iz, key;
+  let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t;
   for (i = 0; i < count; i += 3) {
     first = index ? index.data[i] : i;
     // Streetlight halos (uv.x <= 2, see scene/picking.js) are light, not matter.
     if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
       continue;
     }
-    for (k = 0; k < 3; k++) {
-      j = (index ? index.data[i + k] : i + k) * 3, x = p[j], y = p[j + 1], z = p[j + 2];
-      v[k * 3] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      v[k * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      v[k * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-    }
+    transformTriangle(v, p, index, i, m);
     ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
 
     nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
@@ -47,14 +43,7 @@ export function collider(mesh) {
     tri.push(...v);
     nrm.push(nx / h, nz / h);
 
-    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
-      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
-        key = ix + ',' + iz;
-        if (!cells.has(key)) {
-          cells.set(key, /* alloc */ []);
-        }
-        cells.get(key).push(t);
-      }
+    indexTriangle(cells, v, t);
   }
   c = /* alloc */ {
     tri: Float32Array.from(tri),

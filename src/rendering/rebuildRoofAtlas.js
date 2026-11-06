@@ -1,7 +1,5 @@
 import { radians } from '../globals/radians.js';
 import { earthCirc } from '../globals/earthCirc.js';
-import { roofTexture } from '../globals/roofTexture.js';
-import { roofSampler } from '../globals/roofSampler.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { roofTiles } from '../globals/roofTiles.js';
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
@@ -11,21 +9,16 @@ import { roofSize } from '../globals/roofSize.js';
 
 import { ensureRoofBlit } from './ensureRoofBlit.js';
 import { composeRoofAtlas } from './composeRoofAtlas.js';
-import { destroyTexture } from './destroyTexture.js';
+import { collectRoofTiles } from './collectRoofTiles.js';
+import { resizeRoofTexture } from './resizeRoofTexture.js';
 
 export function rebuildRoofAtlas(backend, rasters, signature, now) {
   const map = backend._map, renderer = sceneByLayer.get(backend).renderer;
   const tiles = roofTiles;
   tiles.length = 0;
-  let zoom = -Infinity, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let layer, tile, coords, tileSize;
-  for (layer of rasters) for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
-    if (tile.done && !tile.request.signal.aborted && tile.image) {
-      tile._roofEntry ||= /* alloc */ { tile, layer };
-      tiles.push(tile._roofEntry);
-      zoom = Math.max(zoom, tile.coords.z);
-    }
-  }
+  let zoom = collectRoofTiles(rasters, tiles);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let coords, tileSize;
   if (!tiles.length) zoom = map.getZoom();
   for ({ tile: { coords } } of tiles) {
     tileSize = TILE_SIZE * map.getZoomScale(zoom, coords.z);
@@ -48,22 +41,7 @@ export function rebuildRoofAtlas(backend, rasters, signature, now) {
   roof.signature = signature; roof.updatedAt = now;
   roof.matrix[0] = pixels / size.x; roof.matrix[10] = pixels / size.y;
   roof.matrix[12] = (origin.x - min.x) / size.x; roof.matrix[14] = (origin.y - min.y) / size.y;
-  const descriptor = roofTexture;
-  descriptor.size[0] = width; descriptor.size[1] = height;
-  descriptor.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
-  if (roof.texture && (roof.texture.width !== width || roof.texture.height !== height)) {
-    destroyTexture(backend, roof.texture.texture);
-    roof.texture.texture = renderer.device.createTexture(descriptor);
-    roof.texture.width = width; roof.texture.height = height;
-  }
-  roof.texture ||= /* alloc */ {
-    device: renderer.device,
-    texture: renderer.device.createTexture(descriptor),
-    sampler: renderer.device.createSampler(roofSampler),
-    samplerOptions: /* alloc */ { addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' },
-    image: null, width, height,
-    format: 'rgba8unorm', srgb: false, flipY: false, uploaded: null,
-  };
+  resizeRoofTexture(backend, roof, width, height);
   // Compose the atlas on the GPU: re-uploading a large canvas stalls Firefox for hundreds of ms.
   ensureRoofBlit(renderer);
   try {

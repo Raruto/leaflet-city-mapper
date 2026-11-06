@@ -7,6 +7,7 @@ import { rasterProgram } from '../terrain/rasterProgram.js';
 import { terrainBuffers } from '../terrain/terrainBuffers.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
+import { terrainTileGeometry } from './terrainTileGeometry.js';
 
 export async function addRasterTile(backend, layer, coords, tile) {
   const ready = await sceneByLayer.get(backend)._terrainPromise;
@@ -31,19 +32,9 @@ export async function addRasterTile(backend, layer, coords, tile) {
   const program = rasterProgram(backend, texture);
   const attributes = terrainBuffers(backend, divisions);
   const base = sceneByLayer.get(backend)._terrainOriginElevation;
-  const bottom = Math.min(sceneByLayer.get(backend)._dem.low, base) - base, top = Math.max(sceneByLayer.get(backend)._dem.high, base) - base;
   const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
   // ponytail: ray picking sees the flat unit grid; read the DEM back if terrain must be pickable.
-  const geometry = /* alloc */ {
-    device,
-    attributes,
-    drawRange: /* alloc */ { start: 0, count: attributes.index.count },
-    // Local bounds whose radius, scaled by the largest axis, still covers the displaced tile.
-    bounds: /* alloc */ {
-      min: /* alloc */ [0, bottom, 0], max: /* alloc */ [1, top, 1], center: /* alloc */ [0.5, (bottom + top) / 2, 0.5],
-      radius: Math.hypot(sizeX, top - bottom, sizeZ) / 2 / Math.max(sizeX, 1, sizeZ),
-    },
-  };
+  const geometry = terrainTileGeometry(backend, attributes, sizeX, sizeZ);
   const mesh = /* alloc */ {
     position: /* alloc */ [(corner.x - origin.x) * metres, 0, -(corner.y - origin.y) * metres],
     rotation: /* alloc */ [0, 0, 0],

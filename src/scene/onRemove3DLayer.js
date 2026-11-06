@@ -2,12 +2,9 @@ import { L } from '../globals/L.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { sceneTransferFields } from '../globals/sceneTransferFields.js';
 import { renderers } from '../globals/renderers.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
-import { sceneCleanupFields } from '../globals/sceneCleanupFields.js';
 
 
 
-import * as destroyTexture from '../rendering/destroyTexture.js';
 import * as endZoom from './endZoom.js';
 import * as onMapChange from './onMapChange.js';
 import * as onPointerLeave from '../picking/onPointerLeave.js';
@@ -18,7 +15,7 @@ import { setParent } from './setParent.js';
 import * as startZoom from './startZoom.js';
 import { cancelUpdate } from './cancelUpdate.js';
 import { update } from './update.js';
-import { releaseRenderer } from './releaseRenderer.js';
+import { releaseSharedScene } from './releaseSharedScene.js';
 
 /** Release source meshes/UI; retain manually added objects and model CPU data. */
 export function onRemove3DLayer(backend, map) {
@@ -28,7 +25,7 @@ export function onRemove3DLayer(backend, map) {
     L.DomEvent.off(sceneByLayer.get(backend).container, sceneByLayer.get(backend)._pointerEvents, backend);
     sceneByLayer.get(backend).container = null;
   }
-  let area, key, layer, animation;
+  let area, key, layer;
   for (area of sceneByLayer.get(backend)._areas.values()) releaseArea(backend, area);
   sceneByLayer.get(backend)._areas.clear();
   sceneByLayer.get(backend)._tooltip?.remove();
@@ -59,20 +56,7 @@ export function onRemove3DLayer(backend, map) {
       map.on('zoomend', endZoom.endZoom, next);
       update(next);
     } else {
-      if (sceneByLayer.get(backend)._roofRaster) destroyTexture.destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
-      sceneByLayer.get(backend)._roofRaster = null;
-      if (sceneByLayer.get(backend)._zoomTransitions) {
-        for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.play();
-      }
-      sceneByLayer.get(backend)._zoomTransitions = null;
-      sceneByLayer.get(backend)._zoomView = null;
-      delete cameraByMap.get(map)._cameraView;
-      map.getContainer().classList.remove('leaflet-camera-zoom');
-      const renderer = sceneByLayer.get(backend).renderer;
-      renderer.canvas.remove();
-      releaseRenderer(renderer, backend);
-      renderers.delete(map);
-      for (key of sceneCleanupFields) delete sceneByLayer.get(backend)[key];
+      releaseSharedScene(backend, map);
     }
   } else update(shared);
   sceneByLayer.get(backend)._shared = sceneByLayer.get(backend).renderer = sceneByLayer.get(backend).scene = sceneByLayer.get(backend).camera = null;

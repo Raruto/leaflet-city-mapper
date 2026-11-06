@@ -10,15 +10,10 @@ import { addSceneLayer } from './addSceneLayer.js';
 import { get3DEvents } from './get3DEvents.js';
 import { getRasterEvents } from '../raster/getRasterEvents.js';
 import { emptyEvents } from './emptyEvents.js';
+import { isNativeLayer } from './isNativeLayer.js';
 
 export function layerLayerAdd(event) {
-  const native = !sceneByLayer.get(this)._3d && (
-    this instanceof L.GridLayer ||
-    this instanceof L.Polyline ||
-    this instanceof L.CircleMarker ||
-    this instanceof L.Marker && !(this.options.icon instanceof L.DivIcon) ||
-    this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)
-  );
+  const native = isNativeLayer(this);
   if (native) {
     if (this instanceof L.GridLayer || this instanceof L.ImageOverlay) {
       this.options.crossOrigin ||= true;

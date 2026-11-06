@@ -7,6 +7,7 @@ import { Given, Then } from '@cucumber/cucumber';
 import { along } from '../../src/traffic/along.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
 import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { refreshTrafficTrips } from '../../src/traffic/refreshTrafficTrips.js';
 import { toLanes } from '../../src/traffic/toLanes.js';
 
 import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
@@ -18,6 +19,23 @@ import { trafficResponse, fulfillTrafficRoute } from '../fixtures/traffic-data.j
 const [cruise] = JSON.parse(readFileSync(new URL('../../examples/data/seine-cruises.geojson', import.meta.url))).features;
 const cruises = date => scheduledTrips(date, cruise.properties.timetable);
 const route = cruise.geometry.coordinates;
+
+Then('unchanged traffic refreshes preserve their clock and status without rebuilding', function () {
+  const state = {
+    lanes: [], trips: [], tripsKey: '', loaded: true, vehicle: 'car', velocity: 8,
+    status: { textContent: '', removeAttribute() {} },
+  };
+  const time = new Date('2026-11-04T12:00:00Z'), ms = time.getTime();
+  assert.equal(refreshTrafficTrips(state, time, ms, true), false);
+  assert.equal(state.status.textContent, '0 car');
+  assert.equal(state.rebasedAt, ms);
+  assert.equal(state.nextCheck, ms + 1000);
+  assert.equal(refreshTrafficTrips(state, time, ms + 1000, true), false);
+  assert.equal(state.nextCheck, ms + 2000);
+  assert.equal(refreshTrafficTrips(state, null, NaN, false), false);
+  assert.equal(state.status.textContent, 'car: select a valid simulation date');
+  assert.deepEqual(state.trips, []);
+});
 
 Then('traffic counts wrap together and clean up across layer toggles', async function () {
   const result = await this.page.evaluate(async () => {

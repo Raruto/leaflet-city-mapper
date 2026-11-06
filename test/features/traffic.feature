@@ -1,5 +1,9 @@
 Feature: Traffic lanes, flows and timetables
 
+  @unit
+  Scenario: Unchanged traffic trips are distinct from failed refreshes
+    Then unchanged traffic refreshes preserve their clock and status without rebuilding
+
   @coverage
   Scenario: Traffic counts share a compact wrapping group
     Given a leaflet map

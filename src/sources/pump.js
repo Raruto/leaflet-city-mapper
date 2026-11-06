@@ -17,31 +17,19 @@ import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 import { getElevation } from "../terrain/getElevation.js";
 
-import { compareDistance } from '../utils/compareDistance.js';
 import { buildArea } from './buildArea.js';
+import { pendingSourceAreas } from './pendingSourceAreas.js';
 
 /** Share four load/build slots across source layers, nearest ground blocks first. */
 export function pump(backend, map = backend._map) {
   const shared = map && renderers.get(map);
   if (!shared) return;
   const layers = /* alloc */ [];
-  let layer, area, center, areaBackend;
+  let layer, area, areaBackend;
   for (layer of sceneByLayer.get(shared)._layers) {
     if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
   }
-  const pending = /* alloc */ [];
-  for (layer of layers) {
-    for (area of sceneByLayer.get(layer)._areas.values()) {
-      if (area.started || area.request.signal.aborted) continue;
-      center = area.coords && map.project(map.getCenter(), area.coords.z).divideBy(256);
-      pending.push(/* alloc */ {
-        layer, area,
-        distance: center
-          ? Math.hypot(area.coords.x + 0.5 - center.x, area.coords.y + 0.5 - center.y) / 2 ** area.coords.z : 0,
-      });
-    }
-  }
-  pending.sort(compareDistance);
+  const pending = pendingSourceAreas(layers, map);
   let inflight = 0;
   for (layer of layers) inflight += sceneByLayer.get(layer)._inflight;
   for ({ layer: areaBackend, area } of pending) {

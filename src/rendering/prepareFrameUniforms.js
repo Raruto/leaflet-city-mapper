@@ -1,8 +1,7 @@
-import { frameBuffer } from '../globals/frameBuffer.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
-import { destroyTexture } from './destroyTexture.js';
+import { prepareFrameBuffer } from './prepareFrameBuffer.js';
 import { updatePointLights } from '../lighting/updatePointLights.js';
 
 export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
@@ -17,17 +16,7 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   const lightLength = Math.hypot(lightX, lightY, lightZ) || 1;
   const skyLength = Math.hypot(view[4], view[5], view[6]) || 1;
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
-  // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).
-  if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
-    if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
-    renderer.uniformBuffer = renderer.device.createBuffer((
-      frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256,
-      frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      frameBuffer
-    ));
-
-    renderer.uniformData = /* alloc */ new Float32Array(renderer.uniformBuffer.size / 4);
-  }
+  prepareFrameBuffer(backend, meshes, shadowMeshes);
   const frameData = renderer.uniformData;
   frameData.set(camera.viewMatrix, 0);
   frameData.set(camera.projectionMatrix, 16);

@@ -3,6 +3,7 @@ import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
 import { trafficStorage } from './trafficStorage.js';
+import { uploadTrafficLanes } from './uploadTrafficLanes.js';
 
 export function rebaseTraffic(state) {
   const { device } = sceneByLayer.get(state.layer).renderer;
@@ -24,26 +25,8 @@ export function rebaseTraffic(state) {
     };
     state.lanesDirty = true;
   }
-  let lane, i, point, trip, binding;
-  if (state.lanesDirty) {
-    let count = 0;
-    for (lane of state.lanes) count += lane.points.length;
-    const data = /* alloc */ new Float32Array(count * 4);
-    let offset = 0;
-    for (lane of state.lanes) {
-      lane.start = offset / 4;
-      for (i = 0; i < lane.points.length; i++) {
-        point = lane.points[i];
-        data[offset++] = point[0];
-        data[offset++] = point[1];
-        data[offset++] = point[2];
-        data[offset++] = lane.lengths[i];
-      }
-    }
-    state.gpu.points?.destroy();
-    state.gpu.points = trafficStorage(device, data);
-    state.lanesDirty = false;
-  }
+  let i, trip, binding;
+  if (state.lanesDirty) uploadTrafficLanes(state, device);
   const data = /* alloc */ new Float32Array(state.trips.length * 4);
   const index = /* alloc */ new Uint32Array(data.buffer);
   for (i = 0; i < state.trips.length; i++) {

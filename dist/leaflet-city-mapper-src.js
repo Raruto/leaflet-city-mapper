@@ -1388,7 +1388,7 @@
     subtree: true
   };
 
-  // src/rendering/synchronizeZoomView.js
+  // src/rendering/updateZoomCamera.js
   init_cameraByMap();
 
   // src/camera/mapUpdateCameraOverlays.js
@@ -1399,6 +1399,28 @@
       if (layer instanceof L.Marker) layer.update();
       else if (layer instanceof L.Popup || layer instanceof L.Tooltip) layer._updatePosition();
     }
+  }
+
+  // src/rendering/updateZoomCamera.js
+  function updateZoomCamera(backend, now) {
+    const map = backend._map;
+    const view = sceneByLayer.get(backend)._zoomView;
+    let proxy, animation;
+    for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) {
+      if (animation.effect.target === map._proxy) {
+        proxy = animation;
+        break;
+      }
+    }
+    const progress = proxy?.effect.getComputedTiming().progress ?? Math.min(1, (now - view.start) / 250);
+    const targetScale = map.getZoomScale(view.targetZoom, view.zoom), scale = 1 + (targetScale - 1) * progress;
+    const from = map.project(view.from, view.zoom), to = map.project(view.to, view.zoom);
+    cameraByMap.get(map)._cameraView = /* alloc */
+    {
+      zoom: map.getScaleZoom(scale, view.zoom),
+      center: map.unproject(from.add(to.subtract(from).multiplyBy(targetScale * progress / scale)), view.zoom)
+    };
+    mapUpdateCameraOverlays(map);
   }
 
   // src/rendering/synchronizeZoomView.js
@@ -1423,25 +1445,7 @@
       for ([animation, { start: start2, time }] of sceneByLayer.get(backend)._zoomTransitions) {
         animation.currentTime = Math.min(animation.effect.getComputedTiming().endTime, time + now - start2);
       }
-      if (sceneByLayer.get(backend)._zoomView) {
-        const view = sceneByLayer.get(backend)._zoomView;
-        let proxy;
-        for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) {
-          if (animation.effect.target === map._proxy) {
-            proxy = animation;
-            break;
-          }
-        }
-        const progress = proxy?.effect.getComputedTiming().progress ?? Math.min(1, (now - view.start) / 250);
-        const targetScale = map.getZoomScale(view.targetZoom, view.zoom), scale = 1 + (targetScale - 1) * progress;
-        const from = map.project(view.from, view.zoom), to = map.project(view.to, view.zoom);
-        cameraByMap.get(map)._cameraView = /* alloc */
-        {
-          zoom: map.getScaleZoom(scale, view.zoom),
-          center: map.unproject(from.add(to.subtract(from).multiplyBy(targetScale * progress / scale)), view.zoom)
-        };
-        mapUpdateCameraOverlays(map);
-      }
+      if (sceneByLayer.get(backend)._zoomView) updateZoomCamera(backend, now);
     }
   }
 
@@ -1670,14 +1674,9 @@
     updateCamera(camera);
   }
 
-  // src/scene/updateWorldMatrix.js
-  init_degrees();
-  function updateWorldMatrix(node) {
-    const parent = node.parent;
-    const parentVersion = parent?._worldMatrixVersion || 0;
-    const matrixMode = Boolean(node.matrix);
-    let changed = node._worldParent !== parent || node._parentWorldVersion !== parentVersion || node._worldMatrixMode !== matrixMode;
-    let i, value, child;
+  // src/scene/worldMatrixChanged.js
+  function worldMatrixChanged(node, changed) {
+    let i, value;
     if (node.matrix) {
       const state = node._matrixState ||= /* alloc */
       new Float64Array(16);
@@ -1694,26 +1693,41 @@
         state[i] = value;
       }
     }
+    return changed;
+  }
+
+  // src/scene/composeLocalTransform.js
+  init_degrees();
+  function composeLocalTransform(node) {
+    const matrix = node._localTransform ||= /* alloc */
+    new DOMMatrix();
+    matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;
+    matrix.m21 = 0, matrix.m22 = 1, matrix.m23 = 0, matrix.m24 = 0;
+    matrix.m31 = 0, matrix.m32 = 0, matrix.m33 = 1, matrix.m34 = 0;
+    matrix.m41 = 0, matrix.m42 = 0, matrix.m43 = 0, matrix.m44 = 1;
+    matrix.translateSelf(node.position[0], node.position[1], node.position[2]);
+    matrix.rotateAxisAngleSelf(0, 1, 0, node.rotation[1] * degrees);
+    matrix.rotateAxisAngleSelf(1, 0, 0, node.rotation[0] * degrees);
+    matrix.rotateAxisAngleSelf(0, 0, 1, node.rotation[2] * degrees);
+    matrix.scaleSelf(node.scale[0], node.scale[1], node.scale[2]);
+    return matrix;
+  }
+
+  // src/scene/updateWorldMatrix.js
+  function updateWorldMatrix(node) {
+    const parent = node.parent;
+    const parentVersion = parent?._worldMatrixVersion || 0;
+    const matrixMode = Boolean(node.matrix);
+    let changed = node._worldParent !== parent || node._parentWorldVersion !== parentVersion || node._worldMatrixMode !== matrixMode;
+    let child;
+    changed = worldMatrixChanged(node, changed);
     if (!changed) {
       for (child of node.children) updateWorldMatrix(child);
       return;
     }
     let local3, world;
     if (node.matrix) local3 = node.matrix;
-    else {
-      const matrix = node._localTransform ||= /* alloc */
-      new DOMMatrix();
-      matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;
-      matrix.m21 = 0, matrix.m22 = 1, matrix.m23 = 0, matrix.m24 = 0;
-      matrix.m31 = 0, matrix.m32 = 0, matrix.m33 = 1, matrix.m34 = 0;
-      matrix.m41 = 0, matrix.m42 = 0, matrix.m43 = 0, matrix.m44 = 1;
-      matrix.translateSelf(node.position[0], node.position[1], node.position[2]);
-      matrix.rotateAxisAngleSelf(0, 1, 0, node.rotation[1] * degrees);
-      matrix.rotateAxisAngleSelf(1, 0, 0, node.rotation[0] * degrees);
-      matrix.rotateAxisAngleSelf(0, 0, 1, node.rotation[2] * degrees);
-      matrix.scaleSelf(node.scale[0], node.scale[1], node.scale[2]);
-      local3 = matrix;
-    }
+    else local3 = composeLocalTransform(node);
     world = node._worldTransform ||= /* alloc */
     new DOMMatrix();
     if (local3 instanceof DOMMatrix) {
@@ -1789,28 +1803,33 @@
     { min, max, center, radius };
   }
 
+  // src/rendering/collectVisibleMesh.js
+  function collectVisibleMesh(mesh, projection, frustum, frustumLengths, candidates) {
+    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
+    const bounds = mesh.geometry.bounds;
+    const world = mesh.worldMatrix;
+    const center = bounds.center;
+    const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
+    const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
+    const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+    const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
+    const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
+    mesh._sortDepth = clipZ / clipW;
+    const radius = bounds.radius * Math.max(
+      Math.hypot(world[0], world[1], world[2]),
+      Math.hypot(world[4], world[5], world[6]),
+      Math.hypot(world[8], world[9], world[10])
+    );
+    mesh._visibleInFrame = frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] && frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] && frustum[2][0] * x + frustum[2][1] * y + frustum[2][2] * z + frustum[2][3] >= -radius * frustumLengths[2] && frustum[3][0] * x + frustum[3][1] * y + frustum[3][2] * z + frustum[3][3] >= -radius * frustumLengths[3] && frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] && frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
+    if (mesh._visibleInFrame) candidates.push(mesh);
+  }
+
   // src/rendering/collectMeshes.js
   function collectMeshes(mesh, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes) {
     if (!mesh.visible) return;
     if (mesh.geometry) {
       if (sunlight?.altitude >= 3 && !mesh.tile && mesh._appearance !== 0 && !mesh.program.nightLight && mesh.program.depthTest !== false) shadowMeshes.push(mesh);
-      if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
-      const bounds = mesh.geometry.bounds;
-      const world = mesh.worldMatrix;
-      const center = bounds.center;
-      const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-      const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-      const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-      const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
-      const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
-      mesh._sortDepth = clipZ / clipW;
-      const radius = bounds.radius * Math.max(
-        Math.hypot(world[0], world[1], world[2]),
-        Math.hypot(world[4], world[5], world[6]),
-        Math.hypot(world[8], world[9], world[10])
-      );
-      mesh._visibleInFrame = frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] && frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] && frustum[2][0] * x + frustum[2][1] * y + frustum[2][2] * z + frustum[2][3] >= -radius * frustumLengths[2] && frustum[3][0] * x + frustum[3][1] * y + frustum[3][2] * z + frustum[3][3] >= -radius * frustumLengths[3] && frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] && frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
-      if (mesh._visibleInFrame) candidates.push(mesh);
+      collectVisibleMesh(mesh, projection, frustum, frustumLengths, candidates);
     }
     let child;
     for (child of mesh.children) {
@@ -1860,7 +1879,7 @@
     collectMeshes(sceneByLayer.get(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
   }
 
-  // src/rendering/updateRoofRaster.js
+  // src/rendering/updateRoofAtlas.js
   init_L();
 
   // src/globals/roofSignatures.js
@@ -1868,19 +1887,6 @@
 
   // src/rendering/rebuildRoofAtlas.js
   init_radians();
-
-  // src/globals/roofTexture.js
-  var roofTexture = {
-    size: [null, null],
-    format: "rgba8unorm",
-    usage: null
-  };
-
-  // src/globals/roofSampler.js
-  var roofSampler = {
-    addressModeU: "clamp-to-edge",
-    addressModeV: "clamp-to-edge"
-  };
 
   // src/globals/roofTiles.js
   var roofTiles = [];
@@ -2007,6 +2013,17 @@
   // src/globals/roofCopySize.js
   var roofCopySize = [null, null];
 
+  // src/rendering/uploadRoofTile.js
+  function uploadRoofTile(device, tile) {
+    const source = tile.texture;
+    if (source.uploaded !== source.image) {
+      device.queue.copyExternalImageToTexture((roofImage.source = tile.image, roofImage), (roofTarget.texture = source.texture, roofTarget), (roofCopySize[0] = source.texture.width, roofCopySize[1] = source.texture.height, roofCopySize));
+      roofImage.source = null;
+      roofTarget.texture = null;
+      source.uploaded = source.image;
+    }
+  }
+
   // src/globals/roofBindGroup.js
   var roofBindGroup = {
     layout: null,
@@ -2052,20 +2069,11 @@
     roofPass.colorAttachments[0].view = null;
     atlasPass.setPipeline(renderer.roofBlit.pipeline);
     tiles.sort(compareRoofTiles);
-    let i, tile, layer, coords, image, source, tileSize, x, y;
+    let i, tile, layer, coords, source, tileSize, x, y;
     for ([i, { tile, layer }] of tiles.entries()) {
-      ({ coords, image } = tile);
+      ({ coords } = tile);
       source = tile.texture;
-      if (source.uploaded !== source.image) {
-        device.queue.copyExternalImageToTexture(
-          (roofImage.source = image, roofImage),
-          (roofTarget.texture = source.texture, roofTarget),
-          (roofCopySize[0] = source.texture.width, roofCopySize[1] = source.texture.height, roofCopySize)
-        );
-        roofImage.source = null;
-        roofTarget.texture = null;
-        source.uploaded = source.image;
-      }
+      uploadRoofTile(device, tile);
       opacities[i * 64] = layer.options.opacity;
       tileSize = TILE_SIZE * map.getZoomScale(zoom, coords.z);
       x = (coords.x * tileSize - min.x) * width / size.x;
@@ -2092,21 +2100,75 @@
     opacityBuffer.destroy();
   }
 
+  // src/rendering/collectRoofTiles.js
+  function collectRoofTiles(rasters, tiles) {
+    let zoom = -Infinity, layer, tile;
+    for (layer of rasters) {
+      for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
+        if (tile.done && !tile.request.signal.aborted && tile.image) {
+          tile._roofEntry ||= /* alloc */
+          { tile, layer };
+          tiles.push(tile._roofEntry);
+          zoom = Math.max(zoom, tile.coords.z);
+        }
+      }
+    }
+    return zoom;
+  }
+
+  // src/globals/roofTexture.js
+  var roofTexture = {
+    size: [null, null],
+    format: "rgba8unorm",
+    usage: null
+  };
+
+  // src/globals/roofSampler.js
+  var roofSampler = {
+    addressModeU: "clamp-to-edge",
+    addressModeV: "clamp-to-edge"
+  };
+
+  // src/rendering/resizeRoofTexture.js
+  function resizeRoofTexture(backend, roof, width, height) {
+    const renderer = sceneByLayer.get(backend).renderer;
+    const descriptor = roofTexture;
+    descriptor.size[0] = width;
+    descriptor.size[1] = height;
+    descriptor.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
+    if (roof.texture && (roof.texture.width !== width || roof.texture.height !== height)) {
+      destroyTexture(backend, roof.texture.texture);
+      roof.texture.texture = renderer.device.createTexture(descriptor);
+      roof.texture.width = width;
+      roof.texture.height = height;
+    }
+    roof.texture ||= /* alloc */
+    {
+      device: renderer.device,
+      texture: renderer.device.createTexture(descriptor),
+      sampler: renderer.device.createSampler(roofSampler),
+      samplerOptions: (
+        /* alloc */
+        { addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" }
+      ),
+      image: null,
+      width,
+      height,
+      format: "rgba8unorm",
+      srgb: false,
+      flipY: false,
+      uploaded: null
+    };
+  }
+
   // src/rendering/rebuildRoofAtlas.js
   function rebuildRoofAtlas(backend, rasters, signature, now) {
     const map = backend._map, renderer = sceneByLayer.get(backend).renderer;
     const tiles = roofTiles;
     tiles.length = 0;
-    let zoom = -Infinity, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let layer, tile, coords, tileSize;
-    for (layer of rasters) for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
-      if (tile.done && !tile.request.signal.aborted && tile.image) {
-        tile._roofEntry ||= /* alloc */
-        { tile, layer };
-        tiles.push(tile._roofEntry);
-        zoom = Math.max(zoom, tile.coords.z);
-      }
-    }
+    let zoom = collectRoofTiles(rasters, tiles);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let coords, tileSize;
     if (!tiles.length) zoom = map.getZoom();
     for ({ tile: { coords } } of tiles) {
       tileSize = TILE_SIZE * map.getZoomScale(zoom, coords.z);
@@ -2141,38 +2203,28 @@
     roof.matrix[10] = pixels / size.y;
     roof.matrix[12] = (origin.x - min.x) / size.x;
     roof.matrix[14] = (origin.y - min.y) / size.y;
-    const descriptor = roofTexture;
-    descriptor.size[0] = width;
-    descriptor.size[1] = height;
-    descriptor.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
-    if (roof.texture && (roof.texture.width !== width || roof.texture.height !== height)) {
-      destroyTexture(backend, roof.texture.texture);
-      roof.texture.texture = renderer.device.createTexture(descriptor);
-      roof.texture.width = width;
-      roof.texture.height = height;
-    }
-    roof.texture ||= /* alloc */
-    {
-      device: renderer.device,
-      texture: renderer.device.createTexture(descriptor),
-      sampler: renderer.device.createSampler(roofSampler),
-      samplerOptions: (
-        /* alloc */
-        { addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" }
-      ),
-      image: null,
-      width,
-      height,
-      format: "rgba8unorm",
-      srgb: false,
-      flipY: false,
-      uploaded: null
-    };
+    resizeRoofTexture(backend, roof, width, height);
     ensureRoofBlit(renderer);
     try {
       composeRoofAtlas(backend, tiles, zoom, min, size, width, height);
     } finally {
       tiles.length = 0;
+    }
+  }
+
+  // src/rendering/updateRoofAtlas.js
+  function updateRoofAtlas(backend, rasters, now) {
+    const signatures = roofSignatures;
+    signatures.length = 0;
+    let loading2 = false, layer;
+    for (layer of rasters) {
+      signatures.push(`${L.Util.stamp(layer)}:${sceneByLayer.get(layer)._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`);
+      loading2 ||= Boolean(sceneByLayer.get(layer)._loadingTiles);
+    }
+    const signature = signatures.join("|");
+    signatures.length = 0;
+    if (!sceneByLayer.get(backend)._roofRaster || sceneByLayer.get(backend)._roofRaster.signature !== signature && (!loading2 || now - sceneByLayer.get(backend)._roofRaster.updatedAt >= 50)) {
+      rebuildRoofAtlas(backend, rasters, signature, now);
     }
   }
 
@@ -2194,18 +2246,7 @@
       for (layer of Object.values(map._layers)) {
         if (sceneByLayer.get(layer).kind === "raster" && sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
       }
-      const signatures = roofSignatures;
-      signatures.length = 0;
-      let loading2 = false;
-      for (layer of rasters) {
-        signatures.push(`${L.Util.stamp(layer)}:${sceneByLayer.get(layer)._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`);
-        loading2 ||= Boolean(sceneByLayer.get(layer)._loadingTiles);
-      }
-      const signature = signatures.join("|");
-      signatures.length = 0;
-      if (!sceneByLayer.get(backend)._roofRaster || sceneByLayer.get(backend)._roofRaster.signature !== signature && (!loading2 || now - sceneByLayer.get(backend)._roofRaster.updatedAt >= 50)) {
-        rebuildRoofAtlas(backend, rasters, signature, now);
-      }
+      updateRoofAtlas(backend, rasters, now);
     } else if (sceneByLayer.get(backend)._roofRaster) {
       destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
       sceneByLayer.get(backend)._roofRaster = null;
@@ -2213,9 +2254,14 @@
     return rasters;
   }
 
+  // src/rendering/compareMeshDepth.js
+  function compareMeshDepth(a, b) {
+    return a.program.transparent ? (a.renderOrder || 0) - (b.renderOrder || 0) || b._sortDepth - a._sortDepth || a.id - b.id : (a._sortDepth ?? 0) - (b._sortDepth ?? 0) || a.id - b.id;
+  }
+
   // src/rendering/compareMeshes.js
   function compareMeshes(a, b) {
-    return Number(Boolean(b.ground)) - Number(Boolean(a.ground)) || (a.ground && b.ground ? (a.renderOrder || 0) - (b.renderOrder || 0) || a.tile.coords.z - b.tile.coords.z : 0) || Number(a.program.transparent) - Number(b.program.transparent) || (a.program.transparent ? (a.renderOrder || 0) - (b.renderOrder || 0) || b._sortDepth - a._sortDepth || a.id - b.id : (a._sortDepth ?? 0) - (b._sortDepth ?? 0) || a.id - b.id);
+    return Number(Boolean(b.ground)) - Number(Boolean(a.ground)) || (a.ground && b.ground ? (a.renderOrder || 0) - (b.renderOrder || 0) || a.tile.coords.z - b.tile.coords.z : 0) || Number(a.program.transparent) - Number(b.program.transparent) || compareMeshDepth(a, b);
   }
 
   // src/rendering/sortMeshes.js
@@ -2223,93 +2269,125 @@
     return meshes.sort(compareMeshes);
   }
 
-  // src/geometry/roofCoverage.js
+  // src/geometry/roofFootprint.js
   init_radians();
-  function roofCoverage(mesh, backend, rasters) {
+  function roofFootprint(mesh, backend, layer) {
     const map = backend._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
+    const state = sceneByLayer.get(layer), zoom = state._tileZoom;
+    const origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
+    const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let i, x, y, z, px, py, nw, se;
+    for (i = 0; i < 8; i++) {
+      x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];
+      z = i & 4 ? bounds.max[2] : bounds.min[2];
+      px = origin.x + (world[0] * x + world[4] * y + world[8] * z + world[12]) * scale;
+      py = origin.y + (world[2] * x + world[6] * y + world[10] * z + world[14]) * scale;
+      minX = Math.min(minX, px);
+      minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px);
+      maxY = Math.max(maxY, py);
+    }
+    if (state.header.maxLat !== void 0 && state.header.minLon !== void 0 && state.header.minLat !== void 0 && state.header.maxLon !== void 0) {
+      nw = map.project(
+        /* alloc */
+        [state.header.maxLat, state.header.minLon],
+        zoom
+      );
+      se = map.project(
+        /* alloc */
+        [state.header.minLat, state.header.maxLon],
+        zoom
+      );
+      minX = Math.max(minX, nw.x);
+      minY = Math.max(minY, nw.y);
+      maxX = Math.min(maxX, se.x);
+      maxY = Math.min(maxY, se.y);
+      if (minX >= maxX || minY >= maxY) return null;
+    }
+    return (
+      /* alloc */
+      [minX, minY, maxX, maxY]
+    );
+  }
+
+  // src/geometry/subtractRoofTile.js
+  function subtractRoofTile(remaining, tile, zoom) {
+    const size = 256 * 2 ** (zoom - tile.coords.z);
+    const left = tile.coords.x * size, top = tile.coords.y * size;
+    const pieces = (
+      /* alloc */
+      []
+    );
+    let x0, y0, x1, y1, l, t, r, b;
+    for ([x0, y0, x1, y1] of remaining) {
+      l = Math.max(x0, left), t = Math.max(y0, top);
+      r = Math.min(x1, left + size), b = Math.min(y1, top + size);
+      if (l >= r || t >= b) {
+        pieces.push(
+          /* alloc */
+          [x0, y0, x1, y1]
+        );
+        continue;
+      }
+      if (y0 < t) pieces.push(
+        /* alloc */
+        [x0, y0, x1, t]
+      );
+      if (b < y1) pieces.push(
+        /* alloc */
+        [x0, b, x1, y1]
+      );
+      if (x0 < l) pieces.push(
+        /* alloc */
+        [x0, t, l, b]
+      );
+      if (r < x1) pieces.push(
+        /* alloc */
+        [r, t, x1, b]
+      );
+    }
+    return pieces;
+  }
+
+  // src/geometry/roofCoverage.js
+  function roofCoverage(mesh, backend, rasters) {
     let intersectsArchive = false, pending = false;
-    let layer, zoom, origin, scale, minX, minY, maxX, maxY, i, x, y, z, px, py, nw, se, remaining, tile, size, left;
-    let top, pieces, x0, y0, x1, y1, l, t, r, b;
+    let layer, footprint, remaining, tile;
     for (layer of rasters) {
       if (!sceneByLayer.get(layer).header) {
         pending = true;
         continue;
       }
-      zoom = sceneByLayer.get(layer)._tileZoom, origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
-      scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
-      minX = minY = Infinity;
-      maxX = maxY = -Infinity;
-      for (i = 0; i < 8; i++) {
-        x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];
-        z = i & 4 ? bounds.max[2] : bounds.min[2];
-        px = origin.x + (world[0] * x + world[4] * y + world[8] * z + world[12]) * scale;
-        py = origin.y + (world[2] * x + world[6] * y + world[10] * z + world[14]) * scale;
-        minX = Math.min(minX, px);
-        minY = Math.min(minY, py);
-        maxX = Math.max(maxX, px);
-        maxY = Math.max(maxY, py);
-      }
-      if (sceneByLayer.get(layer).header.maxLat !== void 0 && sceneByLayer.get(layer).header.minLon !== void 0 && sceneByLayer.get(layer).header.minLat !== void 0 && sceneByLayer.get(layer).header.maxLon !== void 0) {
-        nw = map.project(
-          /* alloc */
-          [sceneByLayer.get(layer).header.maxLat, sceneByLayer.get(layer).header.minLon],
-          zoom
-        );
-        se = map.project(
-          /* alloc */
-          [sceneByLayer.get(layer).header.minLat, sceneByLayer.get(layer).header.maxLon],
-          zoom
-        );
-        minX = Math.max(minX, nw.x);
-        minY = Math.max(minY, nw.y);
-        maxX = Math.min(maxX, se.x);
-        maxY = Math.min(maxY, se.y);
-        if (minX >= maxX || minY >= maxY) continue;
-      }
+      footprint = roofFootprint(mesh, backend, layer);
+      if (!footprint) continue;
       intersectsArchive = true;
       remaining = /* alloc */
-      [
-        /* alloc */
-        [minX, minY, maxX, maxY]
-      ];
+      [footprint];
       for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
         if (!tile.done && !tile.error) continue;
-        size = 256 * 2 ** (zoom - tile.coords.z);
-        left = tile.coords.x * size, top = tile.coords.y * size;
-        pieces = /* alloc */
-        [];
-        for ([x0, y0, x1, y1] of remaining) {
-          l = Math.max(x0, left), t = Math.max(y0, top);
-          r = Math.min(x1, left + size), b = Math.min(y1, top + size);
-          if (l >= r || t >= b) {
-            pieces.push(
-              /* alloc */
-              [x0, y0, x1, y1]
-            );
-            continue;
-          }
-          if (y0 < t) pieces.push(
-            /* alloc */
-            [x0, y0, x1, t]
-          );
-          if (b < y1) pieces.push(
-            /* alloc */
-            [x0, b, x1, y1]
-          );
-          if (x0 < l) pieces.push(
-            /* alloc */
-            [x0, t, l, b]
-          );
-          if (r < x1) pieces.push(
-            /* alloc */
-            [r, t, x1, b]
-          );
-        }
-        remaining = pieces;
+        remaining = subtractRoofTile(remaining, tile, sceneByLayer.get(layer)._tileZoom);
         if (!remaining.length) return true;
       }
     }
     return !intersectsArchive && !pending;
+  }
+
+  // src/rendering/revealRoofMesh.js
+  function revealRoofMesh(backend, mesh, rasters) {
+    if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
+    if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
+      if (mesh._roofCoverageSignature !== sceneByLayer.get(backend)._roofRaster?.signature) {
+        mesh._roofCoverageSignature = sceneByLayer.get(backend)._roofRaster?.signature;
+        mesh._roofCovered = roofCoverage(mesh, backend, rasters);
+      }
+      if (!mesh._roofCovered) {
+        mesh._appearance = 0;
+        return false;
+      }
+      mesh._roofRevealed = true;
+    }
+    return true;
   }
 
   // src/rendering/prepareFrameMeshes.js
@@ -2318,18 +2396,7 @@
     let appearing = false;
     let mesh, progress;
     for (mesh of candidates) {
-      if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
-      if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
-        if (mesh._roofCoverageSignature !== sceneByLayer.get(backend)._roofRaster?.signature) {
-          mesh._roofCoverageSignature = sceneByLayer.get(backend)._roofRaster?.signature;
-          mesh._roofCovered = roofCoverage(mesh, backend, rasters);
-        }
-        if (!mesh._roofCovered) {
-          mesh._appearance = 0;
-          continue;
-        }
-        mesh._roofRevealed = true;
-      }
+      if (!revealRoofMesh(backend, mesh, rasters)) continue;
       if (mesh.fadeDuration) {
         mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
         progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);
@@ -2360,6 +2427,17 @@
     size: null,
     usage: null
   };
+
+  // src/rendering/prepareFrameBuffer.js
+  function prepareFrameBuffer(backend, meshes, shadowMeshes) {
+    const renderer = sceneByLayer.get(backend).renderer;
+    if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
+      if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
+      renderer.uniformBuffer = renderer.device.createBuffer((frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256, frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, frameBuffer));
+      renderer.uniformData = /* alloc */
+      new Float32Array(renderer.uniformBuffer.size / 4);
+    }
+  }
 
   // src/globals/sunBindGroup.js
   var sunBindGroup = {
@@ -2394,20 +2472,32 @@
     sunBindGroup.entries[3].resource.buffer = null;
   }
 
+  // src/lighting/writeLightCell.js
+  function writeLightCell(values, i, key, offsets, data) {
+    let j, o;
+    for (j = 0, o = offsets[key] * 4; j < 8; j++) data[o + j] = values[i + j];
+    offsets[key] += 2;
+  }
+
+  // src/lighting/visitLightCells.js
+  function visitLightCells(values, i, minX, minZ, cellSize, columns, offsets, data) {
+    const radius = values[i + 3], x = values[i] - minX, z = values[i + 2] - minZ;
+    let y, c, key;
+    for (y = Math.floor((z - radius) / cellSize); y <= Math.floor((z + radius) / cellSize); y++) {
+      for (c = Math.floor((x - radius) / cellSize); c <= Math.floor((x + radius) / cellSize); c++) {
+        key = y * columns + c;
+        if (data) {
+          writeLightCell(values, i, key, offsets, data);
+        } else offsets[key]++;
+      }
+    }
+  }
+
   // src/lighting/visitCells.js
   function visitCells(packed, minX, minZ, cellSize, columns, offsets, data) {
-    let values, i, radius, x, z, y, c, key, j, o;
+    let values, i;
     for (values of packed) for (i = 0; i < values.length; i += 8) {
-      radius = values[i + 3], x = values[i] - minX, z = values[i + 2] - minZ;
-      for (y = Math.floor((z - radius) / cellSize); y <= Math.floor((z + radius) / cellSize); y++) {
-        for (c = Math.floor((x - radius) / cellSize); c <= Math.floor((x + radius) / cellSize); c++) {
-          key = y * columns + c;
-          if (data) {
-            for (j = 0, o = offsets[key] * 4; j < 8; j++) data[o + j] = values[i + j];
-            offsets[key] += 2;
-          } else offsets[key]++;
-        }
-      }
+      visitLightCells(values, i, minX, minZ, cellSize, columns, offsets, data);
     }
   }
 
@@ -2607,12 +2697,7 @@
     const lightZ = view[2] * x + view[6] * y + view[10] * z;
     const lightLength = Math.hypot(lightX, lightY, lightZ) || 1;
     const skyLength = Math.hypot(view[4], view[5], view[6]) || 1;
-    if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
-      if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
-      renderer.uniformBuffer = renderer.device.createBuffer((frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256, frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, frameBuffer));
-      renderer.uniformData = /* alloc */
-      new Float32Array(renderer.uniformBuffer.size / 4);
-    }
+    prepareFrameBuffer(backend, meshes, shadowMeshes);
     const frameData = renderer.uniformData;
     frameData.set(camera.viewMatrix, 0);
     frameData.set(camera.projectionMatrix, 16);
@@ -2723,6 +2808,22 @@
     return pipeline;
   }
 
+  // src/rendering/prepareMeshCutout.js
+  function prepareMeshCutout(renderer, mesh, base) {
+    const data = renderer.uniformData;
+    const cutout = (mesh._nativeSource || mesh._rasterSource)?.options.cutout;
+    if (cutout && (!Number.isFinite(cutout.x) || !Number.isFinite(cutout.y) || !Number.isFinite(cutout.radius) || cutout.radius < 0)) {
+      throw (
+        /* alloc */
+        new Error("cutout requires finite x, y and a non-negative radius in CSS pixels")
+      );
+    }
+    data[base + 36] = (cutout?.x ?? 0) * renderer.dpr;
+    data[base + 37] = (cutout?.y ?? 0) * renderer.dpr;
+    data[base + 38] = (cutout?.radius ?? 0) * renderer.dpr;
+    data[base + 39] = cutout?.outside ? 1 : 0;
+  }
+
   // src/rendering/prepareMeshUniforms.js
   function prepareMeshUniforms(renderer, mesh) {
     const uniforms = mesh.program.uniforms;
@@ -2745,17 +2846,7 @@
     data[base + 33] = mesh.highlight?.[1] ?? 0;
     data[base + 34] = mesh.program.nightSparkle ? data[55] : 0;
     data[base + 35] = mesh.ground ? 1 : mesh._appearance ?? 1;
-    const cutout = (mesh._nativeSource || mesh._rasterSource)?.options.cutout;
-    if (cutout && (!Number.isFinite(cutout.x) || !Number.isFinite(cutout.y) || !Number.isFinite(cutout.radius) || cutout.radius < 0)) {
-      throw (
-        /* alloc */
-        new Error("cutout requires finite x, y and a non-negative radius in CSS pixels")
-      );
-    }
-    data[base + 36] = (cutout?.x ?? 0) * renderer.dpr;
-    data[base + 37] = (cutout?.y ?? 0) * renderer.dpr;
-    data[base + 38] = (cutout?.radius ?? 0) * renderer.dpr;
-    data[base + 39] = cutout?.outside ? 1 : 0;
+    prepareMeshCutout(renderer, mesh, base);
     return offset;
   }
 
@@ -2772,6 +2863,19 @@
 
   // src/globals/meshCopySize.js
   var meshCopySize = [null, null];
+
+  // src/rendering/uploadMeshTexture.js
+  function uploadMeshTexture(device, texture) {
+    if (texture.uploaded === texture.image) return;
+    device.queue.copyExternalImageToTexture(
+      (meshImage.source = texture.image, meshImage.flipY = Boolean(texture.flipY), meshImage),
+      (meshTarget.texture = texture.texture, meshTarget),
+      (meshCopySize[0] = texture.image.width, meshCopySize[1] = texture.image.height, meshCopySize)
+    );
+    meshImage.source = null;
+    meshTarget.texture = null;
+    texture.uploaded = texture.image;
+  }
 
   // src/globals/meshBindGroup.js
   var meshBindGroup = {
@@ -2854,6 +2958,48 @@
     }
   ];
 
+  // src/rendering/bindMeshTextures.js
+  function bindMeshTextures(renderer, mesh, textures) {
+    const { program } = mesh;
+    const entries = drawEntries;
+    entries.length = 0;
+    drawMeshEntry.resource.buffer = renderer.uniformBuffer;
+    drawFrameEntry.resource.buffer = renderer.uniformBuffer;
+    entries.push(drawMeshEntry, drawFrameEntry);
+    if (program.terrain) {
+      drawTerrainEntry.resource = program.terrain.texture.createView();
+      entries.push(drawTerrainEntry);
+    }
+    mesh.boundBuffer = renderer.uniformBuffer;
+    const boundTextures = mesh.boundTextures ||= /* alloc */
+    [];
+    boundTextures.length = textures.length;
+    let i, binding, texture;
+    for (i = 0; i < textures.length; i++) {
+      binding = program.bindings[i], texture = textures[i];
+      drawTextureEntries[i].binding = binding.texture;
+      drawTextureEntries[i].resource = texture.texture.createView();
+      drawSamplerEntries[i].binding = binding.sampler;
+      drawSamplerEntries[i].resource = texture.sampler;
+      entries.push(drawTextureEntries[i], drawSamplerEntries[i]);
+      boundTextures[i] ||= /* alloc */
+      [];
+      boundTextures[i][0] = texture.texture;
+      boundTextures[i][1] = texture.sampler;
+    }
+    mesh.bindGroup = renderer.device.createBindGroup((meshBindGroup.layout = program.bindGroupLayout, meshBindGroup.entries = entries, meshBindGroup));
+    meshBindGroup.layout = null;
+    meshBindGroup.entries = null;
+    drawMeshEntry.resource.buffer = null;
+    drawFrameEntry.resource.buffer = null;
+    drawTerrainEntry.resource = null;
+    for (i = 0; i < textures.length; i++) {
+      drawTextureEntries[i].resource = null;
+      drawSamplerEntries[i].resource = null;
+    }
+    entries.length = 0;
+  }
+
   // src/rendering/prepareMeshTextures.js
   function prepareMeshTextures(renderer, mesh) {
     const { program } = mesh;
@@ -2868,60 +3014,14 @@
         /* alloc */
         new Error(`Missing Layer3D texture: ${binding.name}`)
       );
-      if (texture.uploaded !== texture.image) {
-        device.queue.copyExternalImageToTexture(
-          (meshImage.source = texture.image, meshImage.flipY = Boolean(texture.flipY), meshImage),
-          (meshTarget.texture = texture.texture, meshTarget),
-          (meshCopySize[0] = texture.image.width, meshCopySize[1] = texture.image.height, meshCopySize)
-        );
-        meshImage.source = null;
-        meshTarget.texture = null;
-        texture.uploaded = texture.image;
-      }
+      uploadMeshTexture(device, texture);
       textures.push(texture);
     }
     let bindingsChanged = !mesh.bindGroup || mesh.boundBuffer !== renderer.uniformBuffer || textures.length !== mesh.boundTextures.length;
     for (i = 0; !bindingsChanged && i < textures.length; i++) {
       if (textures[i].texture !== mesh.boundTextures[i][0] || textures[i].sampler !== mesh.boundTextures[i][1]) bindingsChanged = true;
     }
-    if (bindingsChanged) {
-      const entries = drawEntries;
-      entries.length = 0;
-      drawMeshEntry.resource.buffer = renderer.uniformBuffer;
-      drawFrameEntry.resource.buffer = renderer.uniformBuffer;
-      entries.push(drawMeshEntry, drawFrameEntry);
-      if (program.terrain) {
-        drawTerrainEntry.resource = program.terrain.texture.createView();
-        entries.push(drawTerrainEntry);
-      }
-      mesh.boundBuffer = renderer.uniformBuffer;
-      const boundTextures = mesh.boundTextures ||= /* alloc */
-      [];
-      boundTextures.length = textures.length;
-      for (i = 0; i < textures.length; i++) {
-        binding = program.bindings[i], texture = textures[i];
-        drawTextureEntries[i].binding = binding.texture;
-        drawTextureEntries[i].resource = texture.texture.createView();
-        drawSamplerEntries[i].binding = binding.sampler;
-        drawSamplerEntries[i].resource = texture.sampler;
-        entries.push(drawTextureEntries[i], drawSamplerEntries[i]);
-        boundTextures[i] ||= /* alloc */
-        [];
-        boundTextures[i][0] = texture.texture;
-        boundTextures[i][1] = texture.sampler;
-      }
-      mesh.bindGroup = device.createBindGroup((meshBindGroup.layout = program.bindGroupLayout, meshBindGroup.entries = entries, meshBindGroup));
-      meshBindGroup.layout = null;
-      meshBindGroup.entries = null;
-      drawMeshEntry.resource.buffer = null;
-      drawFrameEntry.resource.buffer = null;
-      drawTerrainEntry.resource = null;
-      for (i = 0; i < textures.length; i++) {
-        drawTextureEntries[i].resource = null;
-        drawSamplerEntries[i].resource = null;
-      }
-      entries.length = 0;
-    }
+    if (bindingsChanged) bindMeshTextures(renderer, mesh, textures);
   }
 
   // src/rendering/drawGeometry.js
@@ -3002,11 +3102,22 @@
   // src/globals/shadowValues.js
   var shadowValues = new Float32Array(20);
 
+  // src/shadows/shadowMeshMatches.js
+  function shadowMeshMatches(cache, mesh) {
+    const previous = cache.meshes.get(mesh), range = mesh.geometry.drawRange;
+    if (!(previous && previous.world === mesh._worldMatrixVersion && previous.geometry === mesh.geometry && previous.start === range.start && previous.count === range.count && previous.appearance === (mesh._appearance ?? 1))) return false;
+    let attribute;
+    for (attribute of Object.values(mesh.geometry.attributes)) {
+      if (attribute.needsUpdate) return false;
+    }
+    return true;
+  }
+
   // src/shadows/shadowCacheMatches.js
   function shadowCacheMatches(sun, meshes, sunlight) {
     const cache = sun.cache;
     let unchanged = sun.enabled && cache?.meshes.size === meshes.length;
-    let i, mesh, previous, range, attribute;
+    let i, mesh;
     if (unchanged) {
       for (i = 0; i < sunlight.direction.length; i++) {
         if (sunlight.direction[i] !== cache.direction[i]) {
@@ -3017,18 +3128,10 @@
     }
     if (unchanged) {
       for (mesh of meshes) {
-        previous = cache.meshes.get(mesh), range = mesh.geometry.drawRange;
-        if (!(previous && previous.world === mesh._worldMatrixVersion && previous.geometry === mesh.geometry && previous.start === range.start && previous.count === range.count && previous.appearance === (mesh._appearance ?? 1))) {
+        if (!shadowMeshMatches(cache, mesh)) {
           unchanged = false;
           break;
         }
-        for (attribute of Object.values(mesh.geometry.attributes)) {
-          if (attribute.needsUpdate) {
-            unchanged = false;
-            break;
-          }
-        }
-        if (!unchanged) break;
       }
     }
     return unchanged;
@@ -3063,6 +3166,40 @@
   // src/globals/shadowHigh.js
   var shadowHigh = [0, 0, 0];
 
+  // src/shadows/meshShadowBounds.js
+  function meshShadowBounds(mesh, bounds, matrix) {
+    let cached = mesh._shadowBounds;
+    if (!cached || cached.version !== mesh._worldMatrixVersion || cached.bounds !== bounds) {
+      cached ||= mesh._shadowBounds = /* alloc */
+      {
+        min: (
+          /* alloc */
+          [Infinity, Infinity, Infinity]
+        ),
+        max: (
+          /* alloc */
+          [-Infinity, -Infinity, -Infinity]
+        )
+      };
+      cached.version = mesh._worldMatrixVersion;
+      cached.bounds = bounds;
+      cached.min.fill(Infinity);
+      cached.max.fill(-Infinity);
+      let i, x, y, z, w, axis, value;
+      for (i = 0; i < 8; i++) {
+        x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];
+        z = i & 4 ? bounds.max[2] : bounds.min[2];
+        w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+        for (axis = 0; axis < 3; axis++) {
+          value = (matrix[axis] * x + matrix[axis + 4] * y + matrix[axis + 8] * z + matrix[axis + 12]) / w;
+          cached.min[axis] = Math.min(cached.min[axis], value);
+          cached.max[axis] = Math.max(cached.max[axis], value);
+        }
+      }
+    }
+    return cached;
+  }
+
   // src/shadows/shadowBounds.js
   function shadowBounds2(meshes, output = (
     /* alloc */
@@ -3080,38 +3217,11 @@
     const { min, max } = output;
     min.fill(Infinity);
     max.fill(-Infinity);
-    let mesh, bounds, matrix, cached, i, x, y, z, w, axis, value;
+    let mesh, bounds, matrix, cached, axis;
     for (mesh of meshes) {
       if (!mesh.geometry.bounds || mesh.geometry.attributes.position.needsUpdate) computeBounds(mesh.geometry);
       bounds = mesh.geometry.bounds, matrix = mesh.worldMatrix;
-      cached = mesh._shadowBounds;
-      if (!cached || cached.version !== mesh._worldMatrixVersion || cached.bounds !== bounds) {
-        cached ||= mesh._shadowBounds = /* alloc */
-        {
-          min: (
-            /* alloc */
-            [Infinity, Infinity, Infinity]
-          ),
-          max: (
-            /* alloc */
-            [-Infinity, -Infinity, -Infinity]
-          )
-        };
-        cached.version = mesh._worldMatrixVersion;
-        cached.bounds = bounds;
-        cached.min.fill(Infinity);
-        cached.max.fill(-Infinity);
-        for (i = 0; i < 8; i++) {
-          x = i & 1 ? bounds.max[0] : bounds.min[0], y = i & 2 ? bounds.max[1] : bounds.min[1];
-          z = i & 4 ? bounds.max[2] : bounds.min[2];
-          w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
-          for (axis = 0; axis < 3; axis++) {
-            value = (matrix[axis] * x + matrix[axis + 4] * y + matrix[axis + 8] * z + matrix[axis + 12]) / w;
-            cached.min[axis] = Math.min(cached.min[axis], value);
-            cached.max[axis] = Math.max(cached.max[axis], value);
-          }
-        }
-      }
+      cached = meshShadowBounds(mesh, bounds, matrix);
       for (axis = 0; axis < 3; axis++) {
         min[axis] = Math.min(min[axis], cached.min[axis]);
         max[axis] = Math.max(max[axis], cached.max[axis]);
@@ -3610,6 +3720,25 @@
     }
   }
 
+  // src/core/uploadNativeImage.js
+  function uploadNativeImage(state, key, texture, image, device, width, height) {
+    try {
+      device.queue.copyExternalImageToTexture(
+        /* alloc */
+        { source: image },
+        /* alloc */
+        { texture: texture.texture },
+        /* alloc */
+        [width, height]
+      );
+    } catch (error) {
+      texture.texture.destroy();
+      state.textures.delete(key);
+      throw error;
+    }
+    texture.uploaded = image;
+  }
+
   // src/core/textureFor.js
   function textureFor(state, key, image) {
     if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
@@ -3657,21 +3786,7 @@
         texture.pending = true;
         uploadCanvasTexture(state, key, texture, image, device, width, height);
       } else {
-        try {
-          device.queue.copyExternalImageToTexture(
-            /* alloc */
-            { source: image },
-            /* alloc */
-            { texture: texture.texture },
-            /* alloc */
-            [width, height]
-          );
-        } catch (error) {
-          texture.texture.destroy();
-          textures.delete(key);
-          throw error;
-        }
-        texture.uploaded = image;
+        uploadNativeImage(state, key, texture, image, device, width, height);
       }
     }
     texture.used = true;
@@ -3737,11 +3852,6 @@
     code: null
   };
 
-  // src/globals/programLayout.js
-  var programLayout = {
-    entries: null
-  };
-
   // src/globals/pipelineLayout.js
   var pipelineLayout = {
     bindGroupLayouts: [null, null]
@@ -3804,6 +3914,11 @@
       format: "float32x2"
     })])
   });
+
+  // src/globals/programLayout.js
+  var programLayout = {
+    entries: null
+  };
 
   // src/globals/programEntries.js
   var programEntries = [];
@@ -3920,6 +4035,83 @@
     }
   ];
 
+  // src/rendering/createProgramLayout.js
+  function createProgramLayout(device, shaders) {
+    const bindGroupEntries = programEntries;
+    bindGroupEntries.length = 0;
+    meshLayoutEntry.visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
+    frameLayoutEntry.visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
+    bindGroupEntries.push(meshLayoutEntry, frameLayoutEntry);
+    if (shaders.hasTerrain) {
+      terrainLayoutEntry.visibility = GPUShaderStage.VERTEX;
+      bindGroupEntries.push(terrainLayoutEntry);
+    }
+    let texture, entry, index = 0;
+    for (texture of shaders.bindings) {
+      entry = textureLayoutEntries[index];
+      entry.binding = texture.texture;
+      entry.visibility = GPUShaderStage.FRAGMENT;
+      bindGroupEntries.push(entry);
+      entry = samplerLayoutEntries[index++];
+      entry.binding = texture.sampler;
+      entry.visibility = GPUShaderStage.FRAGMENT;
+      bindGroupEntries.push(entry);
+    }
+    const layout = device.createBindGroupLayout((programLayout.entries = bindGroupEntries, programLayout));
+    programLayout.entries = null;
+    return layout;
+  }
+
+  // src/rendering/createProgramUniforms.js
+  function createProgramUniforms(material) {
+    const uniforms = (
+      /* alloc */
+      {
+        baseColor: (
+          /* alloc */
+          { value: material.color || /* alloc */
+          [1, 1, 1] }
+        ),
+        metallic: (
+          /* alloc */
+          { value: material.metallic ?? 0 }
+        ),
+        roughness: (
+          /* alloc */
+          { value: material.roughness ?? 0.85 }
+        ),
+        opacity: (
+          /* alloc */
+          { value: material.opacity ?? 1 }
+        ),
+        alphaCutoff: (
+          /* alloc */
+          { value: material.alphaCutoff ?? 0.5 }
+        ),
+        occlusionStrength: (
+          /* alloc */
+          { value: material.occlusionStrength ?? 1 }
+        ),
+        emissive: (
+          /* alloc */
+          { value: material.emissive || /* alloc */
+          [0, 0, 0] }
+        )
+      }
+    );
+    if (material.baseTexture) uniforms.baseTexture = /* alloc */
+    { value: material.baseTexture };
+    if (material.metalTexture) uniforms.metalTexture = /* alloc */
+    { value: material.metalTexture };
+    if (material.emissiveTexture) uniforms.emissiveTexture = /* alloc */
+    { value: material.emissiveTexture };
+    if (material.occlusionTexture) uniforms.occlusionTexture = /* alloc */
+    { value: material.occlusionTexture };
+    if (material.roofTexture || material.wallTexture) uniforms.roofTexture = /* alloc */
+    { value: null };
+    return uniforms;
+  }
+
   // src/rendering/textureBinding.js
   function textureBinding(bindings, name, enabled) {
     if (!enabled) return "";
@@ -3935,13 +4127,8 @@
     );
   }
 
-  // src/shaders/materialShaders.js
-  function materialShaders(material = defaultMaterial, sparkle = false, elevationWGSL2 = "") {
-    const hasBase = Boolean(material.baseTexture);
-    const hasMetal = Boolean(material.metalTexture);
-    const hasEmissive = Boolean(material.emissiveTexture);
-    const hasOcclusion = Boolean(material.occlusionTexture);
-    const hasRoof = Boolean(material.roofTexture || material.wallTexture);
+  // src/shaders/validateRoofMaterial.js
+  function validateRoofMaterial(material) {
     let name, value;
     for (
       name of
@@ -3956,11 +4143,26 @@
         );
       }
     }
+  }
+
+  // src/shaders/roofVertexShader.js
+  function roofVertexShader(material) {
     const roofOpacity = Number(material.roofTexture ?? 0);
     const wallOpacity = Number(material.wallTexture ?? 0);
-    const hasTerrain = Boolean(material.terrain);
-    const textured = hasBase || hasMetal || hasEmissive || hasOcclusion || material.nightLight;
-    const vertex = (
+    return (
+      /* wgsl */
+      `
+        output.roofUv = (frame.roofMatrix * world).xz;
+        output.roof = select(0.0, select(${wallOpacity.toFixed(8)}, ${roofOpacity.toFixed(8)}, input.normal.y >= 0.5), ((${Boolean(material.roofTexture)} && input.normal.y >= 0.5) ||
+          (${Boolean(material.wallTexture)} && abs(input.normal.y) < 0.5)) && !highlighted);
+      `
+    );
+  }
+
+  // src/shaders/materialVertexShader.js
+  function materialVertexShader(material, sparkle, elevationWGSL2, hasTerrain, textured, hasRoof) {
+    const instanceOffset = material.instanced ? " + input.instanceOffset.xyz" : "";
+    return (
       /* wgsl */
       `
     struct Mesh {
@@ -4008,7 +4210,7 @@
     };
     @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
       var output: VertexOutput;
-      var position = input.position${material.instanced ? " + input.instanceOffset.xyz" : ""};
+      var position = input.position${instanceOffset};
       ${hasTerrain ? "position.y = elevation(u.terrain.xy + input.uv * u.terrain.z, u.terrain.w) - u.terrain.w;" : ""}
       let featureVertex = f32(vertexIndex)${material.instanced ? " + input.instanceOffset.w" : ""};
       let highlighted = featureVertex >= u.highlight.x && featureVertex < u.highlight.y;
@@ -4021,23 +4223,105 @@
       let world = u.worldMatrix * vec4<f32>(position, 1.0);
       output.shadowPosition = solar.matrix * world;
       output.worldPosition = world.xyz / world.w;
-      ${sparkle ? `output.localPosition = input.position${material.instanced ? " + input.instanceOffset.xyz" : ""};` : ""}
+      ${sparkle ? `output.localPosition = input.position${instanceOffset};` : ""}
       let viewPosition = frame.viewMatrix * world;
       output.viewPosition = viewPosition.xyz;
       ${textured ? "output.uv = input.uv;" : ""}
-      ${hasRoof ? (
-        /* wgsl */
-        `
-        output.roofUv = (frame.roofMatrix * world).xz;
-        output.roof = select(0.0, select(${wallOpacity.toFixed(8)}, ${roofOpacity.toFixed(8)}, input.normal.y >= 0.5), ((${Boolean(material.roofTexture)} && input.normal.y >= 0.5) ||
-          (${Boolean(material.wallTexture)} && abs(input.normal.y) < 0.5)) && !highlighted);
-      `
-      ) : ""}
+      ${hasRoof ? roofVertexShader(material) : ""}
       output.position = frame.projectionMatrix * viewPosition;
       return output;
     }
   `
     );
+  }
+
+  // src/shaders/materialBaseShader.js
+  function materialBaseShader(material, hasBase, hasRoof) {
+    return (
+      /* wgsl */
+      `
+      var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);
+      let texel = ${hasBase ? "textureSample(baseTexture, baseTextureSampler, input.uv)" : "vec4<f32>(1.0)"};
+      let alpha = u.material.z * texel.a;
+      ${material.alphaMode === "MASK" ? "if (alpha < u.material.w) { discard; }" : ""}
+      ${material.alphaMode === "BLEND" ? "if (alpha < 0.01) { discard; }" : ""}
+      var base = ${material.vertexColors ? "toLinear(min(input.color, vec3<f32>(1.0)))" : "input.color"} *
+        ${material.baseTexture?.srgb ? "texel.rgb" : "toLinear(texel.rgb)"};
+      ${hasRoof ? (
+        /* wgsl */
+        `
+        if (input.roof > 0.0 && all(input.roofUv >= vec2<f32>(0.0)) &&
+          all(input.roofUv <= vec2<f32>(1.0))) {
+          let roof = textureSampleLevel(roofTexture, roofTextureSampler, input.roofUv, 0.0);
+          base = mix(base, toLinear(roof.rgb), roof.a * input.roof);
+        }
+      `
+      ) : ""}`
+    );
+  }
+
+  // src/shaders/materialSurfaceShader.js
+  function materialSurfaceShader(material, sparkle, hasBase, hasMetal, hasEmissive, hasOcclusion, hasRoof) {
+    return material.unlit ? (
+      /* wgsl */
+      `
+        let rasterTexel = ${hasBase ? "textureSample(baseTexture, baseTextureSampler, input.uv)" : "vec4<f32>(input.color, 1.0)"};
+        return vec4<f32>(toSRGB(toLinear(rasterTexel.rgb) * (frame.atmosphereTint.rgb * (0.55 + 0.45 * sunlight) + artificial)), ${material.alphaMode === "BLEND" ? "u.material.z * rasterTexel.a" : "1.0"});
+      `
+    ) : (
+      /* wgsl */
+      `${materialBaseShader(material, hasBase, hasRoof)}
+      let mr = ${hasMetal ? "textureSample(metalTexture, metalTextureSampler, input.uv)" : "vec4<f32>(1.0)"};
+      let metal = clamp(u.material.x * mr.b, 0.0, 1.0);
+      let rough = clamp(u.material.y * mr.g, 0.08, 1.0);
+      let view = normalize(-input.viewPosition);
+      let halfVector = normalize(view + frame.lightDirection.xyz);
+      let nl = max(dot(normal, frame.lightDirection.xyz), 0.0) * frame.lightDirection.w * sunlight;
+      let nv = max(dot(normal, view), 0.001);
+      let nh = max(dot(normal, halfVector), 0.0);
+      let vh = max(dot(view, halfVector), 0.0);
+      let a2 = pow(rough, 4.0);
+      let d = a2 / max(PI * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0), 0.0001);
+      let gv = nl * sqrt(nv * nv * (1.0 - a2) + a2);
+      let gl = nv * sqrt(nl * nl * (1.0 - a2) + a2);
+      let visibility = 0.5 / max(gv + gl, 0.0001);
+      let f0 = mix(vec3<f32>(0.04), base, metal);
+      let fresnel = f0 + (1.0 - f0) * pow(1.0 - vh, 5.0);
+      let specular = d * visibility * fresnel;
+      let diffuse = (1.0 - metal) * base / PI;
+      let sky = dot(normal, frame.skyDirection.xyz) * 0.5 + 0.5;
+      let ambient = mix(toLinear(vec3<f32>(0.455, 0.412, 0.322)), vec3<f32>(1.0), sky) * (2.0 / PI);
+      let ao = ${hasOcclusion ? "mix(1.0, textureSample(occlusionTexture, occlusionTextureSampler, input.uv).r, u.emissive.w)" : "1.0"};
+      ${sparkle ? (
+        /* wgsl */
+        `
+        let lattice = (fract(input.localPosition / 2.5) - 0.5) * 2.5;
+        let pointGlow = (1.0 - smoothstep(0.16, 0.42, length(lattice))) * u.highlight.z;
+      `
+      ) : ""}
+      // Vertex colour components above 1 are self-lit (e.g. vehicle lamps): dim by day, bright at night.
+      let glow = ${sparkle ? "vec3<f32>(3.0, 2.6, 1.8) * pointGlow +" : ""}${material.vertexColors ? " max(input.color - vec3<f32>(1.0), vec3<f32>(0.0)) * (0.3 + 5.0 * frame.skyDirection.w) +" : ""} u.emissive.rgb * ${hasEmissive ? material.emissiveTexture.srgb ? "textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb" : "toLinear(textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb)" : "vec3<f32>(1.0)"};
+      var color = ambient * base * (1.0 - metal) * ao +
+        (diffuse + specular) * nl * toLinear(vec3<f32>(1.0, 0.937, 0.835)) * 3.0 + glow;
+      ${material.vertexColors ? "color = base * (ambient + toLinear(vec3<f32>(1.0, 0.937, 0.835)) * (3.0 / PI) * nl) + glow;" : ""}
+      color = (color - glow) * frame.atmosphereTint.rgb + base * artificial * (1.0 - metal * 0.5) + glow;
+      appearance(input.position.xy);
+      return vec4<f32>(toSRGB(color), ${material.alphaMode === "BLEND" ? "alpha" : "1.0"});
+      `
+    );
+  }
+
+  // src/shaders/materialShaders.js
+  function materialShaders(material = defaultMaterial, sparkle = false, elevationWGSL2 = "") {
+    const hasBase = Boolean(material.baseTexture);
+    const hasMetal = Boolean(material.metalTexture);
+    const hasEmissive = Boolean(material.emissiveTexture);
+    const hasOcclusion = Boolean(material.occlusionTexture);
+    const hasRoof = Boolean(material.roofTexture || material.wallTexture);
+    validateRoofMaterial(material);
+    const hasTerrain = Boolean(material.terrain);
+    const textured = hasBase || hasMetal || hasEmissive || hasOcclusion || material.nightLight;
+    const vertex = materialVertexShader(material, sparkle, elevationWGSL2, hasTerrain, textured, hasRoof);
     const bindings = (
       /* alloc */
       []
@@ -4154,70 +4438,7 @@
       let sunlight = sunVisibility(input.shadowPosition);
       let worldNormal = normalize(transpose(mat3x3<f32>(frame.viewMatrix[0].xyz, frame.viewMatrix[1].xyz, frame.viewMatrix[2].xyz)) * normalize(input.normal)) * select(-1.0, 1.0, frontFacing);
       let artificial = localLighting(input.worldPosition, worldNormal);
-      ${material.unlit ? (
-        /* wgsl */
-        `
-        let rasterTexel = ${hasBase ? "textureSample(baseTexture, baseTextureSampler, input.uv)" : "vec4<f32>(input.color, 1.0)"};
-        return vec4<f32>(toSRGB(toLinear(rasterTexel.rgb) * (frame.atmosphereTint.rgb * (0.55 + 0.45 * sunlight) + artificial)), ${material.alphaMode === "BLEND" ? "u.material.z * rasterTexel.a" : "1.0"});
-      `
-      ) : (
-        /* wgsl */
-        `
-      var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);
-      let texel = ${hasBase ? "textureSample(baseTexture, baseTextureSampler, input.uv)" : "vec4<f32>(1.0)"};
-      let alpha = u.material.z * texel.a;
-      ${material.alphaMode === "MASK" ? "if (alpha < u.material.w) { discard; }" : ""}
-      ${material.alphaMode === "BLEND" ? "if (alpha < 0.01) { discard; }" : ""}
-      var base = ${material.vertexColors ? "toLinear(min(input.color, vec3<f32>(1.0)))" : "input.color"} *
-        ${material.baseTexture?.srgb ? "texel.rgb" : "toLinear(texel.rgb)"};
-      ${hasRoof ? (
-          /* wgsl */
-          `
-        if (input.roof > 0.0 && all(input.roofUv >= vec2<f32>(0.0)) &&
-          all(input.roofUv <= vec2<f32>(1.0))) {
-          let roof = textureSampleLevel(roofTexture, roofTextureSampler, input.roofUv, 0.0);
-          base = mix(base, toLinear(roof.rgb), roof.a * input.roof);
-        }
-      `
-        ) : ""}
-      let mr = ${hasMetal ? "textureSample(metalTexture, metalTextureSampler, input.uv)" : "vec4<f32>(1.0)"};
-      let metal = clamp(u.material.x * mr.b, 0.0, 1.0);
-      let rough = clamp(u.material.y * mr.g, 0.08, 1.0);
-      let view = normalize(-input.viewPosition);
-      let halfVector = normalize(view + frame.lightDirection.xyz);
-      let nl = max(dot(normal, frame.lightDirection.xyz), 0.0) * frame.lightDirection.w * sunlight;
-      let nv = max(dot(normal, view), 0.001);
-      let nh = max(dot(normal, halfVector), 0.0);
-      let vh = max(dot(view, halfVector), 0.0);
-      let a2 = pow(rough, 4.0);
-      let d = a2 / max(PI * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0), 0.0001);
-      let gv = nl * sqrt(nv * nv * (1.0 - a2) + a2);
-      let gl = nv * sqrt(nl * nl * (1.0 - a2) + a2);
-      let visibility = 0.5 / max(gv + gl, 0.0001);
-      let f0 = mix(vec3<f32>(0.04), base, metal);
-      let fresnel = f0 + (1.0 - f0) * pow(1.0 - vh, 5.0);
-      let specular = d * visibility * fresnel;
-      let diffuse = (1.0 - metal) * base / PI;
-      let sky = dot(normal, frame.skyDirection.xyz) * 0.5 + 0.5;
-      let ambient = mix(toLinear(vec3<f32>(0.455, 0.412, 0.322)), vec3<f32>(1.0), sky) * (2.0 / PI);
-      let ao = ${hasOcclusion ? "mix(1.0, textureSample(occlusionTexture, occlusionTextureSampler, input.uv).r, u.emissive.w)" : "1.0"};
-      ${sparkle ? (
-          /* wgsl */
-          `
-        let lattice = (fract(input.localPosition / 2.5) - 0.5) * 2.5;
-        let pointGlow = (1.0 - smoothstep(0.16, 0.42, length(lattice))) * u.highlight.z;
-      `
-        ) : ""}
-      // Vertex colour components above 1 are self-lit (e.g. vehicle lamps): dim by day, bright at night.
-      let glow = ${sparkle ? "vec3<f32>(3.0, 2.6, 1.8) * pointGlow +" : ""}${material.vertexColors ? " max(input.color - vec3<f32>(1.0), vec3<f32>(0.0)) * (0.3 + 5.0 * frame.skyDirection.w) +" : ""} u.emissive.rgb * ${hasEmissive ? material.emissiveTexture.srgb ? "textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb" : "toLinear(textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb)" : "vec3<f32>(1.0)"};
-      var color = ambient * base * (1.0 - metal) * ao +
-        (diffuse + specular) * nl * toLinear(vec3<f32>(1.0, 0.937, 0.835)) * 3.0 + glow;
-      ${material.vertexColors ? "color = base * (ambient + toLinear(vec3<f32>(1.0, 0.937, 0.835)) * (3.0 / PI) * nl) + glow;" : ""}
-      color = (color - glow) * frame.atmosphereTint.rgb + base * artificial * (1.0 - metal * 0.5) + glow;
-      appearance(input.position.xy);
-      return vec4<f32>(toSRGB(color), ${material.alphaMode === "BLEND" ? "alpha" : "1.0"});
-      `
-      )}
+      ${materialSurfaceShader(material, sparkle, hasBase, hasMetal, hasEmissive, hasOcclusion, hasRoof)}
     }
   `
     );
@@ -4286,76 +4507,11 @@
       ]
     );
     if (material.instanced) vertexBuffers.push(instanceLayout);
-    const bindGroupEntries = programEntries;
-    bindGroupEntries.length = 0;
-    meshLayoutEntry.visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
-    frameLayoutEntry.visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
-    bindGroupEntries.push(meshLayoutEntry, frameLayoutEntry);
-    if (shaders.hasTerrain) {
-      terrainLayoutEntry.visibility = GPUShaderStage.VERTEX;
-      bindGroupEntries.push(terrainLayoutEntry);
-    }
-    let texture, entry, index = 0;
-    for (texture of shaders.bindings) {
-      entry = textureLayoutEntries[index];
-      entry.binding = texture.texture;
-      entry.visibility = GPUShaderStage.FRAGMENT;
-      bindGroupEntries.push(entry);
-      entry = samplerLayoutEntries[index++];
-      entry.binding = texture.sampler;
-      entry.visibility = GPUShaderStage.FRAGMENT;
-      bindGroupEntries.push(entry);
-    }
-    const bindGroupLayout = sceneByLayer.get(backend).renderer.device.createBindGroupLayout((programLayout.entries = bindGroupEntries, programLayout));
-    programLayout.entries = null;
+    const bindGroupLayout = createProgramLayout(sceneByLayer.get(backend).renderer.device, shaders);
     const pipelineLayout2 = sceneByLayer.get(backend).renderer.device.createPipelineLayout((pipelineLayout.bindGroupLayouts[0] = bindGroupLayout, pipelineLayout.bindGroupLayouts[1] = sceneByLayer.get(backend).renderer.sunlight.layout, pipelineLayout));
     pipelineLayout.bindGroupLayouts[0] = null;
     pipelineLayout.bindGroupLayouts[1] = null;
-    const uniforms = (
-      /* alloc */
-      {
-        baseColor: (
-          /* alloc */
-          { value: material.color || /* alloc */
-          [1, 1, 1] }
-        ),
-        metallic: (
-          /* alloc */
-          { value: material.metallic ?? 0 }
-        ),
-        roughness: (
-          /* alloc */
-          { value: material.roughness ?? 0.85 }
-        ),
-        opacity: (
-          /* alloc */
-          { value: material.opacity ?? 1 }
-        ),
-        alphaCutoff: (
-          /* alloc */
-          { value: material.alphaCutoff ?? 0.5 }
-        ),
-        occlusionStrength: (
-          /* alloc */
-          { value: material.occlusionStrength ?? 1 }
-        ),
-        emissive: (
-          /* alloc */
-          { value: material.emissive || /* alloc */
-          [0, 0, 0] }
-        )
-      }
-    );
-    if (material.baseTexture) uniforms.baseTexture = /* alloc */
-    { value: material.baseTexture };
-    if (material.metalTexture) uniforms.metalTexture = /* alloc */
-    { value: material.metalTexture };
-    if (material.emissiveTexture) uniforms.emissiveTexture = /* alloc */
-    { value: material.emissiveTexture };
-    if (material.occlusionTexture) uniforms.occlusionTexture = /* alloc */
-    { value: material.occlusionTexture };
-    if (material.roofTexture || material.wallTexture) uniforms.roofTexture = /* alloc */
-    { value: null };
+    const uniforms = createProgramUniforms(material);
     return (
       /* alloc */
       {
@@ -4601,11 +4757,25 @@
     return target;
   }
 
+  // src/core/markerImageBounds.js
+  function markerImageBounds(state, key, image) {
+    const options = state.source.options.icon.options;
+    const dimensions = options[key === "shadow" ? "shadowSize" : "iconSize"];
+    const bounds = state.markerImageBounds ||= /* alloc */
+    [0, 0, 0, 0];
+    bounds[0] = dimensions ? dimensions.x ?? dimensions[0] : image.naturalWidth;
+    bounds[1] = dimensions ? dimensions.y ?? dimensions[1] : image.naturalHeight;
+    const anchor = key === "shadow" && options.shadowAnchor || options.iconAnchor;
+    bounds[2] = anchor ? anchor.x ?? anchor[0] : Math.floor(bounds[0] / 2);
+    bounds[3] = anchor ? anchor.y ?? anchor[1] : Math.floor(bounds[1] / 2);
+    return bounds;
+  }
+
   // src/core/markerQuadCorners.js
   function markerQuadCorners(state, key, image) {
     const { source, map, backend } = state;
     const position = localPosition(state, source.getLatLng());
-    const options = source.options.icon.options, size = map.getSize();
+    const size = map.getSize();
     const matrices = state.markerMatrices ||= /* alloc */
     {
       root: (
@@ -4634,13 +4804,10 @@
     const clipX = point.x, clipY = point.y, clipZ = point.z, clipW = point.w;
     camera.invertSelf();
     root.invertSelf();
-    const dimensions = options[key === "shadow" ? "shadowSize" : "iconSize"];
-    const width = dimensions ? dimensions.x ?? dimensions[0] : image.naturalWidth;
-    const height = dimensions ? dimensions.y ?? dimensions[1] : image.naturalHeight;
-    const anchor = key === "shadow" && options.shadowAnchor || options.iconAnchor;
+    const [width, height, anchorX, anchorY] = markerImageBounds(state, key, image);
     const centerX = (clipX / clipW + 1) * size.x / 2, centerY = (1 - clipY / clipW) * size.y / 2;
-    const left = centerX - (anchor ? anchor.x ?? anchor[0] : Math.floor(width / 2));
-    const top = centerY - (anchor ? anchor.y ?? anchor[1] : Math.floor(height / 2));
+    const left = centerX - anchorX;
+    const top = centerY - anchorY;
     const corners = (
       /* alloc */
       []
@@ -4680,15 +4847,179 @@
   // src/geometry/nativeGeometry.js
   init_L();
 
-  // src/triangulation/isClockWise.js
-  function isClockWise(points) {
-    let area2 = 0;
-    let i, a, b;
-    for (i = 0; i < points.length; i++) {
-      a = points[i], b = points[(i + 1) % points.length];
-      area2 += a.x * b.y - b.x * a.y;
+  // src/geometry/visit.js
+  init_L();
+
+  // src/geometry/nativeTriangle.js
+  function triangle(point, target, a, b, c) {
+    return target.push(...point(a), ...point(b), ...point(c));
+  }
+
+  // src/geometry/segment.js
+  init_L();
+
+  // src/globals/tau.js
+  var tau = 2 * Math.PI;
+
+  // src/geometry/diskAt.js
+  init_L();
+  function diskAt(center, radius, radiusY, count, index) {
+    return (
+      /* alloc */
+      new L.Point(
+        center.x + radius * Math.cos(index * tau / count),
+        center.y + radiusY * Math.sin(index * tau / count)
+      )
+    );
+  }
+
+  // src/geometry/disk.js
+  function disk(point, center, radius, target, radiusY = radius) {
+    if (!(radius > 0) || !(radiusY > 0)) return;
+    const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(radius))));
+    let i;
+    for (i = 0; i < count; i++) {
+      triangle(point, target, center, diskAt(center, radius, radiusY, count, i), diskAt(center, radius, radiusY, count, i + 1));
     }
-    return area2 < 0;
+  }
+
+  // src/geometry/segment.js
+  function segment(context, a, b, startCap, endCap) {
+    const { options, width, stroke, point } = context;
+    const radius = width / 2;
+    const length = a.distanceTo(b);
+    if (!length) return;
+    const direction = b.subtract(a).divideBy(length);
+    const normal = (
+      /* alloc */
+      new L.Point(-direction.y * radius, direction.x * radius)
+    );
+    if (options.lineCap === "square") {
+      if (startCap) a = a.subtract(direction.multiplyBy(radius));
+      if (endCap) b = b.add(direction.multiplyBy(radius));
+    }
+    triangle(point, stroke, a.add(normal), a.subtract(normal), b.add(normal));
+    triangle(point, stroke, b.add(normal), a.subtract(normal), b.subtract(normal));
+    if (options.lineCap === "round") {
+      if (startCap) disk(point, a, radius, stroke);
+      if (endCap) disk(point, b, radius, stroke);
+    }
+  }
+
+  // src/geometry/lineJoin.js
+  init_L();
+  function lineJoin(context, points, i, b, length) {
+    const { options, width, point, stroke } = context;
+    const a = points[i], radius = width / 2;
+    if (options.lineJoin === "round") {
+      disk(point, a, radius, stroke);
+      return;
+    }
+    const previous = a.subtract(points[(i + points.length - 1) % points.length]);
+    const previousLength = Math.hypot(previous.x, previous.y);
+    if (!previousLength || !length) return;
+    const incoming = previous.divideBy(previousLength), outgoing = b.subtract(a).divideBy(length);
+    const side = incoming.x * outgoing.y - incoming.y * outgoing.x > 0 ? -1 : 1;
+    const n1 = (
+      /* alloc */
+      new L.Point(-incoming.y * side, incoming.x * side)
+    );
+    const n2 = (
+      /* alloc */
+      new L.Point(-outgoing.y * side, outgoing.x * side)
+    );
+    const from = a.add(n1.multiplyBy(radius)), to = a.add(n2.multiplyBy(radius));
+    const denominator = 1 + n1.x * n2.x + n1.y * n2.y;
+    const miter = denominator > 0 ? n1.add(n2).multiplyBy(radius / denominator) : null;
+    triangle(point, stroke, from, a, to);
+    if (options.lineJoin === "miter" && miter && Math.hypot(miter.x, miter.y) <= radius * 4) {
+      triangle(point, stroke, from, a.add(miter), to);
+    }
+  }
+
+  // src/geometry/dashedSegment.js
+  function dashedSegment(context, a, b, length, distance, period) {
+    const dash = context.dash;
+    let offset = 0, phase, index, end, delta;
+    while (offset < length) {
+      phase = ((distance + offset) % period + period) % period, index = 0;
+      while (phase >= dash[index]) phase -= dash[index++];
+      end = Math.min(length, offset + dash[index] - phase);
+      if (index % 2 === 0) {
+        delta = b.subtract(a).divideBy(length);
+        segment(context, a.add(delta.multiplyBy(offset)), a.add(delta.multiplyBy(end)), true, true);
+      }
+      offset = end;
+    }
+  }
+
+  // src/geometry/line.js
+  function line(context, points, closed) {
+    const { options, width, dash } = context;
+    if (!options.stroke || width <= 0 || points.length < 2) return;
+    let distance = Number(options.dashOffset) || 0;
+    let period = 0, value, i, a, b, length;
+    for (value of dash) period += value;
+    for (i = 0; i < points.length - (closed ? 0 : 1); i++) {
+      a = points[i], b = points[(i + 1) % points.length], length = a.distanceTo(b);
+      if (!dash.length) {
+        segment(context, a, b, !closed && i === 0, !closed && i === points.length - 2);
+        if (closed || i > 0) lineJoin(context, points, i, b, length);
+      } else {
+        dashedSegment(context, a, b, length, distance, period);
+      }
+      distance += length;
+    }
+  }
+
+  // src/triangulation/minimumX.js
+  function minimumX(ring3) {
+    let minimum = Infinity;
+    let point;
+    for (point of ring3) minimum = Math.min(minimum, point.x);
+    return minimum;
+  }
+
+  // src/triangulation/mergeHoles.js
+  function mergeHoles(source, target, start2, width) {
+    const middle = Math.min(start2 + width, source.length), end = Math.min(start2 + width * 2, source.length);
+    let left = start2, right = middle, output;
+    for (output = start2; output < end; output++) {
+      if (left < middle && (right >= end || source[left].x <= source[right].x)) {
+        target[output] = source[left++];
+      } else {
+        target[output] = source[right++];
+      }
+    }
+  }
+
+  // src/triangulation/sortHoles.js
+  function sortHoles(holes) {
+    if (holes.length < 2) return holes;
+    const buffer = (
+      /* alloc */
+      new Array(holes.length)
+    );
+    const entries = (
+      /* alloc */
+      []
+    );
+    let ring3, width, start2, previous, i;
+    for (ring3 of holes) entries.push(
+      /* alloc */
+      { ring: ring3, x: minimumX(ring3) }
+    );
+    let source = entries, target = buffer;
+    for (width = 1; width < entries.length; width *= 2) {
+      for (start2 = 0; start2 < entries.length; start2 += width * 2) {
+        mergeHoles(source, target, start2, width);
+      }
+      previous = source;
+      source = target;
+      target = previous;
+    }
+    for (i = 0; i < holes.length; i++) holes[i] = source[i].ring;
+    return holes;
   }
 
   // src/triangulation/cross.js
@@ -4721,6 +5052,33 @@
       new Error("Degenerate polygon ring")
     );
     return ring3;
+  }
+
+  // src/triangulation/isClockWise.js
+  function isClockWise(points) {
+    let area2 = 0;
+    let i, a, b;
+    for (i = 0; i < points.length; i++) {
+      a = points[i], b = points[(i + 1) % points.length];
+      area2 += a.x * b.y - b.x * a.y;
+    }
+    return area2 < 0;
+  }
+
+  // src/triangulation/polygonRings.js
+  function polygonRings(paths, vertices) {
+    const rings = (
+      /* alloc */
+      []
+    );
+    let offset = 0, index, path, ring3;
+    for (index = 0; index < paths.length; index++) {
+      path = paths[index];
+      ring3 = clean(vertices.slice(offset, offset += path.length));
+      if (isClockWise(ring3) !== Boolean(index)) ring3.reverse();
+      rings.push(ring3);
+    }
+    return rings;
   }
 
   // src/triangulation/inside.js
@@ -4770,6 +5128,36 @@
     return false;
   }
 
+  // src/triangulation/connectHole.js
+  function connectHole(polygon2, hole, rings, mid) {
+    let h2 = -1, p2 = -1, distance = Infinity, h, p, a, b, d;
+    for (h = 0; h < hole.length; h++) for (p = 0; p < polygon2.length; p++) {
+      a = hole[h], b = polygon2[p], d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+      if (d >= distance) continue;
+      mid.x = (a.x + b.x) / 2;
+      mid.y = (a.y + b.y) / 2;
+      if (!inside(mid, rings[0]) || insideHole(mid, rings)) continue;
+      if (crossesBoundary(a, b, polygon2, rings)) continue;
+      h2 = h;
+      p2 = p;
+      distance = d;
+    }
+    if (h2 < 0) throw (
+      /* alloc */
+      new Error("Unable to connect polygon hole")
+    );
+    return (
+      /* alloc */
+      [
+        ...polygon2.slice(0, p2 + 1),
+        ...hole.slice(h2),
+        ...hole.slice(0, h2 + 1),
+        polygon2[p2],
+        ...polygon2.slice(p2 + 1)
+      ]
+    );
+  }
+
   // src/triangulation/containsVertex.js
   function containsVertex(polygon2, a, b, c) {
     let p;
@@ -4779,134 +5167,13 @@
     return false;
   }
 
-  // src/triangulation/area.js
-  function area(ring3) {
-    let sum = 0;
-    let i, p, q;
-    for (i = 0; i < ring3.length; i++) {
-      p = ring3[i], q = ring3[(i + 1) % ring3.length];
-      sum += p.x * q.y - q.x * p.y;
-    }
-    return Math.abs(sum) / 2;
-  }
-
-  // src/triangulation/minimumX.js
-  function minimumX(ring3) {
-    let minimum = Infinity;
-    let point;
-    for (point of ring3) minimum = Math.min(minimum, point.x);
-    return minimum;
-  }
-
-  // src/triangulation/sortHoles.js
-  function sortHoles(holes) {
-    if (holes.length < 2) return holes;
-    const buffer = (
-      /* alloc */
-      new Array(holes.length)
-    );
-    const entries = (
-      /* alloc */
-      []
-    );
-    let ring3, width, start2, middle, end, left, right, output, previous, i;
-    for (ring3 of holes) entries.push(
-      /* alloc */
-      { ring: ring3, x: minimumX(ring3) }
-    );
-    let source = entries, target = buffer;
-    for (width = 1; width < entries.length; width *= 2) {
-      for (start2 = 0; start2 < entries.length; start2 += width * 2) {
-        middle = Math.min(start2 + width, entries.length), end = Math.min(start2 + width * 2, entries.length);
-        left = start2, right = middle;
-        for (output = start2; output < end; output++) {
-          if (left < middle && (right >= end || source[left].x <= source[right].x)) {
-            target[output] = source[left++];
-          } else {
-            target[output] = source[right++];
-          }
-        }
-      }
-      previous = source;
-      source = target;
-      target = previous;
-    }
-    for (i = 0; i < holes.length; i++) holes[i] = source[i].ring;
-    return holes;
-  }
-
-  // src/triangulation/triangulate.js
-  function triangulate(contour, holes = geometryEmpty) {
-    const paths = (
-      /* alloc */
-      [contour, ...holes]
-    );
-    const points = paths.flat();
-    let p, index, path, ring3, hole, distance, h, a, b, d, h2, p2, clipped, i, c, triangle22;
-    for (p of points) {
-      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) throw (
-        /* alloc */
-        new Error("Invalid polygon coordinates")
-      );
-    }
-    const vertices = (
-      /* alloc */
-      []
-    );
-    for (index = 0; index < points.length; index++) {
-      p = points[index];
-      vertices.push(
-        /* alloc */
-        { x: p.x - contour[0].x, y: p.y - contour[0].y, index }
-      );
-    }
-    let offset = 0;
-    const rings = (
-      /* alloc */
-      []
-    );
-    for (index = 0; index < paths.length; index++) {
-      path = paths[index];
-      ring3 = clean(vertices.slice(offset, offset += path.length));
-      if (isClockWise(ring3) !== Boolean(index)) ring3.reverse();
-      rings.push(ring3);
-    }
-    let polygon2 = rings[0].slice();
-    const holesToConnect = sortHoles(rings.slice(1));
-    const mid = holesToConnect.length ? (
-      /* alloc */
-      { x: 0, y: 0 }
-    ) : null;
-    for (hole of holesToConnect) {
-      h2 = -1, p2 = -1, distance = Infinity;
-      for (h = 0; h < hole.length; h++) for (p = 0; p < polygon2.length; p++) {
-        a = hole[h], b = polygon2[p], d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
-        if (d >= distance) continue;
-        mid.x = (a.x + b.x) / 2;
-        mid.y = (a.y + b.y) / 2;
-        if (!inside(mid, rings[0]) || insideHole(mid, rings)) continue;
-        if (crossesBoundary(a, b, polygon2, rings)) continue;
-        h2 = h;
-        p2 = p;
-        distance = d;
-      }
-      if (h2 < 0) throw (
-        /* alloc */
-        new Error("Unable to connect polygon hole")
-      );
-      polygon2 = /* alloc */
-      [
-        ...polygon2.slice(0, p2 + 1),
-        ...hole.slice(h2),
-        ...hole.slice(0, h2 + 1),
-        polygon2[p2],
-        ...polygon2.slice(p2 + 1)
-      ];
-    }
+  // src/triangulation/clipEars.js
+  function clipEars(polygon2) {
     const result = (
       /* alloc */
       []
     );
+    let clipped, i, a, b, c, p;
     while (polygon2.length > 3) {
       clipped = false;
       for (i = 0; i < polygon2.length; i++) {
@@ -4934,143 +5201,71 @@
       for (p of polygon2) triangle3.push(p.index);
       result.push(triangle3);
     }
-    let holeArea = 0, actual = 0;
+    return result;
+  }
+
+  // src/triangulation/area.js
+  function area(ring3) {
+    let sum = 0;
+    let i, p, q;
+    for (i = 0; i < ring3.length; i++) {
+      p = ring3[i], q = ring3[(i + 1) % ring3.length];
+      sum += p.x * q.y - q.x * p.y;
+    }
+    return Math.abs(sum) / 2;
+  }
+
+  // src/triangulation/validateArea.js
+  function validateArea(rings, vertices, result) {
+    let holeArea = 0, actual = 0, i, triangle3;
     for (i = 1; i < rings.length; i++) holeArea += area(rings[i]);
     const expected = area(rings[0]) - holeArea;
-    for (triangle22 of result) actual += cross(vertices[triangle22[0]], vertices[triangle22[1]], vertices[triangle22[2]]) / 2;
+    for (triangle3 of result) actual += cross(vertices[triangle3[0]], vertices[triangle3[1]], vertices[triangle3[2]]) / 2;
     if (expected <= 0 || Math.abs(actual - expected) > Math.max(1e-7, expected * 1e-8)) throw (
       /* alloc */
       new Error("Polygon triangulation area mismatch")
     );
+  }
+
+  // src/triangulation/triangulate.js
+  function triangulate(contour, holes = geometryEmpty) {
+    const paths = (
+      /* alloc */
+      [contour, ...holes]
+    );
+    const points = paths.flat();
+    let p, index, hole;
+    for (p of points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) throw (
+        /* alloc */
+        new Error("Invalid polygon coordinates")
+      );
+    }
+    const vertices = (
+      /* alloc */
+      []
+    );
+    for (index = 0; index < points.length; index++) {
+      p = points[index];
+      vertices.push(
+        /* alloc */
+        { x: p.x - contour[0].x, y: p.y - contour[0].y, index }
+      );
+    }
+    const rings = polygonRings(paths, vertices);
+    let polygon2 = rings[0].slice();
+    const holesToConnect = sortHoles(rings.slice(1));
+    const mid = holesToConnect.length ? (
+      /* alloc */
+      { x: 0, y: 0 }
+    ) : null;
+    for (hole of holesToConnect) {
+      polygon2 = connectHole(polygon2, hole, rings, mid);
+    }
+    const result = clipEars(polygon2);
+    validateArea(rings, vertices, result);
     return result;
   }
-
-  // src/geometry/nativeTriangle.js
-  function triangle(point, target, a, b, c) {
-    return target.push(...point(a), ...point(b), ...point(c));
-  }
-
-  // src/globals/tau.js
-  var tau = 2 * Math.PI;
-
-  // src/geometry/diskAt.js
-  init_L();
-  function diskAt(center, radius, radiusY, count, index) {
-    return (
-      /* alloc */
-      new L.Point(
-        center.x + radius * Math.cos(index * tau / count),
-        center.y + radiusY * Math.sin(index * tau / count)
-      )
-    );
-  }
-
-  // src/geometry/disk.js
-  function disk(point, center, radius, target, radiusY = radius) {
-    if (!(radius > 0) || !(radiusY > 0)) return;
-    const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(radius))));
-    let i;
-    for (i = 0; i < count; i++) {
-      triangle(point, target, center, diskAt(center, radius, radiusY, count, i), diskAt(center, radius, radiusY, count, i + 1));
-    }
-  }
-
-  // src/geometry/circleAt.js
-  init_L();
-  function circleAt(center, radius, radiusY, count, index, offset = 0) {
-    const angle = index * tau / count;
-    return (
-      /* alloc */
-      new L.Point(
-        center.x + Math.max(0, radius + offset) * Math.cos(angle),
-        center.y + Math.max(0, radiusY + offset) * Math.sin(angle)
-      )
-    );
-  }
-
-  // src/geometry/line.js
-  init_L();
-
-  // src/geometry/segment.js
-  init_L();
-  function segment(context, a, b, startCap, endCap) {
-    const { options, width, stroke, point } = context;
-    const radius = width / 2;
-    const length = a.distanceTo(b);
-    if (!length) return;
-    const direction = b.subtract(a).divideBy(length);
-    const normal = (
-      /* alloc */
-      new L.Point(-direction.y * radius, direction.x * radius)
-    );
-    if (options.lineCap === "square") {
-      if (startCap) a = a.subtract(direction.multiplyBy(radius));
-      if (endCap) b = b.add(direction.multiplyBy(radius));
-    }
-    triangle(point, stroke, a.add(normal), a.subtract(normal), b.add(normal));
-    triangle(point, stroke, b.add(normal), a.subtract(normal), b.subtract(normal));
-    if (options.lineCap === "round") {
-      if (startCap) disk(point, a, radius, stroke);
-      if (endCap) disk(point, b, radius, stroke);
-    }
-  }
-
-  // src/geometry/line.js
-  function line(context, points, closed) {
-    const { options, width, dash, stroke, point } = context;
-    if (!options.stroke || width <= 0 || points.length < 2) return;
-    const radius = width / 2;
-    let distance = Number(options.dashOffset) || 0;
-    let period = 0;
-    let value, i, a, b, length, previous, previousLength, incoming, outgoing, side, n1, n2, from, to;
-    let denominator, miter, offset, phase, index, end, delta;
-    for (value of dash) period += value;
-    for (i = 0; i < points.length - (closed ? 0 : 1); i++) {
-      a = points[i], b = points[(i + 1) % points.length], length = a.distanceTo(b);
-      if (!dash.length) {
-        segment(context, a, b, !closed && i === 0, !closed && i === points.length - 2);
-        if (closed || i > 0) {
-          if (options.lineJoin === "round") disk(point, a, radius, stroke);
-          else {
-            previous = a.subtract(points[(i + points.length - 1) % points.length]);
-            previousLength = Math.hypot(previous.x, previous.y);
-            if (previousLength && length) {
-              incoming = previous.divideBy(previousLength);
-              outgoing = b.subtract(a).divideBy(length);
-              side = incoming.x * outgoing.y - incoming.y * outgoing.x > 0 ? -1 : 1;
-              n1 = /* alloc */
-              new L.Point(-incoming.y * side, incoming.x * side);
-              n2 = /* alloc */
-              new L.Point(-outgoing.y * side, outgoing.x * side);
-              from = a.add(n1.multiplyBy(radius)), to = a.add(n2.multiplyBy(radius));
-              denominator = 1 + n1.x * n2.x + n1.y * n2.y;
-              miter = denominator > 0 ? n1.add(n2).multiplyBy(radius / denominator) : null;
-              triangle(point, stroke, from, a, to);
-              if (options.lineJoin === "miter" && miter && Math.hypot(miter.x, miter.y) <= radius * 4) {
-                triangle(point, stroke, from, a.add(miter), to);
-              }
-            }
-          }
-        }
-      } else {
-        offset = 0;
-        while (offset < length) {
-          phase = ((distance + offset) % period + period) % period, index = 0;
-          while (phase >= dash[index]) phase -= dash[index++];
-          end = Math.min(length, offset + dash[index] - phase);
-          if (index % 2 === 0) {
-            delta = b.subtract(a).divideBy(length);
-            segment(context, a.add(delta.multiplyBy(offset)), a.add(delta.multiplyBy(end)), true, true);
-          }
-          offset = end;
-        }
-      }
-      distance += length;
-    }
-  }
-
-  // src/geometry/visit.js
-  init_L();
 
   // src/geometry/polygon.js
   function polygon(context, rings, closed) {
@@ -5114,6 +5309,85 @@
     else for (child of coordinates) visit(context, child, closed);
   }
 
+  // src/geometry/dashValues.js
+  function dashValues(options) {
+    const values = Array.isArray(options.dashArray) ? options.dashArray : String(options.dashArray || "").trim().split(/[ ,]+/);
+    const dash = (
+      /* alloc */
+      []
+    );
+    let value, allZero = true;
+    for (value of values) dash.push(Number(value));
+    for (value of dash) {
+      if (!Number.isFinite(value) || value < 0) throw (
+        /* alloc */
+        new Error("Invalid Leaflet dashArray")
+      );
+      if (value !== 0) allZero = false;
+    }
+    if (allZero) dash.length = 0;
+    if (dash.length % 2) dash.push(...dash);
+    return dash;
+  }
+
+  // src/geometry/circleGeometry.js
+  init_L();
+
+  // src/geometry/circleAt.js
+  init_L();
+  function circleAt(center, radius, radiusY, count, index, offset = 0) {
+    const angle = index * tau / count;
+    return (
+      /* alloc */
+      new L.Point(
+        center.x + Math.max(0, radius + offset) * Math.cos(angle),
+        center.y + Math.max(0, radiusY + offset) * Math.sin(angle)
+      )
+    );
+  }
+
+  // src/geometry/circleGeometry.js
+  function circleGeometry(source, context) {
+    const { map, point, fill, stroke, options, dash, width } = context;
+    const center = map.project(source.getLatLng());
+    let radius = source.getRadius(), radiusY = radius, index, i;
+    if (source instanceof L.Circle) {
+      source._project();
+      const projected = source._point.add(map.getPixelOrigin());
+      center.x = projected.x;
+      center.y = projected.y;
+      radius = source._radius;
+      radiusY = source._radiusY || radius;
+    }
+    if (options.fill) disk(point, center, radius, fill, radiusY);
+    const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(Math.max(radius, radiusY)))));
+    if (dash.length) {
+      const points = (
+        /* alloc */
+        []
+      );
+      for (index = 0; index < count; index++) points.push(circleAt(center, radius, radiusY, count, index));
+      line(context, points, true);
+    } else if (options.stroke && width > 0) {
+      for (i = 0; i < count; i++) {
+        triangle(
+          point,
+          stroke,
+          circleAt(center, radius, radiusY, count, i, width / 2),
+          circleAt(center, radius, radiusY, count, i, -width / 2),
+          circleAt(center, radius, radiusY, count, i + 1, width / 2)
+        );
+        triangle(
+          point,
+          stroke,
+          circleAt(center, radius, radiusY, count, i + 1, width / 2),
+          circleAt(center, radius, radiusY, count, i, -width / 2),
+          circleAt(center, radius, radiusY, count, i + 1, -width / 2)
+        );
+      }
+    }
+  }
+
   // src/geometry/nativeGeometry.js
   function nativeGeometry(source, map, point) {
     const fill = (
@@ -5126,65 +5400,13 @@
     );
     const options = source.options;
     const width = Number(options.weight) || 0;
-    const values = Array.isArray(options.dashArray) ? options.dashArray : String(options.dashArray || "").trim().split(/[ ,]+/);
-    const dash = (
-      /* alloc */
-      []
-    );
-    let value, index, i;
-    for (value of values) dash.push(Number(value));
-    let allZero = true;
-    for (value of dash) {
-      if (!Number.isFinite(value) || value < 0) throw (
-        /* alloc */
-        new Error("Invalid Leaflet dashArray")
-      );
-      if (value !== 0) allZero = false;
-    }
-    if (allZero) dash.length = 0;
-    if (dash.length % 2) dash.push(...dash);
+    const dash = dashValues(options);
     const context = (
       /* alloc */
       { fill, stroke, options, width, dash, point, map }
     );
     if (source instanceof L.CircleMarker) {
-      const center = map.project(source.getLatLng());
-      let radius = source.getRadius(), radiusY = radius;
-      if (source instanceof L.Circle) {
-        source._project();
-        const projected = source._point.add(map.getPixelOrigin());
-        center.x = projected.x;
-        center.y = projected.y;
-        radius = source._radius;
-        radiusY = source._radiusY || radius;
-      }
-      if (options.fill) disk(point, center, radius, fill, radiusY);
-      const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(Math.max(radius, radiusY)))));
-      if (dash.length) {
-        const points = (
-          /* alloc */
-          []
-        );
-        for (index = 0; index < count; index++) points.push(circleAt(center, radius, radiusY, count, index));
-        line(context, points, true);
-      } else if (options.stroke && width > 0) {
-        for (i = 0; i < count; i++) {
-          triangle(
-            point,
-            stroke,
-            circleAt(center, radius, radiusY, count, i, width / 2),
-            circleAt(center, radius, radiusY, count, i, -width / 2),
-            circleAt(center, radius, radiusY, count, i + 1, width / 2)
-          );
-          triangle(
-            point,
-            stroke,
-            circleAt(center, radius, radiusY, count, i + 1, width / 2),
-            circleAt(center, radius, radiusY, count, i, -width / 2),
-            circleAt(center, radius, radiusY, count, i + 1, -width / 2)
-          );
-        }
-      }
+      circleGeometry(source, context);
     } else {
       const closed = source instanceof L.Polygon;
       visit(context, source.getLatLngs(), closed);
@@ -5292,6 +5514,25 @@
     }
   }
 
+  // src/core/pruneNativeResources.js
+  function pruneNativeResources(state) {
+    const { meshes, textures, backend } = state;
+    let mesh, texture, key;
+    for ([key, mesh] of meshes) {
+      if (mesh._nativeUsed) continue;
+      disposeMesh(backend, mesh);
+      meshes.delete(key);
+      texture = textures.get(key);
+      if (texture) destroyTexture(backend, texture.texture);
+      textures.delete(key);
+    }
+    for ([key, texture] of textures) {
+      if (texture.used) continue;
+      destroyTexture(backend, texture.texture);
+      textures.delete(key);
+    }
+  }
+
   // src/core/synchronizeNativeLayer.js
   function synchronizeNativeLayer(state) {
     const { source, meshes, textures } = state;
@@ -5299,26 +5540,14 @@
     if (!state.dirty && (!state.marker || !state.viewDirty)) return;
     state.dirty = false;
     state.viewDirty = false;
-    let mesh, texture, key;
+    let mesh, texture;
     for (mesh of meshes.values()) mesh._nativeUsed = false;
     for (texture of textures.values()) texture.used = false;
     if (source instanceof L.GridLayer) syncGridLayer(state);
     else if (source instanceof L.ImageOverlay) syncImageOverlay(state);
     else if (state.marker) syncMarker(state);
     else syncVectorLayer(state);
-    for ([key, mesh] of meshes) {
-      if (mesh._nativeUsed) continue;
-      disposeMesh(state.backend, mesh);
-      meshes.delete(key);
-      texture = textures.get(key);
-      if (texture) destroyTexture(state.backend, texture.texture);
-      textures.delete(key);
-    }
-    for ([key, texture] of textures) {
-      if (texture.used) continue;
-      destroyTexture(state.backend, texture.texture);
-      textures.delete(key);
-    }
+    pruneNativeResources(state);
   }
 
   // src/core/beforeNativeRender.js
@@ -5591,6 +5820,19 @@
   // src/globals/trafficByLayer.js
   var trafficByLayer = /* @__PURE__ */ new WeakMap();
 
+  // src/collision/mergeHits.js
+  function mergeHits(source, target, start2, width) {
+    const middle = Math.min(start2 + width, source.length), end = Math.min(start2 + width * 2, source.length);
+    let left = start2, right = middle, output;
+    for (output = start2; output < end; output++) {
+      if (left < middle && (right >= end || !(source[right].distance < source[left].distance))) {
+        target[output] = source[left++];
+      } else {
+        target[output] = source[right++];
+      }
+    }
+  }
+
   // src/collision/sortHits.js
   function sortHits(hits) {
     if (hits.length < 2) return hits;
@@ -5599,18 +5841,10 @@
       new Array(hits.length)
     );
     let source = hits, target = buffer;
-    let width, start2, middle, end, left, right, output, previous, i;
+    let width, start2, previous, i;
     for (width = 1; width < hits.length; width *= 2) {
       for (start2 = 0; start2 < hits.length; start2 += width * 2) {
-        middle = Math.min(start2 + width, hits.length), end = Math.min(start2 + width * 2, hits.length);
-        left = start2, right = middle;
-        for (output = start2; output < end; output++) {
-          if (left < middle && (right >= end || !(source[right].distance < source[left].distance))) {
-            target[output] = source[left++];
-          } else {
-            target[output] = source[right++];
-          }
-        }
+        mergeHits(source, target, start2, width);
       }
       previous = source;
       source = target;
@@ -5620,12 +5854,150 @@
     return hits;
   }
 
+  // src/collision/localRay.js
+  function localRay(ray, mesh, origin, direction) {
+    const inverse = (
+      /* alloc */
+      new DOMMatrix(mesh.worldMatrix).invertSelf()
+    );
+    const inverseValues = inverse.toFloat64Array();
+    let value, x, y, z, w;
+    for (value of inverseValues) {
+      if (!Number.isFinite(value)) throw (
+        /* alloc */
+        new Error("Singular 3D transform")
+      );
+    }
+    x = ray.origin[0], y = ray.origin[1], z = ray.origin[2];
+    w = inverseValues[3] * x + inverseValues[7] * y + inverseValues[11] * z + inverseValues[15];
+    origin[0] = (inverseValues[0] * x + inverseValues[4] * y + inverseValues[8] * z + inverseValues[12]) / w;
+    origin[1] = (inverseValues[1] * x + inverseValues[5] * y + inverseValues[9] * z + inverseValues[13]) / w;
+    origin[2] = (inverseValues[2] * x + inverseValues[6] * y + inverseValues[10] * z + inverseValues[14]) / w;
+    x = ray.direction[0], y = ray.direction[1], z = ray.direction[2];
+    direction[0] = inverseValues[0] * x + inverseValues[4] * y + inverseValues[8] * z;
+    direction[1] = inverseValues[1] * x + inverseValues[5] * y + inverseValues[9] * z;
+    direction[2] = inverseValues[2] * x + inverseValues[6] * y + inverseValues[10] * z;
+    const directionLength = Math.hypot(...direction) || 1;
+    direction[0] /= directionLength;
+    direction[1] /= directionLength;
+    direction[2] /= directionLength;
+  }
+
+  // src/collision/rayBounds.js
+  function rayBounds(mesh, origin, direction) {
+    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
+    let near = 0, far = Infinity, i, a, b;
+    for (i = 0; i < 3; i++) {
+      if (Math.abs(direction[i]) < 1e-12) {
+        if (origin[i] < mesh.geometry.bounds.min[i] || origin[i] > mesh.geometry.bounds.max[i]) {
+          far = -Infinity;
+          break;
+        }
+      } else {
+        a = (mesh.geometry.bounds.min[i] - origin[i]) / direction[i], b = (mesh.geometry.bounds.max[i] - origin[i]) / direction[i];
+        near = Math.max(near, Math.min(a, b));
+        far = Math.min(far, Math.max(a, b));
+      }
+    }
+    return !(far < near);
+  }
+
+  // src/collision/readTriangle.js
+  function readTriangle(mesh, i, a, b, c) {
+    const { position, index, instanceOffset } = mesh.geometry.attributes;
+    const vertices = index?.count || position.count;
+    const vertex = instanceOffset ? i % vertices : i;
+    const offset = instanceOffset ? Math.floor(i / vertices) * instanceOffset.size : 0;
+    const x = instanceOffset?.data[offset] ?? 0;
+    const y = instanceOffset?.data[offset + 1] ?? 0;
+    const z = instanceOffset?.data[offset + 2] ?? 0;
+    const ai = (index ? index.data[vertex] : vertex) * position.size;
+    const bi = (index ? index.data[vertex + 1] : vertex + 1) * position.size;
+    const ci = (index ? index.data[vertex + 2] : vertex + 2) * position.size;
+    a[0] = position.data[ai];
+    a[1] = position.data[ai + 1];
+    a[2] = position.data[ai + 2];
+    b[0] = position.data[bi];
+    b[1] = position.data[bi + 1];
+    b[2] = position.data[bi + 2];
+    c[0] = position.data[ci];
+    c[1] = position.data[ci + 1];
+    c[2] = position.data[ci + 2];
+    if (instanceOffset) {
+      a[0] = Math.fround(a[0] + x);
+      a[1] = Math.fround(a[1] + y);
+      a[2] = Math.fround(a[2] + z);
+      b[0] = Math.fround(b[0] + x);
+      b[1] = Math.fround(b[1] + y);
+      b[2] = Math.fround(b[2] + z);
+      c[0] = Math.fround(c[0] + x);
+      c[1] = Math.fround(c[1] + y);
+      c[2] = Math.fround(c[2] + z);
+    }
+  }
+
+  // src/collision/hiddenLightHit.js
+  function hiddenLightHit(mesh, i, u, v, night) {
+    if (!mesh.program.nightLight) return false;
+    const { index, uv: { data: uv } } = mesh.geometry.attributes;
+    const idA = index ? index.data[i] : i, idB = index ? index.data[i + 1] : i + 1, idC = index ? index.data[i + 2] : i + 2;
+    const x = uv[idA * 2] * (1 - u - v) + uv[idB * 2] * u + uv[idC * 2] * v;
+    const y = uv[idA * 2 + 1] * (1 - u - v) + uv[idB * 2 + 1] * u + uv[idC * 2 + 1] * v;
+    return x <= 2 && (!night || x * x + y * y > 0.9);
+  }
+
+  // src/collision/triangleDistance.js
+  function triangleDistance(mesh, i, a, b, c, origin, direction, night) {
+    const ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2];
+    const fx = c[0] - a[0], fy = c[1] - a[1], fz = c[2] - a[2];
+    const px = direction[1] * fz - direction[2] * fy;
+    const py = direction[2] * fx - direction[0] * fz;
+    const pz = direction[0] * fy - direction[1] * fx;
+    const det = ex * px + ey * py + ez * pz;
+    if (mesh.program.cullMode === "none" || mesh.program.cullFace === null ? Math.abs(det) < 1e-9 : det < 1e-9) return Infinity;
+    const tx = origin[0] - a[0], ty = origin[1] - a[1], tz = origin[2] - a[2];
+    const u = (tx * px + ty * py + tz * pz) / det;
+    if (u < 0 || u > 1) return Infinity;
+    const qx = ty * ez - tz * ey, qy = tz * ex - tx * ez, qz = tx * ey - ty * ex;
+    const v = (direction[0] * qx + direction[1] * qy + direction[2] * qz) / det;
+    if (v < 0 || u + v > 1) return Infinity;
+    if (hiddenLightHit(mesh, i, u, v, night)) return Infinity;
+    return (fx * qx + fy * qy + fz * qz) / det;
+  }
+
+  // src/collision/worldHit.js
+  function worldHit(ray, mesh, origin, direction, closest, faceIndex) {
+    const x = direction[0] * closest + origin[0];
+    const y = direction[1] * closest + origin[1];
+    const z = direction[2] * closest + origin[2];
+    const matrix = mesh.worldMatrix;
+    const w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+    const worldPoint = (
+      /* alloc */
+      [
+        (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) / w,
+        (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w,
+        (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) / w
+      ]
+    );
+    return (
+      /* alloc */
+      {
+        faceIndex,
+        object: mesh,
+        point: worldPoint,
+        distance: Math.hypot(worldPoint[0] - ray.origin[0], worldPoint[1] - ray.origin[1], worldPoint[2] - ray.origin[2])
+      }
+    );
+  }
+
   // src/collision/intersectMeshes.js
   function intersectMeshes(ray, meshes, night = 0) {
     const hits = (
       /* alloc */
       []
-    ), a = (
+    );
+    const a = (
       /* alloc */
       [0, 0, 0]
     ), b = (
@@ -5642,152 +6014,23 @@
       /* alloc */
       [0, 0, 0]
     );
-    let mesh, inverse, inverseValues, value, matrix, w;
-    let directionLength, near, far, i, a2, b2, position, index, instanceOffset, vertices, closest;
-    let faceIndex, vertex, offset, x, y, z, ai, bi, ci, ex, ey, ez, fx, fy, fz, px, py, pz, det;
-    let tx, ty, tz, u, qx, qy, qz, v, uv, idA, idB, idC, x2, y2;
-    let distance, worldPoint;
+    let mesh, position, index, instanceOffset, vertices, closest, faceIndex, i, distance;
     for (mesh of meshes) {
-      inverse = /* alloc */
-      new DOMMatrix(mesh.worldMatrix).invertSelf();
-      inverseValues = inverse.toFloat64Array();
-      for (value of inverseValues) {
-        if (!Number.isFinite(value)) throw (
-          /* alloc */
-          new Error("Singular 3D transform")
-        );
-      }
-      x = ray.origin[0], y = ray.origin[1], z = ray.origin[2];
-      w = inverseValues[3] * x + inverseValues[7] * y + inverseValues[11] * z + inverseValues[15];
-      origin[0] = (inverseValues[0] * x + inverseValues[4] * y + inverseValues[8] * z + inverseValues[12]) / w;
-      origin[1] = (inverseValues[1] * x + inverseValues[5] * y + inverseValues[9] * z + inverseValues[13]) / w;
-      origin[2] = (inverseValues[2] * x + inverseValues[6] * y + inverseValues[10] * z + inverseValues[14]) / w;
-      x = ray.direction[0], y = ray.direction[1], z = ray.direction[2];
-      direction[0] = inverseValues[0] * x + inverseValues[4] * y + inverseValues[8] * z;
-      direction[1] = inverseValues[1] * x + inverseValues[5] * y + inverseValues[9] * z;
-      direction[2] = inverseValues[2] * x + inverseValues[6] * y + inverseValues[10] * z;
-      directionLength = Math.hypot(...direction) || 1;
-      direction[0] /= directionLength;
-      direction[1] /= directionLength;
-      direction[2] /= directionLength;
-      if (!mesh.geometry.bounds) {
-        computeBounds(mesh.geometry);
-      }
-      near = 0, far = Infinity;
-      for (i = 0; i < 3; i++) {
-        if (Math.abs(direction[i]) < 1e-12) {
-          if (origin[i] < mesh.geometry.bounds.min[i] || origin[i] > mesh.geometry.bounds.max[i]) {
-            far = -Infinity;
-            break;
-          }
-        } else {
-          a2 = (mesh.geometry.bounds.min[i] - origin[i]) / direction[i], b2 = (mesh.geometry.bounds.max[i] - origin[i]) / direction[i];
-          near = Math.max(near, Math.min(a2, b2));
-          far = Math.min(far, Math.max(a2, b2));
-        }
-      }
-      if (far < near) {
-        continue;
-      }
+      localRay(ray, mesh, origin, direction);
+      if (!rayBounds(mesh, origin, direction)) continue;
       ({ position, index, instanceOffset } = mesh.geometry.attributes);
       vertices = index?.count || position.count;
       closest = Infinity, faceIndex = void 0;
       for (i = 0; i < vertices * (instanceOffset?.count ?? 1); i += 3) {
-        vertex = instanceOffset ? i % vertices : i;
-        offset = instanceOffset ? Math.floor(i / vertices) * instanceOffset.size : 0;
-        x = instanceOffset?.data[offset] ?? 0;
-        y = instanceOffset?.data[offset + 1] ?? 0;
-        z = instanceOffset?.data[offset + 2] ?? 0;
-        ai = (index ? index.data[vertex] : vertex) * position.size;
-        bi = (index ? index.data[vertex + 1] : vertex + 1) * position.size;
-        ci = (index ? index.data[vertex + 2] : vertex + 2) * position.size;
-        a[0] = position.data[ai];
-        a[1] = position.data[ai + 1];
-        a[2] = position.data[ai + 2];
-        b[0] = position.data[bi];
-        b[1] = position.data[bi + 1];
-        b[2] = position.data[bi + 2];
-        c[0] = position.data[ci];
-        c[1] = position.data[ci + 1];
-        c[2] = position.data[ci + 2];
-        if (instanceOffset) {
-          a[0] = Math.fround(a[0] + x);
-          a[1] = Math.fround(a[1] + y);
-          a[2] = Math.fround(a[2] + z);
-          b[0] = Math.fround(b[0] + x);
-          b[1] = Math.fround(b[1] + y);
-          b[2] = Math.fround(b[2] + z);
-          c[0] = Math.fround(c[0] + x);
-          c[1] = Math.fround(c[1] + y);
-          c[2] = Math.fround(c[2] + z);
-        }
-        ex = b[0] - a[0];
-        ey = b[1] - a[1];
-        ez = b[2] - a[2];
-        fx = c[0] - a[0];
-        fy = c[1] - a[1];
-        fz = c[2] - a[2];
-        px = direction[1] * fz - direction[2] * fy;
-        py = direction[2] * fx - direction[0] * fz;
-        pz = direction[0] * fy - direction[1] * fx;
-        det = ex * px + ey * py + ez * pz;
-        if (mesh.program.cullMode === "none" || mesh.program.cullFace === null ? Math.abs(det) < 1e-9 : det < 1e-9) {
-          continue;
-        }
-        tx = origin[0] - a[0];
-        ty = origin[1] - a[1];
-        tz = origin[2] - a[2];
-        u = (tx * px + ty * py + tz * pz) / det;
-        if (u < 0 || u > 1) {
-          continue;
-        }
-        qx = ty * ez - tz * ey;
-        qy = tz * ex - tx * ez;
-        qz = tx * ey - ty * ex;
-        v = (direction[0] * qx + direction[1] * qy + direction[2] * qz) / det;
-        if (v < 0 || u + v > 1) {
-          continue;
-        }
-        if (mesh.program.nightLight) {
-          uv = mesh.geometry.attributes.uv.data;
-          idA = index ? index.data[i] : i;
-          idB = index ? index.data[i + 1] : i + 1;
-          idC = index ? index.data[i + 2] : i + 2;
-          x2 = uv[idA * 2] * (1 - u - v) + uv[idB * 2] * u + uv[idC * 2] * v;
-          y2 = uv[idA * 2 + 1] * (1 - u - v) + uv[idB * 2 + 1] * u + uv[idC * 2 + 1] * v;
-          if (x2 <= 2 && (!night || x2 * x2 + y2 * y2 > 0.9)) continue;
-        }
-        distance = (fx * qx + fy * qy + fz * qz) / det;
+        readTriangle(mesh, i, a, b, c);
+        distance = triangleDistance(mesh, i, a, b, c, origin, direction, night);
         if (distance > 0 && distance < closest) {
           closest = distance;
           faceIndex = i / 3;
         }
       }
       if (faceIndex === void 0) continue;
-      x = direction[0] * closest + origin[0];
-      y = direction[1] * closest + origin[1];
-      z = direction[2] * closest + origin[2];
-      matrix = mesh.worldMatrix;
-      w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
-      worldPoint = /* alloc */
-      [
-        (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) / w,
-        (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w,
-        (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) / w
-      ];
-      hits.push(
-        /* alloc */
-        {
-          faceIndex,
-          object: mesh,
-          point: worldPoint,
-          distance: Math.hypot(
-            worldPoint[0] - ray.origin[0],
-            worldPoint[1] - ray.origin[1],
-            worldPoint[2] - ray.origin[2]
-          )
-        }
-      );
+      hits.push(worldHit(ray, mesh, origin, direction, closest, faceIndex));
     }
     return sortHits(hits);
   }
@@ -5800,7 +6043,7 @@
   }
 
   // src/picking/collectVisibleMesh.js
-  function collectVisibleMesh(mesh, meshes) {
+  function collectVisibleMesh2(mesh, meshes) {
     if (!mesh.visible) return true;
     if (mesh.geometry && mesh._appearance !== 0) meshes.push(mesh);
   }
@@ -5858,6 +6101,19 @@
     }
   }
 
+  // src/picking/validateCameraInverse.js
+  function validateCameraInverse(matrix) {
+    let column, row;
+    for (column = 1; column <= 4; column++) {
+      for (row = 1; row <= 4; row++) {
+        if (!Number.isFinite(matrix[`m${column}${row}`])) throw (
+          /* alloc */
+          new Error("Singular 3D transform")
+        );
+      }
+    }
+  }
+
   // src/picking/raycast.js
   function raycast(backend, event, objects = sceneByLayer.get(backend).root.children, recursive = true) {
     if (!sceneByLayer.get(backend).renderer) {
@@ -5885,12 +6141,7 @@
     const endZ = inverseCamera.m13 * x + inverseCamera.m23 * y + inverseCamera.m43;
     const endW = inverseCamera.m14 * x + inverseCamera.m24 * y + inverseCamera.m44;
     let object;
-    if (!Number.isFinite(inverseCamera.m11) || !Number.isFinite(inverseCamera.m12) || !Number.isFinite(inverseCamera.m13) || !Number.isFinite(inverseCamera.m14) || !Number.isFinite(inverseCamera.m21) || !Number.isFinite(inverseCamera.m22) || !Number.isFinite(inverseCamera.m23) || !Number.isFinite(inverseCamera.m24) || !Number.isFinite(inverseCamera.m31) || !Number.isFinite(inverseCamera.m32) || !Number.isFinite(inverseCamera.m33) || !Number.isFinite(inverseCamera.m34) || !Number.isFinite(inverseCamera.m41) || !Number.isFinite(inverseCamera.m42) || !Number.isFinite(inverseCamera.m43) || !Number.isFinite(inverseCamera.m44)) {
-      throw (
-        /* alloc */
-        new Error("Singular 3D transform")
-      );
-    }
+    validateCameraInverse(inverseCamera);
     sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
     sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];
     sceneByLayer.get(backend).raycaster.origin[2] = sceneByLayer.get(backend).camera.position[2];
@@ -5905,7 +6156,7 @@
     const meshes = sceneByLayer.get(backend).raycaster.meshes;
     meshes.length = 0;
     for (object of objects) {
-      if (recursive) traverse(object, collectVisibleMesh, meshes);
+      if (recursive) traverse(object, collectVisibleMesh2, meshes);
       else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
     }
     return intersectMeshes(sceneByLayer.get(backend).raycaster, meshes, sceneByLayer.get(backend).renderer.uniformData?.[55]);
@@ -5918,9 +6169,6 @@
     if (descriptor) Object.defineProperty(map, "_fireDOMEvent", descriptor);
     else delete map._fireDOMEvent;
   }
-
-  // src/core/handleNativeMapEvent.js
-  init_L();
 
   // src/globals/renderers.js
   var renderers = /* @__PURE__ */ new WeakMap();
@@ -5943,9 +6191,61 @@
     "pointerout"
   ]);
 
+  // src/core/nativeEventSource.js
+  init_L();
+
   // src/core/compareNativeHits.js
   function compareNativeHits(a, b) {
     return b.object.renderOrder - a.object.renderOrder || a.distance - b.distance;
+  }
+
+  // src/core/nativeEventSource.js
+  function nativeEventSource(context, event, type) {
+    const hits = (
+      /* alloc */
+      []
+    );
+    let candidate, source, backend;
+    if (type !== context.out) {
+      for (candidate of context.states) {
+        ({ source, backend } = candidate);
+        if (source instanceof L.Marker || source.options.interactive === false || !(source instanceof L.Path) && !source.options.interactive) continue;
+        hits.push(...raycast(backend, event, candidate.meshes.values(), false));
+      }
+    }
+    hits.sort(compareNativeHits);
+    return hits[0]?.object._nativeSource || null;
+  }
+
+  // src/core/updateNativeHover.js
+  function updateNativeHover(map, context, event, source) {
+    if (context.hovered === source) return;
+    if (context.hovered) context.fireDOMEvent.call(
+      map,
+      event,
+      context.out,
+      /* alloc */
+      [context.hovered]
+    );
+    context.hovered = source;
+    if (source) context.fireDOMEvent.call(
+      map,
+      event,
+      context.over,
+      /* alloc */
+      [source]
+    );
+    map.getContainer().style.cursor = source ? "pointer" : "";
+  }
+
+  // src/core/bypassNativeEvent.js
+  function bypassNativeEvent(map, context, event, type) {
+    const target = event.target;
+    const dom = target instanceof Element && target.closest(".leaflet-marker-icon,.leaflet-popup,.leaflet-tooltip,.leaflet-control");
+    if (dom && context.hovered && (type === context.move || type === context.out)) {
+      updateNativeHover(map, context, event, null);
+    }
+    return dom || type === context.move && (map.dragging?.moving() || map._animatingZoom);
   }
 
   // src/core/handleNativeMapEvent.js
@@ -5955,56 +6255,13 @@
     if (!sceneByLayer.get(owner)?.renderer || targets || !coreEventTypes.has(type)) {
       return fireDOMEvent.call(this, event, type, targets);
     }
-    const target = event.target;
-    const dom = target instanceof Element && target.closest(".leaflet-marker-icon,.leaflet-popup,.leaflet-tooltip,.leaflet-control");
-    if (dom && context.hovered && (type === context.move || type === context.out)) {
-      fireDOMEvent.call(
-        map,
-        event,
-        context.out,
-        /* alloc */
-        [context.hovered]
-      );
-      context.hovered = null;
-      map.getContainer().style.cursor = "";
-    }
-    if (dom || type === context.move && (map.dragging?.moving() || map._animatingZoom)) {
+    if (bypassNativeEvent(map, context, event, type)) {
       return fireDOMEvent.call(this, event, type, targets);
     }
-    const hits = (
-      /* alloc */
-      []
-    );
-    let candidate, source2, backend;
-    if (type !== context.out) {
-      for (candidate of context.states) {
-        ({ source: source2, backend } = candidate);
-        if (source2 instanceof L.Marker || source2.options.interactive === false || !(source2 instanceof L.Path) && !source2.options.interactive) continue;
-        hits.push(...raycast(backend, event, candidate.meshes.values(), false));
-      }
-    }
-    hits.sort(compareNativeHits);
-    let source = hits[0]?.object._nativeSource || null;
+    let source = nativeEventSource(context, event, type);
     if ((type === "click" || type === "preclick") && source && map._draggableMoved(source)) source = null;
     if (type === context.move || type === context.out) {
-      if (context.hovered !== source) {
-        if (context.hovered) fireDOMEvent.call(
-          map,
-          event,
-          context.out,
-          /* alloc */
-          [context.hovered]
-        );
-        context.hovered = source;
-        if (source) fireDOMEvent.call(
-          map,
-          event,
-          context.over,
-          /* alloc */
-          [source]
-        );
-        map.getContainer().style.cursor = source ? "pointer" : "";
-      }
+      updateNativeHover(map, context, event, source);
     }
     return fireDOMEvent.call(this, event, type, source ? (
       /* alloc */
@@ -6441,9 +6698,13 @@
     const leftSlope = min.x * rise / distance, rightSlope = max.x * rise / distance;
     const slope = rightSlope - leftSlope;
     let left = Infinity, right = -Infinity;
+    const corners = (
+      /* alloc */
+      [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthWest(), bounds.getSouthEast()]
+    );
     let i, latlng, p, x, y;
     for (i = 0; i < 4; i++) {
-      latlng = i === 0 ? bounds.getNorthWest() : i === 1 ? bounds.getNorthEast() : i === 2 ? bounds.getSouthWest() : bounds.getSouthEast();
+      latlng = corners[i];
       p = map.project(latlng, zoom).subtract(origin);
       x = cos * p.x - sin * p.y;
       y = sin * p.x + cos * p.y;
@@ -6931,83 +7192,6 @@
   // src/scene/attach.js
   init_radians();
 
-  // src/globals/rendererDevices.js
-  var rendererDevices = /* @__PURE__ */ new WeakMap();
-
-  // src/globals/sceneSunlightUniforms.js
-  var sceneSunlightUniforms = new Float32Array(20);
-  sceneSunlightUniforms[0] = sceneSunlightUniforms[5] = sceneSunlightUniforms[10] = sceneSunlightUniforms[15] = 1;
-
-  // src/scene/endZoom.js
-  init_cameraByMap();
-  function endZoom() {
-    const backend = this;
-    let animation;
-    if (sceneByLayer.get(backend)._zoomTransitions) {
-      for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.finish();
-    }
-    sceneByLayer.get(backend)._zoomTransitions = null;
-    sceneByLayer.get(backend)._zoomView = null;
-    delete cameraByMap.get(backend._map)._cameraView;
-    backend._map.getContainer().classList.remove("leaflet-camera-zoom");
-    mapUpdateCameraOverlays(backend._map);
-    sceneByLayer.get(backend)._zoomLevel = null;
-    update(backend);
-  }
-
-  // src/globals/pendingMapChanges.js
-  var pendingMapChanges = [];
-
-  // src/scene/renderPendingMapChange.js
-  function renderPendingMapChange() {
-    const layer = pendingMapChanges.shift();
-    sceneByLayer.get(layer)._queued = false;
-    if (sceneByLayer.get(layer)._shared !== layer || !sceneByLayer.get(layer).renderer) return;
-    if (layer._map._animatingZoom) update(layer);
-    else render(layer);
-  }
-
-  // src/scene/onMapChange.js
-  function onMapChange() {
-    const layer = this;
-    if (sceneByLayer.get(layer)._queued) return;
-    sceneByLayer.get(layer)._queued = true;
-    pendingMapChanges.push(layer);
-    queueMicrotask(renderPendingMapChange);
-  }
-
-  // src/globals/pendingZoomAnimations.js
-  var pendingZoomAnimations = [];
-
-  // src/scene/renderPendingZoomAnimation.js
-  function renderPendingZoomAnimation() {
-    const layer = pendingZoomAnimations.shift();
-    if (sceneByLayer.get(layer)._shared === layer && sceneByLayer.get(layer).renderer) render(layer);
-  }
-
-  // src/scene/onZoomAnim.js
-  function onZoomAnim(event) {
-    const map = this._map;
-    if (event && !sceneByLayer.get(this)._zoomView) {
-      sceneByLayer.get(this)._zoomView = /* alloc */
-      {
-        from: map.getCenter(),
-        zoom: map.getZoom(),
-        to: event.center,
-        targetZoom: event.zoom,
-        start: performance.now()
-      };
-      map.getContainer().classList.add("leaflet-camera-zoom");
-    }
-    pendingZoomAnimations.push(this);
-    queueMicrotask(renderPendingZoomAnimation);
-  }
-
-  // src/scene/startZoom.js
-  function startZoom() {
-    sceneByLayer.get(this)._zoomLevel = null;
-  }
-
   // src/globals/lampDirections.js
   var lampDirections = [
     { x: Math.cos(0 * Math.PI / 3), y: Math.sin(0 * Math.PI / 3), nx: Math.cos(0.5 * Math.PI / 3), nz: -Math.sin(0.5 * Math.PI / 3) },
@@ -7223,15 +7407,20 @@
     }
   }
 
-  // src/geometry/treeGeometry.js
-  function treeGeometry(point, style, addTriangle2) {
-    const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = "round" } = style;
+  // src/geometry/validateTree.js
+  function validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape) {
     if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) || trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top || crownShape !== "round" && crownShape !== "cone") {
       throw (
         /* alloc */
         new Error("Invalid tree dimensions or crown shape")
       );
     }
+  }
+
+  // src/geometry/treeGeometry.js
+  function treeGeometry(point, style, addTriangle2) {
+    const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = "round" } = style;
+    validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);
     const trunk = parseColor(style.trunkColor ?? 7491898);
     const crown = parseColor(style.color ?? 5210683);
     surface(point, addTriangle2, trunkRadius, bottom, trunkRadius, crownBottom + (top - crownBottom) * 0.25, trunk);
@@ -7288,6 +7477,139 @@
 
   // src/globals/archiveDecoder.js
   var archiveDecoder = new TextDecoder();
+
+  // src/archives/tileId.js
+  function tileId(z, x, y) {
+    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) || z < 0 || z > 26 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles tile coordinates")
+      );
+    }
+    let id = (4 ** z - 1) / 3;
+    const n = 2 ** z;
+    let s, rx, ry, swap;
+    for (s = n / 2; s >= 1; s /= 2) {
+      rx = x & s ? 1 : 0, ry = y & s ? 1 : 0;
+      id += s * s * (3 * rx ^ ry);
+      if (!ry) {
+        if (rx) {
+          x = n - 1 - x;
+          y = n - 1 - y;
+        }
+        swap = x;
+        x = y;
+        y = swap;
+      }
+    }
+    return id;
+  }
+
+  // src/globals/headerOffsets.js
+  var headerOffsets = [
+    "rootDirectoryOffset",
+    "rootDirectoryLength",
+    "jsonMetadataOffset",
+    "jsonMetadataLength",
+    "leafDirectoryOffset",
+    "leafDirectoryLength",
+    "tileDataOffset",
+    "tileDataLength",
+    "numAddressedTiles",
+    "numTileEntries",
+    "numTileContents"
+  ];
+
+  // src/globals/headerFlags.js
+  var headerFlags = ["clustered", "internalCompression", "tileCompression", "tileType", "minZoom", "maxZoom"];
+
+  // src/globals/headerBounds.js
+  var headerBounds = ["minLon", "minLat", "maxLon", "maxLat"];
+
+  // src/archives/decodeHeader.js
+  function decodeHeader(data) {
+    const view = data.byteLength >= 127 ? (
+      /* alloc */
+      new DataView(data)
+    ) : null;
+    if (!view || view.getUint32(0, true) !== 1767132496 || view.getUint32(4, true) !== 57894252) {
+      throw (
+        /* alloc */
+        new Error("Expected a PMTiles v3 archive")
+      );
+    }
+    const header = (
+      /* alloc */
+      {}
+    );
+    let i;
+    for (i = 0; i < headerOffsets.length; i++) header[headerOffsets[i]] = Number(view.getBigUint64(8 + i * 8, true));
+    for (i = 0; i < headerFlags.length; i++) header[headerFlags[i]] = view.getUint8(96 + i);
+    for (i = 0; i < headerBounds.length; i++) header[headerBounds[i]] = view.getInt32(102 + i * 4, true) / 1e7;
+    header.centerZoom = view.getUint8(118);
+    header.centerLon = view.getInt32(119, true) / 1e7;
+    header.centerLat = view.getInt32(123, true) / 1e7;
+    return header;
+  }
+
+  // src/archives/read.js
+  async function read(backend, offset, length, signal) {
+    signal?.throwIfAborted();
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles byte range")
+      );
+    }
+    const response = await fetch(
+      sceneByLayer.get(backend).url,
+      /* alloc */
+      {
+        headers: (
+          /* alloc */
+          { Range: `bytes=${offset}-${offset + length - 1}` }
+        ),
+        signal
+      }
+    );
+    if (!response.ok) {
+      throw (
+        /* alloc */
+        new Error(`Unable to read PMTiles: HTTP ${response.status}`)
+      );
+    }
+    const etag = response.headers.get("ETag");
+    if (sceneByLayer.get(backend)._etag && etag !== sceneByLayer.get(backend)._etag) {
+      throw (
+        /* alloc */
+        new Error("PMTiles archive changed; recreate the layer")
+      );
+    }
+    if (etag) sceneByLayer.get(backend)._etag = etag;
+    let data = await response.arrayBuffer();
+    if (response.status === 200) {
+      data = data.slice(offset, offset + length);
+    } else if (response.status !== 206 || !response.headers.get("Content-Range")?.startsWith(`bytes ${offset}-${offset + length - 1}/`)) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles range response")
+      );
+    }
+    if (data.byteLength !== length) {
+      throw (
+        /* alloc */
+        new Error("Truncated PMTiles range")
+      );
+    }
+    return data;
+  }
+
+  // src/archives/getHeader.js
+  function getHeader(layer) {
+    if (!sceneByLayer.has(layer)) return layer.getHeader();
+    if (layer.options.archive && layer.options.archive !== layer) return getHeader(layer.options.archive);
+    return sceneByLayer.get(layer)._header ||= read(layer, 0, 127).then(decodeHeader);
+  }
 
   // src/globals/directoryReader.js
   var directoryReader = {
@@ -7417,160 +7739,64 @@
     );
   }
 
-  // src/archives/read.js
-  async function read(backend, offset, length, signal) {
-    signal?.throwIfAborted();
-    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles byte range")
-      );
-    }
-    const response = await fetch(
-      sceneByLayer.get(backend).url,
-      /* alloc */
-      {
-        headers: (
-          /* alloc */
-          { Range: `bytes=${offset}-${offset + length - 1}` }
-        ),
-        signal
-      }
-    );
-    if (!response.ok) {
-      throw (
-        /* alloc */
-        new Error(`Unable to read PMTiles: HTTP ${response.status}`)
-      );
-    }
-    const etag = response.headers.get("ETag");
-    if (sceneByLayer.get(backend)._etag && etag !== sceneByLayer.get(backend)._etag) {
-      throw (
-        /* alloc */
-        new Error("PMTiles archive changed; recreate the layer")
-      );
-    }
-    if (etag) sceneByLayer.get(backend)._etag = etag;
-    let data = await response.arrayBuffer();
-    if (response.status === 200) {
-      data = data.slice(offset, offset + length);
-    } else if (response.status !== 206 || !response.headers.get("Content-Range")?.startsWith(`bytes ${offset}-${offset + length - 1}/`)) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles range response")
-      );
-    }
-    if (data.byteLength !== length) {
-      throw (
-        /* alloc */
-        new Error("Truncated PMTiles range")
-      );
-    }
-    return data;
-  }
-
   // src/archives/loadDirectory.js
   async function loadDirectory(backend, offset, length, compression) {
     return decodeDirectory(await decompress(await read(backend, offset, length), compression));
   }
 
-  // src/archives/tileId.js
-  function tileId(z, x, y) {
-    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) || z < 0 || z > 26 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles tile coordinates")
-      );
+  // src/archives/getDirectoryEntries.js
+  async function getDirectoryEntries(backend, offset, length, compression) {
+    const directories = sceneByLayer.get(backend)._directories;
+    const key = `${offset}:${length}`;
+    if (!directories.has(key)) {
+      if (directories.size >= 32) directories.delete(directories.keys().next().value);
+      directories.set(key, loadDirectory(backend, offset, length, compression));
     }
-    let id = (4 ** z - 1) / 3;
-    const n = 2 ** z;
-    let s, rx, ry, swap;
-    for (s = n / 2; s >= 1; s /= 2) {
-      rx = x & s ? 1 : 0, ry = y & s ? 1 : 0;
-      id += s * s * (3 * rx ^ ry);
-      if (!ry) {
-        if (rx) {
-          x = n - 1 - x;
-          y = n - 1 - y;
-        }
-        swap = x;
-        x = y;
-        y = swap;
-      }
+    const pending = directories.get(key);
+    try {
+      return await pending;
+    } catch (error) {
+      if (directories.get(key) === pending) directories.delete(key);
+      throw error;
     }
-    return id;
   }
 
-  // src/globals/headerOffsets.js
-  var headerOffsets = [
-    "rootDirectoryOffset",
-    "rootDirectoryLength",
-    "jsonMetadataOffset",
-    "jsonMetadataLength",
-    "leafDirectoryOffset",
-    "leafDirectoryLength",
-    "tileDataOffset",
-    "tileDataLength",
-    "numAddressedTiles",
-    "numTileEntries",
-    "numTileContents"
-  ];
+  // src/archives/findDirectoryEntry.js
+  function findDirectoryEntry(entries, id) {
+    let low = 0, high = entries.length - 1, mid;
+    while (low <= high) {
+      mid = low + high >> 1;
+      if (entries[mid].tileId <= id) low = mid + 1;
+      else high = mid - 1;
+    }
+    return entries[high];
+  }
 
-  // src/globals/headerFlags.js
-  var headerFlags = ["clustered", "internalCompression", "tileCompression", "tileType", "minZoom", "maxZoom"];
-
-  // src/globals/headerBounds.js
-  var headerBounds = ["minLon", "minLat", "maxLon", "maxLat"];
-
-  // src/archives/decodeHeader.js
-  function decodeHeader(data) {
-    const view = data.byteLength >= 127 ? (
-      /* alloc */
-      new DataView(data)
-    ) : null;
-    if (!view || view.getUint32(0, true) !== 1767132496 || view.getUint32(4, true) !== 57894252) {
+  // src/archives/getTileData.js
+  async function getTileData(backend, header, entry, id, signal) {
+    if (id - entry.tileId >= entry.runLength) return;
+    if (entry.offset + entry.length > header.tileDataLength) {
       throw (
         /* alloc */
-        new Error("Expected a PMTiles v3 archive")
+        new Error("PMTiles tile outside data section")
       );
     }
-    const header = (
-      /* alloc */
-      {}
+    const data = await decompress(
+      await read(backend, header.tileDataOffset + entry.offset, entry.length, signal),
+      header.tileCompression
     );
-    let i;
-    for (i = 0; i < headerOffsets.length; i++) header[headerOffsets[i]] = Number(view.getBigUint64(8 + i * 8, true));
-    for (i = 0; i < headerFlags.length; i++) header[headerFlags[i]] = view.getUint8(96 + i);
-    for (i = 0; i < headerBounds.length; i++) header[headerBounds[i]] = view.getInt32(102 + i * 4, true) / 1e7;
-    header.centerZoom = view.getUint8(118);
-    header.centerLon = view.getInt32(119, true) / 1e7;
-    header.centerLat = view.getInt32(123, true) / 1e7;
-    return header;
+    signal?.throwIfAborted();
+    return (
+      /* alloc */
+      { data }
+    );
   }
 
-  // src/archives/getHeader.js
-  function getHeader(layer) {
-    if (!sceneByLayer.has(layer)) return layer.getHeader();
-    if (layer.options.archive && layer.options.archive !== layer) return getHeader(layer.options.archive);
-    return sceneByLayer.get(layer)._header ||= read(layer, 0, 127).then(decodeHeader);
-  }
-
-  // src/archives/getZxy.js
-  async function getZxy(backend, z, x, y, signal) {
-    if (!sceneByLayer.has(backend)) return backend.getZxy(z, x, y, signal);
-    if (backend.options.archive && backend.options.archive !== backend) {
-      return getZxy(backend.options.archive, z, x, y, signal);
-    }
-    const id = tileId(z, x, y);
-    signal?.throwIfAborted();
-    const header = await getHeader(backend);
-    signal?.throwIfAborted();
-    if (z < header.minZoom || z > header.maxZoom) {
-      return;
-    }
+  // src/archives/findTile.js
+  async function findTile(backend, header, id, signal) {
     let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
     let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
-    let depth, key, pending, entries, low, high, mid, entry, data;
+    let depth, entries, entry, tile;
     for (depth = 0; depth < 4; depth++) {
       if (offset === firstOffset || offset === secondOffset || offset === thirdOffset) {
         throw (
@@ -7581,51 +7807,13 @@
       if (depth === 0) firstOffset = offset;
       else if (depth === 1) secondOffset = offset;
       else if (depth === 2) thirdOffset = offset;
-      key = `${offset}:${length}`;
-      if (!sceneByLayer.get(backend)._directories.has(key)) {
-        if (sceneByLayer.get(backend)._directories.size >= 32) {
-          sceneByLayer.get(backend)._directories.delete(sceneByLayer.get(backend)._directories.keys().next().value);
-        }
-        sceneByLayer.get(backend)._directories.set(key, loadDirectory(backend, offset, length, header.internalCompression));
-      }
-      pending = sceneByLayer.get(backend)._directories.get(key);
-      entries = void 0;
-      try {
-        entries = await pending;
-      } catch (error) {
-        if (sceneByLayer.get(backend)._directories.get(key) === pending) sceneByLayer.get(backend)._directories.delete(key);
-        throw error;
-      }
+      entries = await getDirectoryEntries(backend, offset, length, header.internalCompression);
       signal?.throwIfAborted();
-      low = 0, high = entries.length - 1;
-      while (low <= high) {
-        mid = low + high >> 1;
-        if (entries[mid].tileId <= id) {
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-      entry = entries[high];
-      if (!entry) {
-        return;
-      }
+      entry = findDirectoryEntry(entries, id);
+      if (!entry) return;
       if (entry.runLength) {
-        if (id - entry.tileId >= entry.runLength) {
-          return;
-        }
-        if (entry.offset + entry.length > header.tileDataLength) {
-          throw (
-            /* alloc */
-            new Error("PMTiles tile outside data section")
-          );
-        }
-        data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal), header.tileCompression);
-        signal?.throwIfAborted();
-        return (
-          /* alloc */
-          { data }
-        );
+        tile = await getTileData(backend, header, entry, id, signal);
+        return tile;
       }
       if (entry.offset + entry.length > header.leafDirectoryLength) {
         throw (
@@ -7640,6 +7828,20 @@
       /* alloc */
       new Error("PMTiles directory depth exceeds four levels")
     );
+  }
+
+  // src/archives/getZxy.js
+  async function getZxy(backend, z, x, y, signal) {
+    if (!sceneByLayer.has(backend)) return backend.getZxy(z, x, y, signal);
+    if (backend.options.archive && backend.options.archive !== backend) {
+      return getZxy(backend.options.archive, z, x, y, signal);
+    }
+    const id = tileId(z, x, y);
+    signal?.throwIfAborted();
+    const header = await getHeader(backend);
+    signal?.throwIfAborted();
+    if (z < header.minZoom || z > header.maxZoom) return;
+    return findTile(backend, header, id, signal);
   }
 
   // src/archives/loadSource.js
@@ -7687,11 +7889,6 @@
         )
       }
     );
-  }
-
-  // src/utils/compareDistance.js
-  function compareDistance(a, b) {
-    return a.distance - b.distance;
   }
 
   // src/sources/buildArea.js
@@ -7877,25 +8074,49 @@
     }
   }
 
-  // src/sources/buildAreaFeature.js
-  function buildAreaFeature(context, feature) {
-    const { backend, area: area2, map } = context;
-    const coords = area2.coords;
-    const geometry = feature?.geometry;
-    const isTree = geometry?.type === "Point";
-    if (backend.options.nightLight && !isTree) throw (
+  // src/sources/featureAnchor.js
+  function featureAnchor(feature, nightLight) {
+    const geometry = feature?.geometry, point = geometry?.type === "Point";
+    if (nightLight && !point) throw (
       /* alloc */
       new Error("Night lights require Point geometry")
     );
-    if (geometry?.type !== "Polygon" && geometry?.type !== "MultiPolygon" && !isTree) throw (
+    if (geometry?.type !== "Polygon" && geometry?.type !== "MultiPolygon" && !point) throw (
       /* alloc */
       new Error("Unsupported GeoJSON geometry")
     );
-    const coordinates = isTree ? geometry.coordinates : geometry.type === "Polygon" ? geometry.coordinates[0]?.[0] : geometry.coordinates[0]?.[0]?.[0];
+    const coordinates = point ? geometry.coordinates : geometry.type === "Polygon" ? geometry.coordinates[0]?.[0] : geometry.coordinates[0]?.[0]?.[0];
     if (!Number.isFinite(coordinates?.[0]) || !Number.isFinite(coordinates?.[1])) throw (
       /* alloc */
       new Error("Invalid GeoJSON coordinates")
     );
+    return coordinates;
+  }
+
+  // src/sources/extrusionStyle.js
+  function extrusionStyle(backend, feature) {
+    const style = backend.options.style(feature);
+    if (style === null) return null;
+    if (!style || typeof style !== "object") throw (
+      /* alloc */
+      new Error("style must return an extrusion style or null")
+    );
+    const { top, bottom = 0 } = style;
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
+      throw (
+        /* alloc */
+        new Error("Invalid extrusion heights: expected top > bottom >= 0")
+      );
+    }
+    return style;
+  }
+
+  // src/sources/buildAreaFeature.js
+  function buildAreaFeature(context, feature) {
+    const { backend, area: area2, map } = context;
+    const coords = area2.coords;
+    const coordinates = featureAnchor(feature, backend.options.nightLight);
+    const geometry = feature.geometry, isTree = geometry.type === "Point";
     const lon = coordinates[0], lat = coordinates[1];
     if (coords) {
       const anchor = map.project(
@@ -7905,22 +8126,12 @@
       );
       if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
     }
-    const style = backend.options.style(feature);
+    const style = extrusionStyle(backend, feature);
     if (style === null) {
       context.skipped++;
       return;
     }
-    if (!style || typeof style !== "object") throw (
-      /* alloc */
-      new Error("style must return an extrusion style or null")
-    );
     const { top, bottom = 0, color = 14267276 } = style;
-    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
-      throw (
-        /* alloc */
-        new Error("Invalid extrusion heights: expected top > bottom >= 0")
-      );
-    }
     const baseColor = parseColor(color);
     const vertexStart = context.positions.length / 3;
     if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
@@ -8178,22 +8389,18 @@
     }
   }
 
-  // src/sources/pump.js
-  function pump(backend, map = backend._map) {
-    const shared = map && renderers.get(map);
-    if (!shared) return;
-    const layers = (
-      /* alloc */
-      []
-    );
-    let layer, area2, center, areaBackend;
-    for (layer of sceneByLayer.get(shared)._layers) {
-      if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
-    }
+  // src/utils/compareDistance.js
+  function compareDistance(a, b) {
+    return a.distance - b.distance;
+  }
+
+  // src/sources/pendingSourceAreas.js
+  function pendingSourceAreas(layers, map) {
     const pending = (
       /* alloc */
       []
     );
+    let layer, area2, center;
     for (layer of layers) {
       for (area2 of sceneByLayer.get(layer)._areas.values()) {
         if (area2.started || area2.request.signal.aborted) continue;
@@ -8209,6 +8416,22 @@
       }
     }
     pending.sort(compareDistance);
+    return pending;
+  }
+
+  // src/sources/pump.js
+  function pump(backend, map = backend._map) {
+    const shared = map && renderers.get(map);
+    if (!shared) return;
+    const layers = (
+      /* alloc */
+      []
+    );
+    let layer, area2, areaBackend;
+    for (layer of sceneByLayer.get(shared)._layers) {
+      if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
+    }
+    const pending = pendingSourceAreas(layers, map);
     let inflight = 0;
     for (layer of layers) inflight += sceneByLayer.get(layer)._inflight;
     for ({ layer: areaBackend, area: area2 } of pending) {
@@ -8380,6 +8603,97 @@
     sceneByLayer.get(layer).root.position[1] = sceneByLayer.get(layer)._terrainBaseY + (elevation ?? 0) + offset;
   }
 
+  // src/scene/restoreGeometry.js
+  function restoreGeometry(geometry, device) {
+    if (geometry.attributes.index?.data instanceof Uint8Array) {
+      geometry.attributes.index.data = /* alloc */
+      new Uint16Array(geometry.attributes.index.data);
+    }
+    let name, attribute, oldBuffer;
+    for (name in geometry.attributes) {
+      attribute = geometry.attributes[name];
+      attribute.size ||= 1;
+      attribute.count = attribute.data.length / attribute.size;
+      attribute.indexFormat = attribute.data instanceof Uint32Array ? "uint32" : "uint16";
+      oldBuffer = attribute.buffer;
+      attribute.buffer = device.createBuffer(
+        /* alloc */
+        {
+          size: Math.max(4, attribute.data.byteLength),
+          usage: name === "index" ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        }
+      );
+      device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
+      oldBuffer?.destroy();
+    }
+    geometry.device = device;
+    geometry.drawRange.count = geometry.attributes.index?.count || geometry.attributes.position.count;
+  }
+
+  // src/scene/restoreMaterialTextures.js
+  function restoreMaterialTextures(material, device) {
+    let name, texture;
+    for (name in material) {
+      if (name !== "baseTexture" && name !== "metalTexture" && name !== "emissiveTexture" && name !== "occlusionTexture") continue;
+      texture = material[name];
+      if (!texture || texture.device === device) continue;
+      texture.device = device;
+      texture.texture = device.createTexture(
+        /* alloc */
+        {
+          size: (
+            /* alloc */
+            [texture.image.width, texture.image.height]
+          ),
+          format: texture.format,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+        }
+      );
+      texture.sampler = device.createSampler(texture.samplerOptions);
+      texture.uploaded = null;
+    }
+  }
+
+  // src/scene/restoreObject.js
+  function restoreObject(object, backend) {
+    const shared = sceneByLayer.get(backend)._shared;
+    let texture;
+    if (object.geometry && object.geometry.device !== sceneByLayer.get(shared).renderer.device) {
+      const geometry = object.geometry;
+      const material = object.program._layerMaterial;
+      const device = sceneByLayer.get(shared).renderer.device;
+      restoreGeometry(geometry, device);
+      object.bindGroup = null;
+      if (object.boundTextures) object.boundTextures.length = 0;
+      else object.boundTextures = /* alloc */
+      [];
+      restoreMaterialTextures(material, device);
+      object.program.pipelineCache.clear();
+      object.program = createProgram(backend, material);
+      object.device = device;
+    }
+    if (object.texture && object.texture.device !== sceneByLayer.get(shared).renderer.device) {
+      texture = object.texture;
+      texture.device = sceneByLayer.get(shared).renderer.device;
+      texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(
+        /* alloc */
+        {
+          size: (
+            /* alloc */
+            [object.texture.image.width, object.texture.image.height]
+          ),
+          format: object.texture.format,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+        }
+      );
+      texture.sampler = sceneByLayer.get(shared).renderer.device.createSampler(texture.samplerOptions);
+      texture.uploaded = null;
+    }
+  }
+
+  // src/globals/rendererDevices.js
+  var rendererDevices = /* @__PURE__ */ new WeakMap();
+
   // src/scene/showWebGPUWarning.js
   function showWebGPUWarning(map) {
     const container = map.getContainer();
@@ -8463,132 +8777,10 @@
     );
   }
 
-  // src/scene/restoreObject.js
-  function restoreObject(object, backend) {
-    const shared = sceneByLayer.get(backend)._shared;
-    let name, attribute, oldBuffer, texture;
-    if (object.geometry && object.geometry.device !== sceneByLayer.get(shared).renderer.device) {
-      const geometry = object.geometry;
-      const material = object.program._layerMaterial;
-      const device = sceneByLayer.get(shared).renderer.device;
-      if (geometry.attributes.index?.data instanceof Uint8Array) {
-        geometry.attributes.index.data = /* alloc */
-        new Uint16Array(geometry.attributes.index.data);
-      }
-      for (name in geometry.attributes) {
-        attribute = geometry.attributes[name];
-        attribute.size ||= 1;
-        attribute.count = attribute.data.length / attribute.size;
-        attribute.indexFormat = attribute.data instanceof Uint32Array ? "uint32" : "uint16";
-        oldBuffer = attribute.buffer;
-        attribute.buffer = device.createBuffer(
-          /* alloc */
-          {
-            size: Math.max(4, attribute.data.byteLength),
-            usage: name === "index" ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-          }
-        );
-        device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
-        oldBuffer?.destroy();
-      }
-      geometry.device = device;
-      geometry.drawRange.count = geometry.attributes.index?.count || geometry.attributes.position.count;
-      object.bindGroup = null;
-      if (object.boundTextures) object.boundTextures.length = 0;
-      else object.boundTextures = /* alloc */
-      [];
-      for (name in material) {
-        if (name !== "baseTexture" && name !== "metalTexture" && name !== "emissiveTexture" && name !== "occlusionTexture") continue;
-        texture = material[name];
-        if (!texture || texture.device === device) continue;
-        texture.device = device;
-        texture.texture = device.createTexture(
-          /* alloc */
-          {
-            size: (
-              /* alloc */
-              [texture.image.width, texture.image.height]
-            ),
-            format: texture.format,
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
-          }
-        );
-        texture.sampler = device.createSampler(texture.samplerOptions);
-        texture.uploaded = null;
-      }
-      object.program.pipelineCache.clear();
-      object.program = createProgram(backend, material);
-      object.device = device;
-    }
-    if (object.texture && object.texture.device !== sceneByLayer.get(shared).renderer.device) {
-      texture = object.texture;
-      texture.device = sceneByLayer.get(shared).renderer.device;
-      texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(
-        /* alloc */
-        {
-          size: (
-            /* alloc */
-            [object.texture.image.width, object.texture.image.height]
-          ),
-          format: object.texture.format,
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
-        }
-      );
-      texture.sampler = sceneByLayer.get(shared).renderer.device.createSampler(texture.samplerOptions);
-      texture.uploaded = null;
-    }
-  }
-
-  // src/scene/attach.js
-  async function attach(backend, map) {
-    let shared = renderers.get(map);
-    if (sceneByLayer.get(shared)?._rendererReady) {
-      await sceneByLayer.get(shared)._rendererReady.promise;
-    }
-    if (!shared) {
-      shared = backend;
-      sceneByLayer.get(backend)._rendererReady = Promise.withResolvers();
-      sceneByLayer.get(backend)._rendererReady.promise.catch(noOperation);
-      renderers.set(map, shared);
-      const canvas = document.createElement("canvas");
-      if (!navigator.gpu) {
-        failAttachment(
-          /* alloc */
-          new Error("Layer3D requires WebGPU"),
-          backend,
-          map
-        );
-      }
-      const adapter = await requestAdapter(backend, map);
-      const device = await requestDevice(adapter, backend, map);
-      rendererDevices.set(device, map);
-      device.addEventListener("uncapturederror", rendererDeviceError);
-      Promise.all(
-        /* alloc */
-        [device.lost, Promise.resolve(device)]
-      ).then(rendererDeviceLost);
-      const context = canvas.getContext("webgpu");
-      if (!context) {
-        device.destroy();
-        failAttachment(
-          /* alloc */
-          new Error("Unable to create a WebGPU canvas context"),
-          backend,
-          map
-        );
-      }
-      const format = navigator.gpu.getPreferredCanvasFormat();
-      context.configure(
-        /* alloc */
-        { device, format, alphaMode: "premultiplied" }
-      );
-      map.getContainer().querySelector(".leaflet-webgpu-warning")?.remove();
-      sceneByLayer.get(backend)._shared = backend;
-      sceneByLayer.get(backend)._layers = /* alloc */
-      /* @__PURE__ */ new Set();
-      sceneByLayer.get(backend)._sceneOrigin = sceneByLayer.get(backend).location;
-      sceneByLayer.get(backend).scene = emptyNode();
-      sceneByLayer.get(backend).camera = /* alloc */
+  // src/scene/createSceneCamera.js
+  function createSceneCamera() {
+    return (
+      /* alloc */
       {
         position: (
           /* alloc */
@@ -8642,106 +8834,248 @@
         aspect: 1,
         near: 0.1,
         far: 1e4
-      };
-      sceneByLayer.get(backend).renderer = /* alloc */
+      }
+    );
+  }
+
+  // src/globals/sceneSunlightUniforms.js
+  var sceneSunlightUniforms = new Float32Array(20);
+  sceneSunlightUniforms[0] = sceneSunlightUniforms[5] = sceneSunlightUniforms[10] = sceneSunlightUniforms[15] = 1;
+
+  // src/scene/initializeRendererResources.js
+  function initializeRendererResources(backend, device) {
+    const layout = device.createBindGroupLayout(
+      /* alloc */
       {
-        device,
-        context,
-        format,
-        canvas,
-        dpr: Math.min(window.devicePixelRatio, 2)
-      };
-      const layout = device.createBindGroupLayout(
+        entries: (
+          /* alloc */
+          [
+            /* alloc */
+            { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: (
+              /* alloc */
+              { type: "uniform" }
+            ) },
+            /* alloc */
+            { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: (
+              /* alloc */
+              { sampleType: "depth" }
+            ) },
+            /* alloc */
+            { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: (
+              /* alloc */
+              { type: "comparison" }
+            ) },
+            /* alloc */
+            { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: (
+              /* alloc */
+              { type: "read-only-storage" }
+            ) }
+          ]
+        )
+      }
+    );
+    const buffer = sceneByLayer.get(backend).renderer.device.createBuffer(
+      /* alloc */
+      { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }
+    );
+    const sampler = sceneByLayer.get(backend).renderer.device.createSampler(
+      /* alloc */
+      { compare: "less-equal", minFilter: "linear", magFilter: "linear" }
+    );
+    const lights = sceneByLayer.get(backend).renderer.device.createBuffer(
+      /* alloc */
+      { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }
+    );
+    sceneByLayer.get(backend).renderer.sunlight = /* alloc */
+    { layout, buffer, sampler, lights, size: 0 };
+    sceneByLayer.get(backend).renderer.device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
+    resizeSunlight(backend, 1);
+    const emptyImage = document.createElement("canvas");
+    emptyImage.width = 1;
+    emptyImage.height = 1;
+    sceneByLayer.get(backend).renderer.roofFallbackTexture = /* alloc */
+    {
+      device,
+      texture: device.createTexture(
         /* alloc */
         {
-          entries: (
+          size: (
             /* alloc */
-            [
-              /* alloc */
-              { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: (
-                /* alloc */
-                { type: "uniform" }
-              ) },
-              /* alloc */
-              { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: (
-                /* alloc */
-                { sampleType: "depth" }
-              ) },
-              /* alloc */
-              { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: (
-                /* alloc */
-                { type: "comparison" }
-              ) },
-              /* alloc */
-              { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: (
-                /* alloc */
-                { type: "read-only-storage" }
-              ) }
-            ]
-          )
+            [1, 1]
+          ),
+          format: "rgba8unorm",
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         }
-      );
-      const buffer = sceneByLayer.get(backend).renderer.device.createBuffer(
+      ),
+      sampler: device.createSampler(
         /* alloc */
-        { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }
-      );
-      const sampler = sceneByLayer.get(backend).renderer.device.createSampler(
-        /* alloc */
-        { compare: "less-equal", minFilter: "linear", magFilter: "linear" }
-      );
-      const lights = sceneByLayer.get(backend).renderer.device.createBuffer(
-        /* alloc */
-        { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }
-      );
-      sceneByLayer.get(backend).renderer.sunlight = /* alloc */
-      { layout, buffer, sampler, lights, size: 0 };
-      sceneByLayer.get(backend).renderer.device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
-      resizeSunlight(backend, 1);
-      const emptyImage = document.createElement("canvas");
-      emptyImage.width = 1;
-      emptyImage.height = 1;
-      sceneByLayer.get(backend).renderer.roofFallbackTexture = /* alloc */
+        {
+          addressModeU: "clamp-to-edge",
+          addressModeV: "clamp-to-edge"
+        }
+      ),
+      image: emptyImage,
+      format: "rgba8unorm",
+      srgb: false,
+      uploaded: null
+    };
+  }
+
+  // src/globals/pendingMapChanges.js
+  var pendingMapChanges = [];
+
+  // src/scene/renderPendingMapChange.js
+  function renderPendingMapChange() {
+    const layer = pendingMapChanges.shift();
+    sceneByLayer.get(layer)._queued = false;
+    if (sceneByLayer.get(layer)._shared !== layer || !sceneByLayer.get(layer).renderer) return;
+    if (layer._map._animatingZoom) update(layer);
+    else render(layer);
+  }
+
+  // src/scene/onMapChange.js
+  function onMapChange() {
+    const layer = this;
+    if (sceneByLayer.get(layer)._queued) return;
+    sceneByLayer.get(layer)._queued = true;
+    pendingMapChanges.push(layer);
+    queueMicrotask(renderPendingMapChange);
+  }
+
+  // src/scene/startZoom.js
+  function startZoom() {
+    sceneByLayer.get(this)._zoomLevel = null;
+  }
+
+  // src/globals/pendingZoomAnimations.js
+  var pendingZoomAnimations = [];
+
+  // src/scene/renderPendingZoomAnimation.js
+  function renderPendingZoomAnimation() {
+    const layer = pendingZoomAnimations.shift();
+    if (sceneByLayer.get(layer)._shared === layer && sceneByLayer.get(layer).renderer) render(layer);
+  }
+
+  // src/scene/onZoomAnim.js
+  function onZoomAnim(event) {
+    const map = this._map;
+    if (event && !sceneByLayer.get(this)._zoomView) {
+      sceneByLayer.get(this)._zoomView = /* alloc */
       {
-        device,
-        texture: device.createTexture(
-          /* alloc */
-          {
-            size: (
-              /* alloc */
-              [1, 1]
-            ),
-            format: "rgba8unorm",
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
-          }
-        ),
-        sampler: device.createSampler(
-          /* alloc */
-          {
-            addressModeU: "clamp-to-edge",
-            addressModeV: "clamp-to-edge"
-          }
-        ),
-        image: emptyImage,
-        format: "rgba8unorm",
-        srgb: false,
-        uploaded: null
+        from: map.getCenter(),
+        zoom: map.getZoom(),
+        to: event.center,
+        targetZoom: event.zoom,
+        start: performance.now()
       };
-      sceneByLayer.get(shared)._size = null;
-      canvas.className = "leaflet-3d";
-      canvas.style.cssText = "position:absolute;top:0;left:0;pointer-events:none";
-      canvas.setAttribute("role", "img");
-      canvas.setAttribute("aria-label", backend.options.ariaLabel ?? "3D scene");
-      let pane = map.getPane("webgpuPane");
-      if (!pane) {
-        pane = map.createPane("webgpuPane", map.getContainer());
-        pane.style.zIndex = 1;
-        pane.style.pointerEvents = "none";
-      }
-      pane.append(canvas);
-      map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, shared);
-      map.on("zoomstart", startZoom, shared);
-      map.on("zoomanim", onZoomAnim, shared);
-      map.on("zoomend", endZoom, shared);
+      map.getContainer().classList.add("leaflet-camera-zoom");
+    }
+    pendingZoomAnimations.push(this);
+    queueMicrotask(renderPendingZoomAnimation);
+  }
+
+  // src/scene/endZoom.js
+  init_cameraByMap();
+  function endZoom() {
+    const backend = this;
+    let animation;
+    if (sceneByLayer.get(backend)._zoomTransitions) {
+      for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.finish();
+    }
+    sceneByLayer.get(backend)._zoomTransitions = null;
+    sceneByLayer.get(backend)._zoomView = null;
+    delete cameraByMap.get(backend._map)._cameraView;
+    backend._map.getContainer().classList.remove("leaflet-camera-zoom");
+    mapUpdateCameraOverlays(backend._map);
+    sceneByLayer.get(backend)._zoomLevel = null;
+    update(backend);
+  }
+
+  // src/scene/mountRenderer.js
+  function mountRenderer(backend, map, canvas) {
+    sceneByLayer.get(backend)._size = null;
+    canvas.className = "leaflet-3d";
+    canvas.style.cssText = "position:absolute;top:0;left:0;pointer-events:none";
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", backend.options.ariaLabel ?? "3D scene");
+    let pane = map.getPane("webgpuPane");
+    if (!pane) {
+      pane = map.createPane("webgpuPane", map.getContainer());
+      pane.style.zIndex = 1;
+      pane.style.pointerEvents = "none";
+    }
+    pane.append(canvas);
+    map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, backend);
+    map.on("zoomstart", startZoom, backend);
+    map.on("zoomanim", onZoomAnim, backend);
+    map.on("zoomend", endZoom, backend);
+  }
+
+  // src/scene/initializeSharedRenderer.js
+  async function initializeSharedRenderer(backend, map) {
+    const canvas = document.createElement("canvas");
+    if (!navigator.gpu) {
+      failAttachment(
+        /* alloc */
+        new Error("Layer3D requires WebGPU"),
+        backend,
+        map
+      );
+    }
+    const adapter = await requestAdapter(backend, map);
+    const device = await requestDevice(adapter, backend, map);
+    rendererDevices.set(device, map);
+    device.addEventListener("uncapturederror", rendererDeviceError);
+    Promise.all(
+      /* alloc */
+      [device.lost, Promise.resolve(device)]
+    ).then(rendererDeviceLost);
+    const context = canvas.getContext("webgpu");
+    if (!context) {
+      device.destroy();
+      failAttachment(
+        /* alloc */
+        new Error("Unable to create a WebGPU canvas context"),
+        backend,
+        map
+      );
+    }
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    context.configure(
+      /* alloc */
+      { device, format, alphaMode: "premultiplied" }
+    );
+    map.getContainer().querySelector(".leaflet-webgpu-warning")?.remove();
+    sceneByLayer.get(backend)._shared = backend;
+    sceneByLayer.get(backend)._layers = /* alloc */
+    /* @__PURE__ */ new Set();
+    sceneByLayer.get(backend)._sceneOrigin = sceneByLayer.get(backend).location;
+    sceneByLayer.get(backend).scene = emptyNode();
+    sceneByLayer.get(backend).camera = createSceneCamera();
+    sceneByLayer.get(backend).renderer = /* alloc */
+    {
+      device,
+      context,
+      format,
+      canvas,
+      dpr: Math.min(window.devicePixelRatio, 2)
+    };
+    initializeRendererResources(backend, device);
+    mountRenderer(backend, map, canvas);
+  }
+
+  // src/scene/attach.js
+  async function attach(backend, map) {
+    let shared = renderers.get(map);
+    if (sceneByLayer.get(shared)?._rendererReady) {
+      await sceneByLayer.get(shared)._rendererReady.promise;
+    }
+    if (!shared) {
+      shared = backend;
+      sceneByLayer.get(backend)._rendererReady = Promise.withResolvers();
+      sceneByLayer.get(backend)._rendererReady.promise.catch(noOperation);
+      renderers.set(map, shared);
+      await initializeSharedRenderer(backend, map);
       sceneByLayer.get(backend)._rendererReady.resolve();
       delete sceneByLayer.get(shared)._rendererReady;
       render(shared);
@@ -8926,7 +9260,7 @@
   // src/globals/sceneTransferFields.js
   var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
 
-  // src/scene/onRemove3DLayer.js
+  // src/scene/releaseSharedScene.js
   init_cameraByMap();
 
   // src/globals/sceneCleanupFields.js
@@ -8952,6 +9286,26 @@
     renderer.device.destroy();
   }
 
+  // src/scene/releaseSharedScene.js
+  function releaseSharedScene(backend, map) {
+    if (sceneByLayer.get(backend)._roofRaster) destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
+    sceneByLayer.get(backend)._roofRaster = null;
+    if (sceneByLayer.get(backend)._zoomTransitions) {
+      let animation;
+      for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.play();
+    }
+    sceneByLayer.get(backend)._zoomTransitions = null;
+    sceneByLayer.get(backend)._zoomView = null;
+    delete cameraByMap.get(map)._cameraView;
+    map.getContainer().classList.remove("leaflet-camera-zoom");
+    const renderer = sceneByLayer.get(backend).renderer;
+    renderer.canvas.remove();
+    releaseRenderer(renderer, backend);
+    renderers.delete(map);
+    let key;
+    for (key of sceneCleanupFields) delete sceneByLayer.get(backend)[key];
+  }
+
   // src/scene/onRemove3DLayer.js
   function onRemove3DLayer(backend, map) {
     sceneByLayer.get(backend)._added = Promise.withResolvers();
@@ -8960,7 +9314,7 @@
       L.DomEvent.off(sceneByLayer.get(backend).container, sceneByLayer.get(backend)._pointerEvents, backend);
       sceneByLayer.get(backend).container = null;
     }
-    let area2, key, layer, animation;
+    let area2, key, layer;
     for (area2 of sceneByLayer.get(backend)._areas.values()) releaseArea(backend, area2);
     sceneByLayer.get(backend)._areas.clear();
     sceneByLayer.get(backend)._tooltip?.remove();
@@ -8990,20 +9344,7 @@
         map.on("zoomend", endZoom, next);
         update(next);
       } else {
-        if (sceneByLayer.get(backend)._roofRaster) destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
-        sceneByLayer.get(backend)._roofRaster = null;
-        if (sceneByLayer.get(backend)._zoomTransitions) {
-          for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.play();
-        }
-        sceneByLayer.get(backend)._zoomTransitions = null;
-        sceneByLayer.get(backend)._zoomView = null;
-        delete cameraByMap.get(map)._cameraView;
-        map.getContainer().classList.remove("leaflet-camera-zoom");
-        const renderer = sceneByLayer.get(backend).renderer;
-        renderer.canvas.remove();
-        releaseRenderer(renderer, backend);
-        renderers.delete(map);
-        for (key of sceneCleanupFields) delete sceneByLayer.get(backend)[key];
+        releaseSharedScene(backend, map);
       }
     } else update(shared);
     sceneByLayer.get(backend)._shared = sceneByLayer.get(backend).renderer = sceneByLayer.get(backend).scene = sceneByLayer.get(backend).camera = null;
@@ -9211,6 +9552,9 @@
     update(layer);
   }
 
+  // src/models/loadModelResources.js
+  init_cameraByMap();
+
   // src/models/loadBuffer.js
   async function loadBuffer(buffer, directory) {
     if (buffer.binary) return;
@@ -9256,6 +9600,27 @@
       blob = await response.blob();
     }
     return createImageBitmap(blob, geometryImageOptions);
+  }
+
+  // src/models/loadModelResources.js
+  async function loadModelResources(backend, description, directory) {
+    const bufferRequests = (
+      /* alloc */
+      []
+    );
+    let buffer;
+    for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
+    await Promise.all(bufferRequests);
+    await sceneByLayer.get(backend)._added.promise;
+    const imageRequests = (
+      /* alloc */
+      []
+    );
+    let image;
+    for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
+    const images = await Promise.all(imageRequests);
+    await sceneByLayer.get(cameraByMap.get(backend._map)?._terrain3D)?._terrainPromise;
+    return images;
   }
 
   // src/models/textureSampler.js
@@ -9346,12 +9711,36 @@
     );
   }
 
-  // src/globals/geometrySemantics.js
-  var geometrySemantics = [
-    ["POSITION", "position"],
-    ["NORMAL", "normal"],
-    ["TEXCOORD_0", "uv"]
-  ];
+  // src/models/createModelContext.js
+  function createModelContext(backend, description, images) {
+    const context = (
+      /* alloc */
+      {
+        backend,
+        description,
+        images,
+        textures: (
+          /* alloc */
+          /* @__PURE__ */ new Map()
+        ),
+        materials: (
+          /* alloc */
+          []
+        ),
+        active: (
+          /* alloc */
+          /* @__PURE__ */ new Set()
+        ),
+        resources: (
+          /* alloc */
+          []
+        )
+      }
+    );
+    let material;
+    for (material of description.materials || geometryEmpty) context.materials.push(materialFor(context, material));
+    return context;
+  }
 
   // src/globals/geometryQuaternion.js
   var geometryQuaternion = [0, 0, 0, 1];
@@ -9388,6 +9777,13 @@
     );
   }
 
+  // src/globals/geometrySemantics.js
+  var geometrySemantics = [
+    ["POSITION", "position"],
+    ["NORMAL", "normal"],
+    ["TEXCOORD_0", "uv"]
+  ];
+
   // src/globals/types.js
   var types = {
     5120: Int8Array,
@@ -9406,6 +9802,11 @@
     VEC4: 4
   };
 
+  // src/models/readAccessorValue.js
+  function readAccessorValue(input, Type, at) {
+    return Type === Int8Array ? input.getInt8(at) : Type === Uint8Array ? input.getUint8(at) : Type === Int16Array ? input.getInt16(at, true) : Type === Uint16Array ? input.getUint16(at, true) : Type === Uint32Array ? input.getUint32(at, true) : input.getFloat32(at, true);
+  }
+
   // src/models/readAccessorValues.js
   function readAccessorValues(description, Type, size, data, accessorCount, indices, viewIndex, offset, count, stride) {
     const view = description.bufferViews[viewIndex], bytes = Type.BYTES_PER_ELEMENT;
@@ -9419,7 +9820,7 @@
       /* alloc */
       new DataView(buffer)
     );
-    let i, j, at, value, output;
+    let i, j, at, output;
     for (i = 0; i < count; i++) {
       output = indices ? indices[i] : i;
       if (indices && output >= accessorCount) throw (
@@ -9428,10 +9829,63 @@
       );
       for (j = 0; j < size; j++) {
         at = (view.byteOffset || 0) + offset + i * stride + j * bytes;
-        value = Type === Int8Array ? input.getInt8(at) : Type === Uint8Array ? input.getUint8(at) : Type === Int16Array ? input.getInt16(at, true) : Type === Uint16Array ? input.getUint16(at, true) : Type === Uint32Array ? input.getUint32(at, true) : input.getFloat32(at, true);
-        data[output * size + j] = value;
+        data[output * size + j] = readAccessorValue(input, Type, at);
       }
     }
+  }
+
+  // src/models/readSparseAccessor.js
+  function readSparseAccessor(description, spec, Type, size, data) {
+    const sparse = spec.sparse, Index = types[sparse.indices.componentType];
+    if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {
+      throw (
+        /* alloc */
+        new Error("Invalid sparse glTF indices")
+      );
+    }
+    const view = description.bufferViews[sparse.indices.bufferView];
+    const offset = (view.byteOffset || 0) + (sparse.indices.byteOffset || 0);
+    if (sparse.count > spec.count || (sparse.indices.byteOffset || 0) + sparse.count * Index.BYTES_PER_ELEMENT > view.byteLength) {
+      throw (
+        /* alloc */
+        new Error("Invalid sparse glTF indices")
+      );
+    }
+    const indices = (
+      /* alloc */
+      new Index(description.buffers[view.buffer].binary.slice(
+        offset,
+        offset + sparse.count * Index.BYTES_PER_ELEMENT
+      ))
+    );
+    readAccessorValues(
+      description,
+      Type,
+      size,
+      data,
+      spec.count,
+      indices,
+      sparse.values.bufferView,
+      sparse.values.byteOffset || 0,
+      sparse.count,
+      0
+    );
+  }
+
+  // src/models/normalizeAccessor.js
+  function normalizeAccessor(spec, Type, data, size) {
+    const normalized = (
+      /* alloc */
+      new Float32Array(data.length)
+    );
+    let i;
+    for (i = 0; i < data.length; i++) {
+      normalized[i] = spec.normalized ? Math.max(-1, data[i] / (Type === Int8Array ? 127 : Type === Int16Array ? 32767 : Type === Uint8Array ? 255 : Type === Uint32Array ? 4294967295 : 65535)) : data[i];
+    }
+    return (
+      /* alloc */
+      { data: normalized, size, indices: data }
+    );
   }
 
   // src/models/readAccessor.js
@@ -9462,37 +9916,7 @@
       );
     }
     if (spec.sparse) {
-      const sparse = spec.sparse, Index = types[sparse.indices.componentType];
-      if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {
-        throw (
-          /* alloc */
-          new Error("Invalid sparse glTF indices")
-        );
-      }
-      const view = description.bufferViews[sparse.indices.bufferView];
-      const offset = (view.byteOffset || 0) + (sparse.indices.byteOffset || 0);
-      if (sparse.count > spec.count || (sparse.indices.byteOffset || 0) + sparse.count * Index.BYTES_PER_ELEMENT > view.byteLength) {
-        throw (
-          /* alloc */
-          new Error("Invalid sparse glTF indices")
-        );
-      }
-      const indices = (
-        /* alloc */
-        new Index(description.buffers[view.buffer].binary.slice(offset, offset + sparse.count * Index.BYTES_PER_ELEMENT))
-      );
-      readAccessorValues(
-        description,
-        Type,
-        size,
-        data,
-        spec.count,
-        indices,
-        sparse.values.bufferView,
-        sparse.values.byteOffset || 0,
-        sparse.count,
-        0
-      );
+      readSparseAccessor(description, spec, Type, size, data);
     }
     if (spec.componentType === 5126) {
       return (
@@ -9500,23 +9924,129 @@
         { data, size }
       );
     }
-    const normalized = (
+    return normalizeAccessor(spec, Type, data, size);
+  }
+
+  // src/models/readModelAttributes.js
+  function readModelAttributes(description, primitive) {
+    const attributes = (
       /* alloc */
-      new Float32Array(data.length)
+      {}
     );
-    let i;
-    for (i = 0; i < data.length; i++) {
-      normalized[i] = spec.normalized ? Math.max(-1, data[i] / (Type === Int8Array ? 127 : Type === Int16Array ? 32767 : Type === Uint8Array ? 255 : Type === Uint32Array ? 4294967295 : 65535)) : data[i];
+    let semantic, name;
+    for ([semantic, name] of geometrySemantics) {
+      if (primitive.attributes[semantic] !== void 0) {
+        attributes[name] = readAccessor(description, primitive.attributes[semantic]);
+      }
+    }
+    if (!attributes.position) throw (
+      /* alloc */
+      new Error("glTF mesh has no positions")
+    );
+    const vertexCount = attributes.position.data.length / 3;
+    if (attributes.position.size !== 3 || vertexCount < 3) throw (
+      /* alloc */
+      new Error("Invalid glTF vertex attributes")
+    );
+    let attribute;
+    for (attribute of Object.values(attributes)) {
+      if (attribute.data.length / attribute.size !== vertexCount) throw (
+        /* alloc */
+        new Error("Invalid glTF vertex attributes")
+      );
     }
     return (
       /* alloc */
-      { data: normalized, size, indices: data }
+      { attributes, vertexCount }
+    );
+  }
+
+  // src/models/readModelIndices.js
+  function readModelIndices(description, primitive, attributes, vertexCount) {
+    if (primitive.indices !== void 0) {
+      const index = readAccessor(description, primitive.indices);
+      attributes.index = /* alloc */
+      { size: 1, data: index.indices };
+      if (!(index.indices instanceof Uint8Array || index.indices instanceof Uint16Array || index.indices instanceof Uint32Array) || index.size !== 1 || index.indices.length % 3) {
+        throw (
+          /* alloc */
+          new Error("Invalid glTF triangle indices")
+        );
+      }
+      let value;
+      for (value of index.indices) if (value >= vertexCount) throw (
+        /* alloc */
+        new Error("Invalid glTF triangle indices")
+      );
+    } else if (vertexCount % 3) {
+      throw (
+        /* alloc */
+        new Error("Incomplete glTF triangle")
+      );
+    }
+  }
+
+  // src/models/createModelGeometry.js
+  function createModelGeometry(context, primitive, attributes) {
+    let normals;
+    if (!attributes.normal) {
+      normals = vertexNormals(attributes.position.data, attributes.index?.data);
+      attributes.normal = /* alloc */
+      { size: 3, data: normals };
+    }
+    const style = context.materials[primitive.material] || /* alloc */
+    {
+      color: (
+        /* alloc */
+        [1, 1, 1]
+      ),
+      metallic: 1
+    };
+    if ((style.baseTexture || style.metalTexture || style.emissiveTexture || style.occlusionTexture) && !attributes.uv) {
+      throw (
+        /* alloc */
+        new Error("Textured model mesh requires UV coordinates")
+      );
+    }
+    const program = createProgram(context.backend, style);
+    context.resources.push(program);
+    const device = sceneByLayer.get(context.backend).renderer.device;
+    if (attributes.index?.data instanceof Uint8Array) attributes.index.data = Uint16Array.from(attributes.index.data);
+    let name, attribute;
+    for ([name, attribute] of Object.entries(attributes)) {
+      attribute.size ||= 1;
+      attribute.count = attribute.data.length / attribute.size;
+      attribute.indexFormat = attribute.data instanceof Uint32Array ? "uint32" : "uint16";
+      attribute.buffer = device.createBuffer(
+        /* alloc */
+        {
+          size: Math.max(4, attribute.data.byteLength),
+          usage: name === "index" ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        }
+      );
+      device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
+    }
+    const geometry = (
+      /* alloc */
+      {
+        device,
+        attributes,
+        drawRange: (
+          /* alloc */
+          { start: 0, count: attributes.index?.count || attributes.position.count }
+        )
+      }
+    );
+    context.resources.push(geometry);
+    return (
+      /* alloc */
+      { device, geometry, program }
     );
   }
 
   // src/models/modelNode.js
   function modelNode(context, index) {
-    const { backend, description, materials, active, resources } = context;
+    const { backend, description, active } = context;
     if (active.has(index)) throw (
       /* alloc */
       new Error("Cyclic glTF nodes")
@@ -9535,103 +10065,20 @@
       }
     );
     group.matrix = nodeMatrix(spec);
-    let primitive, attributes, semantic, name, vertexCount, attribute, index2, i, normals, style, program;
-    let device, geometry, mesh, child;
+    let primitive, attributeData, attributes, vertexCount, built, mesh, child;
     if (spec.mesh !== void 0) {
       for (primitive of description.meshes[spec.mesh].primitives) {
-        attributes = /* alloc */
-        {};
-        for ([semantic, name] of geometrySemantics) {
-          if (primitive.attributes[semantic] !== void 0) attributes[name] = readAccessor(description, primitive.attributes[semantic]);
-        }
-        if (!attributes.position) throw (
-          /* alloc */
-          new Error("glTF mesh has no positions")
-        );
-        vertexCount = attributes.position.data.length / 3;
-        if (attributes.position.size !== 3 || vertexCount < 3) throw (
-          /* alloc */
-          new Error("Invalid glTF vertex attributes")
-        );
-        for (attribute of Object.values(attributes)) {
-          if (attribute.data.length / attribute.size !== vertexCount) throw (
-            /* alloc */
-            new Error("Invalid glTF vertex attributes")
-          );
-        }
-        if (primitive.indices !== void 0) {
-          index2 = readAccessor(description, primitive.indices);
-          attributes.index = /* alloc */
-          { size: 1, data: index2.indices };
-          if (!(index2.indices instanceof Uint8Array || index2.indices instanceof Uint16Array || index2.indices instanceof Uint32Array) || index2.size !== 1 || index2.indices.length % 3) throw (
-            /* alloc */
-            new Error("Invalid glTF triangle indices")
-          );
-          for (i of index2.indices) {
-            if (i >= vertexCount) throw (
-              /* alloc */
-              new Error("Invalid glTF triangle indices")
-            );
-          }
-        }
-        if (!attributes.index && vertexCount % 3) throw (
-          /* alloc */
-          new Error("Incomplete glTF triangle")
-        );
-        if (!attributes.normal) {
-          normals = vertexNormals(attributes.position.data, attributes.index?.data);
-          attributes.normal = /* alloc */
-          { size: 3, data: normals };
-        }
-        style = materials[primitive.material] || /* alloc */
-        {
-          color: (
-            /* alloc */
-            [1, 1, 1]
-          ),
-          metallic: 1
-        };
-        if ((style.baseTexture || style.metalTexture || style.emissiveTexture || style.occlusionTexture) && !attributes.uv) {
-          throw (
-            /* alloc */
-            new Error("Textured model mesh requires UV coordinates")
-          );
-        }
-        program = createProgram(backend, style);
-        resources.push(program);
-        device = sceneByLayer.get(backend).renderer.device;
-        if (attributes.index?.data instanceof Uint8Array) {
-          attributes.index.data = Uint16Array.from(attributes.index.data);
-        }
-        for ([name, attribute] of Object.entries(attributes)) {
-          attribute.size ||= 1;
-          attribute.count = attribute.data.length / attribute.size;
-          attribute.indexFormat = attribute.data instanceof Uint32Array ? "uint32" : "uint16";
-          attribute.buffer = device.createBuffer(
-            /* alloc */
-            {
-              size: Math.max(4, attribute.data.byteLength),
-              usage: name === "index" ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-            }
-          );
-          device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
-        }
-        geometry = /* alloc */
-        {
-          device,
-          attributes,
-          drawRange: (
-            /* alloc */
-            { start: 0, count: attributes.index?.count || attributes.position.count }
-          )
-        };
-        resources.push(geometry);
+        attributeData = readModelAttributes(description, primitive);
+        attributes = attributeData.attributes;
+        vertexCount = attributeData.vertexCount;
+        readModelIndices(description, primitive, attributes, vertexCount);
+        built = createModelGeometry(context, primitive, attributes);
         mesh = /* alloc */
         {
           ...emptyNode(),
-          device,
-          geometry,
-          program,
+          device: built.device,
+          geometry: built.geometry,
+          program: built.program,
           fadeDuration: 250,
           id: nextId.value++,
           renderOrder: 0
@@ -9645,6 +10092,51 @@
     for (child of spec.children || geometryEmpty) setParent(modelNode(context, child), group);
     active.delete(index);
     return group;
+  }
+
+  // src/models/releaseModelResources.js
+  function releaseModelResources(context) {
+    let resource, attribute;
+    for (resource of context.resources) {
+      if (resource.attributes) {
+        for (attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
+      } else {
+        resource.pipelineCache.clear();
+      }
+    }
+  }
+
+  // src/models/buildModelNodes.js
+  function buildModelNodes(context, scene) {
+    const nodes = (
+      /* alloc */
+      []
+    );
+    let index;
+    try {
+      for (index of scene.nodes) nodes.push(modelNode(context, index));
+    } catch (error) {
+      releaseModelResources(context);
+      throw error;
+    }
+    return nodes;
+  }
+
+  // src/models/applyModelTransform.js
+  function applyModelTransform(backend) {
+    const model = sceneByLayer.get(backend).model;
+    if (backend.options.rotation) {
+      const [x, y = x, z = x] = backend.options.rotation;
+      model.rotation[0] = x;
+      model.rotation[1] = y;
+      model.rotation[2] = z;
+    }
+    if (backend.options.scale) {
+      const [x, y = x, z = x] = backend.options.scale;
+      model.scale[0] = x;
+      model.scale[1] = y;
+      model.scale[2] = z;
+    }
   }
 
   // src/models/loadModel.js
@@ -9667,67 +10159,14 @@
       /* alloc */
       new URL(".", url).href
     );
-    const bufferRequests = (
-      /* alloc */
-      []
-    );
-    let buffer, image, material, index, resource, attribute, node;
-    for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
-    await Promise.all(bufferRequests);
-    await sceneByLayer.get(backend)._added.promise;
-    const imageRequests = (
-      /* alloc */
-      []
-    );
-    for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
-    const images = await Promise.all(imageRequests);
-    await sceneByLayer.get(cameraByMap.get(backend._map)?._terrain3D)?._terrainPromise;
-    const context = (
-      /* alloc */
-      {
-        backend,
-        description,
-        images,
-        textures: (
-          /* alloc */
-          /* @__PURE__ */ new Map()
-        ),
-        materials: (
-          /* alloc */
-          []
-        ),
-        active: (
-          /* alloc */
-          /* @__PURE__ */ new Set()
-        ),
-        resources: (
-          /* alloc */
-          []
-        )
-      }
-    );
-    for (material of description.materials || geometryEmpty) context.materials.push(materialFor(context, material));
+    const images = await loadModelResources(backend, description, directory);
+    const context = createModelContext(backend, description, images);
     const scene = description.scenes?.[description.scene || 0];
     if (!scene) throw (
       /* alloc */
       new Error("Missing glTF scene")
     );
-    const nodes = (
-      /* alloc */
-      []
-    );
-    try {
-      for (index of scene.nodes) nodes.push(modelNode(context, index));
-    } catch (error) {
-      for (resource of context.resources) {
-        if (resource.attributes) {
-          for (attribute of Object.values(resource.attributes)) attribute.buffer.destroy();
-        } else {
-          resource.pipelineCache.clear();
-        }
-      }
-      throw error;
-    }
+    const nodes = buildModelNodes(context, scene);
     const model = (
       /* alloc */
       {
@@ -9741,20 +10180,10 @@
       /* alloc */
       new Error("Expected a glTF model with a non-empty scene")
     );
+    let node;
     for (node of nodes) setParent(node, model);
     sceneByLayer.get(backend).model = model;
-    if (backend.options.rotation) {
-      const [x, y = x, z = x] = backend.options.rotation;
-      sceneByLayer.get(backend).model.rotation[0] = x;
-      sceneByLayer.get(backend).model.rotation[1] = y;
-      sceneByLayer.get(backend).model.rotation[2] = z;
-    }
-    if (backend.options.scale) {
-      const [x, y = x, z = x] = backend.options.scale;
-      sceneByLayer.get(backend).model.scale[0] = x;
-      sceneByLayer.get(backend).model.scale[1] = y;
-      sceneByLayer.get(backend).model.scale[2] = z;
-    }
+    applyModelTransform(backend);
     setParent(sceneByLayer.get(backend).model, sceneByLayer.get(backend).root);
     conformModelToTerrain(backend, cameraByMap.get(backend._map)?._terrain3D);
   }
@@ -9821,28 +10250,36 @@
 
   // src/scene/placeEntry.js
   init_L();
+
+  // src/scene/placeEntryElement.js
+  init_L();
+  function placeEntryElement(input, layer, element) {
+    const label = input.closest("label");
+    if (element.classList.contains("layer-count")) {
+      if (!input.hasAttribute("aria-label")) input.setAttribute("aria-label", label.textContent.trim());
+      element.id = `leaflet-layer-count-${L.Util.stamp(layer)}`;
+      input.setAttribute("aria-describedby", element.id);
+      label.append(element);
+    } else if (element.classList.contains("traffic-status")) {
+      let group = label.nextElementSibling;
+      if (!group?.classList.contains("traffic-status-group")) {
+        group = L.DomUtil.create("div", "traffic-status-group");
+        group.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;max-width:200px;margin:2px 0 6px 20px;";
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", "Traffic counts");
+        label.after(group);
+      }
+      group.append(element);
+    } else label.after(element);
+  }
+
+  // src/scene/placeEntry.js
   function placeEntry(map, layer, element) {
-    let input, entry, label, group;
+    let input, entry;
     for (input of map.getContainer().querySelectorAll(".leaflet-control-layers-selector")) {
       entry = map._layers[input.layerId];
       if (input.layerId === L.Util.stamp(layer) || entry instanceof L.LayerGroup && entry.hasLayer(layer)) {
-        label = input.closest("label");
-        if (element.classList.contains("layer-count")) {
-          if (!input.hasAttribute("aria-label")) input.setAttribute("aria-label", label.textContent.trim());
-          element.id = `leaflet-layer-count-${L.Util.stamp(layer)}`;
-          input.setAttribute("aria-describedby", element.id);
-          label.append(element);
-        } else if (element.classList.contains("traffic-status")) {
-          group = label.nextElementSibling;
-          if (!group?.classList.contains("traffic-status-group")) {
-            group = L.DomUtil.create("div", "traffic-status-group");
-            group.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;max-width:200px;margin:2px 0 6px 20px;";
-            group.setAttribute("role", "group");
-            group.setAttribute("aria-label", "Traffic counts");
-            label.after(group);
-          }
-          group.append(element);
-        } else label.after(element);
+        placeEntryElement(input, layer, element);
         return true;
       }
     }
@@ -9891,6 +10328,25 @@
     return placeUnderEntry(state);
   }
 
+  // src/scene/layerCountTitle.js
+  function layerCountTitle(scene, formatted, pending, error) {
+    return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
+  }
+
+  // src/scene/renderLayerCount.js
+  function renderLayerCount(scene, count, pending, error) {
+    const status = scene._countStatus;
+    if (scene.modelUrl) count = scene.model ? 1 : 0;
+    const loading2 = pending || (scene.modelUrl ? !scene.model : !scene.header && !scene._geojson);
+    const formatted = count.toLocaleString("en-US");
+    const text = error ? "Error" : `${formatted}${loading2 ? "\u2026" : ""}`;
+    const title = layerCountTitle(scene, formatted, pending, error);
+    if (status.textContent !== text) status.textContent = text;
+    if (status.title !== title) status.title = title;
+    if (error && status.getAttribute("role") !== "alert") status.setAttribute("role", "alert");
+    else if (!error && status.hasAttribute("role")) status.removeAttribute("role");
+  }
+
   // src/scene/updateLayerCount.js
   function updateLayerCount(event) {
     const layer = event.target, scene = sceneByLayer.get(layer), status = scene._countStatus;
@@ -9908,15 +10364,7 @@
         error ||= area2.error;
       }
     }
-    if (scene.modelUrl) count = scene.model ? 1 : 0;
-    const loading2 = pending || (scene.modelUrl ? !scene.model : !scene.header && !scene._geojson);
-    const formatted = count.toLocaleString("en-US");
-    const text = error ? "Error" : `${formatted}${loading2 ? "\u2026" : ""}`;
-    const title = error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
-    if (status.textContent !== text) status.textContent = text;
-    if (status.title !== title) status.title = title;
-    if (error && status.getAttribute("role") !== "alert") status.setAttribute("role", "alert");
-    else if (!error && status.hasAttribute("role")) status.removeAttribute("role");
+    renderLayerCount(scene, count, pending, error);
   }
 
   // src/scene/init3D.js
@@ -9958,17 +10406,8 @@
   // src/raster/initRaster.js
   init_L();
 
-  // src/globals/archiveNorthWest.js
-  var archiveNorthWest = [0, 0];
-
-  // src/globals/archiveSouthEast.js
-  var archiveSouthEast = [0, 0];
-
   // src/globals/wantedTiles.js
   var wantedTiles = /* @__PURE__ */ new Map();
-
-  // src/globals/TILE_RADIUS.js
-  var TILE_RADIUS = 6;
 
   // src/globals/coverageTiles.js
   var coverageTiles = /* @__PURE__ */ new Map();
@@ -10011,6 +10450,20 @@
   // src/globals/demSize.js
   var demSize = [null, null];
 
+  // src/terrain/copyTerrainTile.js
+  function copyTerrainTile(atlas, values, start2, columns) {
+    let row, column, value;
+    for (row = 0; row < 256; row++) {
+      for (column = 0; column < 256; column++) {
+        value = values[row * 256 + column];
+        if (!Number.isFinite(value) || value <= -1e3) continue;
+        atlas.elevations[start2 + row * columns * 256 + column] = value;
+        atlas.low = Math.min(atlas.low, value);
+        atlas.high = Math.max(atlas.high, value);
+      }
+    }
+  }
+
   // src/terrain/terrainAtlas.js
   function terrainAtlas(tiles, bounds) {
     const columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
@@ -10018,26 +10471,18 @@
       /* alloc */
       new Float32Array(columns * rows * 65536).fill(-1e9)
     );
-    let low = Infinity, high = -Infinity;
-    let key, values, coordinates, x, y, start2, row, column, value;
+    const atlas = (
+      /* alloc */
+      { elevations, low: Infinity, high: -Infinity }
+    );
+    let key, values, coordinates, x, y, start2;
     for ([key, values] of tiles) {
       coordinates = key.split("/");
       x = Number(coordinates[0]), y = Number(coordinates[1]);
       start2 = (y - bounds.min.y) * 256 * columns * 256 + (x - bounds.min.x) * 256;
-      for (row = 0; row < 256; row++) {
-        for (column = 0; column < 256; column++) {
-          value = values[row * 256 + column];
-          if (!Number.isFinite(value) || value <= -1e3) continue;
-          elevations[start2 + row * columns * 256 + column] = value;
-          low = Math.min(low, value);
-          high = Math.max(high, value);
-        }
-      }
+      copyTerrainTile(atlas, values, start2, columns);
     }
-    return (
-      /* alloc */
-      { elevations, low, high }
-    );
+    return atlas;
   }
 
   // src/terrain/rasterProgram.js
@@ -10165,6 +10610,42 @@
     return attributes;
   }
 
+  // src/raster/terrainTileGeometry.js
+  function terrainTileGeometry(backend, attributes, sizeX, sizeZ) {
+    const scene = sceneByLayer.get(backend), base = scene._terrainOriginElevation;
+    const bottom = Math.min(scene._dem.low, base) - base, top = Math.max(scene._dem.high, base) - base;
+    return (
+      /* alloc */
+      {
+        device: scene.renderer.device,
+        attributes,
+        drawRange: (
+          /* alloc */
+          { start: 0, count: attributes.index.count }
+        ),
+        // Bounds must cover the DEM-displaced tile, although picking uses the flat grid.
+        bounds: (
+          /* alloc */
+          {
+            min: (
+              /* alloc */
+              [0, bottom, 0]
+            ),
+            max: (
+              /* alloc */
+              [1, top, 1]
+            ),
+            center: (
+              /* alloc */
+              [0.5, (bottom + top) / 2, 0.5]
+            ),
+            radius: Math.hypot(sizeX, top - bottom, sizeZ) / 2 / Math.max(sizeX, 1, sizeZ)
+          }
+        )
+      }
+    );
+  }
+
   // src/raster/addRasterTile.js
   async function addRasterTile(backend, layer, coords, tile) {
     const ready = await sceneByLayer.get(backend)._terrainPromise;
@@ -10187,38 +10668,8 @@
     const program = rasterProgram(backend, texture);
     const attributes = terrainBuffers(backend, divisions);
     const base = sceneByLayer.get(backend)._terrainOriginElevation;
-    const bottom = Math.min(sceneByLayer.get(backend)._dem.low, base) - base, top = Math.max(sceneByLayer.get(backend)._dem.high, base) - base;
     const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
-    const geometry = (
-      /* alloc */
-      {
-        device,
-        attributes,
-        drawRange: (
-          /* alloc */
-          { start: 0, count: attributes.index.count }
-        ),
-        // Local bounds whose radius, scaled by the largest axis, still covers the displaced tile.
-        bounds: (
-          /* alloc */
-          {
-            min: (
-              /* alloc */
-              [0, bottom, 0]
-            ),
-            max: (
-              /* alloc */
-              [1, top, 1]
-            ),
-            center: (
-              /* alloc */
-              [0.5, (bottom + top) / 2, 0.5]
-            ),
-            radius: Math.hypot(sizeX, top - bottom, sizeZ) / 2 / Math.max(sizeX, 1, sizeZ)
-          }
-        )
-      }
-    );
+    const geometry = terrainTileGeometry(backend, attributes, sizeX, sizeZ);
     const mesh = (
       /* alloc */
       {
@@ -10588,6 +11039,56 @@
     }
   }
 
+  // src/raster/retainRasterTiles.js
+  function retainRasterTiles(backend, required) {
+    const tiles = sceneByLayer.get(backend)._rasterTiles;
+    let key, tile, coords;
+    for ([key, tile] of tiles) {
+      if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
+    }
+    for ([key, coords] of required) {
+      if (tiles.has(key)) continue;
+      tile = /* alloc */
+      { coords, request: (
+        /* alloc */
+        new AbortController()
+      ), done: false };
+      tiles.set(key, tile);
+    }
+  }
+
+  // src/globals/TILE_RADIUS.js
+  var TILE_RADIUS = 6;
+
+  // src/globals/archiveNorthWest.js
+  var archiveNorthWest = [0, 0];
+
+  // src/globals/archiveSouthEast.js
+  var archiveSouthEast = [0, 0];
+
+  // src/raster/rasterTileRange.js
+  function rasterTileRange(map, header, zoom) {
+    const bounds = map.getBounds();
+    const northwest = map.project(bounds.getNorthWest(), zoom).divideBy(TILE_SIZE).floor();
+    const southeast = map.project(bounds.getSouthEast(), zoom).divideBy(TILE_SIZE).floor();
+    archiveNorthWest[0] = header.maxLat;
+    archiveNorthWest[1] = header.minLon;
+    archiveSouthEast[0] = header.minLat;
+    archiveSouthEast[1] = header.maxLon;
+    const archiveMin = header.maxLat === void 0 || header.minLon === void 0 ? null : map.project(archiveNorthWest, zoom).divideBy(TILE_SIZE).floor();
+    const archiveMax = header.minLat === void 0 || header.maxLon === void 0 ? null : map.project(archiveSouthEast, zoom).divideBy(TILE_SIZE).floor();
+    const center = map.project(map.getCenter(), zoom).divideBy(TILE_SIZE).floor();
+    return (
+      /* alloc */
+      {
+        minX: Math.max(0, northwest.x, archiveMin?.x ?? 0, center.x - TILE_RADIUS),
+        maxX: Math.min(2 ** zoom - 1, southeast.x, archiveMax?.x ?? 2 ** zoom - 1, center.x + TILE_RADIUS),
+        minY: Math.max(0, northwest.y, archiveMin?.y ?? 0, center.y - TILE_RADIUS),
+        maxY: Math.min(2 ** zoom - 1, southeast.y, archiveMax?.y ?? 2 ** zoom - 1, center.y + TILE_RADIUS)
+      }
+    );
+  }
+
   // src/raster/updateRasterTiles.js
   function updateRasterTiles(backend) {
     const map = backend._map;
@@ -10598,23 +11099,12 @@
       backend.options.maxNativeZoom
     ));
     sceneByLayer.get(backend)._tileZoom = zoom;
-    const bounds = map.getBounds();
-    const northWest = map.project(bounds.getNorthWest(), zoom).divideBy(TILE_SIZE).floor();
-    const southEast = map.project(bounds.getSouthEast(), zoom).divideBy(TILE_SIZE).floor();
-    const northWestLocation = archiveNorthWest;
-    northWestLocation[0] = sceneByLayer.get(backend).header.maxLat;
-    northWestLocation[1] = sceneByLayer.get(backend).header.minLon;
-    const southEastLocation = archiveSouthEast;
-    southEastLocation[0] = sceneByLayer.get(backend).header.minLat;
-    southEastLocation[1] = sceneByLayer.get(backend).header.maxLon;
-    const archiveNorthWest2 = sceneByLayer.get(backend).header.maxLat === void 0 || sceneByLayer.get(backend).header.minLon === void 0 ? null : map.project(northWestLocation, zoom).divideBy(TILE_SIZE).floor();
-    const archiveSouthEast2 = sceneByLayer.get(backend).header.minLat === void 0 || sceneByLayer.get(backend).header.maxLon === void 0 ? null : map.project(southEastLocation, zoom).divideBy(TILE_SIZE).floor();
-    const center = map.project(map.getCenter(), zoom).divideBy(TILE_SIZE).floor();
+    const range = rasterTileRange(map, sceneByLayer.get(backend).header, zoom);
     const wanted = wantedTiles;
     wanted.clear();
-    let x, y, key, coords, parent, tile;
-    for (x = Math.max(0, northWest.x, archiveNorthWest2?.x ?? 0, center.x - TILE_RADIUS); x <= Math.min(2 ** zoom - 1, southEast.x, archiveSouthEast2?.x ?? 2 ** zoom - 1, center.x + TILE_RADIUS); x++) {
-      for (y = Math.max(0, northWest.y, archiveNorthWest2?.y ?? 0, center.y - TILE_RADIUS); y <= Math.min(2 ** zoom - 1, southEast.y, archiveSouthEast2?.y ?? 2 ** zoom - 1, center.y + TILE_RADIUS); y++) {
+    let x, y, key, coords, parent;
+    for (x = range.minX; x <= range.maxX; x++) {
+      for (y = range.minY; y <= range.maxY; y++) {
         wanted.set(
           `${zoom}/${x}/${y}`,
           /* alloc */
@@ -10642,18 +11132,7 @@
     for ([key, coords] of wanted) required.set(key, coords);
     wanted.clear();
     coverage.clear();
-    for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {
-      if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
-    }
-    for ([key, coords] of required) {
-      if (sceneByLayer.get(backend)._rasterTiles.has(key)) continue;
-      tile = /* alloc */
-      { coords, request: (
-        /* alloc */
-        new AbortController()
-      ), done: false };
-      sceneByLayer.get(backend)._rasterTiles.set(key, tile);
-    }
+    retainRasterTiles(backend, required);
     pumpRasterTiles(backend);
     pruneRasterTiles(backend);
   }
@@ -10843,176 +11322,6 @@
   // src/terrain/onTerrainAdd.js
   init_cameraByMap();
 
-  // src/terrain/loadTerrain.js
-  init_L();
-
-  // src/geometry/addBridges.js
-  init_radians();
-
-  // src/geometry/bridgeLocal.js
-  init_L();
-  function local([lng, lat, z], crs, origin, metres, base) {
-    const p = crs.project(
-      /* alloc */
-      new L.LatLng(lat, lng)
-    );
-    return (
-      /* alloc */
-      [(p.x - origin.x) * metres, z - base, -(p.y - origin.y) * metres]
-    );
-  }
-
-  // src/geometry/addBridges.js
-  function addBridges(backend, geojson) {
-    const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
-    const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
-    const base = sceneByLayer.get(backend).root.position[1];
-    const position = (
-      /* alloc */
-      []
-    );
-    const normal = (
-      /* alloc */
-      []
-    );
-    const color = (
-      /* alloc */
-      []
-    );
-    sceneByLayer.get(backend)._bridges = /* alloc */
-    /* @__PURE__ */ new Map();
-    let geometry, polygons, polygon2, rings, ring3, path, pixels, points, lng, lat, z, p, coordinate;
-    let triangles, paths, start2, i, contour, holes, bridgeTriangles, minX, minY, maxX, maxY, t, triangle3, bridge, x, y;
-    let key, a, b, c, pa, pb, pc, start22, q, length, nx, nz, corner, k, bucket, polygonIndex;
-    for ({ geometry } of geojson.features) {
-      if (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon") continue;
-      polygons = geometry.coordinates;
-      for (polygonIndex = 0; polygonIndex < (geometry.type === "Polygon" ? 1 : polygons.length); polygonIndex++) {
-        polygon2 = geometry.type === "Polygon" ? polygons : polygons[polygonIndex];
-        rings = /* alloc */
-        [];
-        for (ring3 of polygon2) {
-          path = ring3.slice(0, -1);
-          if (path.length >= 3) rings.push(path);
-        }
-        if (!rings.length) continue;
-        pixels = /* alloc */
-        [];
-        points = /* alloc */
-        [];
-        for (ring3 of rings) for ([lng, lat, z] of ring3) {
-          p = map.project(
-            /* alloc */
-            [lat, lng],
-            zoom
-          );
-          pixels.push(
-            /* alloc */
-            [p.x, p.y, z]
-          );
-        }
-        for (ring3 of rings) for (coordinate of ring3) points.push(local(coordinate, crs, origin, metres, base));
-        triangles = void 0;
-        try {
-          paths = /* alloc */
-          [];
-          start2 = 0;
-          for (ring3 of rings) {
-            path = /* alloc */
-            [];
-            for (i = 0; i < ring3.length; i++) path.push(
-              /* alloc */
-              { x: pixels[start2 + i][0], y: pixels[start2 + i][1] }
-            );
-            paths.push(path);
-            start2 += ring3.length;
-          }
-          [contour, ...holes] = paths;
-          triangles = triangulate(contour, holes);
-        } catch {
-          continue;
-        }
-        bridgeTriangles = /* alloc */
-        [];
-        minX = minY = Infinity;
-        maxX = maxY = -Infinity;
-        for (t of triangles) {
-          triangle3 = /* alloc */
-          [];
-          for (i of t) triangle3.push(pixels[i]);
-          bridgeTriangles.push(triangle3);
-        }
-        for (p of pixels) {
-          minX = Math.min(minX, p[0]);
-          minY = Math.min(minY, p[1]);
-          maxX = Math.max(maxX, p[0]);
-          maxY = Math.max(maxY, p[1]);
-        }
-        bridge = /* alloc */
-        {
-          triangles: bridgeTriangles,
-          min: (
-            /* alloc */
-            [minX, minY]
-          ),
-          max: (
-            /* alloc */
-            [maxX, maxY]
-          )
-        };
-        for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
-          for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
-            key = `${x}/${y}`;
-            bucket = sceneByLayer.get(backend)._bridges.get(key);
-            if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* alloc */
-            []);
-            bucket.push(bridge);
-          }
-        }
-        for ([a, b, c] of triangles) {
-          pa = points[a];
-          pb = points[b];
-          pc = points[c];
-          if ((pb[2] - pa[2]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[2] - pa[2]) < 0) {
-            i = b;
-            b = c;
-            c = i;
-          }
-          for (k = 0; k < 6; k++) {
-            i = k === 0 || k === 3 ? a : k === 1 || k === 5 ? b : c;
-            p = points[i];
-            position.push(p[0], p[1] - (k >= 3 ? 1.2 : 0), p[2]);
-            normal.push(0, k >= 3 ? -1 : 1, 0);
-            color.push(0.6, 0.58, 0.54);
-          }
-        }
-        start22 = 0;
-        for (ring3 of rings) {
-          for (i = 0; i < ring3.length; i++) {
-            p = points[start22 + i], q = points[start22 + (i + 1) % ring3.length];
-            length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1;
-            nx = (q[2] - p[2]) / length;
-            nz = -(q[0] - p[0]) / length;
-            for (k = 0; k < 6; k++) {
-              corner = k === 0 || k === 3 || k === 5 ? p : q;
-              position.push(corner[0], corner[1] - (k === 2 || k >= 4 ? 1.2 : 0), corner[2]);
-              normal.push(nx, 0, nz);
-              color.push(0.6, 0.58, 0.54);
-            }
-          }
-          start22 += ring3.length;
-        }
-      }
-    }
-    if (position.length) {
-      sceneByLayer.get(backend)._bridgeMesh = createMesh(
-        backend,
-        /* alloc */
-        { position, normal, color }
-      );
-    }
-  }
-
   // src/terrain/loadTerrainTiles.js
   async function loadTerrainTiles(state) {
     const { backend, archive, controller, tiles } = state;
@@ -11044,6 +11353,264 @@
     return response.json();
   }
 
+  // src/terrain/terrainTileQueue.js
+  init_L();
+  function terrainTileQueue(backend, header) {
+    const scene = sceneByLayer.get(backend), map = backend._map;
+    scene._terrainZoom = header.maxZoom;
+    archiveNorthWest[0] = header.maxLat;
+    archiveNorthWest[1] = header.minLon;
+    const northwest = map.project(archiveNorthWest, scene._terrainZoom).divideBy(256).floor();
+    archiveSouthEast[0] = header.minLat;
+    archiveSouthEast[1] = header.maxLon;
+    const southeast = map.project(archiveSouthEast, scene._terrainZoom).divideBy(256).floor();
+    scene._terrainBounds = /* alloc */
+    new L.Bounds(northwest, southeast);
+    const tiles = (
+      /* alloc */
+      []
+    );
+    const center = map.project(map.getCenter(), scene._terrainZoom).divideBy(256);
+    let x, y;
+    for (x = northwest.x; x <= southeast.x; x++) {
+      for (y = northwest.y; y <= southeast.y; y++) {
+        tiles.push(
+          /* alloc */
+          { z: scene._terrainZoom, x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) }
+        );
+      }
+    }
+    tiles.sort(compareDistance);
+    return tiles;
+  }
+
+  // src/geometry/addBridges.js
+  init_radians();
+
+  // src/geometry/bridgeLocal.js
+  init_L();
+  function local([lng, lat, z], crs, origin, metres, base) {
+    const p = crs.project(
+      /* alloc */
+      new L.LatLng(lat, lng)
+    );
+    return (
+      /* alloc */
+      [(p.x - origin.x) * metres, z - base, -(p.y - origin.y) * metres]
+    );
+  }
+
+  // src/geometry/bridgePaths.js
+  function bridgePaths(rings, pixels) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    let start2 = 0, ring3, path, i;
+    for (ring3 of rings) {
+      path = /* alloc */
+      [];
+      for (i = 0; i < ring3.length; i++) path.push(
+        /* alloc */
+        { x: pixels[start2 + i][0], y: pixels[start2 + i][1] }
+      );
+      paths.push(path);
+      start2 += ring3.length;
+    }
+    return paths;
+  }
+
+  // src/geometry/indexBridge.js
+  function indexBridge(backend, pixels, triangles) {
+    const bridgeTriangles = (
+      /* alloc */
+      []
+    );
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let t, triangle3, i, p, x, y, key, bucket;
+    for (t of triangles) {
+      triangle3 = /* alloc */
+      [];
+      for (i of t) triangle3.push(pixels[i]);
+      bridgeTriangles.push(triangle3);
+    }
+    for (p of pixels) {
+      minX = Math.min(minX, p[0]);
+      minY = Math.min(minY, p[1]);
+      maxX = Math.max(maxX, p[0]);
+      maxY = Math.max(maxY, p[1]);
+    }
+    const bridge = (
+      /* alloc */
+      {
+        triangles: bridgeTriangles,
+        min: (
+          /* alloc */
+          [minX, minY]
+        ),
+        max: (
+          /* alloc */
+          [maxX, maxY]
+        )
+      }
+    );
+    for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
+      for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
+        key = `${x}/${y}`;
+        bucket = sceneByLayer.get(backend)._bridges.get(key);
+        if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* alloc */
+        []);
+        bucket.push(bridge);
+      }
+    }
+  }
+
+  // src/geometry/bridgeFaces.js
+  function bridgeFaces(context, points, triangles) {
+    const { position, normal, color } = context;
+    let a, b, c, pa, pb, pc, i, k, p;
+    for ([a, b, c] of triangles) {
+      pa = points[a];
+      pb = points[b];
+      pc = points[c];
+      if ((pb[2] - pa[2]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[2] - pa[2]) < 0) {
+        i = b;
+        b = c;
+        c = i;
+      }
+      for (k = 0; k < 6; k++) {
+        i = k === 0 || k === 3 ? a : k === 1 || k === 5 ? b : c;
+        p = points[i];
+        position.push(p[0], p[1] - (k >= 3 ? 1.2 : 0), p[2]);
+        normal.push(0, k >= 3 ? -1 : 1, 0);
+        color.push(0.6, 0.58, 0.54);
+      }
+    }
+  }
+
+  // src/geometry/bridgeEdge.js
+  function bridgeEdge(context, p, q) {
+    const { position, normal, color } = context;
+    const length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1;
+    const nx = (q[2] - p[2]) / length, nz = -(q[0] - p[0]) / length;
+    let k, corner;
+    for (k = 0; k < 6; k++) {
+      corner = k === 0 || k === 3 || k === 5 ? p : q;
+      position.push(corner[0], corner[1] - (k === 2 || k >= 4 ? 1.2 : 0), corner[2]);
+      normal.push(nx, 0, nz);
+      color.push(0.6, 0.58, 0.54);
+    }
+  }
+
+  // src/geometry/bridgeSides.js
+  function bridgeSides(context, points, rings) {
+    let start2 = 0, ring3, i;
+    for (ring3 of rings) {
+      for (i = 0; i < ring3.length; i++) {
+        bridgeEdge(context, points[start2 + i], points[start2 + (i + 1) % ring3.length]);
+      }
+      start2 += ring3.length;
+    }
+  }
+
+  // src/geometry/bridgePolygon.js
+  function bridgePolygon(context, polygon2) {
+    const { backend, map, zoom, crs, origin, metres, base } = context;
+    const rings = (
+      /* alloc */
+      []
+    );
+    let ring3, path, lng, lat, z, p, coordinate, paths, contour, holes, triangles;
+    for (ring3 of polygon2) {
+      path = ring3.slice(0, -1);
+      if (path.length >= 3) rings.push(path);
+    }
+    if (!rings.length) return;
+    const pixels = (
+      /* alloc */
+      []
+    ), points = (
+      /* alloc */
+      []
+    );
+    for (ring3 of rings) for ([lng, lat, z] of ring3) {
+      p = map.project(
+        /* alloc */
+        [lat, lng],
+        zoom
+      );
+      pixels.push(
+        /* alloc */
+        [p.x, p.y, z]
+      );
+    }
+    for (ring3 of rings) for (coordinate of ring3) points.push(local(coordinate, crs, origin, metres, base));
+    try {
+      paths = bridgePaths(rings, pixels);
+      [contour, ...holes] = paths;
+      triangles = triangulate(contour, holes);
+    } catch {
+      return;
+    }
+    indexBridge(backend, pixels, triangles);
+    bridgeFaces(context, points, triangles);
+    bridgeSides(context, points, rings);
+  }
+
+  // src/geometry/addBridges.js
+  function addBridges(backend, geojson) {
+    const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
+    const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
+    const base = sceneByLayer.get(backend).root.position[1];
+    const position = (
+      /* alloc */
+      []
+    ), normal = (
+      /* alloc */
+      []
+    ), color = (
+      /* alloc */
+      []
+    );
+    sceneByLayer.get(backend)._bridges = /* alloc */
+    /* @__PURE__ */ new Map();
+    const context = (
+      /* alloc */
+      { backend, map, crs, zoom, origin, metres, base, position, normal, color }
+    );
+    let geometry, polygons, polygonIndex;
+    for ({ geometry } of geojson.features) {
+      if (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon") continue;
+      polygons = geometry.coordinates;
+      for (polygonIndex = 0; polygonIndex < (geometry.type === "Polygon" ? 1 : polygons.length); polygonIndex++) {
+        bridgePolygon(context, geometry.type === "Polygon" ? polygons : polygons[polygonIndex]);
+      }
+    }
+    if (position.length) {
+      sceneByLayer.get(backend)._bridgeMesh = createMesh(
+        backend,
+        /* alloc */
+        { position, normal, color }
+      );
+    }
+  }
+
+  // src/terrain/applyTerrain.js
+  function applyTerrain(backend, map, bridges) {
+    const scene = sceneByLayer.get(backend);
+    scene._terrainReady = true;
+    scene._terrainOriginElevation = getElevation(backend, scene.location) ?? 0;
+    let layer;
+    for (layer of Object.values(map._layers)) {
+      setTerrainHeight(layer);
+      conformModelToTerrain(layer, backend);
+    }
+    if (bridges) addBridges(backend, bridges);
+    map.fire("terrainchange");
+    update(backend);
+    backend.fire("terrainready");
+  }
+
   // src/terrain/loadTerrain.js
   async function loadTerrain(backend) {
     if (sceneByLayer.get(backend)._terrainLoading || !backend._map) return;
@@ -11051,7 +11618,7 @@
     sceneByLayer.get(backend)._terrainReady = false;
     const controller = sceneByLayer.get(backend)._terrainController = /* alloc */
     new AbortController();
-    let x, y, i, layer;
+    let i;
     try {
       if (!sceneByLayer.get(backend).terrainSource) throw (
         /* alloc */
@@ -11077,32 +11644,8 @@
           new Error("Expected a single-zoom Float32 terrain archive")
         );
       }
-      sceneByLayer.get(backend)._terrainZoom = header.maxZoom;
       const map = backend._map;
-      const northWestLocation = archiveNorthWest;
-      northWestLocation[0] = header.maxLat;
-      northWestLocation[1] = header.minLon;
-      const northwest = map.project(northWestLocation, sceneByLayer.get(backend)._terrainZoom).divideBy(256).floor();
-      const southEastLocation = archiveSouthEast;
-      southEastLocation[0] = header.minLat;
-      southEastLocation[1] = header.maxLon;
-      const southeast = map.project(southEastLocation, sceneByLayer.get(backend)._terrainZoom).divideBy(256).floor();
-      sceneByLayer.get(backend)._terrainBounds = /* alloc */
-      new L.Bounds(northwest, southeast);
-      const tiles = (
-        /* alloc */
-        []
-      );
-      const center = map.project(map.getCenter(), sceneByLayer.get(backend)._terrainZoom).divideBy(256);
-      for (x = northwest.x; x <= southeast.x; x++) {
-        for (y = northwest.y; y <= southeast.y; y++) {
-          tiles.push(
-            /* alloc */
-            { z: sceneByLayer.get(backend)._terrainZoom, x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) }
-          );
-        }
-      }
-      tiles.sort(compareDistance);
+      const tiles = terrainTileQueue(backend, header);
       const state = (
         /* alloc */
         { backend, archive, controller, tiles, next: 0 }
@@ -11119,16 +11662,7 @@
         { signal: controller.signal }
       ).then(readBridges);
       if (controller.signal.aborted || backend._map !== map) return;
-      sceneByLayer.get(backend)._terrainReady = true;
-      sceneByLayer.get(backend)._terrainOriginElevation = getElevation(backend, sceneByLayer.get(backend).location) ?? 0;
-      for (layer of Object.values(map._layers)) {
-        setTerrainHeight(layer);
-        conformModelToTerrain(layer, backend);
-      }
-      if (bridges) addBridges(backend, bridges);
-      map.fire("terrainchange");
-      update(backend);
-      backend.fire("terrainready");
+      applyTerrain(backend, map, bridges);
       return true;
     } catch (error) {
       if (!controller.signal.aborted) backend.fire(
@@ -11230,6 +11764,19 @@
     return null;
   }
 
+  // src/sunlight/updateCelestialDisc.js
+  function updateCelestialDisc(disc, body, sky, size, pitch, bearing, projection) {
+    disc.hidden = true;
+    if (!sky || !body || body.altitude <= 0) return;
+    if (disc.parentNode !== sky) sky.append(disc);
+    const point = projectCelestialBody(body.direction, size, pitch, bearing, projection);
+    if (!point) return;
+    const { left, top } = point;
+    disc.hidden = left < 0 || left > size.x || top < 0 || top > sky.clientHeight || sky.style.display === "none";
+    disc.style.left = `${left}px`;
+    disc.style.top = `${top}px`;
+  }
+
   // src/sunlight/updateSky.js
   function updateSky2({ map, originalSky, sunDisc, moonDisc, projection }) {
     const sun = cameraByMap.get(map)._sunlight, sky = cameraByMap.get(map)._pitchSky;
@@ -11237,20 +11784,8 @@
     else if (originalSky) map.getContainer().style.setProperty("--leaflet-sky-background", originalSky);
     else map.getContainer().style.removeProperty("--leaflet-sky-background");
     const size = map.getSize(), pitch = mapGetPitch(map) * radians, bearing = mapGetBearing(map) * radians;
-    let i, disc, body, point, left, top;
-    for (i = 0; i < 2; i++) {
-      disc = i === 0 ? sunDisc : moonDisc;
-      body = i === 0 ? sun : sun?.moon;
-      disc.hidden = true;
-      if (!sky || !body || body.altitude <= 0 || !sun) continue;
-      if (disc.parentNode !== sky) sky.append(disc);
-      point = projectCelestialBody(body.direction, size, pitch, bearing, projection);
-      if (!point) continue;
-      ({ left, top } = point);
-      disc.hidden = left < 0 || left > size.x || top < 0 || top > sky.clientHeight || sky.style.display === "none";
-      disc.style.left = `${left}px`;
-      disc.style.top = `${top}px`;
-    }
+    updateCelestialDisc(sunDisc, sun, sky, size, pitch, bearing, projection);
+    updateCelestialDisc(moonDisc, sun?.moon, sky, size, pitch, bearing, projection);
   }
 
   // src/sunlight/updateSun.js
@@ -12283,6 +12818,23 @@
     if (state.layer._map) startTraffic(state);
   }
 
+  // src/traffic/trafficNow.js
+  init_cameraByMap();
+  function trafficNow(state) {
+    const control = cameraByMap.get(state.layer._map)?._timeControl;
+    const live = control ? control.live : true;
+    return (
+      /* alloc */
+      {
+        live,
+        time: live ? (
+          /* alloc */
+          /* @__PURE__ */ new Date()
+        ) : control.time
+      }
+    );
+  }
+
   // src/traffic/vehicleOffsets.js
   function vehicleOffsets(length, flow, velocity = speed) {
     const count = Math.round(length * flow / 3600 / velocity);
@@ -12420,23 +12972,6 @@
     return trips;
   }
 
-  // src/traffic/trafficNow.js
-  init_cameraByMap();
-  function trafficNow(state) {
-    const control = cameraByMap.get(state.layer._map)?._timeControl;
-    const live = control ? control.live : true;
-    return (
-      /* alloc */
-      {
-        live,
-        time: live ? (
-          /* alloc */
-          /* @__PURE__ */ new Date()
-        ) : control.time
-      }
-    );
-  }
-
   // src/traffic/failTraffic.js
   function failTraffic(state, error) {
     state.error = error;
@@ -12447,6 +12982,38 @@
 
   // src/globals/trafficRouteMaterial.js
   var trafficRouteMaterial = Object.freeze({ unlit: true });
+
+  // src/traffic/appendRouteDash.js
+  function appendRouteDash(position, normal, color, a, b, dx, dz, x, z, start2, end, r, g, blue) {
+    const px = a[0] + dx * start2, pz = a[1] + dz * start2;
+    const py = a[2] + (b[2] - a[2]) * start2 + 0.4;
+    const qx = a[0] + dx * end, qz = a[1] + dz * end;
+    const qy = a[2] + (b[2] - a[2]) * end + 0.4;
+    let vertex;
+    for (vertex = 0; vertex < 6; vertex++) {
+      if (vertex === 0 || vertex === 3) position.push(px - x, py, pz - z);
+      else if (vertex === 1) position.push(px + x, py, pz + z);
+      else if (vertex === 5) position.push(qx - x, qy, qz - z);
+      else position.push(qx + x, qy, qz + z);
+      normal.push(0, 1, 0);
+      color.push(r, g, blue);
+    }
+  }
+
+  // src/traffic/appendRouteSegment.js
+  function appendRouteSegment(position, normal, color, points, lengths, i, r, g, blue) {
+    const a = points[i - 1], b = points[i];
+    const dx = b[0] - a[0], dz = b[1] - a[1], length = lengths[i] - lengths[i - 1];
+    if (!length) return;
+    const x = -dz / length * 2.5, z = dx / length * 2.5;
+    let distance, start2, end;
+    for (distance = Math.floor(lengths[i - 1] / 30) * 30; distance < lengths[i]; distance += 30) {
+      start2 = Math.max(0, (distance - lengths[i - 1]) / length);
+      end = Math.min(1, (distance + 18 - lengths[i - 1]) / length);
+      if (end <= start2) continue;
+      appendRouteDash(position, normal, color, a, b, dx, dz, x, z, start2, end, r, g, blue);
+    }
+  }
 
   // src/traffic/routeGeometry.js
   function routeGeometry(lanes) {
@@ -12462,8 +13029,7 @@
       /* alloc */
       []
     );
-    let points, lengths, properties, raw, rgb2, r, g, blue, i, a, b, dx, dz, length, x, z, distance, start2, end;
-    let px, py, pz, qx, qy, qz, vertex;
+    let points, lengths, properties, raw, rgb2, r, g, blue, i;
     for ({ points, lengths, properties } of lanes) {
       raw = properties?.route_color;
       rgb2 = /^[\da-f]{6}$/i.test(raw) ? Number.parseInt(raw, 16) : null;
@@ -12471,29 +13037,7 @@
       g = rgb2 === null ? 0.7 : (rgb2 >> 8 & 255) / 255;
       blue = rgb2 === null ? 0.85 : (rgb2 & 255) / 255;
       for (i = 1; i < points.length; i++) {
-        a = points[i - 1], b = points[i];
-        dx = b[0] - a[0], dz = b[1] - a[1], length = lengths[i] - lengths[i - 1];
-        if (!length) continue;
-        x = -dz / length * 2.5, z = dx / length * 2.5;
-        for (distance = Math.floor(lengths[i - 1] / 30) * 30; distance < lengths[i]; distance += 30) {
-          start2 = Math.max(0, (distance - lengths[i - 1]) / length);
-          end = Math.min(1, (distance + 18 - lengths[i - 1]) / length);
-          if (end <= start2) continue;
-          px = a[0] + dx * start2;
-          pz = a[1] + dz * start2;
-          py = a[2] + (b[2] - a[2]) * start2 + 0.4;
-          qx = a[0] + dx * end;
-          qz = a[1] + dz * end;
-          qy = a[2] + (b[2] - a[2]) * end + 0.4;
-          for (vertex = 0; vertex < 6; vertex++) {
-            if (vertex === 0 || vertex === 3) position.push(px - x, py, pz - z);
-            else if (vertex === 1) position.push(px + x, py, pz + z);
-            else if (vertex === 5) position.push(qx - x, qy, qz - z);
-            else position.push(qx + x, qy, qz + z);
-            normal.push(0, 1, 0);
-            color.push(r, g, blue);
-          }
-        }
+        appendRouteSegment(position, normal, color, points, lengths, i, r, g, blue);
       }
     }
     return (
@@ -12617,6 +13161,30 @@
     return buffer;
   }
 
+  // src/traffic/uploadTrafficLanes.js
+  function uploadTrafficLanes(state, device) {
+    let lane, i, point, count = 0;
+    for (lane of state.lanes) count += lane.points.length;
+    const data = (
+      /* alloc */
+      new Float32Array(count * 4)
+    );
+    let offset = 0;
+    for (lane of state.lanes) {
+      lane.start = offset / 4;
+      for (i = 0; i < lane.points.length; i++) {
+        point = lane.points[i];
+        data[offset++] = point[0];
+        data[offset++] = point[1];
+        data[offset++] = point[2];
+        data[offset++] = lane.lengths[i];
+      }
+    }
+    state.gpu.points?.destroy();
+    state.gpu.points = trafficStorage(device, data);
+    state.lanesDirty = false;
+  }
+
   // src/traffic/rebaseTraffic.js
   function rebaseTraffic(state) {
     const { device } = sceneByLayer.get(state.layer).renderer;
@@ -12657,29 +13225,8 @@
       };
       state.lanesDirty = true;
     }
-    let lane, i, point, trip, binding;
-    if (state.lanesDirty) {
-      let count = 0;
-      for (lane of state.lanes) count += lane.points.length;
-      const data2 = (
-        /* alloc */
-        new Float32Array(count * 4)
-      );
-      let offset = 0;
-      for (lane of state.lanes) {
-        lane.start = offset / 4;
-        for (i = 0; i < lane.points.length; i++) {
-          point = lane.points[i];
-          data2[offset++] = point[0];
-          data2[offset++] = point[1];
-          data2[offset++] = point[2];
-          data2[offset++] = lane.lengths[i];
-        }
-      }
-      state.gpu.points?.destroy();
-      state.gpu.points = trafficStorage(device, data2);
-      state.lanesDirty = false;
-    }
+    let i, trip, binding;
+    if (state.lanesDirty) uploadTrafficLanes(state, device);
     const data = (
       /* alloc */
       new Float32Array(state.trips.length * 4)
@@ -12729,6 +13276,43 @@
     );
   }
 
+  // src/traffic/trafficStatusText.js
+  function trafficStatusText(state, valid) {
+    if (!valid) return `${state.vehicle}: select a valid simulation date`;
+    if (!state.loaded) return `${state.vehicle}: loading\u2026`;
+    return `${state.trips.length} ${state.vehicle === "boat" ? "boats" : state.vehicle}`;
+  }
+
+  // src/traffic/refreshTrafficTrips.js
+  function refreshTrafficTrips(state, time, ms, valid) {
+    let text;
+    try {
+      if (valid) state.trips = tripsAt(time, state.lanes, state.velocity);
+      else state.trips.length = 0;
+      text = trafficStatusText(state, valid);
+    } catch (error) {
+      failTraffic(state, error);
+      return;
+    }
+    state.rebasedAt = ms;
+    state.nextCheck = ms + 1e3;
+    let key = "", trip;
+    for (trip of state.trips) key += `${key ? "," : ""}${trip.id}`;
+    const routeNeeded = state.outline && !state.route && state.lanes.length;
+    const changed = key !== state.tripsKey || Boolean(routeNeeded);
+    if (routeNeeded) drawTrafficRoute(state);
+    if (key !== state.tripsKey) {
+      rebuildTrafficMesh(state);
+      state.tripsKey = key;
+    }
+    if (state.mesh) rebaseTraffic(state);
+    if (!state.error) {
+      if (state.status.textContent !== text) state.status.textContent = text;
+      state.status.removeAttribute("role");
+    }
+    return changed;
+  }
+
   // src/traffic/moveTraffic.js
   function moveTraffic(state, seconds) {
     const { device } = state.gpu;
@@ -12749,6 +13333,39 @@
     state.stale = true;
   }
 
+  // src/traffic/updateTrafficLights.js
+  function updateTrafficLights(state) {
+    state.litAt = performance.now();
+    const lights = (
+      /* alloc */
+      []
+    );
+    let trip, x, y, z, dx, dz, lx, ly, lz, light;
+    for (trip of state.trips) {
+      ({ x, y, z, dx, dz } = locateTraffic(state, trip));
+      for ({ position: [lx, ly, lz], ...light } of state.lights) {
+        lights.push(
+          /* alloc */
+          {
+            ...light,
+            position: (
+              /* alloc */
+              [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz]
+            )
+          }
+        );
+      }
+    }
+    state.mesh.extras.lights = lights;
+  }
+
+  // src/traffic/updateTrafficPose.js
+  function updateTrafficPose(state, ms, live) {
+    if (!state.mesh) return;
+    moveTraffic(state, (ms - state.rebasedAt) / 1e3);
+    if (state.lights && (!live || !(performance.now() - state.litAt < 100))) updateTrafficLights(state);
+  }
+
   // src/traffic/tickTraffic.js
   function tickTraffic(state) {
     state.frame = void 0;
@@ -12763,56 +13380,11 @@
     }
     const { live, time } = trafficNow(state), ms = time?.getTime(), valid = Number.isFinite(ms);
     let changed = false;
-    let trip, x, y, z, dx, dz, lx, ly, lz, light;
     if (!live || !valid || !(ms >= state.rebasedAt && ms < state.nextCheck)) {
-      let text;
-      try {
-        if (valid) state.trips = tripsAt(time, state.lanes, state.velocity);
-        else state.trips.length = 0;
-        text = !valid ? `${state.vehicle}: select a valid simulation date` : !state.loaded ? `${state.vehicle}: loading\u2026` : `${state.trips.length} ${state.vehicle === "boat" ? "boats" : state.vehicle}`;
-      } catch (error) {
-        return failTraffic(state, error);
-      }
-      state.rebasedAt = ms;
-      state.nextCheck = ms + 1e3;
-      let key = "";
-      for (trip of state.trips) key += `${key ? "," : ""}${trip.id}`;
-      changed = key !== state.tripsKey || state.outline && !state.route && state.lanes.length;
-      if (state.outline && !state.route && state.lanes.length) drawTrafficRoute(state);
-      if (key !== state.tripsKey) {
-        rebuildTrafficMesh(state);
-        state.tripsKey = key;
-      }
-      if (state.mesh) rebaseTraffic(state);
-      if (!state.error) {
-        if (state.status.textContent !== text) state.status.textContent = text;
-        state.status.removeAttribute("role");
-      }
+      changed = refreshTrafficTrips(state, time, ms, valid);
+      if (changed === void 0) return;
     }
-    if (state.mesh) moveTraffic(state, (ms - state.rebasedAt) / 1e3);
-    if (state.mesh && state.lights && (!live || !(performance.now() - state.litAt < 100))) {
-      state.litAt = performance.now();
-      const lights = (
-        /* alloc */
-        []
-      );
-      for (trip of state.trips) {
-        ({ x, y, z, dx, dz } = locateTraffic(state, trip));
-        for ({ position: [lx, ly, lz], ...light } of state.lights) {
-          lights.push(
-            /* alloc */
-            {
-              ...light,
-              position: (
-                /* alloc */
-                [x - lx * dz - lz * dx, y + ly, z + lx * dx - lz * dz]
-              )
-            }
-          );
-        }
-      }
-      state.mesh.extras.lights = lights;
-    }
+    updateTrafficPose(state, ms, live);
     if (state.mesh || changed) update(state.layer);
     if (live && valid) state.frame = requestAnimationFrame(state.tick);
   }
@@ -13211,14 +13783,6 @@
   init_mapGetBearing();
   init_mapSetPitch();
 
-  // src/walk/step.js
-  init_degrees();
-  init_radians();
-  init_L();
-  init_mapGetBearing();
-  init_mapSetPitchAndBearing();
-  init_mapGetPitch();
-
   // src/utils/wrap.js
   function wrap(angle) {
     return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -13229,11 +13793,71 @@
     return other === layer || sceneByLayer.get(other)._type === "terrain" || sceneByLayer.get(other)._type === "traffic";
   }
 
+  // src/walk/land.js
+  function land(previousY) {
+    const state = sceneByLayer.get(this.layer), ray = state.raycaster;
+    const feet = local2.call(this, this.local), root = state.root;
+    const x = root.position[0] + feet[0] * root.scale[0];
+    const y = root.position[1] + feet[1] * root.scale[1];
+    const z = root.position[2] + feet[2] * root.scale[2];
+    if (y > previousY || this.verticalSpeed > 0) return;
+    updateWorldMatrix(state.scene);
+    ray.origin[0] = x;
+    ray.origin[1] = previousY + 0.01;
+    ray.origin[2] = z;
+    ray.direction[0] = 0;
+    ray.direction[1] = -1;
+    ray.direction[2] = 0;
+    ray.meshes.length = 0;
+    let layer, hit2;
+    for (layer of sceneByLayer.get(state._shared)._layers) {
+      if (shouldSkipOther(layer, this.layer) || sceneByLayer.get(layer).kind === "raster" || layer.options.nightLight) continue;
+      traverse(sceneByLayer.get(layer).root, collectVisibleMesh2, ray.meshes);
+    }
+    for (hit2 of intersectMeshes(ray, ray.meshes)) {
+      if (hit2.point[1] < y - 1e-3) break;
+      this.state.height += (hit2.point[1] - y) / root.scale[1];
+      this.verticalSpeed = 0;
+      break;
+    }
+    ray.meshes.length = 0;
+  }
+
+  // src/walk/moveWalker.js
+  init_L();
+  init_radians();
+
   // src/globals/CELL.js
   var CELL = 8;
 
   // src/globals/colliders.js
   var colliders = /* @__PURE__ */ new WeakMap();
+
+  // src/collision/transformTriangle.js
+  function transformTriangle(v, p, index, i, m) {
+    let k, j, x, y, z;
+    for (k = 0; k < 3; k++) {
+      j = (index ? index.data[i + k] : i + k) * 3, x = p[j], y = p[j + 1], z = p[j + 2];
+      v[k * 3] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      v[k * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      v[k * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+    }
+  }
+
+  // src/collision/indexTriangle.js
+  function indexTriangle(cells, v, t) {
+    let ix, iz, key;
+    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
+      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
+        key = ix + "," + iz;
+        if (!cells.has(key)) cells.set(
+          key,
+          /* alloc */
+          []
+        );
+        cells.get(key).push(t);
+      }
+  }
 
   // src/collision/collider.js
   function collider(mesh) {
@@ -13257,18 +13881,13 @@
       /* alloc */
       []
     );
-    let i, first, k, j, x, y, z, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t, ix, iz, key;
+    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t;
     for (i = 0; i < count; i += 3) {
       first = index ? index.data[i] : i;
       if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
         continue;
       }
-      for (k = 0; k < 3; k++) {
-        j = (index ? index.data[i + k] : i + k) * 3, x = p[j], y = p[j + 1], z = p[j + 2];
-        v[k * 3] = m[0] * x + m[4] * y + m[8] * z + m[12];
-        v[k * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-        v[k * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-      }
+      transformTriangle(v, p, index, i, m);
       ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
       nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
       ny = ez * fx - ex * fz, length = Math.hypot(nx, ny, nz);
@@ -13285,18 +13904,7 @@
       h = Math.hypot(nx, nz), t = nrm.length / 2;
       tri.push(...v);
       nrm.push(nx / h, nz / h);
-      for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
-        for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
-          key = ix + "," + iz;
-          if (!cells.has(key)) {
-            cells.set(
-              key,
-              /* alloc */
-              []
-            );
-          }
-          cells.get(key).push(t);
-        }
+      indexTriangle(cells, v, t);
     }
     c = /* alloc */
     {
@@ -13325,6 +13933,25 @@
     return (fx * qx + fy * qy + fz * qz) / det;
   }
 
+  // src/picking/hitColliderCell.js
+  function hitColliderCell(cell, c, data, ox, oy, oz) {
+    const { dx, dz, seen } = data;
+    let t, height, d;
+    for (t of cell) {
+      if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
+      seen.add(t);
+      for (height = 0.4; height < 2; height += 1.1) {
+        d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
+        if (d >= 0 && d < data.best) {
+          data.best = d;
+          data.found = true;
+          data.normal[0] = c.nrm[t * 2];
+          data.normal[1] = c.nrm[t * 2 + 1];
+        }
+      }
+    }
+  }
+
   // src/picking/hitMesh.js
   function hitMesh(mesh, data) {
     if (!mesh.visible) return true;
@@ -13336,24 +13963,12 @@
     const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
     const seen = data.seen;
     seen.clear();
-    let ix, iz, t, height, d, cell;
+    let ix, iz, cell;
     for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
       for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
         cell = c.cells.get(ix + "," + iz);
         if (!cell) continue;
-        for (t of cell) {
-          if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
-          seen.add(t);
-          for (height = 0.4; height < 2; height += 1.1) {
-            d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
-            if (d >= 0 && d < data.best) {
-              data.best = d;
-              data.found = true;
-              data.normal[0] = c.nrm[t * 2];
-              data.normal[1] = c.nrm[t * 2 + 1];
-            }
-          }
-        }
+        hitColliderCell(cell, c, data, ox, oy, oz);
       }
   }
 
@@ -13376,90 +13991,47 @@
     return length > 1e-6 && hit(this.layer, feet[0], feet[1], feet[2], east / length, -north / length, length + 0.3, this.hitData);
   }
 
-  // src/walk/land.js
-  function land(previousY) {
-    const state = sceneByLayer.get(this.layer), ray = state.raycaster;
-    const feet = local2.call(this, this.local), root = state.root;
-    const x = root.position[0] + feet[0] * root.scale[0];
-    const y = root.position[1] + feet[1] * root.scale[1];
-    const z = root.position[2] + feet[2] * root.scale[2];
-    if (y > previousY || this.verticalSpeed > 0) return;
-    updateWorldMatrix(state.scene);
-    ray.origin[0] = x;
-    ray.origin[1] = previousY + 0.01;
-    ray.origin[2] = z;
-    ray.direction[0] = 0;
-    ray.direction[1] = -1;
-    ray.direction[2] = 0;
-    ray.meshes.length = 0;
-    let layer, hit2;
-    for (layer of sceneByLayer.get(state._shared)._layers) {
-      if (shouldSkipOther(layer, this.layer) || sceneByLayer.get(layer).kind === "raster" || layer.options.nightLight) continue;
-      traverse(sceneByLayer.get(layer).root, collectVisibleMesh, ray.meshes);
+  // src/walk/moveWalker.js
+  function moveWalker(forward, dt) {
+    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
+    const { position, scale } = sceneByLayer.get(this.layer).root;
+    let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
+    const feet = local2.call(this, this.local);
+    let i;
+    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
+    const wall = blocked.call(this, east, north, feet);
+    if (wall) {
+      const into = east * wall[0] - north * wall[1];
+      east -= into * wall[0];
+      north += into * wall[1];
+      if (blocked.call(this, east, north, feet)) east = north = 0;
     }
-    for (hit2 of intersectMeshes(ray, ray.meshes)) {
-      if (hit2.point[1] < y - 1e-3) break;
-      this.state.height += (hit2.point[1] - y) / root.scale[1];
-      this.verticalSpeed = 0;
-      break;
-    }
-    ray.meshes.length = 0;
+    this.state.latlng = /* alloc */
+    new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
+    this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
   }
 
-  // src/walk/step.js
-  function step(now) {
-    const layer = this.layer, map = layer._map;
-    this.frame = requestAnimationFrame(this.step);
-    const dt = Math.min(0.1, (now - (this.last ?? now)) / 1e3);
-    this.last = now;
-    if (!sceneByLayer.get(layer).renderer) return;
-    let changed = false;
-    let part, key, i;
-    if (!this.meshes) {
-      this.meshes = /* alloc */
-      [];
-      for ([part] of limbs) this.meshes.push(createMesh(layer, build(parts[part])));
-      changed = true;
-    }
-    const previousY = sceneByLayer.get(layer).root.position[1] + local2.call(this, this.local)[1] * sceneByLayer.get(layer).root.scale[1];
+  // src/walk/stepWalkerHeight.js
+  function stepWalkerHeight(dt) {
     if (this.keys.has("Space")) {
       this.verticalSpeed = 6;
       this.state.height += this.verticalSpeed * dt;
-      changed = true;
-    } else if (this.verticalSpeed || this.state.height) {
-      this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
-      this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
-      changed = true;
+      return true;
     }
-    let forward = 0, turn = 0;
-    for (key of this.keys) {
-      forward += moves[key]?.[0] || 0;
-      turn += moves[key]?.[1] || 0;
-    }
-    forward = Math.sign(forward);
-    turn = Math.sign(turn);
-    if (turn) {
-      this.state.heading = wrap(this.state.heading + turn * 2.5 * dt);
-      changed = true;
-    }
-    if (forward) {
-      const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng, { position, scale } = sceneByLayer.get(layer).root;
-      let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
-      const feet = local2.call(this, this.local);
-      for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
-      const wall = blocked.call(this, east, north, feet);
-      if (wall) {
-        const into = east * wall[0] - north * wall[1];
-        east -= into * wall[0];
-        north += into * wall[1];
-        if (blocked.call(this, east, north, feet)) east = north = 0;
-      }
-      this.state.latlng = /* alloc */
-      new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
-      this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
-      changed = true;
-    }
-    if (changed) land.call(this, previousY);
+    if (!this.verticalSpeed && !this.state.height) return false;
+    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
+    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
+    return true;
+  }
+
+  // src/walk/updateWalkerView.js
+  init_degrees();
+  init_radians();
+  init_mapGetBearing();
+  init_mapSetPitchAndBearing();
+  init_mapGetPitch();
+  function updateWalkerView(forward, turn, dt) {
+    const map = this.layer._map;
     if (forward || turn) {
       const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
       if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
@@ -13473,8 +14045,45 @@
     const target = forward ? 0.9 : 0;
     if (Math.abs(this.swing - target) > 1e-3) {
       this.swing += (target - this.swing) * Math.min(1, dt * 10);
+      return true;
+    }
+    return false;
+  }
+
+  // src/walk/step.js
+  function step(now) {
+    const layer = this.layer;
+    this.frame = requestAnimationFrame(this.step);
+    const dt = Math.min(0.1, (now - (this.last ?? now)) / 1e3);
+    this.last = now;
+    if (!sceneByLayer.get(layer).renderer) return;
+    let changed = false;
+    let part, key;
+    if (!this.meshes) {
+      this.meshes = /* alloc */
+      [];
+      for ([part] of limbs) this.meshes.push(createMesh(layer, build(parts[part])));
       changed = true;
     }
+    const previousY = sceneByLayer.get(layer).root.position[1] + local2.call(this, this.local)[1] * sceneByLayer.get(layer).root.scale[1];
+    if (stepWalkerHeight.call(this, dt)) changed = true;
+    let forward = 0, turn = 0;
+    for (key of this.keys) {
+      forward += moves[key]?.[0] || 0;
+      turn += moves[key]?.[1] || 0;
+    }
+    forward = Math.sign(forward);
+    turn = Math.sign(turn);
+    if (turn) {
+      this.state.heading = wrap(this.state.heading + turn * 2.5 * dt);
+      changed = true;
+    }
+    if (forward) {
+      moveWalker.call(this, forward, dt);
+      changed = true;
+    }
+    if (changed) land.call(this, previousY);
+    if (updateWalkerView.call(this, forward, turn, dt)) changed = true;
     if (changed) place.call(this);
   }
 
@@ -13844,9 +14453,15 @@
     }
   }
 
+  // src/scene/isNativeLayer.js
+  init_L();
+  function isNativeLayer(layer) {
+    return !sceneByLayer.get(layer)._3d && (layer instanceof L.GridLayer || layer instanceof L.Polyline || layer instanceof L.CircleMarker || layer instanceof L.Marker && !(layer.options.icon instanceof L.DivIcon) || layer instanceof L.ImageOverlay && !(layer instanceof L.VideoOverlay) && !(layer instanceof L.SVGOverlay));
+  }
+
   // src/scene/layerLayerAdd.js
   function layerLayerAdd(event) {
-    const native = !sceneByLayer.get(this)._3d && (this instanceof L.GridLayer || this instanceof L.Polyline || this instanceof L.CircleMarker || this instanceof L.Marker && !(this.options.icon instanceof L.DivIcon) || this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay));
+    const native = isNativeLayer(this);
     if (native) {
       if (this instanceof L.GridLayer || this instanceof L.ImageOverlay) {
         this.options.crossOrigin ||= true;
@@ -13893,32 +14508,33 @@
     init3D(layer, options);
   }
 
-  // src/cog/readCog.js
-  async function readCog(source, offset, length, signal) {
-    signal?.throwIfAborted();
+  // src/cog/validateCogRange.js
+  function validateCogRange(source, offset, length) {
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || length > 32e6 || !Number.isSafeInteger(offset + length) || source.size !== void 0 && offset + length > source.size) {
       throw (
         /* alloc */
         new Error("Invalid COG byte range")
       );
     }
-    if (source.full) return source.full.slice(offset, offset + length);
-    const rangeStart = (source.baseOffset || 0) + offset;
-    const response = await fetch(
-      source.url,
-      /* alloc */
-      {
-        headers: (
-          /* alloc */
-          { Range: `bytes=${rangeStart}-${rangeStart + length - 1}` }
-        ),
-        signal
-      }
-    );
-    if (!response.ok) throw (
-      /* alloc */
-      new Error(`Unable to read COG: HTTP ${response.status}`)
-    );
+  }
+
+  // src/cog/validateCogContentRange.js
+  function validateCogContentRange(source, range, rangeStart, length) {
+    if (!range || Number(range[1]) !== rangeStart || Number(range[2]) !== rangeStart + length - 1 || !Number.isSafeInteger(Number(range[3])) || Number(range[3]) < rangeStart + length || (source.containerSize ?? source.size) !== void 0 && (source.containerSize ?? source.size) !== Number(range[3])) {
+      throw (
+        /* alloc */
+        new Error("Invalid COG range response")
+      );
+    }
+  }
+
+  // src/cog/invalidCogFullResponse.js
+  function invalidCogFullResponse(response) {
+    return response.status !== 200 || Number(response.headers.get("Content-Length")) > 32e6;
+  }
+
+  // src/cog/validateCogResponse.js
+  function validateCogResponse(source, response, rangeStart, length) {
     const etag = response.headers.get("ETag");
     if (source.etag && source.etag !== etag) throw (
       /* alloc */
@@ -13927,19 +14543,18 @@
     if (etag) source.etag = etag;
     const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") || "");
     if (response.status === 206) {
-      if (!range || Number(range[1]) !== rangeStart || Number(range[2]) !== rangeStart + length - 1 || !Number.isSafeInteger(Number(range[3])) || Number(range[3]) < rangeStart + length || (source.containerSize ?? source.size) !== void 0 && (source.containerSize ?? source.size) !== Number(range[3])) {
-        throw (
-          /* alloc */
-          new Error("Invalid COG range response")
-        );
-      }
+      validateCogContentRange(source, range, rangeStart, length);
       if (source.baseOffset === void 0) source.size = Number(range[3]);
-    } else if (response.status !== 200 || Number(response.headers.get("Content-Length")) > 32e6) {
+    } else if (invalidCogFullResponse(response)) {
       throw (
         /* alloc */
         new Error("COG server must support byte ranges for files over 32 MB")
       );
     }
+  }
+
+  // src/cog/readCogBody.js
+  async function readCogBody(response, length) {
     const reader = response.body.getReader(), chunks = (
       /* alloc */
       []
@@ -13969,13 +14584,39 @@
       data.set(chunk, start2);
       start2 += chunk.length;
     }
+    return data;
+  }
+
+  // src/cog/readCog.js
+  async function readCog(source, offset, length, signal) {
+    signal?.throwIfAborted();
+    validateCogRange(source, offset, length);
+    if (source.full) return source.full.slice(offset, offset + length);
+    const rangeStart = (source.baseOffset || 0) + offset;
+    const response = await fetch(
+      source.url,
+      /* alloc */
+      {
+        headers: (
+          /* alloc */
+          { Range: `bytes=${rangeStart}-${rangeStart + length - 1}` }
+        ),
+        signal
+      }
+    );
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`Unable to read COG: HTTP ${response.status}`)
+    );
+    validateCogResponse(source, response, rangeStart, length);
+    const data = await readCogBody(response, length);
     if (response.status === 200) {
-      if (source.baseOffset === void 0) source.size = total;
-      else if (total !== source.containerSize) throw (
+      if (source.baseOffset === void 0) source.size = data.byteLength;
+      else if (data.byteLength !== source.containerSize) throw (
         /* alloc */
         new Error("Truncated PMTiles COG container")
       );
-      source.full = source.baseOffset === void 0 ? data.buffer : data.buffer.slice(source.baseOffset, source.baseOffset + source.size);
+      source.full = source.baseOffset === void 0 ? data.buffer : data.slice(source.baseOffset, source.baseOffset + source.size);
     }
     const result = response.status === 200 ? source.full.slice(offset, offset + length) : data.buffer;
     if (result.byteLength !== length) throw (
@@ -13987,6 +14628,31 @@
 
   // src/globals/cogTags.js
   var cogTags = [256, 257, 258, 259, 262, 277, 284, 317, 322, 323, 324, 325, 339, 33550, 33922, 34735];
+
+  // src/cog/readCogTag.js
+  async function readCogTag(source, entries, i, tag, little) {
+    const type = entries.getUint16(i * 12 + 2, little);
+    const size = type === 3 ? 2 : type === 4 ? 4 : type === 12 ? 8 : 0;
+    const length = entries.getUint32(i * 12 + 4, little);
+    if (!size || !length || length > 1048576) throw (
+      /* alloc */
+      new Error(`Unsupported COG tag ${tag}`)
+    );
+    const data = size * length <= 4 ? (
+      /* alloc */
+      new DataView(entries.buffer, i * 12 + 8, 4)
+    ) : (
+      /* alloc */
+      new DataView(await readCog(source, entries.getUint32(i * 12 + 8, little), size * length))
+    );
+    const values = (
+      /* alloc */
+      []
+    );
+    let j;
+    for (j = 0; j < length; j++) values.push(type === 3 ? data.getUint16(j * size, little) : type === 4 ? data.getUint32(j * size, little) : data.getFloat64(j * size, little));
+    return values;
+  }
 
   // src/cog/readCogDirectory.js
   async function readCogDirectory(source, offset) {
@@ -14007,7 +14673,7 @@
       /* alloc */
       /* @__PURE__ */ new Map()
     );
-    let i, j, tag, type, size, length, data, values;
+    let i, tag;
     for (i = 0; i < count; i++) {
       tag = entries.getUint16(i * 12, little);
       if (tag === 42113) throw (
@@ -14023,28 +14689,182 @@
         /* alloc */
         new Error("Duplicate COG tag")
       );
-      type = entries.getUint16(i * 12 + 2, little);
-      size = type === 3 ? 2 : type === 4 ? 4 : type === 12 ? 8 : 0;
-      length = entries.getUint32(i * 12 + 4, little);
-      if (!size || !length || length > 1048576) throw (
-        /* alloc */
-        new Error(`Unsupported COG tag ${tag}`)
-      );
-      data = size * length <= 4 ? (
-        /* alloc */
-        new DataView(entries.buffer, i * 12 + 8, 4)
-      ) : (
-        /* alloc */
-        new DataView(await readCog(source, entries.getUint32(i * 12 + 8, little), size * length))
-      );
-      values = /* alloc */
-      [];
-      for (j = 0; j < length; j++) values.push(type === 3 ? data.getUint16(j * size, little) : type === 4 ? data.getUint32(j * size, little) : data.getFloat64(j * size, little));
-      tags.set(tag, values);
+      tags.set(tag, await readCogTag(source, entries, i, tag, little));
     }
     return (
       /* alloc */
       { tags, next: entries.getUint32(count * 12, little) }
+    );
+  }
+
+  // src/cog/validCogDimensions.js
+  function validCogDimensions(tags, width, height) {
+    return !!width && !!height && width % 256 === 0 && height % 256 === 0 && tags.get(322)?.[0] === 256 && tags.get(323)?.[0] === 256 && (tags.get(259)?.[0] === 1 || tags.get(259)?.[0] === 8) && (tags.get(284)?.[0] ?? 1) === 1 && (tags.get(317)?.[0] ?? 1) === 1;
+  }
+
+  // src/cog/validCogEncoding.js
+  function validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned) {
+    if (elevation) return tags.get(262)?.[0] === 1;
+    return (samples === 3 || samples === 4) && bits?.length === samples && bytes && unsigned && tags.get(262)?.[0] === 2;
+  }
+
+  // src/cog/getCogProfile.js
+  function getCogProfile(tags) {
+    const width = tags.get(256)?.[0], height = tags.get(257)?.[0], samples = tags.get(277)?.[0] ?? 1;
+    const bits = tags.get(258), format = tags.get(339) || /* alloc */
+    [1];
+    let bytes = true, unsigned = true, floating = true, value;
+    for (value of bits || /* alloc */
+    []) bytes &&= value === 8;
+    for (value of format) {
+      unsigned &&= value === 1;
+      floating &&= value === 3;
+    }
+    const elevation = samples === 1 && bits?.length === 1 && bits[0] === 32 && floating;
+    if (!validCogDimensions(tags, width, height) || !validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned)) {
+      throw (
+        /* alloc */
+        new Error("Unsupported COG profile: expected tiled 256px RGB(A) Uint8 or Float32, DEFLATE without predictor")
+      );
+    }
+    return (
+      /* alloc */
+      { width, height, samples, elevation }
+    );
+  }
+
+  // src/cog/hasCogProjection.js
+  function hasCogProjection(keys) {
+    let projected = false, area2 = false, i;
+    if (keys) for (i = 4; i < keys.length; i += 4) {
+      if (keys[i + 1] !== 0 || keys[i + 2] !== 1) continue;
+      if (keys[i] === 3072 && keys[i + 3] === 3857) projected = true;
+      if (keys[i] === 1025 && keys[i + 3] === 1) area2 = true;
+    }
+    return projected && area2;
+  }
+
+  // src/cog/finiteCogValues.js
+  function finiteCogValues(values) {
+    let value;
+    for (value of values || /* alloc */
+    []) if (!Number.isFinite(value)) return false;
+    return true;
+  }
+
+  // src/cog/validCogGeoArrays.js
+  function validCogGeoArrays(keys, scale, tie) {
+    return !!keys && keys[0] === 1 && keys.length === 4 + keys[3] * 4 && !!scale && scale.length === 3 && finiteCogValues(scale) && scale[0] > 0 && Math.abs(scale[0] - scale[1]) <= 1e-8 && !!tie && tie.length === 6 && finiteCogValues(tie) && tie[0] === 0 && tie[1] === 0;
+  }
+
+  // src/cog/getCogBase.js
+  function getCogBase(tags, width, height, elevation) {
+    const keys = tags.get(34735), scale = tags.get(33550), tie = tags.get(33922);
+    if (!validCogGeoArrays(keys, scale, tie) || !hasCogProjection(keys)) {
+      throw (
+        /* alloc */
+        new Error("COG must use north-up EPSG:3857 PixelIsArea georeferencing")
+      );
+    }
+    return (
+      /* alloc */
+      { width, height, resolution: scale[0], left: tie[3], top: tie[4], elevation }
+    );
+  }
+
+  // src/cog/validCogGrid.js
+  function validCogGrid(source, base, profile, zoom, x, y, resolution) {
+    return zoom >= 0 && zoom <= 24 && Math.abs(20037508342789244e-9 * 2 / (256 * 2 ** zoom) - resolution) <= resolution * 1e-7 && (!profile.elevation || Number.isInteger(x) && Number.isInteger(y)) && Math.abs(base.width / profile.width - base.height / profile.height) <= 1e-7 && profile.elevation === base.elevation && x >= 0 && y >= 0 && x + profile.width / 256 <= 2 ** zoom && y + profile.height / 256 <= 2 ** zoom && !source.levels.has(zoom) && !(base.elevation && source.levels.size);
+  }
+
+  // src/cog/validateCogOffsets.js
+  function validateCogOffsets(source, level) {
+    if (level.offsets?.length !== level.columns * level.rows || level.lengths?.length !== level.offsets.length) {
+      throw (
+        /* alloc */
+        new Error("Invalid COG tile offsets or lengths")
+      );
+    }
+    let i;
+    for (i = 0; i < level.offsets.length; i++) {
+      if (!level.offsets[i] || !level.lengths[i] || level.lengths[i] > 1048576 || level.offsets[i] + level.lengths[i] > source.size) throw (
+        /* alloc */
+        new Error("Invalid COG tile offsets or lengths")
+      );
+    }
+  }
+
+  // src/cog/readCogLevel.js
+  function readCogLevel(source, directory, state) {
+    const tags = directory.tags, profile = getCogProfile(tags);
+    if (!state.base) state.base = getCogBase(tags, profile.width, profile.height, profile.elevation);
+    const base = state.base, resolution = base.resolution * base.width / profile.width;
+    const zoom = Math.round(Math.log2(20037508342789244e-9 * 2 / (256 * resolution)));
+    const span = 20037508342789244e-9 * 2 / 2 ** zoom;
+    let x = (base.left + 20037508342789244e-9) / span;
+    let y = (20037508342789244e-9 - base.top) / span;
+    if (Math.abs(x - Math.round(x)) < 1e-6) x = Math.round(x);
+    if (Math.abs(y - Math.round(y)) < 1e-6) y = Math.round(y);
+    if (!validCogGrid(source, base, profile, zoom, x, y, resolution)) {
+      throw (
+        /* alloc */
+        new Error("COG levels must align with the Web Mercator XYZ tile grid")
+      );
+    }
+    const level = (
+      /* alloc */
+      {
+        x,
+        y,
+        columns: profile.width / 256,
+        rows: profile.height / 256,
+        samples: profile.samples,
+        elevation: profile.elevation,
+        compression: tags.get(259)[0],
+        offsets: tags.get(324),
+        lengths: tags.get(325)
+      }
+    );
+    validateCogOffsets(source, level);
+    source.levels.set(zoom, level);
+    state.minZoom = Math.min(state.minZoom, zoom);
+    state.maxZoom = Math.max(state.maxZoom, zoom);
+  }
+
+  // src/cog/readCogDirectories.js
+  async function readCogDirectories(source, offset) {
+    const state = (
+      /* alloc */
+      { base: null, minZoom: Infinity, maxZoom: -Infinity }
+    );
+    const seen = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let directory;
+    while (offset) {
+      if (seen.has(offset) || seen.size >= 24) throw (
+        /* alloc */
+        new Error("Cyclic or excessive COG directories")
+      );
+      seen.add(offset);
+      directory = await readCogDirectory(source, offset);
+      readCogLevel(source, directory, state);
+      offset = directory.next;
+    }
+    if (!state.base) throw (
+      /* alloc */
+      new Error("COG has no image directory")
+    );
+    if (source.levels.size !== state.maxZoom - state.minZoom + 1) {
+      throw (
+        /* alloc */
+        new Error("COG overview zooms must be contiguous")
+      );
+    }
+    return (
+      /* alloc */
+      { base: state.base, minZoom: state.minZoom, maxZoom: state.maxZoom }
     );
   }
 
@@ -14104,41 +14924,36 @@
     );
   }
 
-  // src/cog/getCogTile.js
-  async function getCogTile(source, z, x, y, signal) {
+  // src/cog/getElevationTile.js
+  async function getElevationTile(source, level, x, y, signal) {
+    const data = await readCogBlock(source, level, x - level.x, y - level.y, signal);
     signal?.throwIfAborted();
-    if (!Number.isSafeInteger(z) || !Number.isSafeInteger(x) || !Number.isSafeInteger(y) || z < 0 || z > 24 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) throw (
+    const view = (
       /* alloc */
-      new Error("Invalid COG tile coordinates")
+      new DataView(data)
+    ), heights = (
+      /* alloc */
+      new Float32Array(256 * 256)
     );
-    const level = source.levels.get(z);
-    if (!level || x + 1 <= level.x || y + 1 <= level.y || x >= level.x + level.columns || y >= level.y + level.rows) return;
-    if (level.elevation) {
-      const data = await readCogBlock(source, level, x - level.x, y - level.y, signal);
-      signal?.throwIfAborted();
-      const view = (
-        /* alloc */
-        new DataView(data)
-      ), heights = (
-        /* alloc */
-        new Float32Array(256 * 256)
-      );
-      let i2, height;
-      for (i2 = 0; i2 < heights.length; i2++) {
-        height = view.getFloat32(i2 * 4, source.little);
-        if (!Number.isFinite(height) || height < -12e3 || height > 1e4) {
-          throw (
-            /* alloc */
-            new Error("Invalid or missing COG elevation sample")
-          );
-        }
-        heights[i2] = height;
+    let i, height;
+    for (i = 0; i < heights.length; i++) {
+      height = view.getFloat32(i * 4, source.little);
+      if (!Number.isFinite(height) || height < -12e3 || height > 1e4) {
+        throw (
+          /* alloc */
+          new Error("Invalid or missing COG elevation sample")
+        );
       }
-      return (
-        /* alloc */
-        { data: heights.buffer }
-      );
+      heights[i] = height;
     }
+    return (
+      /* alloc */
+      { data: heights.buffer }
+    );
+  }
+
+  // src/cog/getColorTile.js
+  async function getColorTile(source, level, x, y, signal) {
     const canvas = (
       /* alloc */
       new OffscreenCanvas(256, 256)
@@ -14181,9 +14996,58 @@
     );
   }
 
+  // src/cog/validCogTileCoordinates.js
+  function validCogTileCoordinates(z, x, y) {
+    return Number.isSafeInteger(z) && Number.isSafeInteger(x) && Number.isSafeInteger(y) && z >= 0 && z <= 24 && x >= 0 && y >= 0 && x < 2 ** z && y < 2 ** z;
+  }
+
+  // src/cog/getCogTile.js
+  async function getCogTile(source, z, x, y, signal) {
+    signal?.throwIfAborted();
+    if (!validCogTileCoordinates(z, x, y)) throw (
+      /* alloc */
+      new Error("Invalid COG tile coordinates")
+    );
+    const level = source.levels.get(z);
+    if (!level || x + 1 <= level.x || y + 1 <= level.y || x >= level.x + level.columns || y >= level.y + level.rows) return;
+    if (level.elevation) return getElevationTile(source, level, x, y, signal);
+    return getColorTile(source, level, x, y, signal);
+  }
+
   // src/cog/getCogHeader.js
   function getCogHeader(source) {
     return source.header;
+  }
+
+  // src/cog/validateCogContainer.js
+  function validateCogContainer(container, header) {
+    if (header.tileType !== 0 || header.tileCompression !== 1 || !Number.isSafeInteger(header.jsonMetadataOffset) || !Number.isSafeInteger(header.jsonMetadataLength) || header.jsonMetadataLength <= 0 || header.jsonMetadataLength > 1048576 || !Number.isSafeInteger(header.tileDataOffset) || !Number.isSafeInteger(header.tileDataLength) || header.tileDataOffset < 127 || header.tileDataOffset + header.tileDataLength > container.size) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles COG asset container")
+      );
+    }
+  }
+
+  // src/cog/getCogAssetEntry.js
+  async function getCogAssetEntry(container, header, asset) {
+    const metadata = JSON.parse(
+      /* alloc */
+      new TextDecoder().decode(await decompress(
+        await readCog(container, header.jsonMetadataOffset, header.jsonMetadataLength),
+        header.internalCompression
+      ))
+    );
+    const assets = metadata.cog_assets || /* alloc */
+    {};
+    const entry = Object.hasOwn(assets, asset) ? metadata.cog_assets[asset] : null;
+    if (metadata.format !== "cog-assets-v1" || !entry || !Number.isSafeInteger(entry.offset) || !Number.isSafeInteger(entry.length) || entry.offset < 0 || entry.length < 8 || entry.offset + entry.length > header.tileDataLength) {
+      throw (
+        /* alloc */
+        new Error(`Invalid or missing PMTiles COG asset: ${asset}`)
+      );
+    }
+    return entry;
   }
 
   // src/cog/openCogAsset.js
@@ -14193,27 +15057,8 @@
       { url }
     );
     const header = decodeHeader(await readCog(container, 0, 127));
-    if (header.tileType !== 0 || header.tileCompression !== 1 || !Number.isSafeInteger(header.jsonMetadataOffset) || !Number.isSafeInteger(header.jsonMetadataLength) || header.jsonMetadataLength <= 0 || header.jsonMetadataLength > 1048576 || !Number.isSafeInteger(header.tileDataOffset) || !Number.isSafeInteger(header.tileDataLength) || header.tileDataOffset < 127 || header.tileDataOffset + header.tileDataLength > container.size) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles COG asset container")
-      );
-    }
-    const metadata = JSON.parse(
-      /* alloc */
-      new TextDecoder().decode(await decompress(
-        await readCog(container, header.jsonMetadataOffset, header.jsonMetadataLength),
-        header.internalCompression
-      ))
-    );
-    const entry = Object.hasOwn(metadata.cog_assets || /* alloc */
-    {}, asset) ? metadata.cog_assets[asset] : null;
-    if (metadata.format !== "cog-assets-v1" || !entry || !Number.isSafeInteger(entry.offset) || !Number.isSafeInteger(entry.length) || entry.offset < 0 || entry.length < 8 || entry.offset + entry.length > header.tileDataLength) {
-      throw (
-        /* alloc */
-        new Error(`Invalid or missing PMTiles COG asset: ${asset}`)
-      );
-    }
+    validateCogContainer(container, header);
+    const entry = await getCogAssetEntry(container, header, asset);
     const baseOffset = header.tileDataOffset + entry.offset;
     return (
       /* alloc */
@@ -14250,118 +15095,8 @@
       /* alloc */
       new Error("Expected classic TIFF (BigTIFF is not supported)")
     );
-    let offset = header.getUint32(4, source.little), base, elevation, minZoom = Infinity, maxZoom = -Infinity;
-    const seen = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    ), half = 20037508342789244e-9;
-    let directory, tags, width, height, samples, bits, format, keys, scale, tie, resolution, zoom, span, x, y, level;
-    let i, value, bytes, unsigned, floating, finite, projected, area2;
-    while (offset) {
-      if (seen.has(offset) || seen.size >= 24) throw (
-        /* alloc */
-        new Error("Cyclic or excessive COG directories")
-      );
-      seen.add(offset);
-      directory = await readCogDirectory(source, offset);
-      tags = directory.tags;
-      width = tags.get(256)?.[0];
-      height = tags.get(257)?.[0];
-      samples = tags.get(277)?.[0] ?? 1;
-      bits = tags.get(258);
-      format = tags.get(339) || /* alloc */
-      [1];
-      bytes = true;
-      unsigned = true;
-      floating = true;
-      for (value of bits || /* alloc */
-      []) bytes &&= value === 8;
-      for (value of format) {
-        unsigned &&= value === 1;
-        floating &&= value === 3;
-      }
-      elevation = samples === 1 && bits?.length === 1 && bits[0] === 32 && floating;
-      if (!width || !height || width % 256 || height % 256 || tags.get(322)?.[0] !== 256 || tags.get(323)?.[0] !== 256 || tags.get(259)?.[0] !== 1 && tags.get(259)?.[0] !== 8 || (tags.get(284)?.[0] ?? 1) !== 1 || (tags.get(317)?.[0] ?? 1) !== 1 || (elevation ? tags.get(262)?.[0] !== 1 : samples !== 3 && samples !== 4 || bits?.length !== samples || !bytes || !unsigned || tags.get(262)?.[0] !== 2)) {
-        throw (
-          /* alloc */
-          new Error("Unsupported COG profile: expected tiled 256px RGB(A) Uint8 or Float32, DEFLATE without predictor")
-        );
-      }
-      if (!base) {
-        keys = tags.get(34735);
-        scale = tags.get(33550);
-        tie = tags.get(33922);
-        finite = true;
-        projected = false;
-        area2 = false;
-        for (value of scale || /* alloc */
-        []) finite &&= Number.isFinite(value);
-        for (value of tie || /* alloc */
-        []) finite &&= Number.isFinite(value);
-        if (keys) for (i = 4; i < keys.length; i += 4) {
-          if (keys[i + 1] !== 0 || keys[i + 2] !== 1) continue;
-          if (keys[i] === 3072 && keys[i + 3] === 3857) projected = true;
-          if (keys[i] === 1025 && keys[i + 3] === 1) area2 = true;
-        }
-        if (!keys || keys[0] !== 1 || keys.length !== 4 + keys[3] * 4 || !scale || scale.length !== 3 || !finite || !(scale[0] > 0) || Math.abs(scale[0] - scale[1]) > 1e-8 || !tie || tie.length !== 6 || tie[0] !== 0 || tie[1] !== 0 || !projected || !area2) {
-          throw (
-            /* alloc */
-            new Error("COG must use north-up EPSG:3857 PixelIsArea georeferencing")
-          );
-        }
-        base = /* alloc */
-        { width, height, resolution: scale[0], left: tie[3], top: tie[4], elevation };
-      }
-      resolution = base.resolution * base.width / width;
-      zoom = Math.round(Math.log2(half * 2 / (256 * resolution)));
-      span = half * 2 / 2 ** zoom;
-      x = (base.left + half) / span;
-      y = (half - base.top) / span;
-      if (Math.abs(x - Math.round(x)) < 1e-6) x = Math.round(x);
-      if (Math.abs(y - Math.round(y)) < 1e-6) y = Math.round(y);
-      if (zoom < 0 || zoom > 24 || Math.abs(half * 2 / (256 * 2 ** zoom) - resolution) > resolution * 1e-7 || elevation && (!Number.isInteger(x) || !Number.isInteger(y)) || Math.abs(base.width / width - base.height / height) > 1e-7 || elevation !== base.elevation || x < 0 || y < 0 || x + width / 256 > 2 ** zoom || y + height / 256 > 2 ** zoom || source.levels.has(zoom) || base.elevation && source.levels.size) {
-        throw (
-          /* alloc */
-          new Error("COG levels must align with the Web Mercator XYZ tile grid")
-        );
-      }
-      level = /* alloc */
-      {
-        x,
-        y,
-        columns: width / 256,
-        rows: height / 256,
-        samples,
-        elevation,
-        compression: tags.get(259)[0],
-        offsets: tags.get(324),
-        lengths: tags.get(325)
-      };
-      if (level.offsets?.length !== level.columns * level.rows || level.lengths?.length !== level.offsets.length) {
-        throw (
-          /* alloc */
-          new Error("Invalid COG tile offsets or lengths")
-        );
-      }
-      for (i = 0; i < level.offsets.length; i++) {
-        if (!level.offsets[i] || !level.lengths[i] || level.lengths[i] > 1048576 || level.offsets[i] + level.lengths[i] > source.size) throw (
-          /* alloc */
-          new Error("Invalid COG tile offsets or lengths")
-        );
-      }
-      source.levels.set(zoom, level);
-      minZoom = Math.min(minZoom, zoom);
-      maxZoom = Math.max(maxZoom, zoom);
-      offset = directory.next;
-    }
-    if (!base) throw (
-      /* alloc */
-      new Error("COG has no image directory")
-    );
-    if (source.levels.size !== maxZoom - minZoom + 1) throw (
-      /* alloc */
-      new Error("COG overview zooms must be contiguous")
-    );
+    const { base, minZoom, maxZoom } = await readCogDirectories(source, header.getUint32(4, source.little));
+    const half = 20037508342789244e-9;
     const left = base.left + base.resolution / 2, right = base.left + (base.width - 0.5) * base.resolution;
     const top = base.top - base.resolution / 2, bottom = base.top - (base.height - 0.5) * base.resolution;
     source.header = /* alloc */

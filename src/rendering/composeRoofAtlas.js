@@ -1,8 +1,6 @@
 import { roofBuffer } from '../globals/roofBuffer.js';
 import { roofPass } from '../globals/roofPass.js';
-import { roofImage } from '../globals/roofImage.js';
-import { roofTarget } from '../globals/roofTarget.js';
-import { roofCopySize } from '../globals/roofCopySize.js';
+import { uploadRoofTile } from './uploadRoofTile.js';
 import { roofBindGroup } from '../globals/roofBindGroup.js';
 import { roofCommands } from '../globals/roofCommands.js';
 import { sceneByLayer } from '../globals/sceneByLayer.js';
@@ -33,28 +31,11 @@ export function composeRoofAtlas(backend, tiles, zoom, min, size, width, height)
   roofPass.colorAttachments[0].view = null;
   atlasPass.setPipeline(renderer.roofBlit.pipeline);
   tiles.sort(compareRoofTiles);
-  let i, tile, layer, coords, image, source, tileSize, x, y;
+  let i, tile, layer, coords, source, tileSize, x, y;
   for ([i, { tile, layer }] of tiles.entries()) {
-    ({ coords, image } = tile);
+    ({ coords } = tile);
     source = tile.texture;
-    if (source.uploaded !== source.image) {
-      device.queue.copyExternalImageToTexture((
-        roofImage.source = image,
-        roofImage
-      ), (
-        roofTarget.texture = source.texture,
-        roofTarget
-      ),
-        (
-        roofCopySize[0] = source.texture.width,
-        roofCopySize[1] = source.texture.height,
-        roofCopySize
-      ));
-      roofImage.source = null;
-      roofTarget.texture = null;
-
-      source.uploaded = source.image;
-    }
+    uploadRoofTile(device, tile);
 
     opacities[i * 64] = layer.options.opacity;
     tileSize = TILE_SIZE * map.getZoomScale(zoom, coords.z);

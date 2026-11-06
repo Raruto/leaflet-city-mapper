@@ -1,5 +1,8 @@
 import { defaultMaterial } from '../globals/defaultMaterial.js';
 import { textureBinding } from '../rendering/textureBinding.js';
+import { validateRoofMaterial } from './validateRoofMaterial.js';
+import { materialVertexShader } from './materialVertexShader.js';
+import { materialSurfaceShader } from './materialSurfaceShader.js';
 
 /** Material WGSL and texture bindings, without a GPU device or Leaflet layer. */
 export function materialShaders(material = defaultMaterial, sparkle = false, elevationWGSL = '') {
@@ -8,89 +11,10 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
   const hasEmissive = Boolean(material.emissiveTexture);
   const hasOcclusion = Boolean(material.occlusionTexture);
   const hasRoof = Boolean(material.roofTexture || material.wallTexture);
-  let name, value;
-  for (name of /* alloc */ ['roofTexture', 'wallTexture']) {
-    value = material[name];
-    if (value !== undefined && typeof value !== 'boolean' &&
-      (!Number.isFinite(value) || value < 0 || value > 1)) {
-      throw /* alloc */ new Error(`${name} must be a boolean or a finite number between 0 and 1`);
-    }
-  }
-  const roofOpacity = Number(material.roofTexture ?? 0);
-  const wallOpacity = Number(material.wallTexture ?? 0);
+  validateRoofMaterial(material);
   const hasTerrain = Boolean(material.terrain);
   const textured = hasBase || hasMetal || hasEmissive || hasOcclusion || material.nightLight;
-  const vertex = /* wgsl */ `
-    struct Mesh {
-      worldMatrix: mat4x4<f32>,
-      baseColor: vec4<f32>,
-      material: vec4<f32>,
-      emissive: vec4<f32>,
-      terrain: vec4<f32>,
-      highlight: vec4<f32>,
-      cutout: vec4<f32>,
-    };
-    struct Frame {
-      viewMatrix: mat4x4<f32>,
-      projectionMatrix: mat4x4<f32>,
-      roofMatrix: mat4x4<f32>,
-      lightDirection: vec4<f32>,
-      skyDirection: vec4<f32>,
-      atmosphereTint: vec4<f32>,
-    };
-    @group(0) @binding(0) var<uniform> u: Mesh;
-    @group(0) @binding(1) var<uniform> frame: Frame;
-    struct Solar { matrix: mat4x4<f32>, params: vec4<f32> };
-    @group(1) @binding(0) var<uniform> solar: Solar;
-    ${hasTerrain ? /* wgsl */ `@group(0) @binding(2) var dem: texture_2d<f32>;${elevationWGSL}` : ''}
-    struct VertexInput {
-      @location(0) position: vec3<f32>,
-      @location(1) normal: vec3<f32>,
-      ${material.instanced ? '@location(4) instanceOffset: vec4<f32>,' : ''}
-      ${material.vertexColors ? '@location(2) color: vec3<f32>,' : ''}
-      ${textured ? '@location(3) uv: vec2<f32>,' : ''}
-    };
-    struct VertexOutput {
-      @builtin(position) position: vec4<f32>,
-      @location(0) color: vec3<f32>,
-      @location(1) normal: vec3<f32>,
-      @location(2) viewPosition: vec3<f32>,
-      @location(6) shadowPosition: vec4<f32>,
-      @location(7) worldPosition: vec3<f32>,
-      ${sparkle ? '@location(8) localPosition: vec3<f32>,' : ''}
-      ${textured ? '@location(3) uv: vec2<f32>,' : ''}
-      ${hasRoof ? '@location(4) roofUv: vec2<f32>, @location(5) roof: f32,' : ''}
-    };
-    @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-      var output: VertexOutput;
-      var position = input.position${material.instanced ? ' + input.instanceOffset.xyz' : ''};
-      ${hasTerrain ? 'position.y = elevation(u.terrain.xy + input.uv * u.terrain.z, u.terrain.w) - u.terrain.w;' : ''}
-      let featureVertex = f32(vertexIndex)${material.instanced ? ' + input.instanceOffset.w' : ''};
-      let highlighted = featureVertex >= u.highlight.x && featureVertex < u.highlight.y;
-      output.color = ${material.vertexColors
-      ? 'select(input.color, vec3<f32>(72.0 / 255.0, 217.0 / 255.0, 1.0), highlighted)'
-      : 'u.baseColor.rgb'};
-      // Inverse-transpose from cofactors; the camera view matrix is orthonormal.
-      let m = mat3x3<f32>(u.worldMatrix[0].xyz, u.worldMatrix[1].xyz, u.worldMatrix[2].xyz);
-      let normal = (cross(m[1], m[2]) * input.normal.x + cross(m[2], m[0]) * input.normal.y +
-        cross(m[0], m[1]) * input.normal.z) / determinant(m);
-      output.normal = (frame.viewMatrix * vec4<f32>(normal, 0.0)).xyz;
-      let world = u.worldMatrix * vec4<f32>(position, 1.0);
-      output.shadowPosition = solar.matrix * world;
-      output.worldPosition = world.xyz / world.w;
-      ${sparkle ? `output.localPosition = input.position${material.instanced ? ' + input.instanceOffset.xyz' : ''};` : ''}
-      let viewPosition = frame.viewMatrix * world;
-      output.viewPosition = viewPosition.xyz;
-      ${textured ? 'output.uv = input.uv;' : ''}
-      ${hasRoof ? /* wgsl */ `
-        output.roofUv = (frame.roofMatrix * world).xz;
-        output.roof = select(0.0, select(${wallOpacity.toFixed(8)}, ${roofOpacity.toFixed(8)}, input.normal.y >= 0.5), ((${Boolean(material.roofTexture)} && input.normal.y >= 0.5) ||
-          (${Boolean(material.wallTexture)} && abs(input.normal.y) < 0.5)) && !highlighted);
-      ` : ''}
-      output.position = frame.projectionMatrix * viewPosition;
-      return output;
-    }
-  `;
+  const vertex = materialVertexShader(material, sparkle, elevationWGSL, hasTerrain, textured, hasRoof);
   const bindings = /* alloc */ [];
   const baseBinding = textureBinding(bindings, 'baseTexture', hasBase);
   const metalBinding = textureBinding(bindings, 'metalTexture', hasMetal);
@@ -199,63 +123,7 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       let sunlight = sunVisibility(input.shadowPosition);
       let worldNormal = normalize(transpose(mat3x3<f32>(frame.viewMatrix[0].xyz, frame.viewMatrix[1].xyz, frame.viewMatrix[2].xyz)) * normalize(input.normal)) * select(-1.0, 1.0, frontFacing);
       let artificial = localLighting(input.worldPosition, worldNormal);
-      ${material.unlit ? /* wgsl */ `
-        let rasterTexel = ${hasBase ? 'textureSample(baseTexture, baseTextureSampler, input.uv)' : 'vec4<f32>(input.color, 1.0)'};
-        return vec4<f32>(toSRGB(toLinear(rasterTexel.rgb) * (frame.atmosphereTint.rgb * (0.55 + 0.45 * sunlight) + artificial)), ${material.alphaMode === 'BLEND' ? 'u.material.z * rasterTexel.a' : '1.0'});
-      ` : /* wgsl */ `
-      var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);
-      let texel = ${hasBase ? 'textureSample(baseTexture, baseTextureSampler, input.uv)' : 'vec4<f32>(1.0)'};
-      let alpha = u.material.z * texel.a;
-      ${material.alphaMode === 'MASK' ? 'if (alpha < u.material.w) { discard; }' : ''}
-      ${material.alphaMode === 'BLEND' ? 'if (alpha < 0.01) { discard; }' : ''}
-      var base = ${material.vertexColors ? 'toLinear(min(input.color, vec3<f32>(1.0)))' : 'input.color'} *
-        ${material.baseTexture?.srgb ? 'texel.rgb' : 'toLinear(texel.rgb)'};
-      ${hasRoof ? /* wgsl */ `
-        if (input.roof > 0.0 && all(input.roofUv >= vec2<f32>(0.0)) &&
-          all(input.roofUv <= vec2<f32>(1.0))) {
-          let roof = textureSampleLevel(roofTexture, roofTextureSampler, input.roofUv, 0.0);
-          base = mix(base, toLinear(roof.rgb), roof.a * input.roof);
-        }
-      ` : ''}
-      let mr = ${hasMetal ? 'textureSample(metalTexture, metalTextureSampler, input.uv)' : 'vec4<f32>(1.0)'};
-      let metal = clamp(u.material.x * mr.b, 0.0, 1.0);
-      let rough = clamp(u.material.y * mr.g, 0.08, 1.0);
-      let view = normalize(-input.viewPosition);
-      let halfVector = normalize(view + frame.lightDirection.xyz);
-      let nl = max(dot(normal, frame.lightDirection.xyz), 0.0) * frame.lightDirection.w * sunlight;
-      let nv = max(dot(normal, view), 0.001);
-      let nh = max(dot(normal, halfVector), 0.0);
-      let vh = max(dot(view, halfVector), 0.0);
-      let a2 = pow(rough, 4.0);
-      let d = a2 / max(PI * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0), 0.0001);
-      let gv = nl * sqrt(nv * nv * (1.0 - a2) + a2);
-      let gl = nv * sqrt(nl * nl * (1.0 - a2) + a2);
-      let visibility = 0.5 / max(gv + gl, 0.0001);
-      let f0 = mix(vec3<f32>(0.04), base, metal);
-      let fresnel = f0 + (1.0 - f0) * pow(1.0 - vh, 5.0);
-      let specular = d * visibility * fresnel;
-      let diffuse = (1.0 - metal) * base / PI;
-      let sky = dot(normal, frame.skyDirection.xyz) * 0.5 + 0.5;
-      let ambient = mix(toLinear(vec3<f32>(0.455, 0.412, 0.322)), vec3<f32>(1.0), sky) * (2.0 / PI);
-      let ao = ${hasOcclusion ? 'mix(1.0, textureSample(occlusionTexture, occlusionTextureSampler, input.uv).r, u.emissive.w)' : '1.0'};
-      ${sparkle ? /* wgsl */ `
-        let lattice = (fract(input.localPosition / 2.5) - 0.5) * 2.5;
-        let pointGlow = (1.0 - smoothstep(0.16, 0.42, length(lattice))) * u.highlight.z;
-      ` : ''}
-      // Vertex colour components above 1 are self-lit (e.g. vehicle lamps): dim by day, bright at night.
-      let glow = ${sparkle ? 'vec3<f32>(3.0, 2.6, 1.8) * pointGlow +' : ''}${material.vertexColors
-      ? ' max(input.color - vec3<f32>(1.0), vec3<f32>(0.0)) * (0.3 + 5.0 * frame.skyDirection.w) +' : ''} u.emissive.rgb * ${hasEmissive
-      ? material.emissiveTexture.srgb
-        ? 'textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb'
-        : 'toLinear(textureSample(emissiveTexture, emissiveTextureSampler, input.uv).rgb)'
-      : 'vec3<f32>(1.0)'};
-      var color = ambient * base * (1.0 - metal) * ao +
-        (diffuse + specular) * nl * toLinear(vec3<f32>(1.0, 0.937, 0.835)) * 3.0 + glow;
-      ${material.vertexColors ? 'color = base * (ambient + toLinear(vec3<f32>(1.0, 0.937, 0.835)) * (3.0 / PI) * nl) + glow;' : ''}
-      color = (color - glow) * frame.atmosphereTint.rgb + base * artificial * (1.0 - metal * 0.5) + glow;
-      appearance(input.position.xy);
-      return vec4<f32>(toSRGB(color), ${material.alphaMode === 'BLEND' ? 'alpha' : '1.0'});
-      `}
+      ${materialSurfaceShader(material, sparkle, hasBase, hasMetal, hasEmissive, hasOcclusion, hasRoof)}
     }
   `;
   return /* alloc */ { vertex, fragment, bindings, textured, hasTerrain };

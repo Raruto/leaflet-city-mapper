@@ -5,11 +5,12 @@ import { markerCameraIconPoint } from './markerCameraIconPoint.js';
 import { localPosition } from './localPosition.js';
 
 import { transformNativePoint } from './transformNativePoint.js';
+import { markerImageBounds } from './markerImageBounds.js';
 
 export function markerQuadCorners(state, key, image) {
   const { source, map, backend } = state;
   const position = localPosition(state, source.getLatLng());
-  const options = source.options.icon.options, size = map.getSize();
+  const size = map.getSize();
   const matrices = state.markerMatrices ||= /* alloc */ {
     root: /* alloc */ new DOMMatrix(),
     camera: /* alloc */ new DOMMatrix(),
@@ -28,14 +29,10 @@ export function markerQuadCorners(state, key, image) {
   const clipX = point.x, clipY = point.y, clipZ = point.z, clipW = point.w;
   camera.invertSelf();
   root.invertSelf();
-  const dimensions = options[key === 'shadow' ? 'shadowSize' : 'iconSize'];
-  const width = dimensions ? dimensions.x ?? dimensions[0] : image.naturalWidth;
-  const height = dimensions ? dimensions.y ?? dimensions[1] : image.naturalHeight;
-  const anchor = (key === 'shadow' && options.shadowAnchor) ||
-    options.iconAnchor;
+  const [width, height, anchorX, anchorY] = markerImageBounds(state, key, image);
   const centerX = (clipX / clipW + 1) * size.x / 2, centerY = (1 - clipY / clipW) * size.y / 2;
-  const left = centerX - (anchor ? anchor.x ?? anchor[0] : Math.floor(width / 2));
-  const top = centerY - (anchor ? anchor.y ?? anchor[1] : Math.floor(height / 2));
+  const left = centerX - anchorX;
+  const top = centerY - anchorY;
   const corners = /* alloc */ [];
   let pointX, pointY, offset, x, y;
   for (i = 0; i < 4; i++) {

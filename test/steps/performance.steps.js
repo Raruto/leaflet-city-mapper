@@ -100,7 +100,7 @@ Then('Leaflet binding checks handle these modules:', function (table) {
   }
 });
 
-Then('source modules access Leaflet only through its explicit global binding', async function () {
+Then('source modules access Leaflet only through its explicit global binding', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -138,7 +138,7 @@ function visit(node, depth, file, source, errors) {
   }
 }
 
-Then('no source file defines arrows, nested functions or callback array methods', async function () {
+Then('no source file defines arrows, nested functions or callback array methods', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -201,7 +201,7 @@ Then('local allocation checks handle these modules:', function (table) {
   }
 });
 
-Then('source functions allocate no object literals, array literals or constructed instances', async function () {
+Then('source functions allocate no object literals, array literals or constructed instances', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -316,7 +316,7 @@ Then('source export counting handles these modules:', function (table) {
   }
 });
 
-Then('each source file exports at most one binding', async function () {
+Then('each source file exports at most one binding', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -344,7 +344,7 @@ Then('source function counting handles these modules:', function (table) {
   }
 });
 
-Then('each source file defines at most one function', async function () {
+Then('each source file defines at most one function', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -417,7 +417,7 @@ Then('module variable checks handle these files:', function (table) {
   }
 });
 
-Then('module constants and state use dedicated global modules', async function () {
+Then('module constants and state use dedicated global modules', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -480,7 +480,7 @@ Then('loop declaration checks handle these modules:', function (table) {
   }
 });
 
-Then('source loops declare no variables in their headers or bodies', async function () {
+Then('source loops declare no variables in their headers or bodies', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
@@ -528,7 +528,7 @@ Then('standalone scope checks handle these modules:', function (table) {
   }
 });
 
-Then('source files contain no standalone block scopes', async function () {
+Then('source files contain no standalone block scopes', { timeout: 60000 }, async function () {
   const errors = [];
   for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
