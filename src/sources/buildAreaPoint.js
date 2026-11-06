@@ -1,5 +1,5 @@
-import { projectedTree } from './projectedTree.js';
-import { generateTreeGeometry } from './generateTreeGeometry.js';
+import { projectedTree } from '../projections/projectTreePoint.js';
+import { generateTreeGeometry } from '../geometry/generateTreeGeometry.js';
 import { lampPostGeometry } from '../geometry/lampPostGeometry.js';
 import { lightGeometry } from '../geometry/lightGeometry.js';
 import { treeGeometry } from '../geometry/treeGeometry.js';

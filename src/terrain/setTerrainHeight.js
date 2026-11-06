@@ -2,7 +2,6 @@ import { locationByLayer } from '../weakmaps/locationByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainBaseYByLayer } from '../weakmaps/terrainBaseYByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 

@@ -2,7 +2,7 @@ import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 
 
 
-import { update as updateScene } from '../scene/update.js';
+import { update as updateScene } from '../scene/scheduleSceneUpdate.js';
 import { trafficNow } from './trafficNow.js';
 import { refreshTrafficTrips } from './refreshTrafficTrips.js';
 import { updateTrafficPose } from './updateTrafficPose.js';

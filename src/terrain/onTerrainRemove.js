@@ -11,12 +11,11 @@ import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 import { renderEmpty } from '../globals/renderEmpty.js';
 
-import { destroyTexture } from '../rendering/destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
 import { setRasterTerrain } from '../raster/setRasterTerrain.js';
@@ -28,8 +27,8 @@ import { clearLayerTerrain } from './clearLayerTerrain.js';
 export function onTerrainRemove(layer, map) {
 
   terrainControllerByLayer.get(layer)?.abort();
-  mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
-  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
+  terrainLoadingByLayer.set(layer, false);
+  terrainReadyByLayer.set(layer, false);
   map.eachLayer(clearLayerTerrain);
   let tile, l, grid, attribute;
   for (tile of rasterTilesByLayer.get(layer).keys()) removeRasterTile(layer, tile);
@@ -41,20 +40,20 @@ export function onTerrainRemove(layer, map) {
 
   map.fire('terrainchange');
   terrainTilesByLayer.get(layer).clear();
-  mutateWeakMap(terrainOriginElevationByLayer, layer, "=", 0);
-  mutateWeakMap(terrainPromiseByLayer, layer, "=", null);
+  terrainOriginElevationByLayer.set(layer, 0);
+  terrainPromiseByLayer.set(layer, null);
   if (rasterProgramByLayer.get(layer)) {
     rasterProgramByLayer.get(layer).pipelineCache.clear();
   }
-  mutateWeakMap(rasterProgramByLayer, layer, "=", null);
+  rasterProgramByLayer.set(layer, null);
   if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
-  mutateWeakMap(demByLayer, layer, "=", null);
+  demByLayer.set(layer, null);
   for (grid of terrainGridsByLayer.get(layer)?.values() || renderEmpty) {
     for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
-  mutateWeakMap(terrainGridsByLayer, layer, "=", null);
-  mutateWeakMap(bridgesByLayer, layer, "=", null);
+  terrainGridsByLayer.set(layer, null);
+  bridgesByLayer.set(layer, null);
   disposeMesh(layer, bridgeMeshByLayer.get(layer));
-  mutateWeakMap(bridgeMeshByLayer, layer, "=", null);
+  bridgeMeshByLayer.set(layer, null);
   onRemove3DLayer(layer, map);
 }

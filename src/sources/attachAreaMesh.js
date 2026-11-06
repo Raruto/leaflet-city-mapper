@@ -4,12 +4,12 @@ import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { nextId } from '../globals/nextId.js';
 
 
-import { emptyNode } from '../scene/emptyNode.js';
-import { createProgram } from '../rendering/createProgram.js';
+import { emptyNode } from '../scene/createSceneNode.js';
+import { createProgram } from '../materials/createProgram.js';
 
 import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/update.js';
-import { instanceAreaGeometry } from './instanceAreaGeometry.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
+import { instanceAreaGeometry } from '../geometry/instanceAreaGeometry.js';
 
 export function attachAreaMesh(context) {
   const { backend: layer, area } = context;

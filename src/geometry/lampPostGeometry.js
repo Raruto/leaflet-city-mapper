@@ -1,5 +1,5 @@
-import { parseColor } from "../utils/parseColor.js";
-import { ring } from './lampRing.js';
+import { parseColor } from "../colors/parseColor.js";
+import { ring } from './createLampRing.js';
 import { lampDirections } from '../globals/lampDirections.js';
 
 /** Schematic support and lamp head; wall-mounted fixtures do not get an invented pole. */

@@ -1,4 +1,4 @@
-import { mirror } from './mirror.js';
+import { mirror } from './mirrorVehiclePart.js';
 
 export function boatBenches() {
   const benches = /* alloc */ [];

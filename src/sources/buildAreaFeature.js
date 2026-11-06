@@ -1,7 +1,7 @@
 import { L } from '../globals/L.js';
 import { buildAreaPoint } from './buildAreaPoint.js';
-import { buildAreaPolygon } from './buildAreaPolygon.js';
-import { parseColor } from '../utils/parseColor.js';
+import { buildAreaPolygon } from '../geometry/buildExtrudedPolygon.js';
+import { parseColor } from '../colors/parseColor.js';
 import { featureAnchor } from './featureAnchor.js';
 import { extrusionStyle } from './extrusionStyle.js';
 

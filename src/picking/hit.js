@@ -7,7 +7,7 @@ import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 
 
 import { traverse } from '../scene/traverse.js';
-import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
+import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
 import { shouldSkipOther } from './shouldSkipOther.js';
 import { hitMesh } from './hitMesh.js';
 

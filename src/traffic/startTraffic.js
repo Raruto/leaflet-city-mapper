@@ -1,4 +1,4 @@
-import { underEntry } from '../scene/underEntry.js';
+import { underEntry } from '../layer-controls/underEntry.js';
 
 export function startTraffic(state) {
   state.layer._map.off('simulationtimechange layerremove', state.update).on('simulationtimechange layerremove', state.update);

@@ -3,7 +3,7 @@ import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
 
 import { geometryEmpty } from '../globals/geometryEmpty.js';
 import { loadBuffer } from './loadBuffer.js';
-import { loadImage } from './loadImage.js';
+import { loadImage } from '../textures/loadModelImage.js';
 
 export async function loadModelResources(layer, description, directory) {
   const bufferRequests = /* alloc */ [];

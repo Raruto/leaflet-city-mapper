@@ -1,4 +1,4 @@
-import { projectCelestialBody } from './projectCelestialBody.js';
+import { projectCelestialBody } from '../projections/projectCelestialBody.js';
 
 export function updateCelestialDisc(disc, body, sky, size, pitch, bearing, projection) {
   disc.hidden = true;

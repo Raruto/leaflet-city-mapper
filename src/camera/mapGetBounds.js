@@ -4,8 +4,8 @@ import { mapMethods } from '../globals/mapMethods.js';
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
-import { groundBounds } from './groundBounds.js';
-import { animationPoint } from './animationPoint.js';
+import { groundBounds } from '../projections/groundBounds.js';
+import { animationPoint } from '../projections/transformZoomAnimationPoint.js';
 
 export function mapGetBounds() {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.getBounds.call(this);

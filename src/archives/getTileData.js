@@ -1,5 +1,5 @@
 import { decompress } from './decompress.js';
-import { read } from './read.js';
+import { read } from './readArchiveRange.js';
 
 export async function getTileData(layer, header, entry, id, signal) {
   if (id - entry.tileId >= entry.runLength) return;

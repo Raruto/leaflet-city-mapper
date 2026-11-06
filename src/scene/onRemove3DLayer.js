@@ -12,7 +12,6 @@ import { sceneFields } from '../weakmaps/sceneFields.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { L } from '../globals/L.js';
 import { sceneTransferFields } from '../globals/sceneTransferFields.js';
@@ -20,31 +19,31 @@ import { renderers } from '../weakmaps/renderers.js';
 
 
 
-import * as endZoom from './endZoom.js';
+import * as endZoom from '../animations/endZoom.js';
 import * as onMapChange from './onMapChange.js';
 import * as onPointerLeave from '../picking/onPointerLeave.js';
-import * as onZoomAnim from './onZoomAnim.js';
+import * as onZoomAnim from '../animations/onZoomAnim.js';
 import { releaseArea } from '../sources/releaseArea.js';
-import { updateStatus } from '../sources/updateStatus.js';
+import { updateStatus } from '../sources/updateSourceStatus.js';
 import { setParent } from './setParent.js';
-import * as startZoom from './startZoom.js';
+import * as startZoom from '../animations/startZoom.js';
 import { cancelUpdate } from './cancelUpdate.js';
-import { update } from './update.js';
+import { update } from './scheduleSceneUpdate.js';
 import { releaseSharedScene } from './releaseSharedScene.js';
 
 /** Release source meshes/UI; retain manually added objects and model CPU data. */
 export function onRemove3DLayer(layer, map) {
-  mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+  addedByLayer.set(layer, Promise.withResolvers());
   if (containerByLayer.get(layer)) {
     onPointerLeave.onPointerLeave(layer);
     L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
-    mutateWeakMap(containerByLayer, layer, "=", null);
+    containerByLayer.set(layer, null);
   }
   let area, key, sceneLayer, field;
   for (area of areasByLayer.get(layer).values()) releaseArea(layer, area);
   areasByLayer.get(layer).clear();
   tooltipByLayer.get(layer)?.remove();
-  mutateWeakMap(tooltipByLayer, layer, "=", null);
+  tooltipByLayer.set(layer, null);
   if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
   const shared = sharedByLayer.get(layer);
   if (!shared) return;
@@ -61,10 +60,10 @@ export function onRemove3DLayer(layer, map) {
       const next = layersByLayer.get(layer).values().next().value;
       for (key of sceneTransferFields) {
         field = sceneFields[key];
-        mutateWeakMap(field, next, "=", field.get(layer));
+        field.set(next, field.get(layer));
         field.delete(layer);
       }
-      for (sceneLayer of layersByLayer.get(next)) mutateWeakMap(sharedByLayer, sceneLayer, "=", next);
+      for (sceneLayer of layersByLayer.get(next)) sharedByLayer.set(sceneLayer, next);
       renderers.set(map, next);
       map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange.onMapChange, next);
       map.on('zoomstart', startZoom.startZoom, next);
@@ -75,8 +74,8 @@ export function onRemove3DLayer(layer, map) {
       releaseSharedScene(layer, map);
     }
   } else update(shared);
-  mutateWeakMap(sharedByLayer, layer, "=", null);
-  mutateWeakMap(rendererByLayer, layer, "=", null);
-  mutateWeakMap(sceneByLayer, layer, "=", null);
-  mutateWeakMap(cameraByLayer, layer, "=", null);
+  sharedByLayer.set(layer, null);
+  rendererByLayer.set(layer, null);
+  sceneByLayer.set(layer, null);
+  cameraByLayer.set(layer, null);
 }

@@ -1,5 +1,4 @@
 import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -8,6 +7,6 @@ import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 
 export function onPMTileRemove(layer, map) {
   releaseRasterTiles(layer);
-  mutateWeakMap(terrain3DByLayer, layer, "=", null);
+  terrain3DByLayer.set(layer, null);
   onRemove3DLayer(layer, map);
 }

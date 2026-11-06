@@ -4,7 +4,6 @@ import { pruneWantedByLayer } from '../weakmaps/pruneWantedByLayer.js';
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -15,15 +14,15 @@ export function pruneRasterTiles(layer) {
   const now = performance.now();
   if (pruneVersionByLayer.get(layer) === rasterVersionByLayer.get(layer) && pruneWantedByLayer.get(layer) === wanted &&
     now < pruneAfterByLayer.get(layer)) return Number.isFinite(pruneAfterByLayer.get(layer));
-  mutateWeakMap(pruneVersionByLayer, layer, "=", rasterVersionByLayer.get(layer));
-  mutateWeakMap(pruneWantedByLayer, layer, "=", wanted);
-  mutateWeakMap(pruneAfterByLayer, layer, "=", Infinity);
+  pruneVersionByLayer.set(layer, rasterVersionByLayer.get(layer));
+  pruneWantedByLayer.set(layer, wanted);
+  pruneAfterByLayer.set(layer, Infinity);
   const pending = /* alloc */ [];
   let key, tile, parts, overlaps, coords, zoom;
   for (key of wanted) {
     tile = rasterTilesByLayer.get(layer).get(key);
     if (tile?.done && now - tile.loadedAt < 250) {
-      mutateWeakMap(pruneAfterByLayer, layer, "=", Math.min(pruneAfterByLayer.get(layer), tile.loadedAt + 250));
+      pruneAfterByLayer.set(layer, Math.min(pruneAfterByLayer.get(layer), tile.loadedAt + 250));
     }
     if (!tile?.done || now - tile.loadedAt < 250) {
       parts = key.split('/');

@@ -1,4 +1,4 @@
-import { sample } from './sample.js';
+import { sample } from './sampleTerrainTile.js';
 
 /** Bilinear DEM sampling, with the original first-valid-neighbour no-data rule. */
 

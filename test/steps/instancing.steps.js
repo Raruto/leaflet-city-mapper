@@ -3,10 +3,10 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
-import { instanceAreaGeometry } from '../../src/sources/instanceAreaGeometry.js';
+import { instanceAreaGeometry } from '../../src/geometry/instanceAreaGeometry.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
 import { treeGeometry } from '../../src/geometry/treeGeometry.js';
-import { addTriangle } from '../../src/sources/addTriangle.js';
+import { addTriangle } from '../../src/geometry/appendAreaTriangle.js';
 
 Then('source instancing preserves vertex data and falls back for incompatible features', function () {
   const context = {
@@ -76,9 +76,9 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
   await this.page.goto(this.baseUrl);
   const result = await this.page.evaluate(async () => {
     const { attachAreaMesh } = await import('/src/sources/attachAreaMesh.js');
-    const { emptyNode } = await import('/src/scene/emptyNode.js');
+    const { emptyNode } = await import('/src/scene/createSceneNode.js');
     const globals = await import('/test/fixtures/globals.js');
-    const { updateWorldMatrix } = await import('/src/scene/updateWorldMatrix.js');
+    const { updateWorldMatrix } = await import('/src/transforms/updateWorldMatrix.js');
     const { prepareFrameUniforms } = await import('/src/rendering/prepareFrameUniforms.js');
     const { drawSceneMeshes } = await import('/src/rendering/drawSceneMeshes.js');
     const { ensureShadowPipeline } = await import('/src/shadows/ensureShadowPipeline.js');

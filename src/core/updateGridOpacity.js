@@ -1,6 +1,6 @@
 
-import { cancelGridFade } from './cancelGridFade.js';
-import { scheduleGridFade } from './scheduleGridFade.js';
+import { cancelGridFade } from '../animations/cancelGridFade.js';
+import { scheduleGridFade } from '../animations/scheduleGridFade.js';
 
 export function updateGridOpacity() {
   if (!this._map) return;
@@ -24,4 +24,4 @@ export function updateGridOpacity() {
   cancelGridFade(layer);
   if (fading) scheduleGridFade(layer);
 }
-import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';
+import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';

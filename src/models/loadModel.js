@@ -3,13 +3,12 @@ import { modelByLayer } from '../weakmaps/modelByLayer.js';
 import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
 import { decodeModel } from './decodeModel.js';
 import { setParent } from '../scene/setParent.js';
-import { emptyNode } from '../scene/emptyNode.js';
+import { emptyNode } from '../scene/createSceneNode.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { loadModelResources } from './loadModelResources.js';
 import { createModelContext } from './createModelContext.js';
@@ -43,7 +42,7 @@ export async function loadModel(layer) {
   if (!nodes.length) throw /* alloc */ new Error('Expected a glTF model with a non-empty scene');
   let node;
   for (node of nodes) setParent(node, model);
-  mutateWeakMap(modelByLayer, layer, "=", model);
+  modelByLayer.set(layer, model);
   applyModelTransform(layer);
   setParent(modelByLayer.get(layer), rootByLayer.get(layer));
   conformModelToTerrain(layer, terrain3DByMap.get(layer._map));

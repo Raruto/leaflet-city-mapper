@@ -4,7 +4,7 @@ import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { onAdd3DLayer } from './onAdd3DLayer.js';
 import { onPMTileAdd } from '../raster/onPMTileAdd.js';
 import { onTerrainAdd } from '../terrain/onTerrainAdd.js';
-import { addRasterImage } from '../core/addRasterImage.js';
+import { addRasterImage } from '../textures/attachRasterImage.js';
 import { addTimeLayer } from '../sunlight/addTimeLayer.js';
 
 export function addSceneLayer(layer, map) {

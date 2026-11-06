@@ -4,6 +4,56 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 import { prepare3DChecks } from './3d.steps.js';
+import { mockLeaflet } from '../fixtures/leaflet.js';
+import { nativeLayerMethod } from '../../src/native/nativeLayerMethod.js';
+import { reorderNativeLayer } from '../../src/native/reorderNativeLayer.js';
+import { removeLayerEvents } from '../../src/scene/removeLayerEvents.js';
+import { nativeGPUByLayer } from '../../src/weakmaps/nativeGPUByLayer.js';
+import { nativeGPUOrderByMap } from '../../src/weakmaps/nativeGPUOrderByMap.js';
+import { nativeGPUBackByMap } from '../../src/weakmaps/nativeGPUBackByMap.js';
+import { eventMapByLayer } from '../../src/weakmaps/eventMapByLayer.js';
+import { eventsByLayer } from '../../src/weakmaps/eventsByLayer.js';
+
+Then('native WeakMap counters and event cleanup preserve their values', function () {
+  const previousLeaflet = mockLeaflet({ Marker: class {}, GridLayer: class {} });
+  const previousImage = Object.getOwnPropertyDescriptor(globalThis, 'HTMLImageElement');
+  Object.defineProperty(globalThis, 'HTMLImageElement', { configurable: true, value: class {} });
+  try {
+    const map = {}, otherMap = {}, source = {};
+    const state = {
+      source, map, hidden: new Set(), images: new Set(),
+      originalMethods: new Map(['bringToFront', 'bringToBack'].map(name => [name, () => source])),
+    };
+    nativeGPUByLayer.set(source, state);
+    nativeGPUOrderByMap.set(map, 0);
+    nativeGPUBackByMap.set(map, 0);
+    nativeGPUOrderByMap.set(otherMap, 10);
+    nativeGPUBackByMap.set(otherMap, -10);
+    for (const [method, expected] of [['bringToFront', 1], ['bringToFront', 2], ['bringToBack', -1]]) {
+      assert.equal(nativeLayerMethod(method, source, []), source);
+      assert.equal(state.order, expected);
+      assert.equal(state.dirty, true);
+    }
+    for (const [front, expected] of [[false, -2], [true, 3], [false, -3]]) {
+      reorderNativeLayer.call(state, front);
+      assert.equal(state.order, expected);
+      assert.equal((front ? nativeGPUOrderByMap : nativeGPUBackByMap).get(map), expected);
+    }
+    assert.equal(nativeGPUOrderByMap.get(otherMap), 10);
+    assert.equal(nativeGPUBackByMap.get(otherMap), -10);
+    const layer = {}, events = { move() {} }, calls = [];
+    eventMapByLayer.set(layer, { off(...args) { calls.push(args); } });
+    eventsByLayer.set(layer, events);
+    removeLayerEvents.call(layer);
+    assert.deepEqual(calls, [[events, layer]]);
+    assert.equal(eventMapByLayer.get(layer), null);
+    assert.equal(eventsByLayer.get(layer), null);
+  } finally {
+    mockLeaflet(previousLeaflet);
+    if (previousImage) Object.defineProperty(globalThis, 'HTMLImageElement', previousImage);
+    else delete globalThis.HTMLImageElement;
+  }
+});
 
 Given('the native WebGPU gallery uses the {string} renderer preference', { timeout: 30000 }, async function (renderer) {
   await this.page.goto(this.baseUrl);
@@ -93,9 +143,9 @@ Then('native map content is drawn by WebGPU while HTML UI remains native', async
 Then('native marker scratch transforms match independent DOM matrix projections', async function () {
   const result = await this.page.evaluate(async base => {
     const [{ markerQuadCorners }, { markerCameraIconPoint }, { localPosition }] = await Promise.all([
-      import(`${base}/src/core/markerQuadCorners.js`),
-      import(`${base}/src/core/markerCameraIconPoint.js`),
-      import(`${base}/src/core/localPosition.js`),
+      import(`${base}/src/geometry/markerQuadCorners.js`),
+      import(`${base}/src/projections/markerCameraIconPoint.js`),
+      import(`${base}/src/projections/localPosition.js`),
     ]);
     let error = 0, stable = true, independent = true;
     for (const source of [nativeLayers.Marker, nativeLayers['Marker (default icon)']]) {

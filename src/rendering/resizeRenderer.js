@@ -1,11 +1,10 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sizeByLayer } from '../weakmaps/sizeByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { depthTexture as sharedDepthTexture } from '../globals/depthTexture.js';
 
 
-import { destroyTexture } from './destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 
 export function resizeRenderer(layer, size) {
   if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {
@@ -22,6 +21,6 @@ export function resizeRenderer(layer, size) {
       sharedDepthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT,
       sharedDepthTexture
     ));
-    mutateWeakMap(sizeByLayer, layer, "=", size);
+    sizeByLayer.set(layer, size);
   }
 }

@@ -4,8 +4,8 @@ import { dragByHandler } from '../weakmaps/dragByHandler.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
-import { pointOf } from '../camera/pointOf.js';
-import { scheduleMarkerPan } from './scheduleMarkerPan.js';
+import { pointOf } from '../projections/toPoint.js';
+import { scheduleMarkerPan } from '../animations/scheduleMarkerPan.js';
 
 export function adjustCameraMarkerPan(event) {
   const marker = this._marker, map = marker._map;

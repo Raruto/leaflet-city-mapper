@@ -1,9 +1,8 @@
 import { highlightedFeatureByLayer } from '../weakmaps/highlightedFeatureByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 
 /** Highlight a source vertex range in the shader; vertex colors stay untouched. */
 
@@ -12,7 +11,7 @@ export function setHighlight(layer, feature) {
   if (highlightedFeatureByLayer.get(layer)?.mesh === feature?.mesh &&
     highlightedFeatureByLayer.get(layer)?.vertexStart === feature?.vertexStart) return;
   if (highlightedFeatureByLayer.get(layer)) highlightedFeatureByLayer.get(layer).mesh.highlight = null;
-  mutateWeakMap(highlightedFeatureByLayer, layer, "=", feature);
+  highlightedFeatureByLayer.set(layer, feature);
   if (feature) {
     feature.mesh.highlightRange[0] = feature.vertexStart;
     feature.mesh.highlightRange[1] = feature.vertexEnd;

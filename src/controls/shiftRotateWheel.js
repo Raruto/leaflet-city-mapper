@@ -1,6 +1,6 @@
 import { mapSetBearing } from '../camera/mapSetBearing.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-import { editable } from './editable.js';
+import { editable } from './isEditableTarget.js';
 
 export function shiftRotateWheel(event) {
   const handler = this._cameraShiftRotate;

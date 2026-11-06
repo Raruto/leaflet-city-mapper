@@ -3,7 +3,6 @@ import { cursorByLayer } from '../weakmaps/cursorByLayer.js';
 import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -33,7 +32,7 @@ export function showFeature(layer, feature, event) {
       }
     }
     if (visible) {
-      if (cursorByLayer.get(shared) === undefined) mutateWeakMap(cursorByLayer, shared, "=", containerByLayer.get(layer).style.cursor);
+      if (cursorByLayer.get(shared) === undefined) cursorByLayer.set(shared, containerByLayer.get(layer).style.cursor);
       containerByLayer.get(layer).style.cursor = 'pointer';
     } else if (cursorByLayer.get(shared) !== undefined) {
       containerByLayer.get(layer).style.cursor = cursorByLayer.get(shared);

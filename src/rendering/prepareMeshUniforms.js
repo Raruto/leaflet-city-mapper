@@ -22,4 +22,4 @@ export function prepareMeshUniforms(renderer, mesh) {
   prepareMeshCutout(renderer, mesh, base);
   return offset;
 }
-import { prepareMeshCutout } from './prepareMeshCutout.js';
+import { prepareMeshCutout } from '../materials/prepareMeshCutout.js';

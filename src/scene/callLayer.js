@@ -6,7 +6,7 @@ import { setGeoJSONData } from '../sources/setGeoJSONData.js';
 import { getHeader } from '../archives/getHeader.js';
 import { getZxy } from '../archives/getZxy.js';
 import { getRasterTileSize } from '../raster/getRasterTileSize.js';
-import { isLoading } from '../raster/isLoading.js';
+import { isLoading } from '../raster/isRasterLoading.js';
 import { setPMTileOpacity } from '../raster/setPMTileOpacity.js';
 import { setPMTileZIndex } from '../raster/setPMTileZIndex.js';
 

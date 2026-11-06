@@ -1,11 +1,10 @@
 import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { blobParts } from '../globals/blobParts.js';
 
-import { update } from "../scene/update.js";
+import { update } from "../scene/scheduleSceneUpdate.js";
 import { registerTerrainTile } from "./registerTerrainTile.js";
 import { pruneRasterTiles } from "./pruneRasterTiles.js";
 import { pumpRasterTiles } from './pumpRasterTiles.js';
@@ -43,18 +42,18 @@ export async function finishRasterTile(layer, tile) {
     createRasterMesh(layer, tile);
     tile.loadedAt = performance.now();
     tile.done = true;
-    mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+    rasterVersionByLayer.set(layer, (rasterVersionByLayer.get(layer) || 0) + 1);
     registerTerrainTile(layer, tile.coords, tile);
     layer.fire('tileload', /* alloc */ { tile, coords: tile.coords });
     update(layer);
   } catch (error) {
     if (tile.request.signal.aborted) return;
     tile.error = error.message;
-    mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+    rasterVersionByLayer.set(layer, (rasterVersionByLayer.get(layer) || 0) + 1);
     layer.fire('tileerror', /* alloc */ { tile, coords: tile.coords, error });
     layer.fire('error', /* alloc */ { error, coords: tile.coords });
   } finally {
-    mutateWeakMap(loadingTilesByLayer, layer, "--", undefined, false);
+    loadingTilesByLayer.set(layer, loadingTilesByLayer.get(layer) - 1);
     if (layer._map) {
       pumpRasterTiles(layer);
       pruneRasterTiles(layer);

@@ -3,7 +3,6 @@ import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
 import { locationByLayer } from '../weakmaps/locationByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { radians } from '../globals/radians.js';
 import { createMesh } from '../rendering/createMesh.js';
@@ -19,7 +18,7 @@ export function addBridges(layer, geojson) {
   const origin = crs.project(locationByLayer.get(layer)), metres = Math.cos(locationByLayer.get(layer).lat * radians);
   const base = rootByLayer.get(layer).position[1];
   const position = /* alloc */ [], normal = /* alloc */ [], color = /* alloc */ [];
-  mutateWeakMap(bridgesByLayer, layer, "=", /* alloc */ new Map());
+  bridgesByLayer.set(layer, /* alloc */ new Map());
   const context = /* alloc */ { backend: layer, map, crs, zoom, origin, metres, base, position, normal, color };
   let geometry, polygons, polygonIndex;
   for ({ geometry } of geojson.features) {
@@ -30,6 +29,6 @@ export function addBridges(layer, geojson) {
     }
   }
   if (position.length) {
-    mutateWeakMap(bridgeMeshByLayer, layer, "=", createMesh(layer, /* alloc */ { position, normal, color }));
+    bridgeMeshByLayer.set(layer, createMesh(layer, /* alloc */ { position, normal, color }));
   }
 }

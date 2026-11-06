@@ -3,9 +3,9 @@ import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 
 
 
-import { createProgram } from '../rendering/createProgram.js';
-import { restoreGeometry } from './restoreGeometry.js';
-import { restoreMaterialTextures } from './restoreMaterialTextures.js';
+import { createProgram } from '../materials/createProgram.js';
+import { restoreGeometry } from '../geometry/restoreGeometry.js';
+import { restoreMaterialTextures } from '../textures/restoreMaterialTextures.js';
 
 export function restoreObject(object, layer) {
   const shared = sharedByLayer.get(layer);

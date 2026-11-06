@@ -1,4 +1,4 @@
-import { toLanes } from './toLanes.js';
+import { toLanes } from './featuresToTrafficLanes.js';
 import { prepareTraffic } from './prepareTraffic.js';
 
 export function loadedTrafficLanes(state, signal, data) {

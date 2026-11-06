@@ -9,8 +9,8 @@ import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
 
 import { intersectMeshes } from '../collision/intersectMeshes.js';
 import { traverse } from '../scene/traverse.js';
-import { updateCamera } from '../scene/updateCamera.js';
-import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
+import { updateCamera } from '../camera/updateSceneCamera.js';
+import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
 import { collectVisibleMesh } from './collectVisibleMesh.js';
 import { placeTraffic } from '../traffic/placeTraffic.js';
 import { validateCameraInverse } from './validateCameraInverse.js';

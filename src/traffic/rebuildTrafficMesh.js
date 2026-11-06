@@ -1,5 +1,5 @@
 import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
-import { build } from '../geometry/build.js';
+import { build } from '../geometry/buildGeometryParts.js';
 import { createTrafficMesh } from './createTrafficMesh.js';
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { trafficBounds } from './trafficBounds.js';

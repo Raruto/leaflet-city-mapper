@@ -3,8 +3,8 @@ import { shadowCamera } from '../globals/shadowCamera.js';
 import { shadowLow } from '../globals/shadowLow.js';
 import { shadowHigh } from '../globals/shadowHigh.js';
 
-import { shadowBounds } from './shadowBounds.js';
-import { updateCamera } from '../scene/updateCamera.js';
+import { shadowBounds } from '../geometry/shadowBounds.js';
+import { updateCamera } from '../camera/updateSceneCamera.js';
 
 export function shadowMatrix(meshes, sunlight) {
   const { min, max } = shadowBounds(meshes, sharedShadowBounds);

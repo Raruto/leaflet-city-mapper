@@ -16,9 +16,9 @@ import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
  * in metres, `name`/`description` for the default tooltip. The status line (count and vehicle type) sits under the layer's entry in the layers control.
  * L.Control.Time on the same map drives the time; without one, vehicles run live.
  */
-import { build } from '../geometry/build.js';
+import { build } from '../geometry/buildGeometryParts.js';
 import { init3D } from '../scene/init3D.js';
-import { tooltip } from './tooltip.js';
+import { tooltip } from './trafficTooltip.js';
 
 
 

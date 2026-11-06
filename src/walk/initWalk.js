@@ -1,7 +1,7 @@
 import { L } from '../globals/L.js';
-import { initialize } from './initialize.js';
-import { onAdd } from './onAdd.js';
-import { onRemove } from './onRemove.js';
+import { initialize } from './initializeWalkControl.js';
+import { onAdd } from './onAddWalkControl.js';
+import { onRemove } from './onRemoveWalkControl.js';
 
 /**
  * Third-person walk mode, toggled by a map button (and Esc): a pedestrian at the map centre runs with W/S (or ↑/↓) and

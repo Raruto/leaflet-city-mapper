@@ -1,5 +1,4 @@
 import { hoveredFeatureByLayer } from '../weakmaps/hoveredFeatureByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -11,7 +10,7 @@ import { showFeature } from './showFeature.js';
 
 export function onClick(layer, event) {
   const feature = findFeature(layer, event);
-  mutateWeakMap(hoveredFeatureByLayer, layer, "=", feature);
+  hoveredFeatureByLayer.set(layer, feature);
   setHighlight(layer, feature);
   showFeature(layer, feature, event);
   layer.fire('featureclick', /* alloc */ { feature, originalEvent: event });

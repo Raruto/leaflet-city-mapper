@@ -1,7 +1,6 @@
 import { frameByLayer } from '../weakmaps/frameByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { pendingUpdates } from '../globals/pendingUpdates.js';
 
@@ -15,7 +14,7 @@ export function renderPendingUpdates() {
   let failure;
   let layer;
   for (layer of updates) {
-    mutateWeakMap(frameByLayer, layer, "=", null);
+    frameByLayer.set(layer, null);
     if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) continue;
     try {
       render(layer);

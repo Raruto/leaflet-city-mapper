@@ -3,10 +3,45 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
-import { angles } from '../../src/camera/angles.js';
-import { transformNativePoint } from '../../src/core/transformNativePoint.js';
-import { project } from '../../src/camera/project.js';
+import { angles } from '../../src/projections/cameraAngles.js';
+import { transformNativePoint } from '../../src/transforms/transformNativePoint.js';
+import { project } from '../../src/projections/projectCameraPoint.js';
 import { mockLeaflet } from '../fixtures/leaflet.js';
+import { mapAnimateCamera } from '../../src/animations/mapAnimateCamera.js';
+import { cancelCameraAnimation } from '../../src/animations/cancelCameraAnimation.js';
+import { cameraAnimationByMap } from '../../src/weakmaps/cameraAnimationByMap.js';
+import { cameraFrameByMap } from '../../src/weakmaps/cameraFrameByMap.js';
+
+Then('the camera WeakMap stores the same animation that is scheduled', function () {
+  const names = ['matchMedia', 'requestAnimationFrame', 'cancelAnimationFrame'];
+  const previous = names.map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
+  const map = { options: { maxPitch: 85 } }, cancelled = [];
+  const mocks = {
+    matchMedia: () => ({ matches: false }),
+    requestAnimationFrame: () => 42,
+    cancelAnimationFrame: frame => cancelled.push(frame),
+  };
+  for (const name of names) Object.defineProperty(globalThis, name, { configurable: true, value: mocks[name] });
+  try {
+    assert.equal(mapAnimateCamera(map, 30, 90, { animate: true, duration: 1 }), map);
+    const animation = cameraAnimationByMap.get(map);
+    assert.equal(globals.cameraAnimations.get(map), animation);
+    assert.equal(animation.pitch, 30);
+    assert.equal(animation.delta, 90);
+    assert.equal(cameraFrameByMap.get(map), 42);
+    cancelCameraAnimation(map);
+    assert.equal(cameraAnimationByMap.get(map), null);
+    assert.equal(cameraFrameByMap.get(map), null);
+    assert.equal(globals.cameraAnimations.has(map), false);
+    assert.deepEqual(cancelled, [42]);
+  } finally {
+    cancelCameraAnimation(map);
+    for (const [name, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
 
 Then('camera projection preserves its formulas without intermediate point instances', function () {
   let allocations = 0;

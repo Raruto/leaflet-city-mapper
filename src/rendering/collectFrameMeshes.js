@@ -6,7 +6,7 @@ import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
 
 
 
-import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
+import { updateWorldMatrix } from "../transforms/updateWorldMatrix.js";
 import { collectMeshes } from './collectMeshes.js';
 
 export function collectFrameMeshes(layer, sunlight, sceneChanged) {

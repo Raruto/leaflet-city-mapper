@@ -1,4 +1,4 @@
-import { triangle } from './nativeTriangle.js';
+import { triangle } from './appendNativeTriangle.js';
 import { line } from './line.js';
 import { triangulate } from '../triangulation/triangulate.js';
 

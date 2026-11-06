@@ -3,14 +3,14 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 
-import { createProgram } from '../../src/rendering/createProgram.js';
-import { createGeometry } from '../../src/raster/createGeometry.js';
+import { createProgram } from '../../src/materials/createProgram.js';
+import { createGeometry } from '../../src/geometry/createRasterQuadGeometry.js';
 import { drawGeometry } from '../../src/rendering/drawGeometry.js';
-import { reportCompilation } from '../../src/rendering/reportCompilation.js';
+import { reportCompilation } from '../../src/gpu/reportShaderCompilation.js';
 import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
-import { terrainGrid } from '../../src/terrain/terrainGrid.js';
-import { terrainBuffers } from '../../src/terrain/terrainBuffers.js';
+import { terrainGrid } from '../../src/geometry/terrainGrid.js';
+import { terrainBuffers } from '../../src/geometry/terrainBuffers.js';
 
 Then('terrain allocation results preserve grid topology and no-data sampling', function () {
   for (const divisions of [1, 2, 4, 64]) {
@@ -223,8 +223,8 @@ Then('terrain buffers are cached by subdivision and isolated by backend', functi
 Then('allocation-free shadow intermediates preserve projection matrices and bounds ownership', async function () {
   const result = await this.page.evaluate(async () => {
     const { shadowMatrix } = await import('/src/shadows/shadowMatrix.js');
-    const { shadowBounds } = await import('/src/shadows/shadowBounds.js');
-    const { updateCamera } = await import('/src/scene/updateCamera.js');
+    const { shadowBounds } = await import('/src/geometry/shadowBounds.js');
+    const { updateCamera } = await import('/src/camera/updateSceneCamera.js');
     const mesh = { worldMatrix: [2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 50, 20, -40, 1],
       _worldMatrixVersion: 1, geometry: { bounds: { min: [-5, -2, -3], max: [10, 8, 6] },
         attributes: { position: {} } } };

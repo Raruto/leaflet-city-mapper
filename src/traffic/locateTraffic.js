@@ -1,4 +1,4 @@
-import { along } from './along.js';
+import { along } from '../geometry/interpolateRoute.js';
 
 export function locateTraffic(state, trip) {
   const { points, lengths, length } = trip.lane;

@@ -2,7 +2,7 @@ import { L } from '../globals/L.js';
 import { tooltipPosition } from '../globals/tooltipPosition.js';
 
 
-import { displayPoint } from '../camera/displayPoint.js';
+import { displayPoint } from '../projections/displayContainerPoint.js';
 
 export function tooltipSetPosition(point) {
   tooltipPosition.value.call(this, point);

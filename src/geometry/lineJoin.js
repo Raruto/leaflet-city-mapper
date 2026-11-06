@@ -1,5 +1,5 @@
 import { L } from '../globals/L.js';
-import { triangle } from './nativeTriangle.js';
+import { triangle } from './appendNativeTriangle.js';
 import { disk } from './disk.js';
 
 export function lineJoin(context, points, i, b, length) {

@@ -1,7 +1,6 @@
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -20,7 +19,7 @@ export function setRasterTerrain(layer, terrain) {
       setParent(tile.mesh, rootByLayer.get(layer));
     }
   }
-  mutateWeakMap(terrain3DByLayer, layer, "=", terrain || null);
+  terrain3DByLayer.set(layer, terrain || null);
   if (terrain) {
     for (tile of rasterTilesByLayer.get(layer).values()) {
       if (tile.done) registerTerrainTile(layer, tile.coords, tile);

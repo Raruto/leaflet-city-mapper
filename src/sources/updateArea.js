@@ -5,7 +5,7 @@ import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 
 
 
-import { pump } from "./pump.js";
+import { pump } from "./pumpSourceAreas.js";
 import { releaseArea } from './releaseArea.js';
 import { compareAreaDistance } from './compareAreaDistance.js';
 

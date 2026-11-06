@@ -1,5 +1,5 @@
 import { routeColor } from '../traffic/routeColor.js';
-import { carriage } from './carriage.js';
+import { carriage } from './buildCarriage.js';
 
 export function metroModel(index, properties) {
   const color = routeColor(properties), parts = /* alloc */ [];

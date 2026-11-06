@@ -1,7 +1,7 @@
 import { archiveHeaderByLayer } from '../weakmaps/archiveHeaderByLayer.js';
 import { sceneLayers } from '../weakmaps/sceneLayers.js';
 import { decodeHeader } from './decodeHeader.js';
-import { read } from './read.js';
+import { read } from './readArchiveRange.js';
 
 /** Cache header initialization; failures remain visible to all callers. */
 

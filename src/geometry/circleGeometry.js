@@ -2,7 +2,7 @@ import { L } from '../globals/L.js';
 import { disk } from './disk.js';
 import { circleAt } from './circleAt.js';
 import { line } from './line.js';
-import { triangle } from './nativeTriangle.js';
+import { triangle } from './appendNativeTriangle.js';
 
 export function circleGeometry(source, context) {
   const { map, point, fill, stroke, options, dash, width } = context;

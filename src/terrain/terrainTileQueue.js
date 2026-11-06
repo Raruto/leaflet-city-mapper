@@ -1,6 +1,5 @@
 import { terrainBoundsByLayer } from '../weakmaps/terrainBoundsByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { L } from '../globals/L.js';
 import { archiveNorthWest } from '../globals/archiveNorthWest.js';
@@ -9,12 +8,12 @@ import { compareDistance } from '../utils/compareDistance.js';
 
 export function terrainTileQueue(layer, header) {
   const map = layer._map
-  mutateWeakMap(terrainZoomByLayer, layer, "=", header.maxZoom);
+  terrainZoomByLayer.set(layer, header.maxZoom);
   archiveNorthWest[0] = header.maxLat; archiveNorthWest[1] = header.minLon;
   const northwest = map.project(archiveNorthWest, terrainZoomByLayer.get(layer)).divideBy(256).floor();
   archiveSouthEast[0] = header.minLat; archiveSouthEast[1] = header.maxLon;
   const southeast = map.project(archiveSouthEast, terrainZoomByLayer.get(layer)).divideBy(256).floor();
-  mutateWeakMap(terrainBoundsByLayer, layer, "=", /* alloc */ new L.Bounds(northwest, southeast));
+  terrainBoundsByLayer.set(layer, /* alloc */ new L.Bounds(northwest, southeast));
   const tiles = /* alloc */ [];
   const center = map.project(map.getCenter(), terrainZoomByLayer.get(layer)).divideBy(256);
   let x, y;

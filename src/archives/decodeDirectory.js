@@ -1,5 +1,5 @@
 import { directoryReader } from '../globals/directoryReader.js';
-import { varint } from './varint.js';
+import { varint } from './readVarint.js';
 
 /** Decode delta/varint directory columns, rejecting malformed entries. */
 

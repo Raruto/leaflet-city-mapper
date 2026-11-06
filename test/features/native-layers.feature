@@ -1,5 +1,9 @@
 @coverage
 Feature: Native Leaflet layers rendered automatically with WebGPU
+  @unit
+  Scenario: Direct WeakMap updates preserve native stacking and event cleanup
+    Then native WeakMap counters and event cleanup preserve their values
+
   Scenario Outline: Native raster, vector and marker layers share the GPU scene
     Given the native WebGPU gallery uses the "<renderer>" renderer preference
     Then native map content is drawn by WebGPU while HTML UI remains native

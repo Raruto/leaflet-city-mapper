@@ -1,5 +1,5 @@
 import { triangulate } from '../triangulation/triangulate.js';
-import { local } from './bridgeLocal.js';
+import { local } from '../projections/projectBridgePoint.js';
 import { bridgePaths } from './bridgePaths.js';
 import { indexBridge } from './indexBridge.js';
 import { bridgeFaces } from './bridgeFaces.js';

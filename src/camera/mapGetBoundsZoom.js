@@ -6,8 +6,8 @@ import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
 import { fitCameraBounds } from './fitCameraBounds.js';
-import { pointOf } from './pointOf.js';
-import { groundBounds } from './groundBounds.js';
+import { pointOf } from '../projections/toPoint.js';
+import { groundBounds } from '../projections/groundBounds.js';
 
 export function mapGetBoundsZoom(bounds, inside, padding) {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.getBoundsZoom.call(this, bounds, inside, padding);

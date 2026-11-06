@@ -1,8 +1,8 @@
 import { roundProfile } from '../globals/roundProfile.js';
 
 
-import { parseColor } from "../utils/parseColor.js";
-import { ring } from './treeRing.js';
+import { parseColor } from "../colors/parseColor.js";
+import { ring } from './createTreeRing.js';
 import { surface } from './surface.js';
 import { validateTree } from './validateTree.js';
 

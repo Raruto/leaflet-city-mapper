@@ -1,5 +1,5 @@
 import { trafficRouteMaterial } from '../globals/trafficRouteMaterial.js';
-import { routeGeometry } from './routeGeometry.js';
+import { routeGeometry } from '../geometry/routeGeometry.js';
 import { createTrafficMesh } from './createTrafficMesh.js';
 
 

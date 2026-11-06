@@ -1,4 +1,4 @@
-import { parseColor } from "../utils/parseColor.js";
+import { parseColor } from "../colors/parseColor.js";
 import { quad } from './quad.js';
 import { emitter } from './emitter.js';
 

@@ -2,9 +2,9 @@ import { L } from '../globals/L.js';
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
 import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
 import { cameraAngles } from '../globals/cameraAngles.js';
-import { pointOf } from './pointOf.js';
-import { angles } from './angles.js';
-import { verticalGroundY } from './verticalGroundY.js';
+import { pointOf } from '../projections/toPoint.js';
+import { angles } from '../projections/cameraAngles.js';
+import { verticalGroundY } from '../projections/verticalGroundY.js';
 
 
 export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {

@@ -13,11 +13,11 @@ import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
 import { radians } from '../globals/radians.js';
 import { rasterPoint } from '../globals/rasterPoint.js';
 import { nextId } from '../globals/nextId.js';
-import { rasterProgram } from '../terrain/rasterProgram.js';
-import { terrainBuffers } from '../terrain/terrainBuffers.js';
+import { rasterProgram } from '../materials/terrainRasterProgram.js';
+import { terrainBuffers } from '../geometry/terrainBuffers.js';
 import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/update.js';
-import { terrainTileGeometry } from './terrainTileGeometry.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
+import { terrainTileGeometry } from '../geometry/terrainTileGeometry.js';
 
 export async function addRasterTile(layer, rasterLayer, coords, tile) {
   const ready = await terrainPromiseByLayer.get(layer);

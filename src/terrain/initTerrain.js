@@ -3,7 +3,6 @@ import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -21,9 +20,9 @@ export function initTerrain(layer, options) {
   const layerOptions = /* alloc */ { ...options };
   delete layerOptions.url;
   init3D(layer, layerOptions);
-  mutateWeakMap(terrainSourceByLayer, layer, "=", terrainSource);
-  mutateWeakMap(terrainTilesByLayer, layer, "=", /* alloc */ new Map());
-  mutateWeakMap(rasterTilesByLayer, layer, "=", /* alloc */ new Map());
-  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
-  mutateWeakMap(kindByLayer, layer, "=", 'terrain');
+  terrainSourceByLayer.set(layer, terrainSource);
+  terrainTilesByLayer.set(layer, /* alloc */ new Map());
+  rasterTilesByLayer.set(layer, /* alloc */ new Map());
+  terrainReadyByLayer.set(layer, false);
+  kindByLayer.set(layer, 'terrain');
 }

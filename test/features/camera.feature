@@ -1,5 +1,9 @@
 Feature: Standalone WebGPU camera with Leaflet as its only dependency
   @unit
+  Scenario: Direct camera state updates retain the scheduled animation
+    Then the camera WeakMap stores the same animation that is scheduled
+
+  @unit
   Scenario: Camera projection allocates only its independent result point
     Then camera projection preserves its formulas without intermediate point instances
 

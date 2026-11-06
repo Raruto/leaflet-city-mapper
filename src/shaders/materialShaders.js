@@ -1,6 +1,6 @@
 import { defaultMaterial } from '../globals/defaultMaterial.js';
-import { textureBinding } from '../rendering/textureBinding.js';
-import { validateRoofMaterial } from './validateRoofMaterial.js';
+import { textureBinding } from '../textures/textureBinding.js';
+import { validateRoofMaterial } from '../materials/validateRoofMaterial.js';
 import { materialVertexShader } from './materialVertexShader.js';
 import { materialSurfaceShader } from './materialSurfaceShader.js';
 

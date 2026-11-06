@@ -2,7 +2,7 @@ import { addedByLayer } from '../weakmaps/addedByLayer.js';
 
 
 
-import * as attach from './attach.js';
+import * as attach from './attachSharedScene.js';
 
 export async function attachLayer(layer, map) {
   try {

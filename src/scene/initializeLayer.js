@@ -1,7 +1,7 @@
 import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
 
-import { reportError } from './reportError.js';
+import { reportError } from './reportLayerError.js';
 
 
 export function initializeLayer(task) {

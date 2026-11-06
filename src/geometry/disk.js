@@ -1,4 +1,4 @@
-import { triangle } from './nativeTriangle.js';
+import { triangle } from './appendNativeTriangle.js';
 import { diskAt } from './diskAt.js';
 
 export function disk(point, center, radius, target, radiusY = radius) {

@@ -2,7 +2,7 @@ import { L } from '../globals/L.js';
 import { popupPosition } from '../globals/popupPosition.js';
 
 
-import { displayPoint } from '../camera/displayPoint.js';
+import { displayPoint } from '../projections/displayContainerPoint.js';
 
 export function popupUpdatePosition() {
   popupPosition.value.call(this);

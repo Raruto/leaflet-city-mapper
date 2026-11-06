@@ -1,12 +1,12 @@
 import { nextId } from '../globals/nextId.js';
 import { geometryEmpty } from '../globals/geometryEmpty.js';
 
-import { emptyNode } from '../scene/emptyNode.js';
-import { nodeMatrix } from './nodeMatrix.js';
+import { emptyNode } from '../scene/createSceneNode.js';
+import { nodeMatrix } from '../transforms/modelNodeMatrix.js';
 import { setParent } from '../scene/setParent.js';
 import { readModelAttributes } from './readModelAttributes.js';
 import { readModelIndices } from './readModelIndices.js';
-import { createModelGeometry } from './createModelGeometry.js';
+import { createModelGeometry } from '../geometry/createModelGeometry.js';
 
 export function modelNode(context, index) {
   const { backend: layer, description, active } = context;

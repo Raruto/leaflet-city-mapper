@@ -3,9 +3,9 @@ import { terrainRequestByLayer } from '../weakmaps/terrainRequestByLayer.js';
 
 
 
-import { destroyTexture } from '../rendering/destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 
 export function removeRasterTile(layer, tile) {
   terrainRequestByLayer.get(layer)?.abort();

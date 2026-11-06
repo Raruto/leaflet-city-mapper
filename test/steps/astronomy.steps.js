@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
 import { atmosphere } from '../../src/sunlight/atmosphere.js';
-import { moonPosition } from '../../src/sunlight/moonPosition.js';
-import { solarPosition } from '../../src/sunlight/solarPosition.js';
-import { solarTime } from '../../src/sunlight/solarTime.js';
+import { moonPosition } from '../../src/astronomy/moonPosition.js';
+import { solarPosition } from '../../src/astronomy/solarPosition.js';
+import { solarTime } from '../../src/astronomy/solarTime.js';
 
 const eiffel = [48.858, 2.2945];
 const unit = direction => Math.abs(Math.hypot(...direction) - 1) < 1e-12;

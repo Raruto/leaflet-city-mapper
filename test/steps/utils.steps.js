@@ -21,49 +21,49 @@ Then('every demo data file fits the GitHub upload size limit', async function ()
   assert.deepEqual(oversized, [], 'Demo data files must fit the GitHub 100 MiB per-file Git limit');
 });
 
-import { parseColor } from '../../src/utils/parseColor.js';
+import { parseColor } from '../../src/colors/parseColor.js';
 import { triangulate } from '../../src/triangulation/triangulate.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
 import { setVertexColor } from '../../src/geometry/setVertexColor.js';
 import { treeGeometry } from '../../src/geometry/treeGeometry.js';
 import { lightGeometry } from '../../src/geometry/lightGeometry.js';
 import { lampPostGeometry } from '../../src/geometry/lampPostGeometry.js';
-import { emptyNode } from '../../src/scene/emptyNode.js';
+import { emptyNode } from '../../src/scene/createSceneNode.js';
 import { setParent } from '../../src/scene/setParent.js';
 import { traverse } from '../../src/scene/traverse.js';
 import { decodeDirectory } from '../../src/archives/decodeDirectory.js';
 import { getZxy } from '../../src/archives/getZxy.js';
 import { loadSource } from '../../src/archives/loadSource.js';
-import { read as readArchive } from '../../src/archives/read.js';
+import { read as readArchive } from '../../src/archives/readArchiveRange.js';
 import { decodeHeader } from '../../src/archives/decodeHeader.js';
 import { decompress } from '../../src/archives/decompress.js';
 import { tileId } from '../../src/archives/tileId.js';
-import { varint } from '../../src/archives/varint.js';
+import { varint } from '../../src/archives/readVarint.js';
 import { decodeModel } from '../../src/models/decodeModel.js';
 import { loadModel } from '../../src/models/loadModel.js';
 import { readAccessor } from '../../src/models/readAccessor.js';
-import { nodeMatrix } from '../../src/models/nodeMatrix.js';
+import { nodeMatrix } from '../../src/transforms/modelNodeMatrix.js';
 import { vertexNormals } from '../../src/geometry/vertexNormals.js';
-import { textureSampler } from '../../src/models/textureSampler.js';
+import { textureSampler } from '../../src/textures/modelTextureSampler.js';
 import { lightGrid } from '../../src/lighting/lightGrid.js';
 import { cacheLightGrid } from '../../src/lighting/cacheLightGrid.js';
 import { updatePointLights } from '../../src/lighting/updatePointLights.js';
 import { worldLights } from '../../src/lighting/worldLights.js';
 import { bridgeElevation } from '../../src/geometry/bridgeElevation.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
-import { terrainGrid } from '../../src/terrain/terrainGrid.js';
+import { terrainGrid } from '../../src/geometry/terrainGrid.js';
 import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
-import { toLanes } from '../../src/traffic/toLanes.js';
+import { toLanes } from '../../src/traffic/featuresToTrafficLanes.js';
 import { tripsAt } from '../../src/traffic/tripsAt.js';
-import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { routeGeometry } from '../../src/geometry/routeGeometry.js';
 import { collider } from '../../src/collision/collider.js';
 import { horizontalRay } from '../../src/collision/horizontalRay.js';
 import { materialShaders } from '../../src/shaders/materialShaders.js';
 import { sortMeshes } from '../../src/rendering/sortMeshes.js';
-import { projectCelestialBody } from '../../src/sunlight/projectCelestialBody.js';
+import { projectCelestialBody } from '../../src/projections/projectCelestialBody.js';
 import { atmosphere } from '../../src/sunlight/atmosphere.js';
-import { mix } from '../../src/sunlight/mix.js';
-import { rgb } from '../../src/sunlight/rgb.js';
+import { mix } from '../../src/colors/mixColor.js';
+import { rgb } from '../../src/colors/formatRGB.js';
 import { updateSky } from '../../src/sunlight/updateSky.js';
 import { updateSun } from '../../src/sunlight/updateSun.js';
 import { useSelectedTime } from '../../src/sunlight/useSelectedTime.js';
@@ -72,15 +72,15 @@ import { removeSun } from '../../src/sunlight/removeSun.js';
 import { styleTimeControl } from '../../src/sunlight/styleTimeControl.js';
 import { roofCoverage } from '../../src/geometry/roofCoverage.js';
 import { box } from '../../src/geometry/box.js';
-import { build } from '../../src/geometry/build.js';
+import { build } from '../../src/geometry/buildGeometryParts.js';
 import { clipLine } from '../../src/geometry/clipLine.js';
 import { clipSegment } from '../../src/geometry/clipSegment.js';
-import { cross } from '../../src/geometry/cross.js';
-import { sub } from '../../src/geometry/sub.js';
-import { below } from '../../src/geometry/below.js';
-import { materialFor } from '../../src/models/materialFor.js';
+import { cross } from '../../src/geometry/crossVector.js';
+import { sub } from '../../src/geometry/subtractVector.js';
+import { below } from '../../src/geometry/offsetBelowGround.js';
+import { materialFor } from '../../src/materials/modelMaterialFor.js';
 import { loadBuffer } from '../../src/models/loadBuffer.js';
-import { loadImage } from '../../src/models/loadImage.js';
+import { loadImage } from '../../src/textures/loadModelImage.js';
 import { carModel } from '../../src/vehicles/carModel.js';
 import { boatModel } from '../../src/vehicles/boatModel.js';
 import { bicycleModel } from '../../src/vehicles/bicycleModel.js';
@@ -91,8 +91,8 @@ import { metroModel } from '../../src/vehicles/metroModel.js';
 import { sortHits } from '../../src/collision/sortHits.js';
 import { addBridges } from '../../src/geometry/addBridges.js';
 import { quad } from '../../src/geometry/quad.js';
-import { ring as lampRing } from '../../src/geometry/lampRing.js';
-import { ring as treeRing } from '../../src/geometry/treeRing.js';
+import { ring as lampRing } from '../../src/geometry/createLampRing.js';
+import { ring as treeRing } from '../../src/geometry/createTreeRing.js';
 
 Then('the build generates readable and minified bundles and standalone compatibility files', async function () {
   const load = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -1086,10 +1086,10 @@ Then('the standalone 3D {string} utilities preserve their results and errors', a
 Then('standalone browser math preserves scene transforms and picking', async function () {
   const result = await this.page.evaluate(async base => {
     const [{ emptyNode }, { setParent }, { updateWorldMatrix }, { updateCamera }, { intersectMeshes }] = await Promise.all([
-      import(`${base}/src/scene/emptyNode.js`),
+      import(`${base}/src/scene/createSceneNode.js`),
       import(`${base}/src/scene/setParent.js`),
-      import(`${base}/src/scene/updateWorldMatrix.js`),
-      import(`${base}/src/scene/updateCamera.js`),
+      import(`${base}/src/transforms/updateWorldMatrix.js`),
+      import(`${base}/src/camera/updateSceneCamera.js`),
       import(`${base}/src/collision/intersectMeshes.js`),
     ]);
     const parent = emptyNode(), child = emptyNode();

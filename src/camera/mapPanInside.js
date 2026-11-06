@@ -4,7 +4,7 @@ import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
-import { pointOf } from './pointOf.js';
+import { pointOf } from '../projections/toPoint.js';
 
 export function mapPanInside(latlng, options = /* alloc */ {}) {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.panInside.call(this, latlng, options);

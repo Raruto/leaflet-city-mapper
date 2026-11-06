@@ -2,7 +2,7 @@ import { L } from '../globals/L.js';
 import { markerMethods } from '../globals/markerMethods.js';
 
 
-import { initNativeGPU } from './initNativeGPU.js';
+import { initNativeGPU } from '../native/initNativeGPU.js';
 
 export function markerSetIcon(icon) {
   if (!(icon instanceof L.DivIcon)) icon.options.crossOrigin ||= true;

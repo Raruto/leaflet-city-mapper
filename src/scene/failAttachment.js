@@ -3,7 +3,7 @@ import { rendererReadyByLayer } from '../weakmaps/rendererReadyByLayer.js';
 import { renderers } from '../weakmaps/renderers.js';
 
 
-import { showWebGPUWarning } from './showWebGPUWarning.js';
+import { showWebGPUWarning } from '../gpu/showWebGPUWarning.js';
 
 export function failAttachment(error, layer, map) {
   showWebGPUWarning(map);

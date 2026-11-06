@@ -5,7 +5,7 @@ import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';
 
 import './camera/mapCamera.js';
 import { init3D } from './scene/init3D.js';
-import { initNativeGPU } from './core/initNativeGPU.js';
+import { initNativeGPU } from './native/initNativeGPU.js';
 import { initRaster } from './raster/initRaster.js';
 import { setGeoJSONData } from './sources/setGeoJSONData.js';
 import { initTerrain } from './terrain/initTerrain.js';
@@ -14,7 +14,7 @@ import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
 
 import { initializeNativeLayer } from './core/initializeNativeLayer.js';
-import { layerLayerAdd } from './scene/layerLayerAdd.js';
+import { layerLayerAdd } from './scene/addRegisteredLayer.js';
 import { layerInitialize } from './scene/layerInitialize.js';
 import { removeLayer } from './core/removeLayer.js';
 import { getPitch } from './camera/getPitch.js';
@@ -32,16 +32,11 @@ import { layerCallInitHooks } from './core/layerCallInitHooks.js';
  * It initializes a native instance from the bundled source modules;
  * types receive flat options (`{ ...source, pane, attribution }`); plugin state remains external.
  *
- * Folder layout:
- * - scene/: source routing, lifecycle and graph; initializers live in their domain folders.
- * - core/: Leaflet layer integration; camera/ and controls/: camera and interaction.
- * - sources/ and picking/: source geometry and feature interaction.
- * - rendering/, shaders/, shadows/ and lighting/: WebGPU drawing and illumination.
- * - geometry/, triangulation/ and collision/: mesh operations and spatial queries.
- * - models/, archives/ and raster/: glTF loading, archive access and raster tiles.
- * - globals/: one shared value per module, imported directly by its consumers.
- * - terrain/, sunlight/, traffic/ and walk/: feature-specific operations.
- *   Operations receive the layer explicitly, without subclasses or prototype replacement.
+ * Source folders are flat and grouped by responsibility; see README's source layout.
+ * Initializers and orchestration stay in their domain folders; shared geometry,
+ * projections, transforms, textures and animations have dedicated folders.
+ * Shared values live in globals/, private WeakMaps in weakmaps/.
+ * Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
  * When `type` is omitted, inline FeatureCollections use 'geojson'; *.pmtiles URLs use

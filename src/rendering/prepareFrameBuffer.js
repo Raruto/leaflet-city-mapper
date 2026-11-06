@@ -1,7 +1,7 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 
 import { frameBuffer } from '../globals/frameBuffer.js';
-import { destroyTexture } from './destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 
 export function prepareFrameBuffer(layer, meshes, shadowMeshes) {
   const renderer = rendererByLayer.get(layer);

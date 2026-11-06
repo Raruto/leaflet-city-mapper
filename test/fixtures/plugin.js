@@ -5,11 +5,11 @@ import '../../src/index.js';
 
 
 import { mapSetPitchAndBearing } from '../../src/camera/mapSetPitchAndBearing.js';
-import { mapStopPitchBearingAnimation } from '../../src/camera/mapStopPitchBearingAnimation.js';
-import { mapAnimateCamera } from '../../src/camera/mapAnimateCamera.js';
+import { mapStopPitchBearingAnimation } from '../../src/animations/mapStopPitchBearingAnimation.js';
+import { mapAnimateCamera } from '../../src/animations/mapAnimateCamera.js';
 import { mapUpdateCameraOverlays } from '../../src/camera/mapUpdateCameraOverlays.js';
-import { markerCameraIconPoint } from '../../src/core/markerCameraIconPoint.js';
-import { ready } from '../../src/scene/ready.js';
+import { markerCameraIconPoint } from '../../src/projections/markerCameraIconPoint.js';
+import { ready } from '../../src/core/whenReady.js';
 import { callLayer } from '../../src/scene/callLayer.js';
 import { getLocation } from '../../src/scene/getLocation.js';
 import { mapGetPitch } from '../../src/camera/mapGetPitch.js';

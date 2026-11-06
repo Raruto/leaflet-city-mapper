@@ -7,15 +7,15 @@ import { Then } from '@cucumber/cucumber';
 import { buildArea } from '../../src/sources/buildArea.js';
 import { buildAreaFeature } from '../../src/sources/buildAreaFeature.js';
 import { sourceAreaContext } from '../../src/sources/sourceAreaContext.js';
-import { emptyNode } from '../../src/scene/emptyNode.js';
+import { emptyNode } from '../../src/scene/createSceneNode.js';
 import { prepareFrameMeshes } from '../../src/rendering/prepareFrameMeshes.js';
 import { resizeRenderer } from '../../src/rendering/resizeRenderer.js';
 import { prepareFrameUniforms } from '../../src/rendering/prepareFrameUniforms.js';
-import { updateRoofRaster } from '../../src/rendering/updateRoofRaster.js';
+import { updateRoofRaster } from '../../src/textures/updateRoofRaster.js';
 import { shadowCacheMatches } from '../../src/shadows/shadowCacheMatches.js';
-import { shadowBounds } from '../../src/shadows/shadowBounds.js';
+import { shadowBounds } from '../../src/geometry/shadowBounds.js';
 import { drawShadowMeshes } from '../../src/shadows/drawShadowMeshes.js';
-import { cross } from '../../src/geometry/cross.js';
+import { cross } from '../../src/geometry/crossVector.js';
 import { compareDistance } from '../../src/utils/compareDistance.js';
 import { noOperation } from '../../src/utils/noOperation.js';
 import { notifyCameraTouchChange } from '../../src/controls/notifyCameraTouchChange.js';
@@ -26,7 +26,7 @@ import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
 import { initializerFor } from '../../src/scene/initializerFor.js';
 import { resolveNextInitialization } from '../../src/scene/resolveNextInitialization.js';
 import { initializeLayer } from '../../src/scene/initializeLayer.js';
-import { destroyAfterSubmission } from '../../src/rendering/destroyAfterSubmission.js';
+import { destroyAfterSubmission } from '../../src/textures/destroyTextureAfterSubmission.js';
 import { finishCompassPermission } from '../../src/controls/finishCompassPermission.js';
 
 Then('compass permission results preserve denial, stale requests and registration failures', function () {
@@ -146,8 +146,8 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
     const { collectFrameMeshes } = await import('/src/rendering/collectFrameMeshes.js');
     const { prepareFrameUniforms } = await import('/src/rendering/prepareFrameUniforms.js');
     const { drawSceneMeshes } = await import('/src/rendering/drawSceneMeshes.js');
-    const { updateWorldMatrix } = await import('/src/scene/updateWorldMatrix.js');
-    const { emptyNode } = await import('/src/scene/emptyNode.js');
+    const { updateWorldMatrix } = await import('/src/transforms/updateWorldMatrix.js');
+    const { emptyNode } = await import('/src/scene/createSceneNode.js');
     const identity = new DOMMatrix().toFloat64Array();
     globals.mapMethods.value = { layerPointToContainerPoint(point) { return point; } };
     const createBackend = () => {

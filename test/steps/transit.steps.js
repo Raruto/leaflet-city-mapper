@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { transitLanes, transitSettings } from '../../examples/data/paris-traffic.js';
 
-import { build } from '../../src/geometry/build.js';
+import { build } from '../../src/geometry/buildGeometryParts.js';
 import { tripsAt } from '../../src/traffic/tripsAt.js';
-import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { routeGeometry } from '../../src/geometry/routeGeometry.js';
 
 Then('transit route dashes follow line colours and sloping terrain', function () {
   const lane = { points: [[0, 0, 10], [60, 0, 40]], lengths: [0, 60], properties: { route_color: 'FF0000' } };

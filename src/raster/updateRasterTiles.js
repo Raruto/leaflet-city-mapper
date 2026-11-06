@@ -3,7 +3,6 @@ import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
 import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { wantedTiles } from '../globals/wantedTiles.js';
 import { coverageTiles } from '../globals/coverageTiles.js';
@@ -27,7 +26,7 @@ export function updateRasterTiles(layer) {
     layer.options.maxZoom,
     layer.options.maxNativeZoom
   ));
-  mutateWeakMap(tileZoomByLayer, layer, "=", zoom);
+  tileZoomByLayer.set(layer, zoom);
   const range = rasterTileRange(map, headerByLayer.get(layer), zoom);
   const wanted = wantedTiles;
   wanted.clear();
@@ -37,7 +36,7 @@ export function updateRasterTiles(layer) {
       wanted.set(`${zoom}/${x}/${y}`, /* alloc */ { z: zoom, x, y });
     }
   }
-  mutateWeakMap(wantedRasterTilesByLayer, layer, "=", /* alloc */ new Set(wanted.keys()));
+  wantedRasterTilesByLayer.set(layer, /* alloc */ new Set(wanted.keys()));
   const coverage = coverageTiles;
   coverage.clear();
   const parentZoom = Math.max(headerByLayer.get(layer).minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);

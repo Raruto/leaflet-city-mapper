@@ -1,14 +1,13 @@
 import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
 import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 import { buildAreaFeature } from './buildAreaFeature.js';
 import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
 import { sourceAreaContext } from './sourceAreaContext.js';
-import { pump } from './pump.js';
+import { pump } from './pumpSourceAreas.js';
 
 export async function buildArea(layer, area, map) {
   let feature;
@@ -42,7 +41,7 @@ export async function buildArea(layer, area, map) {
       layer.fire('error', /* alloc */ { error });
     }
   } finally {
-    mutateWeakMap(inflightByLayer, layer, "--", undefined, false);
+    inflightByLayer.set(layer, inflightByLayer.get(layer) - 1);
     pump(layer, map);
   }
 }

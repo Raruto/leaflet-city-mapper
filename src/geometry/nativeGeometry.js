@@ -1,5 +1,5 @@
 import { L } from '../globals/L.js';
-import { visit } from './visit.js';
+import { visit } from './visitNativeCoordinates.js';
 import { dashValues } from './dashValues.js';
 import { circleGeometry } from './circleGeometry.js';
 

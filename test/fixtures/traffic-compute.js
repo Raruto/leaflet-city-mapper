@@ -2,8 +2,8 @@ import * as globals from './globals.js';
 
 
 
-import { build } from '../../src/geometry/build.js';
-import { along } from '../../src/traffic/along.js';
+import { build } from '../../src/geometry/buildGeometryParts.js';
+import { along } from '../../src/geometry/interpolateRoute.js';
 
 /** Exercise the real GPU shader independently of map loading and animation-frame throttling. */
 export async function checkTrafficCompute(device) {

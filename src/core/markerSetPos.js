@@ -1,8 +1,8 @@
 import { markerMethods } from '../globals/markerMethods.js';
 
-import { markerCameraIconPoint } from './markerCameraIconPoint.js';
+import { markerCameraIconPoint } from '../projections/markerCameraIconPoint.js';
 
-import { displayPoint } from '../camera/displayPoint.js';
+import { displayPoint } from '../projections/displayContainerPoint.js';
 
 export function markerSetPos(point) {
   markerMethods.value._setPos.call(this, displayPoint(this._map, point));

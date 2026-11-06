@@ -6,12 +6,11 @@ import { pointerEventsByLayer } from '../weakmaps/pointerEventsByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { L } from '../globals/L.js';
 
 
-import * as attach from './attach.js';
+import * as attach from './attachSharedScene.js';
 import * as onClick from '../picking/onClick.js';
 import * as onPointerLeave from '../picking/onPointerLeave.js';
 import * as onPointerMove from '../picking/onPointerMove.js';
@@ -24,10 +23,10 @@ import { attachLayer } from './attachLayer.js';
 export function onAdd3DLayer(layer, map) {
   if (!locationByLayer.get(layer)) {
     const center = map.getCenter();
-    mutateWeakMap(locationByLayer, layer, "=", /* alloc */ new L.LatLng(center.lat, center.lng));
+    locationByLayer.set(layer, /* alloc */ new L.LatLng(center.lat, center.lng));
   }
   if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
-    mutateWeakMap(containerByLayer, layer, "=", map.getContainer());
+    containerByLayer.set(layer, map.getContainer());
     if (!pointerEventsByLayer.get(layer)) {
       pointerEventsByLayer.set(layer, /* alloc */ {
         mousemove: pointerMove,
@@ -36,7 +35,7 @@ export function onAdd3DLayer(layer, map) {
       });
     }
     if (layer.options.tooltip) {
-      mutateWeakMap(tooltipByLayer, layer, "=", L.DomUtil.create('div', 'leaflet-3d-tooltip', containerByLayer.get(layer)));
+      tooltipByLayer.set(layer, L.DomUtil.create('div', 'leaflet-3d-tooltip', containerByLayer.get(layer)));
       tooltipByLayer.get(layer).hidden = true;
       tooltipByLayer.get(layer).setAttribute('role', 'tooltip');
       tooltipByLayer.get(layer).setAttribute('aria-live', 'polite');

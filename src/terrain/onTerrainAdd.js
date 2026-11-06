@@ -1,7 +1,6 @@
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
@@ -17,12 +16,12 @@ export function onTerrainAdd(layer, map) {
   if (terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
     throw /* alloc */ new Error('Only one terrain layer can be active per map');
   }
-  mutateWeakMap(terrain3DByMap, map, "=", layer);
+  terrain3DByMap.set(map, layer);
   onAdd3DLayer(layer, map);
-  if (rootByLayer.get(layer)) mutateWeakMap(terrainPromiseByLayer, layer, "=", loadTerrain(layer));
+  if (rootByLayer.get(layer)) terrainPromiseByLayer.set(layer, loadTerrain(layer));
   else {
     const pending = Promise.withResolvers();
-    mutateWeakMap(terrainPromiseByLayer, layer, "=", pending.promise);
+    terrainPromiseByLayer.set(layer, pending.promise);
     layer.once('ready', loadReadyTerrain, /* alloc */ { backend: layer, ...pending });
   }
   map.eachLayer(setLayerTerrain, layer);

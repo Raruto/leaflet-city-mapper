@@ -11,20 +11,20 @@ import { frameCommands } from '../globals/frameCommands.js';
 import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
 
 
-import { synchronizeZoomView } from './synchronizeZoomView.js';
+import { synchronizeZoomView } from '../animations/synchronizeZoomView.js';
 import { resizeRenderer } from './resizeRenderer.js';
-import { updateMapCamera } from './updateMapCamera.js';
+import { updateMapCamera } from '../camera/updateMapCamera.js';
 import { collectFrameMeshes } from './collectFrameMeshes.js';
-import { updateRoofRaster } from './updateRoofRaster.js';
+import { updateRoofRaster } from '../textures/updateRoofRaster.js';
 import { prepareFrameMeshes } from './prepareFrameMeshes.js';
 import { prepareFrameUniforms } from './prepareFrameUniforms.js';
 import { drawSceneMeshes } from './drawSceneMeshes.js';
-import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
+import { updateWorldMatrix } from "../transforms/updateWorldMatrix.js";
 import { renderSunlight } from '../shadows/renderSunlight.js';
 import { cancelUpdate } from '../scene/cancelUpdate.js';
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 import { pruneRasterTiles } from '../raster/pruneRasterTiles.js';
-import { beforeNativeRender } from '../core/beforeNativeRender.js';
+import { beforeNativeRender } from '../native/beforeNativeRender.js';
 
 /**
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.

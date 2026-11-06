@@ -12,8 +12,8 @@ import { HEIGHT } from '../globals/HEIGHT.js';
 
 import { computeBounds } from './computeBounds.js';
 import { getElevation } from '../terrain/getElevation.js';
-import { update } from '../scene/update.js';
-import { updateWorldMatrix } from '../scene/updateWorldMatrix.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
+import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
 import { vertexNormals } from './vertexNormals.js';
 import { collectMeshes } from '../collision/collectMeshes.js';
 

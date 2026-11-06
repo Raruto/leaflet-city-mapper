@@ -3,7 +3,7 @@ import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
 
 
 
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 
 export function setRasterZIndex(layer, zIndex) {
   let tile, terrainMesh;

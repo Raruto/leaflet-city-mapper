@@ -1,6 +1,5 @@
 import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
 import { rotateControlByMap } from '../weakmaps/rotateControlByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { L } from '../globals/L.js';
 import { Compass } from '../globals/Compass.js';
@@ -77,7 +76,8 @@ export function cameraControls(map) {
   addCameraHandler(map, 'touchRotate', TouchMode.value);
   addCameraHandler(map, 'touchPitch', TouchMode.value);
   const container = map.getContainer();
-  const state = mutateWeakMap(cameraTouchStateByMap, map, "=", /* alloc */ { map, container, touch: null, nativeZoom: undefined });
+  const state = /* alloc */ { map, container, touch: null, nativeZoom: undefined };
+  cameraTouchStateByMap.set(map, state);
   touchByContainer.set(container, state);
   cameraTouchStates.add(state);
   container.addEventListener('touchstart', startCameraTouch, cameraListenerOptions);
@@ -87,7 +87,7 @@ export function cameraControls(map) {
   window.addEventListener('blur', endAllCameraTouches);
   map.on('cameratouchchange', changeCameraTouch, map);
   if (map.options.rotateControl) {
-    mutateWeakMap(rotateControlByMap, map, "=", /* alloc */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions));
+    rotateControlByMap.set(map, /* alloc */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions));
     rotateControlByMap.get(map).addTo(map);
   }
   map.once('unload', cleanupCameraTouch, map);

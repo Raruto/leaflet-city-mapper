@@ -4,11 +4,11 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Given, Then } from '@cucumber/cucumber';
-import { along } from '../../src/traffic/along.js';
+import { along } from '../../src/geometry/interpolateRoute.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
-import { routeGeometry } from '../../src/traffic/routeGeometry.js';
+import { routeGeometry } from '../../src/geometry/routeGeometry.js';
 import { refreshTrafficTrips } from '../../src/traffic/refreshTrafficTrips.js';
-import { toLanes } from '../../src/traffic/toLanes.js';
+import { toLanes } from '../../src/traffic/featuresToTrafficLanes.js';
 
 import { vehicleOffsets } from '../../src/traffic/vehicleOffsets.js';
 import { getLocation } from '../../src/scene/getLocation.js';
@@ -409,7 +409,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   const result = await this.page.evaluate(async () => {
     const layer = cruiseBoats, owner = globals.renderers.get(map);
     const [{ along }, { scheduledTrips }] = await Promise.all([
-      import(new URL('../src/traffic/along.js', location.href)),
+      import(new URL('../src/geometry/interpolateRoute.js', location.href)),
       import(new URL('../src/traffic/scheduledTrips.js', location.href)),
     ]);
     const [cruise] = (await (await fetch('../examples/data/seine-cruises.geojson')).json()).features;

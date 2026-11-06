@@ -3,7 +3,7 @@ import { popupPan } from '../globals/popupPan.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
-import { pointOf } from '../camera/pointOf.js';
+import { pointOf } from '../projections/toPoint.js';
 
 export function popupAdjustPan() {
   const map = this._map;

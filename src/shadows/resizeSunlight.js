@@ -4,7 +4,7 @@ import { shadowTexture } from '../globals/shadowTexture.js';
 
 
 import { bindSunlight } from './bindSunlight.js';
-import { destroyTexture } from '../rendering/destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 
 export function resizeSunlight(layer, size) {
   const device = rendererByLayer.get(layer).device, sun = rendererByLayer.get(layer).sunlight;

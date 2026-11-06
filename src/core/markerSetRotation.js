@@ -1,4 +1,4 @@
-import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';
+import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';
 
 export function markerSetRotation(marker, rotation) {
   if (!Number.isFinite(rotation)) throw /* alloc */ new TypeError('Marker rotation must be finite');

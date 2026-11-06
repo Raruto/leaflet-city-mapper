@@ -3,9 +3,9 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
-import { local } from '../../src/walk/local.js';
-import { onAdd as addWalk } from '../../src/walk/onAdd.js';
-import { onRemove as removeWalk } from '../../src/walk/onRemove.js';
+import { local } from '../../src/projections/walkerLocalPosition.js';
+import { onAdd as addWalk } from '../../src/walk/onAddWalkControl.js';
+import { onRemove as removeWalk } from '../../src/walk/onRemoveWalkControl.js';
 
 Then('Walk scratch stays map-owned across control replacement', function () {
   const firstMap = {}, secondMap = {};

@@ -4,7 +4,7 @@ import { rootByLayer } from '../weakmaps/rootByLayer.js';
 
 
 
-import { destroyTexture } from '../rendering/destroyTexture.js';
+import { destroyTexture } from '../textures/destroyTexture.js';
 import { bindSunlight } from '../shadows/bindSunlight.js';
 import { cacheLightGrid } from './cacheLightGrid.js';
 import { collectLightMeshes } from './collectLightMeshes.js';

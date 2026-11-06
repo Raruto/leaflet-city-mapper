@@ -4,7 +4,7 @@ import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
 import { sunByMap } from '../weakmaps/sunByMap.js';
 
 
-import { render } from './render.js';
+import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 
 export function removeSun(state) {

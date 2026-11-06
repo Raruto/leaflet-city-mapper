@@ -3,7 +3,6 @@ import { rasterGeometryByLayer } from '../weakmaps/rasterGeometryByLayer.js';
 import { rasterProgramByLayer } from '../weakmaps/rasterProgramByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { radians } from '../globals/radians.js';
 import { rasterTexture } from '../globals/rasterTexture.js';
@@ -17,10 +16,10 @@ import { nextId } from '../globals/nextId.js';
 
 
 
-import { createProgram } from "../rendering/createProgram.js";
+import { createProgram } from "../materials/createProgram.js";
 import { setParent } from "../scene/setParent.js";
 
-import { createGeometry } from './createGeometry.js';
+import { createGeometry } from '../geometry/createRasterQuadGeometry.js';
 
 export function createRasterMesh(layer, tile) {
   const device = rendererByLayer.get(layer).device;
@@ -49,11 +48,11 @@ export function createRasterMesh(layer, tile) {
   texture.uploaded = tile.image;
 
   if (!rasterProgramByLayer.get(layer)) {
-    mutateWeakMap(rasterProgramByLayer, layer, "=", createProgram(layer, /* alloc */ {
+    rasterProgramByLayer.set(layer, createProgram(layer, /* alloc */ {
       baseTexture: texture, unlit: true, alphaMode: 'BLEND', doubleSided: layer.options.doubleSided,
     }));
   }
-  if (!rasterGeometryByLayer.get(layer)) mutateWeakMap(rasterGeometryByLayer, layer, "=", createGeometry(device));
+  if (!rasterGeometryByLayer.get(layer)) rasterGeometryByLayer.set(layer, createGeometry(device));
   const { coords } = tile;
   const crs = layer._map.options.crs;
   const origin = crs.project(locationByLayer.get(layer));

@@ -1,4 +1,4 @@
-import { refreshNativeLayerContract } from './refreshNativeLayerContract.js';
+import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';
 
 export function redrawPath() {
   refreshNativeLayerContract(this);

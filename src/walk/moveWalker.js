@@ -2,8 +2,8 @@ import { rootByLayer } from '../weakmaps/rootByLayer.js';
 
 import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
-import { local } from './local.js';
-import { blocked } from './blocked.js';
+import { local } from '../projections/walkerLocalPosition.js';
+import { blocked } from './isWalkBlocked.js';
 
 export function moveWalker(forward, dt) {
   const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;

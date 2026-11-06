@@ -1,4 +1,4 @@
-import { visitCells } from './visitCells.js';
+import { visitCells } from './visitLightGridCells.js';
 
 /** Pack world-space point lights into the shader's spatial grid. */
 export function lightGrid(packed, maxBytes) {

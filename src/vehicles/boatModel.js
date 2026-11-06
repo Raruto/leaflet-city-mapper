@@ -5,7 +5,7 @@ import { glass } from '../globals/glass.js';
 
 import { box } from '../geometry/box.js';
 
-import { mirror } from './mirror.js';
+import { mirror } from './mirrorVehiclePart.js';
 
 import { boatBenches } from './boatBenches.js';
 

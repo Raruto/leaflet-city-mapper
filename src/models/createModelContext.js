@@ -1,5 +1,5 @@
 import { geometryEmpty } from '../globals/geometryEmpty.js';
-import { materialFor } from './materialFor.js';
+import { materialFor } from '../materials/modelMaterialFor.js';
 
 export function createModelContext(layer, description, images) {
   const context = /* alloc */ {

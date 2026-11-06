@@ -3,7 +3,7 @@ import { mapMethods } from '../globals/mapMethods.js';
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
 
-import { project } from './project.js';
+import { project } from '../projections/projectCameraPoint.js';
 
 export function mapLimitOffset(offset, bounds) {
   if (!bounds || !mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value._limitOffset.call(this, offset, bounds);

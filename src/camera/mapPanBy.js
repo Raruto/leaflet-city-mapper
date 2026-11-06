@@ -1,7 +1,7 @@
 import { mapMethods } from '../globals/mapMethods.js';
 
-import { project } from './project.js';
-import { pointOf } from './pointOf.js';
+import { project } from '../projections/projectCameraPoint.js';
+import { pointOf } from '../projections/toPoint.js';
 
 export function mapPanBy(offset, options) {
   const half = this.getSize().divideBy(2);

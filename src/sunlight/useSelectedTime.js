@@ -2,7 +2,7 @@ import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
 
 
 
-import { render } from './render.js';
+import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 import { updateSun } from './updateSun.js';
 

@@ -5,7 +5,6 @@ import { terrainControllerByLayer } from '../weakmaps/terrainControllerByLayer.j
 import { terrainLoadingByLayer } from '../weakmaps/terrainLoadingByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { createLayer } from '../scene/createLayer.js';
 
@@ -16,16 +15,18 @@ import { applyTerrain } from './applyTerrain.js';
 
 export async function loadTerrain(layer) {
   if (terrainLoadingByLayer.get(layer) || !layer._map) return;
-  mutateWeakMap(terrainLoadingByLayer, layer, "=", true);
-  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
-  const controller = mutateWeakMap(terrainControllerByLayer, layer, "=", /* alloc */ new AbortController());
+  terrainLoadingByLayer.set(layer, true);
+  terrainReadyByLayer.set(layer, false);
+  const controller = /* alloc */ new AbortController();
+  terrainControllerByLayer.set(layer, controller);
   let i;
   try {
     if (!terrainSourceByLayer.get(layer)) throw /* alloc */ new Error('Terrain layer requires a PMTiles or COG elevation archive');
-    const archive = mutateWeakMap(terrainArchiveByLayer, layer, "=", createLayer(/* alloc */ { source: /* alloc */ {
+    const archive = createLayer(/* alloc */ { source: /* alloc */ {
       type: layer.options.asset !== undefined || /\.tiff?(?:[?#]|$)/i.test(terrainSourceByLayer.get(layer)) ? 'cog' : 'pmtiles',
       url: terrainSourceByLayer.get(layer), archive: layer.options.archive, asset: layer.options.asset,
-    } }));
+    } });
+    terrainArchiveByLayer.set(layer, archive);
     await readyByLayer.get(archive);
     const header = headerByLayer.get(archive);
     if (header.tileType !== 0 || header.minZoom !== header.maxZoom) {
@@ -46,6 +47,6 @@ export async function loadTerrain(layer) {
     if (!controller.signal.aborted) layer.fire('error', /* alloc */ { error });
     return false;
   } finally {
-    mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
+    terrainLoadingByLayer.set(layer, false);
   }
 }

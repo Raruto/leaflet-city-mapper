@@ -7,7 +7,7 @@ import { taillight } from '../globals/taillight.js';
 import { box } from '../geometry/box.js';
 
 
-import { mirror } from './mirror.js';
+import { mirror } from './mirrorVehiclePart.js';
 
 
 

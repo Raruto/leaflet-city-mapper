@@ -1,12 +1,11 @@
 import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 
 import { atmosphere } from './atmosphere.js';
-import { moonPosition } from './moonPosition.js';
-import { solarPosition } from './solarPosition.js';
-import { render } from './render.js';
+import { moonPosition } from '../astronomy/moonPosition.js';
+import { solarPosition } from '../astronomy/solarPosition.js';
+import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 
 export function updateSun(state) {
@@ -18,7 +17,8 @@ export function updateSun(state) {
     slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
     output.textContent = `${time.slice(11, 16)} UTC${control.live ? ' · now' : ''}`;
     const center = map.getCenter();
-    const sun = mutateWeakMap(sunlightByMap, map, "=", solarPosition(control.time, center.lat, center.lng));
+    const sun = solarPosition(control.time, center.lat, center.lng);
+    sunlightByMap.set(map, sun);
     Object.assign(sun, atmosphere(sun.altitude));
     sun.moon = moonPosition(control.time, center.lat, center.lng);
     status.textContent = sun.altitude <= 0

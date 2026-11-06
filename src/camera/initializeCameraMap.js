@@ -1,6 +1,5 @@
 import { cameraMaps } from '../weakmaps/cameraMaps.js';
 import { cameraReadyByMap } from '../weakmaps/cameraReadyByMap.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
@@ -27,7 +26,7 @@ export function initializeCameraMap() {
   this.once('unload', cleanupCameraMap, this);
   this.whenReady(cameraMapReady, this);
   if (this.options.rotate || this.options.trackContainerMutation) {
-    mutateWeakMap(cameraReadyByMap, this, "=", loadCameraControls(this));
+    cameraReadyByMap.set(this, loadCameraControls(this));
     cameraReadyByMap.get(this).catch(noOperation);
   }
 }

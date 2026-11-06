@@ -1,5 +1,5 @@
 import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 
 export function disposeMesh(layer, mesh) {
   if (!mesh) {

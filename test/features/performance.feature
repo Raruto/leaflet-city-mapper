@@ -116,9 +116,9 @@ Feature: Performance-oriented source style
 
     Examples:
       | file                            |
-      | src/geometry/lampRing.js         |
-      | src/geometry/treeRing.js         |
-      | src/geometry/sub.js              |
+      | src/geometry/createLampRing.js   |
+      | src/geometry/createTreeRing.js   |
+      | src/geometry/subtractVector.js   |
       | src/geometry/computeBounds.js    |
       | src/lighting/cacheLightGrid.js   |
 
@@ -127,31 +127,31 @@ Feature: Performance-oriented source style
     Then local allocation checks accept source file "<file>"
 
     Examples:
-      | file                                  |
-      | src/sunlight/projectCelestialBody.js   |
-      | src/sunlight/updateSky.js              |
-      | src/sunlight/onAddSun.js               |
-      | src/sunlight/atmosphere.js             |
-      | src/sunlight/mix.js                    |
-      | src/sunlight/rgb.js                    |
-      | src/sunlight/solarTime.js              |
-      | src/sunlight/solarPosition.js          |
-      | src/sunlight/moonPosition.js           |
-      | src/sunlight/horizontalPosition.js     |
-      | src/sunlight/initialize.js             |
-      | src/sunlight/updateSun.js              |
-      | src/sunlight/useSelectedTime.js        |
-      | src/sunlight/removeSun.js              |
-      | src/sunlight/addTimeLayer.js           |
-      | src/sunlight/addTo.js                  |
-      | src/sunlight/initSunlight.js           |
-      | src/sunlight/onAdd.js                  |
-      | src/sunlight/remove.js                 |
-      | src/sunlight/removeTimeLayer.js        |
-      | src/sunlight/render.js                 |
-      | src/sunlight/styleTimeControl.js       |
-      | src/sunlight/tickSun.js                |
-      | src/sunlight/useLiveTime.js            |
+      | file                                    |
+      | src/projections/projectCelestialBody.js |
+      | src/sunlight/updateSky.js                |
+      | src/sunlight/onAddSun.js                 |
+      | src/sunlight/atmosphere.js               |
+      | src/colors/mixColor.js                   |
+      | src/colors/formatRGB.js                  |
+      | src/astronomy/solarTime.js               |
+      | src/astronomy/solarPosition.js           |
+      | src/astronomy/moonPosition.js            |
+      | src/astronomy/horizontalPosition.js      |
+      | src/sunlight/initializeTimeControl.js    |
+      | src/sunlight/updateSun.js                |
+      | src/sunlight/useSelectedTime.js          |
+      | src/sunlight/removeSun.js                |
+      | src/sunlight/addTimeLayer.js             |
+      | src/sunlight/addTimeControlToMap.js       |
+      | src/sunlight/initSunlight.js             |
+      | src/sunlight/onAddTimeControl.js          |
+      | src/sunlight/removeTimeControl.js        |
+      | src/sunlight/removeTimeLayer.js          |
+      | src/sunlight/requestSunlightRender.js    |
+      | src/sunlight/styleTimeControl.js         |
+      | src/sunlight/tickSun.js                  |
+      | src/sunlight/useLiveTime.js              |
 
   @unit
   Scenario Outline: Archive modules justify every necessary local allocation
@@ -160,12 +160,12 @@ Feature: Performance-oriented source style
     Examples:
       | file                            |
       | src/archives/decodeDirectory.js  |
-      | src/archives/varint.js           |
+      | src/archives/readVarint.js       |
       | src/archives/tileId.js           |
       | src/archives/decompress.js       |
       | src/archives/getZxy.js           |
       | src/archives/getHeader.js        |
-      | src/archives/read.js             |
+      | src/archives/readArchiveRange.js |
       | src/archives/loadDirectory.js    |
       | src/archives/loadSource.js       |
 

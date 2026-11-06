@@ -7,10 +7,10 @@ import { nextId } from '../globals/nextId.js';
 
 
 
-import { emptyNode } from '../scene/emptyNode.js';
-import { createProgram } from './createProgram.js';
+import { emptyNode } from '../scene/createSceneNode.js';
+import { createProgram } from '../materials/createProgram.js';
 import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/update.js';
+import { update } from '../scene/scheduleSceneUpdate.js';
 
 /**
  * Add a non-indexed, vertex-coloured mesh from flat vec3 arrays `{ position, normal, color }` in layer-local metres.

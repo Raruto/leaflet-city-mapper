@@ -2,7 +2,6 @@ import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
 import { sceneLayers } from '../weakmaps/sceneLayers.js';
 import { typeByLayer } from '../weakmaps/typeByLayer.js';
-import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
@@ -38,16 +37,17 @@ export function layerInitialize(options = sceneEmptyOptions) {
   } = options;
   const settings = /* alloc */ { ...source, ...core };
   L.Util.setOptions(this, core);
-  mutateWeakMap(typeByLayer, this, "=", type);
+  typeByLayer.set(this, type);
   if (type === '3d') {
     init3D(this, settings);
     return;
   }
-  mutateWeakMap(kindByLayer, this, "=", 'pending');
+  kindByLayer.set(this, 'pending');
   const task = /* alloc */ { layer: this, type, settings, ready: null };
   pendingInitializations.push(task);
   loading.value = loading.value.catch(noOperation).then(resolveNextInitialization);
-  const ready = mutateWeakMap(readyByLayer, this, "=", loading.value.then(initializeLayer));
+  const ready = loading.value.then(initializeLayer);
+  readyByLayer.set(this, ready);
   task.ready = ready;
   ready.catch(noOperation);
 }

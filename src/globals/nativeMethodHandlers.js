@@ -1,17 +1,17 @@
-import { nativeSetLatLng } from '../core/nativeSetLatLng.js';
-import { nativeSetLatLngs } from '../core/nativeSetLatLngs.js';
-import { nativeAddLatLng } from '../core/nativeAddLatLng.js';
-import { nativeSetRadius } from '../core/nativeSetRadius.js';
-import { nativeSetStyle } from '../core/nativeSetStyle.js';
-import { nativeRedraw } from '../core/nativeRedraw.js';
-import { nativeSetIcon } from '../core/nativeSetIcon.js';
-import { nativeSetUrl } from '../core/nativeSetUrl.js';
-import { nativeSetBounds } from '../core/nativeSetBounds.js';
-import { nativeSetOpacity } from '../core/nativeSetOpacity.js';
-import { nativeSetZIndex } from '../core/nativeSetZIndex.js';
-import { nativeSetZIndexOffset } from '../core/nativeSetZIndexOffset.js';
-import { nativeBringToFront } from '../core/nativeBringToFront.js';
-import { nativeBringToBack } from '../core/nativeBringToBack.js';
+import { nativeSetLatLng } from '../native/nativeSetLatLng.js';
+import { nativeSetLatLngs } from '../native/nativeSetLatLngs.js';
+import { nativeAddLatLng } from '../native/nativeAddLatLng.js';
+import { nativeSetRadius } from '../native/nativeSetRadius.js';
+import { nativeSetStyle } from '../native/nativeSetStyle.js';
+import { nativeRedraw } from '../native/nativeRedraw.js';
+import { nativeSetIcon } from '../native/nativeSetIcon.js';
+import { nativeSetUrl } from '../native/nativeSetUrl.js';
+import { nativeSetBounds } from '../native/nativeSetBounds.js';
+import { nativeSetOpacity } from '../native/nativeSetOpacity.js';
+import { nativeSetZIndex } from '../native/nativeSetZIndex.js';
+import { nativeSetZIndexOffset } from '../native/nativeSetZIndexOffset.js';
+import { nativeBringToFront } from '../native/nativeBringToFront.js';
+import { nativeBringToBack } from '../native/nativeBringToBack.js';
 
 export const nativeMethodHandlers = {
   setLatLng: nativeSetLatLng,

@@ -3,7 +3,7 @@ import { pitchSkyByMap } from '../weakmaps/pitchSkyByMap.js';
 
 
 
-import { cancelCameraAnimation } from './cancelCameraAnimation.js';
+import { cancelCameraAnimation } from '../animations/cancelCameraAnimation.js';
 import { adjustCameraDrag } from '../controls/adjustCameraDrag.js';
 
 export function cleanupCameraMap() {
