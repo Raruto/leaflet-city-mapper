@@ -1,13 +1,14 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+
 
 
 import { updateRasterTiles } from "./updateRasterTiles.js";
 
-export async function updateAttachedTiles(backend, map, attached) {
+export async function updateAttachedTiles(layer, map, attached) {
   try {
-    await Promise.all(/* alloc */ [attached, sceneByLayer.get(backend).ready]);
-    if (backend._map === map && map.hasLayer(backend)) updateRasterTiles(backend);
+    await Promise.all(/* alloc */ [attached, readyByLayer.get(layer)]);
+    if (layer._map === map && map.hasLayer(layer)) updateRasterTiles(layer);
   } catch (error) {
-    backend.fire('error', /* alloc */ { error });
+    layer.fire('error', /* alloc */ { error });
   }
 }

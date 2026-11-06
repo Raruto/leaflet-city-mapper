@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { zoomViewByLayer } from '../weakmaps/zoomViewByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { pendingZoomAnimations } from '../globals/pendingZoomAnimations.js';
 
 
@@ -8,9 +10,9 @@ import { renderPendingZoomAnimation } from './renderPendingZoomAnimation.js';
 
 export function onZoomAnim(event) {
   const map = this._map;
-  if (event && !sceneByLayer.get(this)._zoomView) {
-    sceneByLayer.get(this)._zoomView = /* alloc */ { from: map.getCenter(), zoom: map.getZoom(), to: event.center,
-      targetZoom: event.zoom, start: performance.now() };
+  if (event && !zoomViewByLayer.get(this)) {
+    mutateWeakMap(zoomViewByLayer, this, "=", /* alloc */ { from: map.getCenter(), zoom: map.getZoom(), to: event.center,
+      targetZoom: event.zoom, start: performance.now() });
     map.getContainer().classList.add('leaflet-camera-zoom');
   }
   pendingZoomAnimations.push(this);

@@ -1,15 +1,17 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { addedByLayer } from '../weakmaps/addedByLayer.js';
+import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
+
+
 
 
 import { setRasterTerrain } from "./setRasterTerrain.js";
 
-export async function finishAttachment(backend, map, attached) {
+export async function finishAttachment(layer, map, attached) {
   try {
     await attached;
-    sceneByLayer.get(backend)._added.resolve();
-    setRasterTerrain(backend, cameraByMap.get(map)._terrain3D);
+    addedByLayer.get(layer).resolve();
+    setRasterTerrain(layer, terrain3DByMap.get(map));
   } catch (error) {
-    backend.fire('error', /* alloc */ { error });
+    layer.fire('error', /* alloc */ { error });
   }
 }

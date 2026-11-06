@@ -1,6 +1,20 @@
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rendererReadyByLayer } from '../weakmaps/rendererReadyByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
+import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { terrainBaseYByLayer } from '../weakmaps/terrainBaseYByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { radians } from '../globals/radians.js';
-import { renderers } from '../globals/renderers.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { renderers } from '../weakmaps/renderers.js';
 import { setParent } from './setParent.js';
 import { render } from '../rendering/render.js';
 import { update } from './update.js';
@@ -16,39 +30,41 @@ import { initializeSharedRenderer } from './initializeSharedRenderer.js';
  * Buffer/program handles belong to one context; typed arrays and decoded images do not.
  * @private
  */
-export async function attach(backend, map) {
+export async function attach(layer, map) {
   let shared = renderers.get(map);
-  if (sceneByLayer.get(shared)?._rendererReady) {
-    await sceneByLayer.get(shared)._rendererReady.promise;
+
+  if (rendererReadyByLayer.get(shared)) {
+    await rendererReadyByLayer.get(shared).promise;
   }
   if (!shared) {
-    shared = backend;
-    sceneByLayer.get(backend)._rendererReady = Promise.withResolvers();
-    sceneByLayer.get(backend)._rendererReady.promise.catch(noOperation);
+    shared = layer;
+    mutateWeakMap(rendererReadyByLayer, layer, "=", Promise.withResolvers());
+    rendererReadyByLayer.get(layer).promise.catch(noOperation);
     renderers.set(map, shared);
-    await initializeSharedRenderer(backend, map);
-    sceneByLayer.get(backend)._rendererReady.resolve();
-    delete sceneByLayer.get(shared)._rendererReady;
+    await initializeSharedRenderer(layer, map);
+    rendererReadyByLayer.get(layer).resolve();
+    rendererReadyByLayer.delete(shared);
     render(shared);
     renderers.set(map, shared);
   }
-  const origin = map.options.crs.project(sceneByLayer.get(shared)._sceneOrigin);
-  const point = map.options.crs.project(sceneByLayer.get(backend).location);
-  const metres = Math.cos(sceneByLayer.get(shared)._sceneOrigin.lat * radians);
-  sceneByLayer.get(backend)._terrainBaseY ??= sceneByLayer.get(backend).root.position[1];
-  sceneByLayer.get(backend).root.position[0] = (point.x - origin.x) * metres;
-  sceneByLayer.get(backend).root.position[1] = sceneByLayer.get(backend)._terrainBaseY;
-  sceneByLayer.get(backend).root.position[2] = -(point.y - origin.y) * metres;
-  setTerrainHeight(backend);
+
+  const origin = map.options.crs.project(sceneOriginByLayer.get(shared));
+  const point = map.options.crs.project(locationByLayer.get(layer));
+  const metres = Math.cos(sceneOriginByLayer.get(shared).lat * radians);
+  if (terrainBaseYByLayer.get(layer) == null) terrainBaseYByLayer.set(layer, rootByLayer.get(layer).position[1]);
+  rootByLayer.get(layer).position[0] = (point.x - origin.x) * metres;
+  rootByLayer.get(layer).position[1] = terrainBaseYByLayer.get(layer);
+  rootByLayer.get(layer).position[2] = -(point.y - origin.y) * metres;
+  setTerrainHeight(layer);
   // Each group's metres are measured at its own latitude, not the shared camera origin.
-  sceneByLayer.get(backend).root.scale.fill(metres / Math.cos(sceneByLayer.get(backend).location.lat * radians));
-  sceneByLayer.get(backend)._shared = shared;
-  sceneByLayer.get(backend).renderer = sceneByLayer.get(shared).renderer;
-  sceneByLayer.get(backend).scene = sceneByLayer.get(shared).scene;
-  sceneByLayer.get(backend).camera = sceneByLayer.get(shared).camera;
-  sceneByLayer.get(shared)._layers.add(backend);
-  setParent(sceneByLayer.get(backend).root, sceneByLayer.get(shared).scene);
-  traverse(sceneByLayer.get(backend).root, restoreObject, backend);
+  rootByLayer.get(layer).scale.fill(metres / Math.cos(locationByLayer.get(layer).lat * radians));
+  mutateWeakMap(sharedByLayer, layer, "=", shared);
+  mutateWeakMap(rendererByLayer, layer, "=", rendererByLayer.get(shared));
+  mutateWeakMap(sceneByLayer, layer, "=", sceneByLayer.get(shared));
+  mutateWeakMap(cameraByLayer, layer, "=", cameraByLayer.get(shared));
+  layersByLayer.get(shared).add(layer);
+  setParent(rootByLayer.get(layer), sceneByLayer.get(shared));
+  traverse(rootByLayer.get(layer), restoreObject, layer);
   update(shared);
-  if ((sceneByLayer.get(backend).header && sceneByLayer.get(backend).kind !== 'raster') || sceneByLayer.get(backend)._geojson) updateArea(backend);
+  if ((headerByLayer.get(layer) && kindByLayer.get(layer) !== 'raster') || geojsonByLayer.get(layer)) updateArea(layer);
 }

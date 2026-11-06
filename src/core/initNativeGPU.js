@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { nativeLayer } from './nativeLayer.js';
@@ -8,18 +11,18 @@ import { readyNativeGPU } from './readyNativeGPU.js';
 import { reportError } from '../scene/reportError.js';
 
 export function initNativeGPU(source, map) {
-  if (sceneByLayer.get(source)._nativeGPU) return;
+  if (nativeGPUByLayer.get(source)) return;
   if (!document.getElementById('leaflet-webgpu-targets')) {
     const style = document.createElement('style');
     style.id = 'leaflet-webgpu-targets';
     style.textContent = '.leaflet-webgpu-target{opacity:0!important}';
     document.head.append(style);
   }
-  const state = sceneByLayer.get(source)._nativeGPU = /* alloc */ {
+  const state = mutateWeakMap(nativeGPUByLayer, source, "=", /* alloc */ {
     source, map, hidden: /* alloc */ new Set(),
-  };
+  });
   hideTargets(state);
   source.once('remove', removeTargets.bind(null, state));
-  sceneByLayer.get(source).ready = Promise.resolve().then(readyNativeGPU.bind(null, state));
-  sceneByLayer.get(source).ready.catch(reportError.bind(null, source));
+  mutateWeakMap(readyByLayer, source, "=", Promise.resolve().then(readyNativeGPU.bind(null, state)));
+  readyByLayer.get(source).catch(reportError.bind(null, source));
 }

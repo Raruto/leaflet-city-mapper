@@ -1,9 +1,10 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+
 
 
 import { update } from '../scene/update.js';
 
 export function updateNativeLayerView() {
   this.viewDirty = true;
-  if (sceneByLayer.get(this.backend)._shared) update(this.backend);
+  if (sharedByLayer.get(this.backend)) update(this.backend);
 }

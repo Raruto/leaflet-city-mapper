@@ -1,4 +1,4 @@
-import { dragStates } from '../globals/dragStates.js';
+import { dragStates } from '../weakmaps/dragStates.js';
 import { cameraFocusOptions } from '../globals/cameraFocusOptions.js';
 
 

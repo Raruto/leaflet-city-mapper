@@ -22,11 +22,23 @@
     }
   });
 
-  // src/globals/cameraByMap.js
-  var cameraByMap;
-  var init_cameraByMap = __esm({
-    "src/globals/cameraByMap.js"() {
-      cameraByMap = /* @__PURE__ */ new WeakMap();
+  // src/weakmaps/mutateWeakMap.js
+  function mutateWeakMap(weakMap, key, operator, value, prefix = true) {
+    const current2 = weakMap.get(key);
+    if (operator === "++" || operator === "--") {
+      const next = current2 + (operator === "++" ? 1 : -1);
+      weakMap.set(key, next);
+      return prefix ? next : current2;
+    }
+    if (operator !== "=") throw (
+      /* alloc */
+      new Error("Unsupported WeakMap assignment: " + operator)
+    );
+    weakMap.set(key, value);
+    return value;
+  }
+  var init_mutateWeakMap = __esm({
+    "src/weakmaps/mutateWeakMap.js"() {
     }
   });
 
@@ -46,23 +58,39 @@
     }
   });
 
+  // src/weakmaps/cameraPitchByMap.js
+  var cameraPitchByMap;
+  var init_cameraPitchByMap = __esm({
+    "src/weakmaps/cameraPitchByMap.js"() {
+      cameraPitchByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // src/camera/mapGetPitch.js
   function mapGetPitch(map) {
-    return cameraByMap.get(map)?._cameraPitch ?? 0;
+    return cameraPitchByMap.get(map) ?? 0;
   }
   var init_mapGetPitch = __esm({
     "src/camera/mapGetPitch.js"() {
-      init_cameraByMap();
+      init_cameraPitchByMap();
+    }
+  });
+
+  // src/weakmaps/cameraBearingByMap.js
+  var cameraBearingByMap;
+  var init_cameraBearingByMap = __esm({
+    "src/weakmaps/cameraBearingByMap.js"() {
+      cameraBearingByMap = /* @__PURE__ */ new WeakMap();
     }
   });
 
   // src/camera/mapGetBearing.js
   function mapGetBearing(map) {
-    return cameraByMap.get(map)?._cameraBearing ?? 0;
+    return cameraBearingByMap.get(map) ?? 0;
   }
   var init_mapGetBearing = __esm({
     "src/camera/mapGetBearing.js"() {
-      init_cameraByMap();
+      init_cameraBearingByMap();
     }
   });
 
@@ -74,27 +102,36 @@
     }
   });
 
+  // src/weakmaps/pitchSkyByMap.js
+  var pitchSkyByMap;
+  var init_pitchSkyByMap = __esm({
+    "src/weakmaps/pitchSkyByMap.js"() {
+      pitchSkyByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // src/camera/updateSky.js
   function updateSky() {
     const height = this.getSize().y, pitch = mapGetPitch(this) * radians;
     const far = height * this.options.pitchMaxDistance, distance = height * 1.5;
     const top = height / 2 - far * Math.abs(Math.cos(pitch)) * distance / (distance + Math.sin(pitch) * far);
-    if (top > 0 && !cameraByMap.get(this)._pitchSky) {
-      cameraByMap.get(this)._pitchSky = L.DomUtil.create("div", "leaflet-pitch-sky", this.getContainer());
-      cameraByMap.get(this)._pitchSky.setAttribute("aria-hidden", "true");
-      cameraByMap.get(this)._pitchSky.style.cssText = "position:absolute;inset:0 0 auto;height:0;z-index:0;pointer-events:none;background:var(--leaflet-sky-background,linear-gradient(#9ec5e8,#dfe9f0))";
+    if (top > 0 && !pitchSkyByMap.get(this)) {
+      mutateWeakMap(pitchSkyByMap, this, "=", L.DomUtil.create("div", "leaflet-pitch-sky", this.getContainer()));
+      pitchSkyByMap.get(this).setAttribute("aria-hidden", "true");
+      pitchSkyByMap.get(this).style.cssText = "position:absolute;inset:0 0 auto;height:0;z-index:0;pointer-events:none;background:var(--leaflet-sky-background,linear-gradient(#9ec5e8,#dfe9f0))";
     }
-    if (cameraByMap.get(this)._pitchSky) {
-      cameraByMap.get(this)._pitchSky.style.inset = pitch > Math.PI / 2 ? "auto 0 0" : "0 0 auto";
-      cameraByMap.get(this)._pitchSky.style.height = `${Math.max(0, Math.ceil(top))}px`;
-      cameraByMap.get(this)._pitchSky.style.display = top > 0 ? "" : "none";
+    if (pitchSkyByMap.get(this)) {
+      pitchSkyByMap.get(this).style.inset = pitch > Math.PI / 2 ? "auto 0 0" : "0 0 auto";
+      pitchSkyByMap.get(this).style.height = `${Math.max(0, Math.ceil(top))}px`;
+      pitchSkyByMap.get(this).style.display = top > 0 ? "" : "none";
     }
   }
   var init_updateSky = __esm({
     "src/camera/updateSky.js"() {
+      init_pitchSkyByMap();
+      init_mutateWeakMap();
       init_L();
       init_radians();
-      init_cameraByMap();
       init_mapGetPitch();
     }
   });
@@ -112,8 +149,8 @@
       );
     }
     const previousPitch = mapGetPitch(map), previousBearing = mapGetBearing(map);
-    cameraByMap.get(map)._cameraPitch = Math.max(0, Math.min(map.options.maxPitch, pitch));
-    cameraByMap.get(map)._cameraBearing = (bearing % 360 + 360) % 360;
+    mutateWeakMap(cameraPitchByMap, map, "=", Math.max(0, Math.min(map.options.maxPitch, pitch)));
+    mutateWeakMap(cameraBearingByMap, map, "=", (bearing % 360 + 360) % 360);
     if (map._loaded) {
       updateSky.call(map);
       if (previousBearing !== mapGetBearing(map)) map.fire(
@@ -131,10 +168,28 @@
   }
   var init_mapSetPitchAndBearing = __esm({
     "src/camera/mapSetPitchAndBearing.js"() {
-      init_cameraByMap();
+      init_cameraBearingByMap();
+      init_cameraPitchByMap();
+      init_mutateWeakMap();
       init_mapGetPitch();
       init_mapGetBearing();
       init_updateSky();
+    }
+  });
+
+  // src/weakmaps/cameraAnimationByMap.js
+  var cameraAnimationByMap;
+  var init_cameraAnimationByMap = __esm({
+    "src/weakmaps/cameraAnimationByMap.js"() {
+      cameraAnimationByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
+  // src/weakmaps/cameraFrameByMap.js
+  var cameraFrameByMap;
+  var init_cameraFrameByMap = __esm({
+    "src/weakmaps/cameraFrameByMap.js"() {
+      cameraFrameByMap = /* @__PURE__ */ new WeakMap();
     }
   });
 
@@ -157,8 +212,8 @@
   // src/camera/cancelCameraAnimation.js
   function cancelCameraAnimation(map) {
     cameraAnimations.delete(map);
-    cameraByMap.get(map)._cameraAnimation = null;
-    cameraByMap.get(map)._cameraFrame = null;
+    mutateWeakMap(cameraAnimationByMap, map, "=", null);
+    mutateWeakMap(cameraFrameByMap, map, "=", null);
     if (!cameraAnimations.size && cameraAnimationFrame.value !== null) {
       cancelAnimationFrame(cameraAnimationFrame.value);
       cameraAnimationFrame.value = null;
@@ -166,9 +221,27 @@
   }
   var init_cancelCameraAnimation = __esm({
     "src/camera/cancelCameraAnimation.js"() {
+      init_cameraAnimationByMap();
+      init_cameraFrameByMap();
+      init_mutateWeakMap();
       init_cameraAnimations();
-      init_cameraByMap();
       init_cameraAnimationFrame();
+    }
+  });
+
+  // src/weakmaps/cameraTouchStateByMap.js
+  var cameraTouchStateByMap;
+  var init_cameraTouchStateByMap = __esm({
+    "src/weakmaps/cameraTouchStateByMap.js"() {
+      cameraTouchStateByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
+  // src/weakmaps/rotateControlByMap.js
+  var rotateControlByMap;
+  var init_rotateControlByMap = __esm({
+    "src/weakmaps/rotateControlByMap.js"() {
+      rotateControlByMap = /* @__PURE__ */ new WeakMap();
     }
   });
 
@@ -212,10 +285,10 @@
     }
   });
 
-  // src/globals/touchByContainer.js
+  // src/weakmaps/touchByContainer.js
   var touchByContainer;
   var init_touchByContainer = __esm({
-    "src/globals/touchByContainer.js"() {
+    "src/weakmaps/touchByContainer.js"() {
       touchByContainer = /* @__PURE__ */ new WeakMap();
     }
   });
@@ -295,14 +368,14 @@
     let failure;
     let map, animation, progress, eased;
     for ([map, animation] of pending) {
-      cameraByMap.get(map)._cameraFrame = null;
-      if (cameraByMap.get(map)._cameraAnimation !== animation) continue;
+      mutateWeakMap(cameraFrameByMap, map, "=", null);
+      if (cameraAnimationByMap.get(map) !== animation) continue;
       progress = animation.duration ? Math.min(1, (now - animation.start) / (animation.duration * 1e3)) : 1;
       eased = 1 - (1 - progress) ** 3;
       try {
         mapSetPitchAndBearing(map, animation.fromPitch + (Math.max(0, Math.min(map.options.maxPitch, animation.pitch)) - animation.fromPitch) * eased, animation.fromBearing + animation.delta * eased);
-        if (progress < 1 && cameraByMap.get(map)._cameraAnimation === animation) scheduleCameraAnimation(map, animation);
-        else if (cameraByMap.get(map)._cameraAnimation === animation) cameraByMap.get(map)._cameraAnimation = null;
+        if (progress < 1 && cameraAnimationByMap.get(map) === animation) scheduleCameraAnimation(map, animation);
+        else if (cameraAnimationByMap.get(map) === animation) mutateWeakMap(cameraAnimationByMap, map, "=", null);
       } catch (error) {
         failure ||= error;
       }
@@ -311,9 +384,11 @@
   }
   var init_runCameraAnimations = __esm({
     "src/camera/runCameraAnimations.js"() {
+      init_cameraAnimationByMap();
+      init_cameraFrameByMap();
+      init_mutateWeakMap();
       init_cameraAnimationFrame();
       init_cameraAnimations();
-      init_cameraByMap();
       init_mapSetPitchAndBearing();
       init_scheduleCameraAnimation();
     }
@@ -323,13 +398,14 @@
   function scheduleCameraAnimation(map, animation) {
     cameraAnimations.set(map, animation);
     if (cameraAnimationFrame.value === null) cameraAnimationFrame.value = requestAnimationFrame(runCameraAnimations);
-    cameraByMap.get(map)._cameraFrame = cameraAnimationFrame.value;
+    mutateWeakMap(cameraFrameByMap, map, "=", cameraAnimationFrame.value);
   }
   var init_scheduleCameraAnimation = __esm({
     "src/camera/scheduleCameraAnimation.js"() {
+      init_cameraFrameByMap();
+      init_mutateWeakMap();
       init_cameraAnimations();
       init_cameraAnimationFrame();
-      init_cameraByMap();
       init_runCameraAnimations();
     }
   });
@@ -351,15 +427,21 @@
     );
     const start2 = performance.now(), fromPitch = mapGetPitch(map), fromBearing = mapGetBearing(map);
     const delta = ((bearing - fromBearing) % 360 + 540) % 360 - 180;
-    const animation = cameraByMap.get(map)._cameraAnimation = /* alloc */
-    { duration, start: start2, fromPitch, fromBearing, pitch, delta };
+    const animation = mutateWeakMap(
+      cameraAnimationByMap,
+      map,
+      "=",
+      /* alloc */
+      { duration, start: start2, fromPitch, fromBearing, pitch, delta }
+    );
     scheduleCameraAnimation(map, animation);
     return map;
   }
   var init_mapAnimateCamera = __esm({
     "src/camera/mapAnimateCamera.js"() {
+      init_cameraAnimationByMap();
+      init_mutateWeakMap();
       init_cameraEmptyOptions();
-      init_cameraByMap();
       init_mapSetPitchAndBearing();
       init_mapGetPitch();
       init_mapGetBearing();
@@ -464,10 +546,10 @@
     }
   });
 
-  // src/globals/dragStates.js
+  // src/weakmaps/dragStates.js
   var dragStates;
   var init_dragStates = __esm({
-    "src/globals/dragStates.js"() {
+    "src/weakmaps/dragStates.js"() {
       dragStates = { value: /* @__PURE__ */ new WeakMap() };
     }
   });
@@ -978,11 +1060,27 @@
     }
   });
 
+  // src/weakmaps/touchPitchByMap.js
+  var touchPitchByMap;
+  var init_touchPitchByMap = __esm({
+    "src/weakmaps/touchPitchByMap.js"() {
+      touchPitchByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
+  // src/weakmaps/touchRotateByMap.js
+  var touchRotateByMap;
+  var init_touchRotateByMap = __esm({
+    "src/weakmaps/touchRotateByMap.js"() {
+      touchRotateByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // src/controls/startCameraTouch.js
   function startCameraTouch(event) {
     const state = touchByContainer.get(this), { map, container } = state;
     if (state.touch || event.touches.length !== 2 || event.target.closest(".leaflet-control")) return;
-    if (!cameraByMap.get(map).touchRotate.enabled() && !cameraByMap.get(map).touchPitch.enabled()) return;
+    if (!touchRotateByMap.get(map).enabled() && !touchPitchByMap.get(map).enabled()) return;
     const [a, b] = event.touches;
     if (Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) < 1) return;
     mapStopPitchBearingAnimation(map);
@@ -1019,9 +1117,10 @@
   }
   var init_startCameraTouch = __esm({
     "src/controls/startCameraTouch.js"() {
+      init_touchPitchByMap();
+      init_touchRotateByMap();
       init_L();
       init_touchByContainer();
-      init_cameraByMap();
       init_mapStopPitchBearingAnimation();
       init_mapGetBearing();
       init_mapGetPitch();
@@ -1038,7 +1137,7 @@
     middle.x = (a.clientX + b.clientX) / 2 - rect.left;
     middle.y = (a.clientY + b.clientY) / 2 - rect.top;
     const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * degrees;
-    mapSetPitchAndBearing(map, cameraByMap.get(map).touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, cameraByMap.get(map).touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
+    mapSetPitchAndBearing(map, touchPitchByMap.get(map).enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, touchRotateByMap.get(map).enabled() ? touch.bearing + delta : touch.bearing);
     const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
     if (distance < 1) return;
     const zoom = touch.zooming ? Math.max(map.getMinZoom(), Math.min(
@@ -1065,9 +1164,10 @@
   }
   var init_moveCameraTouch = __esm({
     "src/controls/moveCameraTouch.js"() {
+      init_touchPitchByMap();
+      init_touchRotateByMap();
       init_degrees();
       init_touchByContainer();
-      init_cameraByMap();
       init_mapSetPitchAndBearing();
     }
   });
@@ -1106,8 +1206,8 @@
 
   // src/controls/changeCameraTouch.js
   function changeCameraTouch() {
-    const state = cameraByMap.get(this)._cameraTouchState, { map, container } = state;
-    const active = cameraByMap.get(map).touchRotate.enabled() || cameraByMap.get(map).touchPitch.enabled();
+    const state = cameraTouchStateByMap.get(this), { map, container } = state;
+    const active = touchRotateByMap.get(map).enabled() || touchPitchByMap.get(map).enabled();
     if (active && state.nativeZoom === void 0) {
       state.nativeZoom = map.touchZoom?.enabled();
       map.touchZoom?.disable();
@@ -1119,7 +1219,9 @@
   }
   var init_changeCameraTouch = __esm({
     "src/controls/changeCameraTouch.js"() {
-      init_cameraByMap();
+      init_cameraTouchStateByMap();
+      init_touchPitchByMap();
+      init_touchRotateByMap();
       init_endCameraTouch();
     }
   });
@@ -1138,7 +1240,7 @@
 
   // src/controls/cleanupCameraTouch.js
   function cleanupCameraTouch() {
-    const state = cameraByMap.get(this)._cameraTouchState;
+    const state = cameraTouchStateByMap.get(this);
     if (!state) return;
     const { container, map } = state;
     endCameraTouch(state);
@@ -1149,13 +1251,14 @@
     cameraTouchStates.delete(state);
     if (!cameraTouchStates.size) window.removeEventListener("blur", endAllCameraTouches);
     map.off("cameratouchchange", changeCameraTouch, map);
-    cameraByMap.get(map).rotateControl?.remove();
+    rotateControlByMap.get(map)?.remove();
     touchByContainer.delete(container);
-    delete cameraByMap.get(map)._cameraTouchState;
+    cameraTouchStateByMap.delete(map);
   }
   var init_cleanupCameraTouch = __esm({
     "src/controls/cleanupCameraTouch.js"() {
-      init_cameraByMap();
+      init_cameraTouchStateByMap();
+      init_rotateControlByMap();
       init_cameraTouchStates();
       init_touchByContainer();
       init_endCameraTouch();
@@ -1167,16 +1270,30 @@
     }
   });
 
+  // src/weakmaps/cameraHandlersByMap.js
+  var cameraHandlersByMap;
+  var init_cameraHandlersByMap = __esm({
+    "src/weakmaps/cameraHandlersByMap.js"() {
+      cameraHandlersByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // src/controls/addCameraHandler.js
   function addCameraHandler(map, name, Type) {
-    const handler = cameraByMap.get(map)[name] = /* alloc */
-    new Type(map);
+    let handlers = cameraHandlersByMap.get(map);
+    if (!handlers) cameraHandlersByMap.set(map, handlers = /* alloc */
+    /* @__PURE__ */ new Map());
+    const handler = (
+      /* alloc */
+      new Type(map)
+    );
+    handlers.set(name, handler);
     map._handlers.push(handler);
     if (map.options[name]) handler.enable();
   }
   var init_addCameraHandler = __esm({
     "src/controls/addCameraHandler.js"() {
-      init_cameraByMap();
+      init_cameraHandlersByMap();
     }
   });
 
@@ -1194,8 +1311,13 @@
     addCameraHandler(map, "touchRotate", TouchMode.value);
     addCameraHandler(map, "touchPitch", TouchMode.value);
     const container = map.getContainer();
-    const state = cameraByMap.get(map)._cameraTouchState = /* alloc */
-    { map, container, touch: null, nativeZoom: void 0 };
+    const state = mutateWeakMap(
+      cameraTouchStateByMap,
+      map,
+      "=",
+      /* alloc */
+      { map, container, touch: null, nativeZoom: void 0 }
+    );
     touchByContainer.set(container, state);
     cameraTouchStates.add(state);
     container.addEventListener("touchstart", startCameraTouch, cameraListenerOptions);
@@ -1205,21 +1327,28 @@
     window.addEventListener("blur", endAllCameraTouches);
     map.on("cameratouchchange", changeCameraTouch, map);
     if (map.options.rotateControl) {
-      cameraByMap.get(map).rotateControl = /* alloc */
-      new L.Control.Rotate(typeof map.options.rotateControl === "object" ? map.options.rotateControl : cameraEmptyOptions);
-      cameraByMap.get(map).rotateControl.addTo(map);
+      mutateWeakMap(
+        rotateControlByMap,
+        map,
+        "=",
+        /* alloc */
+        new L.Control.Rotate(typeof map.options.rotateControl === "object" ? map.options.rotateControl : cameraEmptyOptions)
+      );
+      rotateControlByMap.get(map).addTo(map);
     }
     map.once("unload", cleanupCameraTouch, map);
   }
   var init_cameraControls = __esm({
     "src/controls/cameraControls.js"() {
+      init_cameraTouchStateByMap();
+      init_rotateControlByMap();
+      init_mutateWeakMap();
       init_L();
       init_Compass();
       init_ContainerResize();
       init_PitchDrag();
       init_ShiftRotate();
       init_TouchMode();
-      init_cameraByMap();
       init_touchByContainer();
       init_cameraTouchStates();
       init_cameraListenerOptions();
@@ -1314,18 +1443,33 @@
   // src/globals/gridEvents.js
   var gridEvents = { value: void 0 };
 
-  // src/globals/sceneByLayer.js
-  var sceneByLayer = /* @__PURE__ */ new WeakMap();
+  // src/weakmaps/nativeGPUByLayer.js
+  var nativeGPUByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/readyByLayer.js
+  var readyByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/core/initNativeGPU.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/nativeGPUBackByMap.js
+  var nativeGPUBackByMap = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/nativeGPUOrderByMap.js
+  var nativeGPUOrderByMap = /* @__PURE__ */ new WeakMap();
 
   // src/core/nativeLayer.js
+  init_mutateWeakMap();
   init_L();
-  init_cameraByMap();
 
   // src/core/nativeLayerMethod.js
+  init_mutateWeakMap();
   init_L();
-  init_cameraByMap();
 
-  // src/globals/imageStates.js
+  // src/weakmaps/sharedByLayer.js
+  var sharedByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/imageStates.js
   var imageStates = /* @__PURE__ */ new WeakMap();
 
   // src/core/nativeImageRefresh.js
@@ -1371,25 +1515,55 @@
     states.add(state);
   }
 
+  // src/weakmaps/frameByLayer.js
+  var frameByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/scene/update.js
+  init_mutateWeakMap();
+
   // src/globals/pendingUpdates.js
   var pendingUpdates = /* @__PURE__ */ new Set();
+
+  // src/weakmaps/layersByLayer.js
+  var layersByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rendererByLayer.js
+  var rendererByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneByLayer.js
+  var sceneByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/shadowMeshesByLayer.js
+  var shadowMeshesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/wantedRasterTilesByLayer.js
+  var wantedRasterTilesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sunlightByMap.js
+  var sunlightByMap = /* @__PURE__ */ new WeakMap();
 
   // src/globals/frameCommands.js
   var frameCommands = [null];
 
-  // src/globals/nativeRenderByLayer.js
+  // src/weakmaps/nativeRenderByLayer.js
   var nativeRenderByLayer = /* @__PURE__ */ new WeakMap();
 
-  // src/rendering/render.js
-  init_cameraByMap();
+  // src/weakmaps/zoomTransitionsByLayer.js
+  var zoomTransitionsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/zoomViewByLayer.js
+  var zoomViewByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/globals/meshStack.js
   var meshStack = {
     subtree: true
   };
 
+  // src/weakmaps/cameraViewByMap.js
+  var cameraViewByMap = /* @__PURE__ */ new WeakMap();
+
   // src/rendering/updateZoomCamera.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/camera/mapUpdateCameraOverlays.js
   init_L();
@@ -1402,11 +1576,11 @@
   }
 
   // src/rendering/updateZoomCamera.js
-  function updateZoomCamera(backend, now) {
-    const map = backend._map;
-    const view = sceneByLayer.get(backend)._zoomView;
+  function updateZoomCamera(layer, now) {
+    const map = layer._map;
+    const view = zoomViewByLayer.get(layer);
     let proxy, animation;
-    for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) {
+    for (animation of zoomTransitionsByLayer.get(layer).keys()) {
       if (animation.effect.target === map._proxy) {
         proxy = animation;
         break;
@@ -1415,39 +1589,53 @@
     const progress = proxy?.effect.getComputedTiming().progress ?? Math.min(1, (now - view.start) / 250);
     const targetScale = map.getZoomScale(view.targetZoom, view.zoom), scale = 1 + (targetScale - 1) * progress;
     const from = map.project(view.from, view.zoom), to = map.project(view.to, view.zoom);
-    cameraByMap.get(map)._cameraView = /* alloc */
-    {
-      zoom: map.getScaleZoom(scale, view.zoom),
-      center: map.unproject(from.add(to.subtract(from).multiplyBy(targetScale * progress / scale)), view.zoom)
-    };
+    mutateWeakMap(
+      cameraViewByMap,
+      map,
+      "=",
+      /* alloc */
+      {
+        zoom: map.getScaleZoom(scale, view.zoom),
+        center: map.unproject(from.add(to.subtract(from).multiplyBy(targetScale * progress / scale)), view.zoom)
+      }
+    );
     mapUpdateCameraOverlays(map);
   }
 
   // src/rendering/synchronizeZoomView.js
-  function synchronizeZoomView(backend, now) {
-    const map = backend._map;
+  function synchronizeZoomView(layer, now) {
+    const map = layer._map;
     let animation, time, start2;
     if (map._animatingZoom) {
-      sceneByLayer.get(backend)._zoomTransitions ||= /* alloc */
-      /* @__PURE__ */ new Map();
+      if (!zoomTransitionsByLayer.get(layer)) zoomTransitionsByLayer.set(
+        layer,
+        /* alloc */
+        /* @__PURE__ */ new Map()
+      );
       for (animation of map.getContainer().getAnimations(meshStack)) {
-        if (!(animation instanceof CSSTransition) || animation.transitionProperty !== "transform" || !animation.effect.target.classList.contains("leaflet-zoom-animated") || sceneByLayer.get(backend)._zoomTransitions.has(animation)) {
+        if (!(animation instanceof CSSTransition) || animation.transitionProperty !== "transform" || !animation.effect.target.classList.contains("leaflet-zoom-animated") || zoomTransitionsByLayer.get(layer).has(animation)) {
           continue;
         }
         time = animation.currentTime || 0;
         animation.pause();
-        sceneByLayer.get(backend)._zoomTransitions.set(
+        zoomTransitionsByLayer.get(layer).set(
           animation,
           /* alloc */
           { start: now, time }
         );
       }
-      for ([animation, { start: start2, time }] of sceneByLayer.get(backend)._zoomTransitions) {
+      for ([animation, { start: start2, time }] of zoomTransitionsByLayer.get(layer)) {
         animation.currentTime = Math.min(animation.effect.getComputedTiming().endTime, time + now - start2);
       }
-      if (sceneByLayer.get(backend)._zoomView) updateZoomCamera(backend, now);
+      if (zoomViewByLayer.get(layer)) updateZoomCamera(layer, now);
     }
   }
+
+  // src/weakmaps/sizeByLayer.js
+  var sizeByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/rendering/resizeRenderer.js
+  init_mutateWeakMap();
 
   // src/globals/depthTexture.js
   var depthTexture = {
@@ -1472,23 +1660,29 @@
 
   // src/rendering/destroyTexture.js
   function destroyTexture(layer, texture) {
-    destroyAfterSubmission(layer, texture, sceneByLayer.get(layer).renderer.device.queue.onSubmittedWorkDone());
+    destroyAfterSubmission(layer, texture, rendererByLayer.get(layer).device.queue.onSubmittedWorkDone());
   }
 
   // src/rendering/resizeRenderer.js
-  function resizeRenderer(backend, size) {
-    if (!sceneByLayer.get(backend)._size || !sceneByLayer.get(backend)._size.equals(size)) {
-      sceneByLayer.get(backend).renderer.width = size.x;
-      sceneByLayer.get(backend).renderer.height = size.y;
-      sceneByLayer.get(backend).renderer.canvas.width = Math.round(size.x * sceneByLayer.get(backend).renderer.dpr);
-      sceneByLayer.get(backend).renderer.canvas.height = Math.round(size.y * sceneByLayer.get(backend).renderer.dpr);
-      sceneByLayer.get(backend).renderer.canvas.style.width = `${size.x}px`;
-      sceneByLayer.get(backend).renderer.canvas.style.height = `${size.y}px`;
-      if (sceneByLayer.get(backend).renderer.depthTexture) destroyTexture(backend, sceneByLayer.get(backend).renderer.depthTexture);
-      sceneByLayer.get(backend).renderer.depthTexture = sceneByLayer.get(backend).renderer.device.createTexture((depthTexture.size[0] = sceneByLayer.get(backend).renderer.canvas.width, depthTexture.size[1] = sceneByLayer.get(backend).renderer.canvas.height, depthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, depthTexture));
-      sceneByLayer.get(backend)._size = size;
+  function resizeRenderer(layer, size) {
+    if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {
+      rendererByLayer.get(layer).width = size.x;
+      rendererByLayer.get(layer).height = size.y;
+      rendererByLayer.get(layer).canvas.width = Math.round(size.x * rendererByLayer.get(layer).dpr);
+      rendererByLayer.get(layer).canvas.height = Math.round(size.y * rendererByLayer.get(layer).dpr);
+      rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
+      rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
+      if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
+      rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((depthTexture.size[0] = rendererByLayer.get(layer).canvas.width, depthTexture.size[1] = rendererByLayer.get(layer).canvas.height, depthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, depthTexture));
+      mutateWeakMap(sizeByLayer, layer, "=", size);
     }
   }
+
+  // src/weakmaps/cameraByLayer.js
+  var cameraByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneOriginByLayer.js
+  var sceneOriginByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/rendering/updateMapCamera.js
   init_radians();
@@ -1500,10 +1694,81 @@
   // src/globals/earthCirc.js
   var earthCirc = 2 * Math.PI * 6378137;
 
-  // src/rendering/updateMapCamera.js
-  init_cameraByMap();
+  // src/weakmaps/terrain3DByMap.js
+  var terrain3DByMap = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/walkByMap.js
+  // src/weakmaps/bridgesByLayer.js
+  var bridgesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainReadyByLayer.js
+  var terrainReadyByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainTilesByLayer.js
+  var terrainTilesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainZoomByLayer.js
+  var terrainZoomByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/terrain/getElevation.js
+  init_L();
+
+  // src/geometry/bridgeElevation.js
+  function bridgeElevation(point, bridges) {
+    const bucket = bridges?.get(`${Math.floor(point.x / 64)}/${Math.floor(point.y / 64)}`);
+    if (!bucket) return null;
+    let bridge, a, b, c, d, u, v;
+    for (bridge of bucket) {
+      if (point.x < bridge.min[0] || point.x > bridge.max[0] || point.y < bridge.min[1] || point.y > bridge.max[1]) {
+        continue;
+      }
+      for ([a, b, c] of bridge.triangles) {
+        d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+        u = ((b[1] - c[1]) * (point.x - c[0]) + (c[0] - b[0]) * (point.y - c[1])) / d;
+        v = ((c[1] - a[1]) * (point.x - c[0]) + (a[0] - c[0]) * (point.y - c[1])) / d;
+        if (u >= 0 && v >= 0 && u + v <= 1) {
+          return u * a[2] + v * b[2] + (1 - u - v) * c[2];
+        }
+      }
+    }
+    return null;
+  }
+
+  // src/terrain/sample.js
+  function sample(tiles, px, py) {
+    const tileX = Math.floor(px / 256), tileY = Math.floor(py / 256);
+    const tile = tiles.get(`${tileX}/${tileY}`);
+    if (!tile) return null;
+    const elevation = tile[(py - tileY * 256) * 256 + px - tileX * 256];
+    return Number.isFinite(elevation) && elevation > -1e3 ? elevation : null;
+  }
+
+  // src/terrain/terrainElevation.js
+  function terrainElevation(point, tiles) {
+    const x = point.x - 0.5, y = point.y - 0.5;
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const fx = x - x0, fy = y - y0;
+    const a = sample(tiles, x0, y0), b = sample(tiles, x0 + 1, y0);
+    const c = sample(tiles, x0, y0 + 1), d = sample(tiles, x0 + 1, y0 + 1);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || !Number.isFinite(d)) {
+      return Number.isFinite(a) ? a : Number.isFinite(b) ? b : Number.isFinite(c) ? c : Number.isFinite(d) ? d : null;
+    }
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  }
+
+  // src/terrain/getElevation.js
+  function getElevation(layer, location) {
+    if (!layer._map || !terrainReadyByLayer.get(layer)) return null;
+    const point = location instanceof L.Point ? location : layer._map.project(location, terrainZoomByLayer.get(layer));
+    return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
+  }
+
+  // src/terrain/mapElevationOf.js
+  function mapElevationOf(map, location) {
+    const terrain = terrain3DByMap.get(map);
+    return terrain && getElevation(terrain, location);
+  }
+
+  // src/weakmaps/walkByMap.js
   var walkByMap = /* @__PURE__ */ new WeakMap();
 
   // src/rendering/updateMapCamera.js
@@ -1578,63 +1843,9 @@
     projectionViewMatrix[12] = combined.m41, projectionViewMatrix[13] = combined.m42, projectionViewMatrix[14] = combined.m43, projectionViewMatrix[15] = combined.m44;
   }
 
-  // src/terrain/getElevation.js
-  init_L();
-
-  // src/geometry/bridgeElevation.js
-  function bridgeElevation(point, bridges) {
-    const bucket = bridges?.get(`${Math.floor(point.x / 64)}/${Math.floor(point.y / 64)}`);
-    if (!bucket) return null;
-    let bridge, a, b, c, d, u, v;
-    for (bridge of bucket) {
-      if (point.x < bridge.min[0] || point.x > bridge.max[0] || point.y < bridge.min[1] || point.y > bridge.max[1]) {
-        continue;
-      }
-      for ([a, b, c] of bridge.triangles) {
-        d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
-        u = ((b[1] - c[1]) * (point.x - c[0]) + (c[0] - b[0]) * (point.y - c[1])) / d;
-        v = ((c[1] - a[1]) * (point.x - c[0]) + (a[0] - c[0]) * (point.y - c[1])) / d;
-        if (u >= 0 && v >= 0 && u + v <= 1) {
-          return u * a[2] + v * b[2] + (1 - u - v) * c[2];
-        }
-      }
-    }
-    return null;
-  }
-
-  // src/terrain/sample.js
-  function sample(tiles, px, py) {
-    const tileX = Math.floor(px / 256), tileY = Math.floor(py / 256);
-    const tile = tiles.get(`${tileX}/${tileY}`);
-    if (!tile) return null;
-    const elevation = tile[(py - tileY * 256) * 256 + px - tileX * 256];
-    return Number.isFinite(elevation) && elevation > -1e3 ? elevation : null;
-  }
-
-  // src/terrain/terrainElevation.js
-  function terrainElevation(point, tiles) {
-    const x = point.x - 0.5, y = point.y - 0.5;
-    const x0 = Math.floor(x), y0 = Math.floor(y);
-    const fx = x - x0, fy = y - y0;
-    const a = sample(tiles, x0, y0), b = sample(tiles, x0 + 1, y0);
-    const c = sample(tiles, x0, y0 + 1), d = sample(tiles, x0 + 1, y0 + 1);
-    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || !Number.isFinite(d)) {
-      return Number.isFinite(a) ? a : Number.isFinite(b) ? b : Number.isFinite(c) ? c : Number.isFinite(d) ? d : null;
-    }
-    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
-  }
-
-  // src/terrain/getElevation.js
-  function getElevation(backend, location) {
-    if (!backend._map || !sceneByLayer.get(backend)._terrainReady) return null;
-    const point = location instanceof L.Point ? location : backend._map.project(location, sceneByLayer.get(backend)._terrainZoom);
-    return bridgeElevation(point, sceneByLayer.get(backend)._bridges) ?? terrainElevation(point, sceneByLayer.get(backend)._terrainTiles);
-  }
-
   // src/camera/animationPoint.js
-  init_cameraByMap();
   function animationPoint(map, point, inverse = false) {
-    const view = cameraByMap.get(map)._cameraView;
+    const view = cameraViewByMap.get(map);
     if (!view) return point;
     const half = map.getSize().divideBy(2), scale = map.getZoomScale(view.zoom);
     const shift = map.project(map.getCenter(), view.zoom).subtract(map.project(view.center, view.zoom));
@@ -1642,22 +1853,22 @@
   }
 
   // src/rendering/updateMapCamera.js
-  function updateMapCamera(backend, size) {
-    const map = backend._map;
-    const zoom = cameraByMap.get(map)._cameraView?.zoom ?? map.getZoom();
-    const pixelsPerMeter = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+  function updateMapCamera(layer, size) {
+    const map = layer._map;
+    const zoom = cameraViewByMap.get(map)?.zoom ?? map.getZoom();
+    const pixelsPerMeter = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneOriginByLayer.get(layer).lat * radians));
     const origin = animationPoint(map, mapMethods.value.layerPointToContainerPoint.call(
       map,
-      map.project(sceneByLayer.get(backend)._sceneOrigin).subtract(map.getPixelOrigin())
+      map.project(sceneOriginByLayer.get(layer)).subtract(map.getPixelOrigin())
     ));
     const distance = size.y * 1.5 / pixelsPerMeter;
     const targetX = (size.x / 2 - origin.x) / pixelsPerMeter;
     const walker = walkByMap.get(map)?.control?._walk;
-    const targetY = ((cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, map.getCenter()) : void 0) ?? 0) + (walker?.saved ? walker.state.height : 0);
+    const targetY = (mapElevationOf(map, map.getCenter()) ?? 0) + (walker?.saved ? walker.state.height : 0);
     const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
     const pitch = mapGetPitch(map) * radians;
     const bearing = mapGetBearing(map) * radians;
-    const camera = sceneByLayer.get(backend).camera;
+    const camera = cameraByLayer.get(layer);
     camera.fov = cameraFov;
     camera.aspect = size.x / size.y;
     camera.near = Math.max(0.1, distance / 1e4);
@@ -1673,6 +1884,9 @@
     camera.target[2] = targetZ;
     updateCamera(camera);
   }
+
+  // src/weakmaps/visibleMeshesByLayer.js
+  var visibleMeshesByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/scene/worldMatrixChanged.js
   function worldMatrixChanged(node, changed) {
@@ -1838,10 +2052,10 @@
   }
 
   // src/rendering/collectFrameMeshes.js
-  function collectFrameMeshes(backend, sunlight, sceneChanged) {
-    const camera = sceneByLayer.get(backend).camera;
+  function collectFrameMeshes(layer, sunlight, sceneChanged) {
+    const camera = cameraByLayer.get(layer);
     const projection = camera.projectionViewMatrix;
-    const renderer = sceneByLayer.get(backend).renderer;
+    const renderer = rendererByLayer.get(layer);
     const frustum = renderer.frustum ||= /* alloc */
     [
       /* alloc */
@@ -1869,15 +2083,35 @@
       }
       frustumLengths[i] = Math.hypot(plane[0], plane[1], plane[2]);
     }
-    const candidates = sceneByLayer.get(backend)._visibleMeshes ||= /* alloc */
-    [];
+    let candidates = visibleMeshesByLayer.get(layer);
+    if (!candidates) visibleMeshesByLayer.set(layer, candidates = /* alloc */
+    []);
     candidates.length = 0;
-    const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes ||= /* alloc */
-    [];
+    let shadowMeshes = shadowMeshesByLayer.get(layer);
+    if (!shadowMeshes) shadowMeshesByLayer.set(layer, shadowMeshes = /* alloc */
+    []);
     shadowMeshes.length = 0;
-    if (sceneChanged) updateWorldMatrix(sceneByLayer.get(backend).scene);
-    collectMeshes(sceneByLayer.get(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
+    if (sceneChanged) updateWorldMatrix(sceneByLayer.get(layer));
+    collectMeshes(sceneByLayer.get(layer), sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
   }
+
+  // src/weakmaps/kindByLayer.js
+  var kindByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rasterTilesByLayer.js
+  var rasterTilesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/roofRasterByLayer.js
+  var roofRasterByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/roofRastersByLayer.js
+  var roofRastersByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/loadingTilesByLayer.js
+  var loadingTilesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rasterVersionByLayer.js
+  var rasterVersionByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/rendering/updateRoofAtlas.js
   init_L();
@@ -1886,6 +2120,7 @@
   var roofSignatures = [];
 
   // src/rendering/rebuildRoofAtlas.js
+  init_mutateWeakMap();
   init_radians();
 
   // src/globals/roofTiles.js
@@ -2055,8 +2290,8 @@
   }
 
   // src/rendering/composeRoofAtlas.js
-  function composeRoofAtlas(backend, tiles, zoom, min, size, width, height) {
-    const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, map = backend._map;
+  function composeRoofAtlas(layer, tiles, zoom, min, size, width, height) {
+    const renderer = rendererByLayer.get(layer), device = renderer.device, map = layer._map;
     const opacityLength = Math.max(1, tiles.length) * 64;
     if (roofOpacities.value.length < opacityLength) {
       roofOpacities.value = /* alloc */
@@ -2065,16 +2300,16 @@
     const opacities = roofOpacities.value;
     const opacityBuffer = device.createBuffer((roofBuffer.size = opacities.byteLength, roofBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, roofBuffer));
     const encoder = device.createCommandEncoder();
-    const atlasPass = encoder.beginRenderPass((roofPass.colorAttachments[0].view = sceneByLayer.get(backend)._roofRaster.texture.texture.createView(), roofPass));
+    const atlasPass = encoder.beginRenderPass((roofPass.colorAttachments[0].view = roofRasterByLayer.get(layer).texture.texture.createView(), roofPass));
     roofPass.colorAttachments[0].view = null;
     atlasPass.setPipeline(renderer.roofBlit.pipeline);
     tiles.sort(compareRoofTiles);
-    let i, tile, layer, coords, source, tileSize, x, y;
-    for ([i, { tile, layer }] of tiles.entries()) {
+    let i, tile, rasterLayer, coords, source, tileSize, x, y;
+    for ([i, { tile, layer: rasterLayer }] of tiles.entries()) {
       ({ coords } = tile);
       source = tile.texture;
       uploadRoofTile(device, tile);
-      opacities[i * 64] = layer.options.opacity;
+      opacities[i * 64] = rasterLayer.options.opacity;
       tileSize = TILE_SIZE * map.getZoomScale(zoom, coords.z);
       x = (coords.x * tileSize - min.x) * width / size.x;
       y = (coords.y * tileSize - min.y) * height / size.y;
@@ -2104,7 +2339,7 @@
   function collectRoofTiles(rasters, tiles) {
     let zoom = -Infinity, layer, tile;
     for (layer of rasters) {
-      for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
+      for (tile of rasterTilesByLayer.get(layer).values()) {
         if (tile.done && !tile.request.signal.aborted && tile.image) {
           tile._roofEntry ||= /* alloc */
           { tile, layer };
@@ -2130,14 +2365,14 @@
   };
 
   // src/rendering/resizeRoofTexture.js
-  function resizeRoofTexture(backend, roof, width, height) {
-    const renderer = sceneByLayer.get(backend).renderer;
+  function resizeRoofTexture(layer, roof, width, height) {
+    const renderer = rendererByLayer.get(layer);
     const descriptor = roofTexture;
     descriptor.size[0] = width;
     descriptor.size[1] = height;
     descriptor.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
     if (roof.texture && (roof.texture.width !== width || roof.texture.height !== height)) {
-      destroyTexture(backend, roof.texture.texture);
+      destroyTexture(layer, roof.texture.texture);
       roof.texture.texture = renderer.device.createTexture(descriptor);
       roof.texture.width = width;
       roof.texture.height = height;
@@ -2162,8 +2397,8 @@
   }
 
   // src/rendering/rebuildRoofAtlas.js
-  function rebuildRoofAtlas(backend, rasters, signature, now) {
-    const map = backend._map, renderer = sceneByLayer.get(backend).renderer;
+  function rebuildRoofAtlas(layer, rasters, signature, now) {
+    const map = layer._map, renderer = rendererByLayer.get(layer);
     const tiles = roofTiles;
     tiles.length = 0;
     let zoom = collectRoofTiles(rasters, tiles);
@@ -2177,7 +2412,7 @@
       maxX = Math.max(maxX, (coords.x + 1) * tileSize);
       maxY = Math.max(maxY, (coords.y + 1) * tileSize);
     }
-    const origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
+    const origin = map.project(sceneOriginByLayer.get(layer), zoom);
     const min = roofMin, size = roofSize;
     min.x = tiles.length ? minX : origin.x;
     min.y = tiles.length ? minY : origin.y;
@@ -2185,7 +2420,7 @@
     size.y = tiles.length ? maxY - minY : 1;
     const scale = Math.min(1, 4096 / Math.max(size.x, size.y));
     const width = Math.max(1, Math.ceil(size.x * scale)), height = Math.max(1, Math.ceil(size.y * scale));
-    const pixels = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+    const pixels = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneOriginByLayer.get(layer).lat * radians));
     const roof = (
       /* alloc */
       {
@@ -2193,63 +2428,64 @@
           /* alloc */
           [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
         ),
-        texture: sceneByLayer.get(backend)._roofRaster?.texture
+        texture: roofRasterByLayer.get(layer)?.texture
       }
     );
-    sceneByLayer.get(backend)._roofRaster = roof;
+    mutateWeakMap(roofRasterByLayer, layer, "=", roof);
     roof.signature = signature;
     roof.updatedAt = now;
     roof.matrix[0] = pixels / size.x;
     roof.matrix[10] = pixels / size.y;
     roof.matrix[12] = (origin.x - min.x) / size.x;
     roof.matrix[14] = (origin.y - min.y) / size.y;
-    resizeRoofTexture(backend, roof, width, height);
+    resizeRoofTexture(layer, roof, width, height);
     ensureRoofBlit(renderer);
     try {
-      composeRoofAtlas(backend, tiles, zoom, min, size, width, height);
+      composeRoofAtlas(layer, tiles, zoom, min, size, width, height);
     } finally {
       tiles.length = 0;
     }
   }
 
   // src/rendering/updateRoofAtlas.js
-  function updateRoofAtlas(backend, rasters, now) {
+  function updateRoofAtlas(layer, rasters, now) {
     const signatures = roofSignatures;
     signatures.length = 0;
-    let loading2 = false, layer;
-    for (layer of rasters) {
-      signatures.push(`${L.Util.stamp(layer)}:${sceneByLayer.get(layer)._rasterVersion || 0}:${layer.options.opacity}:${layer.options.zIndex}`);
-      loading2 ||= Boolean(sceneByLayer.get(layer)._loadingTiles);
+    let loading2 = false, rasterLayer;
+    for (rasterLayer of rasters) {
+      signatures.push(`${L.Util.stamp(rasterLayer)}:${rasterVersionByLayer.get(rasterLayer) || 0}:${rasterLayer.options.opacity}:${rasterLayer.options.zIndex}`);
+      loading2 ||= Boolean(loadingTilesByLayer.get(rasterLayer));
     }
     const signature = signatures.join("|");
     signatures.length = 0;
-    if (!sceneByLayer.get(backend)._roofRaster || sceneByLayer.get(backend)._roofRaster.signature !== signature && (!loading2 || now - sceneByLayer.get(backend)._roofRaster.updatedAt >= 50)) {
-      rebuildRoofAtlas(backend, rasters, signature, now);
+    if (!roofRasterByLayer.get(layer) || roofRasterByLayer.get(layer).signature !== signature && (!loading2 || now - roofRasterByLayer.get(layer).updatedAt >= 50)) {
+      rebuildRoofAtlas(layer, rasters, signature, now);
     }
   }
 
   // src/rendering/updateRoofRaster.js
-  function updateRoofRaster(backend, now) {
-    const map = backend._map;
-    const rasters = sceneByLayer.get(backend)._roofRasters ||= /* alloc */
-    [];
+  function updateRoofRaster(layer, now) {
+    const map = layer._map;
+    let rasters = roofRastersByLayer.get(layer);
+    if (!rasters) roofRastersByLayer.set(layer, rasters = /* alloc */
+    []);
     rasters.length = 0;
     let hasRoofTexture = false;
-    let layer;
-    for (layer of sceneByLayer.get(backend)._layers) {
-      if (layer.options.roofTexture || layer.options.wallTexture) {
+    let sceneLayer, rasterLayer;
+    for (sceneLayer of layersByLayer.get(layer)) {
+      if (sceneLayer.options.roofTexture || sceneLayer.options.wallTexture) {
         hasRoofTexture = true;
         break;
       }
     }
     if (hasRoofTexture) {
-      for (layer of Object.values(map._layers)) {
-        if (sceneByLayer.get(layer).kind === "raster" && sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
+      for (rasterLayer of Object.values(map._layers)) {
+        if (kindByLayer.get(rasterLayer) === "raster" && rasterTilesByLayer.get(rasterLayer) && rasterLayer.options.opacity > 0) rasters.push(rasterLayer);
       }
-      updateRoofAtlas(backend, rasters, now);
-    } else if (sceneByLayer.get(backend)._roofRaster) {
-      destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
-      sceneByLayer.get(backend)._roofRaster = null;
+      updateRoofAtlas(layer, rasters, now);
+    } else if (roofRasterByLayer.get(layer)) {
+      destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
+      roofRasterByLayer.set(layer, null);
     }
     return rasters;
   }
@@ -2269,13 +2505,19 @@
     return meshes.sort(compareMeshes);
   }
 
+  // src/weakmaps/headerByLayer.js
+  var headerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/tileZoomByLayer.js
+  var tileZoomByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/geometry/roofFootprint.js
   init_radians();
-  function roofFootprint(mesh, backend, layer) {
-    const map = backend._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
-    const state = sceneByLayer.get(layer), zoom = state._tileZoom;
-    const origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
-    const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+  function roofFootprint(mesh, layer, rasterLayer) {
+    const map = layer._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
+    const zoom = tileZoomByLayer.get(rasterLayer);
+    const origin = map.project(sceneOriginByLayer.get(layer), zoom);
+    const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneOriginByLayer.get(layer).lat * radians));
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let i, x, y, z, px, py, nw, se;
     for (i = 0; i < 8; i++) {
@@ -2288,15 +2530,15 @@
       maxX = Math.max(maxX, px);
       maxY = Math.max(maxY, py);
     }
-    if (state.header.maxLat !== void 0 && state.header.minLon !== void 0 && state.header.minLat !== void 0 && state.header.maxLon !== void 0) {
+    if (headerByLayer.get(rasterLayer).maxLat !== void 0 && headerByLayer.get(rasterLayer).minLon !== void 0 && headerByLayer.get(rasterLayer).minLat !== void 0 && headerByLayer.get(rasterLayer).maxLon !== void 0) {
       nw = map.project(
         /* alloc */
-        [state.header.maxLat, state.header.minLon],
+        [headerByLayer.get(rasterLayer).maxLat, headerByLayer.get(rasterLayer).minLon],
         zoom
       );
       se = map.project(
         /* alloc */
-        [state.header.minLat, state.header.maxLon],
+        [headerByLayer.get(rasterLayer).minLat, headerByLayer.get(rasterLayer).maxLon],
         zoom
       );
       minX = Math.max(minX, nw.x);
@@ -2351,22 +2593,22 @@
   }
 
   // src/geometry/roofCoverage.js
-  function roofCoverage(mesh, backend, rasters) {
+  function roofCoverage(mesh, layer, rasters) {
     let intersectsArchive = false, pending = false;
-    let layer, footprint, remaining, tile;
-    for (layer of rasters) {
-      if (!sceneByLayer.get(layer).header) {
+    let rasterLayer, footprint, remaining, tile;
+    for (rasterLayer of rasters) {
+      if (!headerByLayer.get(rasterLayer)) {
         pending = true;
         continue;
       }
-      footprint = roofFootprint(mesh, backend, layer);
+      footprint = roofFootprint(mesh, layer, rasterLayer);
       if (!footprint) continue;
       intersectsArchive = true;
       remaining = /* alloc */
       [footprint];
-      for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
+      for (tile of rasterTilesByLayer.get(rasterLayer).values()) {
         if (!tile.done && !tile.error) continue;
-        remaining = subtractRoofTile(remaining, tile, sceneByLayer.get(layer)._tileZoom);
+        remaining = subtractRoofTile(remaining, tile, tileZoomByLayer.get(rasterLayer));
         if (!remaining.length) return true;
       }
     }
@@ -2374,12 +2616,12 @@
   }
 
   // src/rendering/revealRoofMesh.js
-  function revealRoofMesh(backend, mesh, rasters) {
+  function revealRoofMesh(layer, mesh, rasters) {
     if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
     if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
-      if (mesh._roofCoverageSignature !== sceneByLayer.get(backend)._roofRaster?.signature) {
-        mesh._roofCoverageSignature = sceneByLayer.get(backend)._roofRaster?.signature;
-        mesh._roofCovered = roofCoverage(mesh, backend, rasters);
+      if (mesh._roofCoverageSignature !== roofRasterByLayer.get(layer)?.signature) {
+        mesh._roofCoverageSignature = roofRasterByLayer.get(layer)?.signature;
+        mesh._roofCovered = roofCoverage(mesh, layer, rasters);
       }
       if (!mesh._roofCovered) {
         mesh._appearance = 0;
@@ -2391,12 +2633,12 @@
   }
 
   // src/rendering/prepareFrameMeshes.js
-  function prepareFrameMeshes(backend, rasters, now, meshes) {
-    const candidates = sceneByLayer.get(backend)._visibleMeshes, shadowMeshes = sceneByLayer.get(backend)._shadowMeshes, renderer = sceneByLayer.get(backend).renderer;
+  function prepareFrameMeshes(layer, rasters, now, meshes) {
+    const candidates = visibleMeshesByLayer.get(layer), shadowMeshes = shadowMeshesByLayer.get(layer), renderer = rendererByLayer.get(layer);
     let appearing = false;
     let mesh, progress;
     for (mesh of candidates) {
-      if (!revealRoofMesh(backend, mesh, rasters)) continue;
+      if (!revealRoofMesh(layer, mesh, rasters)) continue;
       if (mesh.fadeDuration) {
         mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
         progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);
@@ -2429,15 +2671,18 @@
   };
 
   // src/rendering/prepareFrameBuffer.js
-  function prepareFrameBuffer(backend, meshes, shadowMeshes) {
-    const renderer = sceneByLayer.get(backend).renderer;
+  function prepareFrameBuffer(layer, meshes, shadowMeshes) {
+    const renderer = rendererByLayer.get(layer);
     if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
-      if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
+      if (renderer.uniformBuffer) destroyTexture(layer, renderer.uniformBuffer);
       renderer.uniformBuffer = renderer.device.createBuffer((frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256, frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, frameBuffer));
       renderer.uniformData = /* alloc */
       new Float32Array(renderer.uniformBuffer.size / 4);
     }
   }
+
+  // src/weakmaps/rootByLayer.js
+  var rootByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/globals/sunBindGroup.js
   var sunBindGroup = {
@@ -2463,8 +2708,8 @@
 
   // src/shadows/bindSunlight.js
   function bindSunlight(layer) {
-    const sun = sceneByLayer.get(layer).renderer.sunlight;
-    sun.bindGroup = sceneByLayer.get(layer).renderer.device.createBindGroup((sunBindGroup.layout = sun.layout, sunBindGroup.entries[0].resource.buffer = sun.buffer, sunBindGroup.entries[1].resource = sun.texture.createView(), sunBindGroup.entries[2].resource = sun.sampler, sunBindGroup.entries[3].resource.buffer = sun.lights, sunBindGroup));
+    const sun = rendererByLayer.get(layer).sunlight;
+    sun.bindGroup = rendererByLayer.get(layer).device.createBindGroup((sunBindGroup.layout = sun.layout, sunBindGroup.entries[0].resource.buffer = sun.buffer, sunBindGroup.entries[1].resource = sun.texture.createView(), sunBindGroup.entries[2].resource = sun.sampler, sunBindGroup.entries[3].resource.buffer = sun.lights, sunBindGroup));
     sunBindGroup.layout = null;
     sunBindGroup.entries[0].resource.buffer = null;
     sunBindGroup.entries[1].resource = null;
@@ -2643,8 +2888,8 @@
   }
 
   // src/lighting/updatePointLights.js
-  function updatePointLights(backend) {
-    const { device, sunlight: sun } = sceneByLayer.get(backend).renderer;
+  function updatePointLights(layer) {
+    const { device, sunlight: sun } = rendererByLayer.get(layer);
     const fixed = (
       /* alloc */
       []
@@ -2653,10 +2898,10 @@
       /* alloc */
       []
     );
-    let layer;
-    for (layer of sceneByLayer.get(backend)._layers) {
-      if (!layer.options.nightLight || !sceneByLayer.get(layer).root.visible) continue;
-      collectLightMeshes(sceneByLayer.get(layer).root, fixed, moving);
+    let sceneLayer;
+    for (sceneLayer of layersByLayer.get(layer)) {
+      if (!sceneLayer.options.nightLight || !rootByLayer.get(sceneLayer).visible) continue;
+      collectLightMeshes(rootByLayer.get(sceneLayer), fixed, moving);
     }
     const maxBytes = device.limits.maxStorageBufferBindingSize;
     const staticGrid = cacheLightGrid(fixed, sun.staticLightGrid, maxBytes);
@@ -2669,12 +2914,12 @@
     );
     let uploadStatic = staticGrid !== sun.staticLightGrid;
     if (sun.lights.size < size) {
-      destroyTexture(backend, sun.lights);
+      destroyTexture(layer, sun.lights);
       sun.lights = device.createBuffer(
         /* alloc */
         { size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }
       );
-      bindSunlight(backend);
+      bindSunlight(layer);
       uploadStatic = true;
     }
     staticGrid.data[6] = staticGrid.data.length / 4;
@@ -2686,8 +2931,8 @@
   }
 
   // src/rendering/prepareFrameUniforms.js
-  function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
-    const renderer = sceneByLayer.get(backend).renderer, camera = sceneByLayer.get(backend).camera;
+  function prepareFrameUniforms(layer, meshes, shadowMeshes, sunlight) {
+    const renderer = rendererByLayer.get(layer), camera = cameraByLayer.get(layer);
     const view = camera.viewMatrix, direction = sunlight?.direction;
     const x = direction ? direction[0] : -300;
     const y = direction ? direction[1] : 500;
@@ -2697,11 +2942,11 @@
     const lightZ = view[2] * x + view[6] * y + view[10] * z;
     const lightLength = Math.hypot(lightX, lightY, lightZ) || 1;
     const skyLength = Math.hypot(view[4], view[5], view[6]) || 1;
-    prepareFrameBuffer(backend, meshes, shadowMeshes);
+    prepareFrameBuffer(layer, meshes, shadowMeshes);
     const frameData = renderer.uniformData;
     frameData.set(camera.viewMatrix, 0);
     frameData.set(camera.projectionMatrix, 16);
-    if (sceneByLayer.get(backend)._roofRaster?.matrix) frameData.set(sceneByLayer.get(backend)._roofRaster.matrix, 32);
+    if (roofRasterByLayer.get(layer)?.matrix) frameData.set(roofRasterByLayer.get(layer).matrix, 32);
     else {
       frameData.fill(0, 32, 48);
       frameData[32] = frameData[37] = frameData[42] = frameData[47] = 1;
@@ -2720,7 +2965,7 @@
     frameData[57] = tint ? tint[1] : 1;
     frameData[58] = tint ? tint[2] : 1;
     frameData[59] = 0;
-    if (night > 0) updatePointLights(backend);
+    if (night > 0) updatePointLights(layer);
     renderer.uniformSlot = 1;
   }
 
@@ -3025,9 +3270,9 @@
   }
 
   // src/rendering/drawGeometry.js
-  function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
+  function drawGeometry(layer, mesh, pass, cullMode, frontFace) {
     const { geometry } = mesh;
-    const renderer = sceneByLayer.get(backend).renderer;
+    const renderer = rendererByLayer.get(layer);
     const { device } = renderer;
     const pipeline = drawPipeline(renderer, mesh, cullMode, frontFace);
     const offset = prepareMeshUniforms(renderer, mesh);
@@ -3057,8 +3302,8 @@
   }
 
   // src/rendering/drawSceneMeshes.js
-  function drawSceneMeshes(backend, encoder, meshes) {
-    const renderer = sceneByLayer.get(backend).renderer;
+  function drawSceneMeshes(layer, encoder, meshes) {
+    const renderer = rendererByLayer.get(layer);
     const pass = encoder.beginRenderPass((scenePass.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(), scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(), scenePass));
     scenePass.colorAttachments[0].view = null;
     scenePass.depthStencilAttachment.view = null;
@@ -3072,7 +3317,7 @@
         mesh.program.uniforms.opacity.value = mesh.opacity;
       }
       uniforms = mesh.program.uniforms;
-      if (uniforms.roofTexture) uniforms.roofTexture.value = sceneByLayer.get(backend)._roofRaster?.texture || renderer.roofFallbackTexture;
+      if (uniforms.roofTexture) uniforms.roofTexture.value = roofRasterByLayer.get(layer)?.texture || renderer.roofFallbackTexture;
       if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion || mesh._worldMatrixVersion === void 0) {
         determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) - world[4] * (world[1] * world[10] - world[2] * world[9]) + world[8] * (world[1] * world[6] - world[2] * world[5]);
         if (!Number.isFinite(determinant) || determinant === 0) {
@@ -3087,10 +3332,10 @@
       frontFace = mesh._frontFace;
       program = mesh.program;
       if (program.transparent && program._layerMaterial.doubleSided && !mesh._nativeSource) {
-        drawGeometry(backend, mesh, pass, "front", frontFace);
-        drawGeometry(backend, mesh, pass, "back", frontFace);
+        drawGeometry(layer, mesh, pass, "front", frontFace);
+        drawGeometry(layer, mesh, pass, "back", frontFace);
       } else {
-        drawGeometry(backend, mesh, pass, program.cullMode, frontFace);
+        drawGeometry(layer, mesh, pass, program.cullMode, frontFace);
       }
     }
     pass.end();
@@ -3441,8 +3686,8 @@
   var shadowOffsets = [null];
 
   // src/shadows/drawShadowMeshes.js
-  function drawShadowMeshes(backend, encoder, meshes) {
-    const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+  function drawShadowMeshes(layer, encoder, meshes) {
+    const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
     const pass = encoder.beginRenderPass((shadowPass.depthStencilAttachment.view = sun.texture.createView(), shadowPass));
     shadowPass.depthStencilAttachment.view = null;
     let pipeline = sun.pipeline;
@@ -3491,18 +3736,18 @@
   };
 
   // src/shadows/resizeSunlight.js
-  function resizeSunlight(backend, size) {
-    const device = sceneByLayer.get(backend).renderer.device, sun = sceneByLayer.get(backend).renderer.sunlight;
+  function resizeSunlight(layer, size) {
+    const device = rendererByLayer.get(layer).device, sun = rendererByLayer.get(layer).sunlight;
     if (sun.size === size) return;
-    if (sun.texture) destroyTexture(backend, sun.texture);
+    if (sun.texture) destroyTexture(layer, sun.texture);
     sun.size = size;
     sun.texture = device.createTexture((shadowTexture.size[0] = size, shadowTexture.size[1] = size, shadowTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC, shadowTexture));
-    bindSunlight(backend);
+    bindSunlight(layer);
   }
 
   // src/shadows/renderSunlight.js
-  function renderSunlight(backend, encoder, meshes, sunlight) {
-    const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+  function renderSunlight(layer, encoder, meshes, sunlight) {
+    const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
     if (!meshes.length || !sunlight || sunlight.altitude < 3) {
       if (!sun.enabled) return;
       device.queue.writeBuffer(sun.buffer, 0, disabledShadow);
@@ -3513,7 +3758,7 @@
     if (shadowCacheMatches(sun, meshes, sunlight)) return;
     const values = shadowValues;
     sun.enabled = true;
-    resizeSunlight(backend, Math.min(2048, device.limits.maxTextureDimension2D));
+    resizeSunlight(layer, Math.min(2048, device.limits.maxTextureDimension2D));
     values.set(shadowMatrix(meshes, sunlight));
     values[16] = 1;
     device.queue.writeBuffer(sun.buffer, 0, values);
@@ -3525,7 +3770,7 @@
         break;
       }
     }
-    drawShadowMeshes(backend, encoder, meshes);
+    drawShadowMeshes(layer, encoder, meshes);
     const snapshots = (
       /* alloc */
       /* @__PURE__ */ new Map()
@@ -3552,14 +3797,36 @@
   }
 
   // src/scene/cancelUpdate.js
-  function cancelUpdate(backend) {
-    const frame = sceneByLayer.get(backend)._frame;
-    pendingUpdates.delete(backend);
-    sceneByLayer.get(backend)._frame = null;
+  init_mutateWeakMap();
+  function cancelUpdate(layer) {
+    const frame = frameByLayer.get(layer);
+    pendingUpdates.delete(layer);
+    mutateWeakMap(frameByLayer, layer, "=", null);
     if (!pendingUpdates.size && frame != null) {
       cancelAnimationFrame(frame);
     }
   }
+
+  // src/weakmaps/pruneAfterByLayer.js
+  var pruneAfterByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/pruneVersionByLayer.js
+  var pruneVersionByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/pruneWantedByLayer.js
+  var pruneWantedByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/raster/pruneRasterTiles.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/terrain3DByLayer.js
+  var terrain3DByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/raster/releaseRasterTile.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/terrainRequestByLayer.js
+  var terrainRequestByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/scene/setParent.js
   function setParent(node, parent) {
@@ -3570,51 +3837,51 @@
 
   // src/raster/removeRasterTile.js
   function removeRasterTile(layer, tile) {
-    sceneByLayer.get(layer)._terrainRequest?.abort();
-    const mesh = sceneByLayer.get(layer)._rasterTiles.get(tile);
+    terrainRequestByLayer.get(layer)?.abort();
+    const mesh = rasterTilesByLayer.get(layer).get(tile);
     if (!mesh) return;
     setParent(mesh, null);
     update(layer);
     if (mesh.texture !== tile.texture) destroyTexture(layer, mesh.texture.texture);
-    sceneByLayer.get(layer)._rasterTiles.delete(tile);
+    rasterTilesByLayer.get(layer).delete(tile);
   }
 
   // src/raster/releaseRasterTile.js
-  function releaseRasterTile(backend, tile) {
+  function releaseRasterTile(layer, tile) {
     const key = `${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`;
-    if (sceneByLayer.get(backend)._rasterTiles.get(key) !== tile) return;
-    sceneByLayer.get(backend)._rasterTiles.delete(key);
-    sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
+    if (rasterTilesByLayer.get(layer).get(key) !== tile) return;
+    rasterTilesByLayer.get(layer).delete(key);
+    mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
     tile.request.abort();
-    if (sceneByLayer.get(backend)._terrain3D) removeRasterTile(sceneByLayer.get(backend)._terrain3D, tile);
+    if (terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
     if (tile.mesh) setParent(tile.mesh, null);
-    if (tile.texture) destroyTexture(backend, tile.texture.texture);
+    if (tile.texture) destroyTexture(layer, tile.texture.texture);
     tile.image?.close();
-    backend.fire(
+    layer.fire(
       "tileunload",
       /* alloc */
       { tile, coords: tile.coords }
     );
-    update(backend);
+    update(layer);
   }
 
   // src/raster/pruneRasterTiles.js
-  function pruneRasterTiles(backend) {
-    const wanted = sceneByLayer.get(backend)._wantedRasterTiles;
+  function pruneRasterTiles(layer) {
+    const wanted = wantedRasterTilesByLayer.get(layer);
     const now = performance.now();
-    if (sceneByLayer.get(backend)._pruneVersion === sceneByLayer.get(backend)._rasterVersion && sceneByLayer.get(backend)._pruneWanted === wanted && now < sceneByLayer.get(backend)._pruneAfter) return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
-    sceneByLayer.get(backend)._pruneVersion = sceneByLayer.get(backend)._rasterVersion;
-    sceneByLayer.get(backend)._pruneWanted = wanted;
-    sceneByLayer.get(backend)._pruneAfter = Infinity;
+    if (pruneVersionByLayer.get(layer) === rasterVersionByLayer.get(layer) && pruneWantedByLayer.get(layer) === wanted && now < pruneAfterByLayer.get(layer)) return Number.isFinite(pruneAfterByLayer.get(layer));
+    mutateWeakMap(pruneVersionByLayer, layer, "=", rasterVersionByLayer.get(layer));
+    mutateWeakMap(pruneWantedByLayer, layer, "=", wanted);
+    mutateWeakMap(pruneAfterByLayer, layer, "=", Infinity);
     const pending = (
       /* alloc */
       []
     );
     let key, tile, parts2, overlaps, coords, zoom;
     for (key of wanted) {
-      tile = sceneByLayer.get(backend)._rasterTiles.get(key);
+      tile = rasterTilesByLayer.get(layer).get(key);
       if (tile?.done && now - tile.loadedAt < 250) {
-        sceneByLayer.get(backend)._pruneAfter = Math.min(sceneByLayer.get(backend)._pruneAfter, tile.loadedAt + 250);
+        mutateWeakMap(pruneAfterByLayer, layer, "=", Math.min(pruneAfterByLayer.get(layer), tile.loadedAt + 250));
       }
       if (!tile?.done || now - tile.loadedAt < 250) {
         parts2 = key.split("/");
@@ -3624,7 +3891,7 @@
         );
       }
     }
-    for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {
+    for ([key, tile] of rasterTilesByLayer.get(layer)) {
       if (wanted.has(key)) continue;
       overlaps = false;
       for (coords of pending) {
@@ -3634,9 +3901,9 @@
           break;
         }
       }
-      if (!overlaps) releaseRasterTile(backend, tile);
+      if (!overlaps) releaseRasterTile(layer, tile);
     }
-    return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
+    return Number.isFinite(pruneAfterByLayer.get(layer));
   }
 
   // src/core/synchronizeNativeLayer.js
@@ -3644,7 +3911,7 @@
 
   // src/core/current.js
   function current(state) {
-    return sceneByLayer.get(state.source)._nativeGPU === state && state.map.hasLayer(state.source);
+    return nativeGPUByLayer.get(state.source) === state && state.map.hasLayer(state.source);
   }
 
   // src/core/syncGridLayer.js
@@ -3653,6 +3920,9 @@
   // src/globals/coreWhite.js
   var coreWhite = Object.freeze([1, 1, 1]);
 
+  // src/weakmaps/cameraZIndexOffsetByLayer.js
+  var cameraZIndexOffsetByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/core/styleNativeMesh.js
   init_L();
   function styleNativeMesh(state, mesh, color, opacity) {
@@ -3660,7 +3930,7 @@
     mesh.program.uniforms.baseColor.value = color;
     mesh.program.uniforms.opacity.value = opacity;
     if (source instanceof L.GridLayer) mesh.opacity = opacity;
-    const zIndex = marker ? source._zIndex + (sceneByLayer.get(source)._cameraZIndexOffset || 0) : source.options.zIndex;
+    const zIndex = marker ? source._zIndex + (cameraZIndexOffsetByLayer.get(source) || 0) : source.options.zIndex;
     mesh.renderOrder = paneOrder * 1e6 + (zIndex || 0) * 1e3 + order;
     mesh._nativeSource = source;
     mesh._nativeUsed = true;
@@ -3679,12 +3949,12 @@
   });
 
   // src/rendering/disposeMesh.js
-  function disposeMesh(backend, mesh) {
+  function disposeMesh(layer, mesh) {
     if (!mesh) {
       return;
     }
     setParent(mesh, null);
-    update(backend);
+    update(layer);
     let attribute;
     for (attribute of Object.values(mesh.geometry.attributes)) {
       attribute.buffer.destroy();
@@ -3747,20 +4017,20 @@
         new Error("WebGPU native raster layers require image or canvas tiles")
       );
     }
-    const { backend, textures, meshes } = state;
+    const { backend: layer, textures, meshes } = state;
     let texture = textures.get(key);
     const url = image.currentSrc || image.src;
     if (!texture || texture.image !== image || texture.url !== url) {
       if (texture) {
         const mesh = meshes.get(key);
-        if (mesh) disposeMesh(backend, mesh);
+        if (mesh) disposeMesh(layer, mesh);
         meshes.delete(key);
-        destroyTexture(backend, texture.texture);
+        destroyTexture(layer, texture.texture);
         textures.delete(key);
       }
       const width = image.naturalWidth || image.width, height = image.naturalHeight || image.height;
       if (!width || !height) return;
-      const { device } = sceneByLayer.get(backend).renderer;
+      const { device } = rendererByLayer.get(layer);
       texture = /* alloc */
       {
         device,
@@ -4449,7 +4719,7 @@
   }
 
   // src/rendering/reportCompilation.js
-  async function reportCompilation(backend, pending) {
+  async function reportCompilation(layer, pending) {
     let info, message;
     try {
       const infos = await Promise.all(pending);
@@ -4458,7 +4728,7 @@
         for (message of info.messages) if (message.type === "error") errors += `${errorCount++ ? "\n" : ""}${message.message}`;
       }
       if (errorCount) {
-        backend.fire(
+        layer.fire(
           "error",
           /* alloc */
           {
@@ -4470,7 +4740,7 @@
         );
       }
     } catch (error) {
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error }
@@ -4479,18 +4749,18 @@
   }
 
   // src/rendering/createProgram.js
-  function createProgram(backend, material = defaultMaterial) {
+  function createProgram(layer, material = defaultMaterial) {
     const shaders = materialShaders(
       material,
-      !!backend.options.nightSparkle,
+      !!layer.options.nightSparkle,
       material.terrain ? elevationWGSL : ""
     );
-    const vertex = sceneByLayer.get(backend).renderer.device.createShaderModule((vertexShader.code = shaders.vertex, vertexShader));
+    const vertex = rendererByLayer.get(layer).device.createShaderModule((vertexShader.code = shaders.vertex, vertexShader));
     vertexShader.code = null;
-    const fragment = sceneByLayer.get(backend).renderer.device.createShaderModule((fragmentShader.code = shaders.fragment, fragmentShader));
+    const fragment = rendererByLayer.get(layer).device.createShaderModule((fragmentShader.code = shaders.fragment, fragmentShader));
     fragmentShader.code = null;
     reportCompilation(
-      backend,
+      layer,
       /* alloc */
       [
         vertex.getCompilationInfo(),
@@ -4507,15 +4777,15 @@
       ]
     );
     if (material.instanced) vertexBuffers.push(instanceLayout);
-    const bindGroupLayout = createProgramLayout(sceneByLayer.get(backend).renderer.device, shaders);
-    const pipelineLayout2 = sceneByLayer.get(backend).renderer.device.createPipelineLayout((pipelineLayout.bindGroupLayouts[0] = bindGroupLayout, pipelineLayout.bindGroupLayouts[1] = sceneByLayer.get(backend).renderer.sunlight.layout, pipelineLayout));
+    const bindGroupLayout = createProgramLayout(rendererByLayer.get(layer).device, shaders);
+    const pipelineLayout2 = rendererByLayer.get(layer).device.createPipelineLayout((pipelineLayout.bindGroupLayouts[0] = bindGroupLayout, pipelineLayout.bindGroupLayouts[1] = rendererByLayer.get(layer).sunlight.layout, pipelineLayout));
     pipelineLayout.bindGroupLayouts[0] = null;
     pipelineLayout.bindGroupLayouts[1] = null;
     const uniforms = createProgramUniforms(material);
     return (
       /* alloc */
       {
-        device: sceneByLayer.get(backend).renderer.device,
+        device: rendererByLayer.get(layer).device,
         vertex,
         fragment,
         bindings: shaders.bindings,
@@ -4532,7 +4802,7 @@
         depthTest: material.depthTest !== false,
         terrain: material.terrain,
         nightLight: Boolean(material.nightLight),
-        nightSparkle: !!backend.options.nightSparkle,
+        nightSparkle: !!layer.options.nightSparkle,
         uniforms,
         _layerMaterial: material
       }
@@ -4540,8 +4810,8 @@
   }
 
   // src/rendering/createMesh.js
-  function createMesh(backend, data, material = defaultMaterial, usage = 0, program) {
-    const { device } = sceneByLayer.get(backend).renderer, attributes = (
+  function createMesh(layer, data, material = defaultMaterial, usage = 0, program) {
+    const { device } = rendererByLayer.get(layer), attributes = (
       /* alloc */
       {}
     );
@@ -4568,7 +4838,7 @@
           ) }
         ),
         program: program || createProgram(
-          backend,
+          layer,
           /* alloc */
           { vertexColors: true, doubleSided: true, ...material }
         ),
@@ -4580,14 +4850,14 @@
         )
       }
     );
-    setParent(mesh, sceneByLayer.get(backend).root);
-    update(backend);
+    setParent(mesh, rootByLayer.get(layer));
+    update(layer);
     return mesh;
   }
 
   // src/core/putNativeMesh.js
   function putNativeMesh(state, key, position, color, opacity, texture, uv) {
-    const { backend, source, meshes } = state;
+    const { backend: layer, source, meshes } = state;
     if (!position.length) return;
     let mesh = meshes.get(key);
     if (!mesh || mesh.geometry.attributes.position.data.length !== position.length || mesh.program.uniforms.baseTexture?.value !== texture) {
@@ -4613,8 +4883,8 @@
         }
       );
       if (texture) material.baseTexture = texture;
-      if (mesh) disposeMesh(backend, mesh);
-      mesh = createMesh(backend, data, material, 0, source instanceof L.GridLayer ? state.rasterProgram : void 0);
+      if (mesh) disposeMesh(layer, mesh);
+      mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? state.rasterProgram : void 0);
       if (source instanceof L.GridLayer) {
         state.rasterProgram ||= mesh.program;
         mesh.texture = texture;
@@ -4651,12 +4921,15 @@
     return putNativeMesh(state, key, position, coreWhite, opacity, texture, uv);
   }
 
+  // src/weakmaps/locationByLayer.js
+  var locationByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/core/localPosition.js
   init_radians();
   function localPosition(state, latlng) {
-    const { map, backend } = state, crs = map.options.crs;
-    const origin = crs.project(sceneByLayer.get(backend).location), point = crs.project(latlng);
-    const metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
+    const { map, backend: layer } = state, crs = map.options.crs;
+    const origin = crs.project(locationByLayer.get(layer)), point = crs.project(latlng);
+    const metres = Math.cos(locationByLayer.get(layer).lat * radians);
     return (
       /* alloc */
       [(point.x - origin.x) * metres, 0, -(point.y - origin.y) * metres]
@@ -4773,7 +5046,7 @@
 
   // src/core/markerQuadCorners.js
   function markerQuadCorners(state, key, image) {
-    const { source, map, backend } = state;
+    const { source, map, backend: layer } = state;
     const position = localPosition(state, source.getLatLng());
     const size = map.getSize();
     const matrices = state.markerMatrices ||= /* alloc */
@@ -4792,7 +5065,7 @@
       )
     };
     const root = matrices.root, camera = matrices.camera, point = matrices.point;
-    const worldMatrix = sceneByLayer.get(backend).root.worldMatrix, projection = sceneByLayer.get(backend).camera.projectionViewMatrix;
+    const worldMatrix = rootByLayer.get(layer).worldMatrix, projection = cameraByLayer.get(layer).projectionViewMatrix;
     let i, keyName;
     for (i = 0; i < 16; i++) {
       keyName = coreMatrixKeys[i];
@@ -5516,19 +5789,19 @@
 
   // src/core/pruneNativeResources.js
   function pruneNativeResources(state) {
-    const { meshes, textures, backend } = state;
+    const { meshes, textures, backend: layer } = state;
     let mesh, texture, key;
     for ([key, mesh] of meshes) {
       if (mesh._nativeUsed) continue;
-      disposeMesh(backend, mesh);
+      disposeMesh(layer, mesh);
       meshes.delete(key);
       texture = textures.get(key);
-      if (texture) destroyTexture(backend, texture.texture);
+      if (texture) destroyTexture(layer, texture.texture);
       textures.delete(key);
     }
     for ([key, texture] of textures) {
       if (texture.used) continue;
-      destroyTexture(backend, texture.texture);
+      destroyTexture(layer, texture.texture);
       textures.delete(key);
     }
   }
@@ -5536,7 +5809,7 @@
   // src/core/synchronizeNativeLayer.js
   function synchronizeNativeLayer(state) {
     const { source, meshes, textures } = state;
-    if (!current(state) || !sceneByLayer.get(state.backend).renderer || state.failed) return;
+    if (!current(state) || !rendererByLayer.get(state.backend) || state.failed) return;
     if (!state.dirty && (!state.marker || !state.viewDirty)) return;
     state.dirty = false;
     state.viewDirty = false;
@@ -5565,48 +5838,49 @@
   }
 
   // src/rendering/render.js
-  function render(backend) {
-    cancelUpdate(backend);
-    if (sceneByLayer.get(backend)._shared !== backend || !sceneByLayer.get(backend).renderer) return;
-    const map = backend._map;
+  function render(layer) {
+    cancelUpdate(layer);
+    if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) return;
+    const map = layer._map;
     const now = performance.now();
     const size = map.getSize();
     if (!size.x || !size.y) return;
-    synchronizeZoomView(backend, now);
-    resizeRenderer(backend, size);
-    updateMapCamera(backend, size);
-    updateWorldMatrix(sceneByLayer.get(backend).scene);
+    synchronizeZoomView(layer, now);
+    resizeRenderer(layer, size);
+    updateMapCamera(layer, size);
+    updateWorldMatrix(sceneByLayer.get(layer));
     let sceneChanged = false;
-    let layer, native;
-    for (layer of sceneByLayer.get(backend)._layers) {
-      native = nativeRenderByLayer.get(layer);
+    let sceneLayer, native;
+    for (sceneLayer of layersByLayer.get(layer)) {
+      native = nativeRenderByLayer.get(sceneLayer);
       if (!native) continue;
       beforeNativeRender(native);
       sceneChanged = true;
     }
-    const sunlight = cameraByMap.get(map)._sunlight;
-    collectFrameMeshes(backend, sunlight, sceneChanged);
-    const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes;
-    const renderer = sceneByLayer.get(backend).renderer;
-    const rasters = updateRoofRaster(backend, now);
+    const sunlight = sunlightByMap.get(map);
+    collectFrameMeshes(layer, sunlight, sceneChanged);
+    const shadowMeshes = shadowMeshesByLayer.get(layer);
+    const renderer = rendererByLayer.get(layer);
+    const rasters = updateRoofRaster(layer, now);
     const meshes = renderer.frameMeshes ||= /* alloc */
     [];
     meshes.length = 0;
-    let appearing = prepareFrameMeshes(backend, rasters, now, meshes);
+    let appearing = prepareFrameMeshes(layer, rasters, now, meshes);
     const encoder = renderer.device.createCommandEncoder();
-    prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight);
-    renderSunlight(backend, encoder, shadowMeshes, sunlight);
-    drawSceneMeshes(backend, encoder, meshes);
+    prepareFrameUniforms(layer, meshes, shadowMeshes, sunlight);
+    renderSunlight(layer, encoder, shadowMeshes, sunlight);
+    drawSceneMeshes(layer, encoder, meshes);
     renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
     renderer.device.queue.submit((frameCommands[0] = encoder.finish(), frameCommands));
     frameCommands[0] = null;
-    for (layer of sceneByLayer.get(backend)._layers) {
-      if (sceneByLayer.get(layer)._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
+    for (sceneLayer of layersByLayer.get(layer)) {
+      if (wantedRasterTilesByLayer.get(sceneLayer)) appearing = pruneRasterTiles(sceneLayer) || appearing;
     }
-    if (map._animatingZoom || appearing) update(backend);
+    if (map._animatingZoom || appearing) update(layer);
   }
 
   // src/scene/renderPendingUpdates.js
+  init_mutateWeakMap();
   function renderPendingUpdates() {
     const updates = (
       /* alloc */
@@ -5614,12 +5888,12 @@
     );
     pendingUpdates.clear();
     let failure;
-    let backend;
-    for (backend of updates) {
-      sceneByLayer.get(backend)._frame = null;
-      if (sceneByLayer.get(backend)._shared !== backend || !sceneByLayer.get(backend).renderer) continue;
+    let layer;
+    for (layer of updates) {
+      mutateWeakMap(frameByLayer, layer, "=", null);
+      if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) continue;
       try {
-        render(backend);
+        render(layer);
       } catch (error) {
         failure ||= error;
       }
@@ -5628,18 +5902,18 @@
   }
 
   // src/scene/update.js
-  function update(backend) {
-    const shared = sceneByLayer.get(backend)._shared;
-    if (!shared) return backend;
-    if (shared !== backend) {
+  function update(layer) {
+    const shared = sharedByLayer.get(layer);
+    if (!shared) return layer;
+    if (shared !== layer) {
       update(shared);
-      return backend;
+      return layer;
     }
-    if (sceneByLayer.get(backend)._frame != null) return backend;
+    if (frameByLayer.get(layer) != null) return layer;
     const first = pendingUpdates.values().next().value;
-    pendingUpdates.add(backend);
-    sceneByLayer.get(backend)._frame = first ? sceneByLayer.get(first)._frame : requestAnimationFrame(renderPendingUpdates);
-    return backend;
+    pendingUpdates.add(layer);
+    mutateWeakMap(frameByLayer, layer, "=", first ? frameByLayer.get(first) : requestAnimationFrame(renderPendingUpdates));
+    return layer;
   }
 
   // src/core/hideTargets.js
@@ -5685,12 +5959,12 @@
       image.addEventListener("load", nativeImageRefresh);
       image.addEventListener("error", nativeImageError);
     }
-    if (sceneByLayer.get(state.backend)._shared) update(state.backend);
+    if (sharedByLayer.get(state.backend)) update(state.backend);
   }
 
   // src/core/nativeLayerMethod.js
   function nativeLayerMethod(name, source, args) {
-    const state = sceneByLayer.get(source)._nativeGPU, original = state.originalMethods.get(name);
+    const state = nativeGPUByLayer.get(source), original = state.originalMethods.get(name);
     const result = original.apply(source, args);
     let layer, zIndex;
     if ((name === "bringToFront" || name === "bringToBack") && source instanceof L.GridLayer) {
@@ -5703,8 +5977,8 @@
       const edge = name === "bringToFront" ? extreme + 1 : extreme - 1;
       if (Number.isFinite(edge)) source.setZIndex(edge);
     }
-    if (name === "bringToFront") state.order = ++cameraByMap.get(state.map)._nativeGPUOrder;
-    if (name === "bringToBack") state.order = --cameraByMap.get(state.map)._nativeGPUBack;
+    if (name === "bringToFront") state.order = mutateWeakMap(nativeGPUOrderByMap, state.map, "++", void 0, true);
+    if (name === "bringToBack") state.order = mutateWeakMap(nativeGPUBackByMap, state.map, "--", void 0, true);
     refreshNativeLayer(state);
     return result;
   }
@@ -5814,10 +6088,13 @@
   // src/core/nativeEvents.js
   init_L();
 
-  // src/globals/nativeEventMaps.js
+  // src/weakmaps/nativeEventMaps.js
   var nativeEventMaps = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/trafficByLayer.js
+  // src/weakmaps/raycasterByLayer.js
+  var raycasterByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/trafficByLayer.js
   var trafficByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/collision/mergeHits.js
@@ -6115,20 +6392,20 @@
   }
 
   // src/picking/raycast.js
-  function raycast(backend, event, objects = sceneByLayer.get(backend).root.children, recursive = true) {
-    if (!sceneByLayer.get(backend).renderer) {
+  function raycast(layer, event, objects = rootByLayer.get(layer).children, recursive = true) {
+    if (!rendererByLayer.get(layer)) {
       return (
         /* alloc */
         []
       );
     }
-    const traffic = trafficByLayer.get(backend);
+    const traffic = trafficByLayer.get(layer);
     if (traffic) placeTraffic(traffic);
-    const rect = backend._map.getContainer().getBoundingClientRect();
-    updateWorldMatrix(sceneByLayer.get(backend).scene);
-    updateCamera(sceneByLayer.get(backend).camera);
-    const inverseCamera = sceneByLayer.get(backend).raycaster.inverse;
-    const matrix = sceneByLayer.get(backend).camera.projectionViewMatrix;
+    const rect = layer._map.getContainer().getBoundingClientRect();
+    updateWorldMatrix(sceneByLayer.get(layer));
+    updateCamera(cameraByLayer.get(layer));
+    const inverseCamera = raycasterByLayer.get(layer).inverse;
+    const matrix = cameraByLayer.get(layer).projectionViewMatrix;
     inverseCamera.m11 = matrix[0], inverseCamera.m12 = matrix[1], inverseCamera.m13 = matrix[2], inverseCamera.m14 = matrix[3];
     inverseCamera.m21 = matrix[4], inverseCamera.m22 = matrix[5], inverseCamera.m23 = matrix[6], inverseCamera.m24 = matrix[7];
     inverseCamera.m31 = matrix[8], inverseCamera.m32 = matrix[9], inverseCamera.m33 = matrix[10], inverseCamera.m34 = matrix[11];
@@ -6142,24 +6419,24 @@
     const endW = inverseCamera.m14 * x + inverseCamera.m24 * y + inverseCamera.m44;
     let object;
     validateCameraInverse(inverseCamera);
-    sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
-    sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];
-    sceneByLayer.get(backend).raycaster.origin[2] = sceneByLayer.get(backend).camera.position[2];
-    sceneByLayer.get(backend).raycaster.direction[0] = endX / endW - sceneByLayer.get(backend).raycaster.origin[0];
-    sceneByLayer.get(backend).raycaster.direction[1] = endY / endW - sceneByLayer.get(backend).raycaster.origin[1];
-    sceneByLayer.get(backend).raycaster.direction[2] = endZ / endW - sceneByLayer.get(backend).raycaster.origin[2];
-    const direction = sceneByLayer.get(backend).raycaster.direction;
+    raycasterByLayer.get(layer).origin[0] = cameraByLayer.get(layer).position[0];
+    raycasterByLayer.get(layer).origin[1] = cameraByLayer.get(layer).position[1];
+    raycasterByLayer.get(layer).origin[2] = cameraByLayer.get(layer).position[2];
+    raycasterByLayer.get(layer).direction[0] = endX / endW - raycasterByLayer.get(layer).origin[0];
+    raycasterByLayer.get(layer).direction[1] = endY / endW - raycasterByLayer.get(layer).origin[1];
+    raycasterByLayer.get(layer).direction[2] = endZ / endW - raycasterByLayer.get(layer).origin[2];
+    const direction = raycasterByLayer.get(layer).direction;
     const rayLength = Math.hypot(direction[0], direction[1], direction[2]) || 1;
-    sceneByLayer.get(backend).raycaster.direction[0] /= rayLength;
-    sceneByLayer.get(backend).raycaster.direction[1] /= rayLength;
-    sceneByLayer.get(backend).raycaster.direction[2] /= rayLength;
-    const meshes = sceneByLayer.get(backend).raycaster.meshes;
+    raycasterByLayer.get(layer).direction[0] /= rayLength;
+    raycasterByLayer.get(layer).direction[1] /= rayLength;
+    raycasterByLayer.get(layer).direction[2] /= rayLength;
+    const meshes = raycasterByLayer.get(layer).meshes;
     meshes.length = 0;
     for (object of objects) {
       if (recursive) traverse(object, collectVisibleMesh2, meshes);
       else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
     }
-    return intersectMeshes(sceneByLayer.get(backend).raycaster, meshes, sceneByLayer.get(backend).renderer.uniformData?.[55]);
+    return intersectMeshes(raycasterByLayer.get(layer), meshes, rendererByLayer.get(layer).uniformData?.[55]);
   }
 
   // src/core/restoreNativeEvents.js
@@ -6170,7 +6447,7 @@
     else delete map._fireDOMEvent;
   }
 
-  // src/globals/renderers.js
+  // src/weakmaps/renderers.js
   var renderers = /* @__PURE__ */ new WeakMap();
 
   // src/globals/coreEventTypes.js
@@ -6205,12 +6482,12 @@
       /* alloc */
       []
     );
-    let candidate, source, backend;
+    let candidate, source, layer;
     if (type !== context.out) {
       for (candidate of context.states) {
-        ({ source, backend } = candidate);
+        ({ source, backend: layer } = candidate);
         if (source instanceof L.Marker || source.options.interactive === false || !(source instanceof L.Path) && !source.options.interactive) continue;
-        hits.push(...raycast(backend, event, candidate.meshes.values(), false));
+        hits.push(...raycast(layer, event, candidate.meshes.values(), false));
       }
     }
     hits.sort(compareNativeHits);
@@ -6252,7 +6529,7 @@
   function handleNativeMapEvent(event, type = event.type, targets) {
     const map = this, context = nativeEventMaps.get(map), fireDOMEvent = context.fireDOMEvent;
     const owner = renderers.get(map);
-    if (!sceneByLayer.get(owner)?.renderer || targets || !coreEventTypes.has(type)) {
+    if (!rendererByLayer.get(owner) || targets || !coreEventTypes.has(type)) {
       return fireDOMEvent.call(this, event, type, targets);
     }
     if (bypassNativeEvent(map, context, event, type)) {
@@ -6320,12 +6597,12 @@
   }
 
   // src/core/reorderNativeLayer.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/core/updateNativeLayerView.js
   function updateNativeLayerView() {
     this.viewDirty = true;
-    if (sceneByLayer.get(this.backend)._shared) update(this.backend);
+    if (sharedByLayer.get(this.backend)) update(this.backend);
   }
 
   // src/core/disposeNativeLayer.js
@@ -6333,7 +6610,7 @@
     const state = this;
     if (state.disposed) return;
     state.disposed = true;
-    const { source, map, backend, meshes, textures, images } = state;
+    const { source, map, backend: layer, meshes, textures, images } = state;
     const events = "load tileload tileunload move drag";
     source.off(events, refreshNativeEvent, state);
     map.off("zoomend", refreshNativeEvent, state);
@@ -6344,17 +6621,17 @@
       if (methods.own) Object.defineProperty(source, name, methods.own);
       else delete source[name];
     }
-    for (mesh of meshes.values()) disposeMesh(backend, mesh);
+    for (mesh of meshes.values()) disposeMesh(layer, mesh);
     meshes.clear();
-    for (texture of textures.values()) destroyTexture(backend, texture.texture);
+    for (texture of textures.values()) destroyTexture(layer, texture.texture);
     textures.clear();
     for (image of images) {
       image.removeEventListener("load", nativeImageRefresh);
       image.removeEventListener("error", nativeImageError);
       removeImageState(image, state);
     }
-    nativeRenderByLayer.delete(backend);
-    backend.remove();
+    nativeRenderByLayer.delete(layer);
+    layer.remove();
   }
 
   // src/core/resolveNativeReady.js
@@ -6379,7 +6656,7 @@
   // src/core/nativeLayer.js
   async function nativeLayer(state) {
     const { source, map } = state;
-    const backend = state.backend = createLayer(
+    const layer = state.backend = createLayer(
       /* alloc */
       {
         source: (
@@ -6398,12 +6675,12 @@
     /* @__PURE__ */ new Map();
     state.images = /* alloc */
     /* @__PURE__ */ new Set();
-    cameraByMap.get(map)._nativeGPUOrder ||= 0;
-    cameraByMap.get(map)._nativeGPUBack ||= 0;
+    if (!nativeGPUOrderByMap.get(map)) nativeGPUOrderByMap.set(map, 0);
+    if (!nativeGPUBackByMap.get(map)) nativeGPUBackByMap.set(map, 0);
     state.dirty = true;
     state.viewDirty = true;
     state.failed = false;
-    state.order = ++cameraByMap.get(map)._nativeGPUOrder;
+    state.order = mutateWeakMap(nativeGPUOrderByMap, map, "++", void 0, true);
     state.marker = source instanceof L.Marker;
     state.paneOrder = Number(getComputedStyle(source.getPane()).zIndex) || 0;
     state.disposed = false;
@@ -6425,11 +6702,11 @@
       source[name] = nativeMethodHandlers[name];
     }
     const ready = state.ready = Promise.withResolvers();
-    backend.once("ready", resolveNativeReady, state);
-    backend.once("error", rejectNativeReady, state);
-    backend.on("error", forwardNativeError, state);
+    layer.once("ready", resolveNativeReady, state);
+    layer.once("error", rejectNativeReady, state);
+    layer.on("error", forwardNativeError, state);
     refreshNativeLayer(state);
-    backend.addTo(map);
+    layer.addTo(map);
     try {
       await ready.promise;
     } catch (error) {
@@ -6437,7 +6714,7 @@
       throw error;
     }
     if (!current(state)) return source;
-    nativeRenderByLayer.set(backend, state);
+    nativeRenderByLayer.set(layer, state);
     try {
       synchronizeNativeLayer(state);
     } catch (error) {
@@ -6449,8 +6726,9 @@
   }
 
   // src/core/removeTargets.js
+  init_mutateWeakMap();
   function removeTargets(state) {
-    if (sceneByLayer.get(state.source)._nativeGPU === state) sceneByLayer.get(state.source)._nativeGPU = null;
+    if (nativeGPUByLayer.get(state.source) === state) mutateWeakMap(nativeGPUByLayer, state.source, "=", null);
     if (state.backend) disposeNativeLayer.call(state);
     let element;
     for (element of state.hidden) {
@@ -6460,7 +6738,7 @@
 
   // src/core/readyNativeGPU.js
   function readyNativeGPU(state) {
-    if (sceneByLayer.get(state.source)._nativeGPU !== state) return state.source;
+    if (nativeGPUByLayer.get(state.source) !== state) return state.source;
     return nativeLayer(state);
   }
 
@@ -6475,26 +6753,31 @@
 
   // src/core/initNativeGPU.js
   function initNativeGPU(source, map) {
-    if (sceneByLayer.get(source)._nativeGPU) return;
+    if (nativeGPUByLayer.get(source)) return;
     if (!document.getElementById("leaflet-webgpu-targets")) {
       const style = document.createElement("style");
       style.id = "leaflet-webgpu-targets";
       style.textContent = ".leaflet-webgpu-target{opacity:0!important}";
       document.head.append(style);
     }
-    const state = sceneByLayer.get(source)._nativeGPU = /* alloc */
-    {
+    const state = mutateWeakMap(
+      nativeGPUByLayer,
       source,
-      map,
-      hidden: (
-        /* alloc */
-        /* @__PURE__ */ new Set()
-      )
-    };
+      "=",
+      /* alloc */
+      {
+        source,
+        map,
+        hidden: (
+          /* alloc */
+          /* @__PURE__ */ new Set()
+        )
+      }
+    );
     hideTargets(state);
     source.once("remove", removeTargets.bind(null, state));
-    sceneByLayer.get(source).ready = Promise.resolve().then(readyNativeGPU.bind(null, state));
-    sceneByLayer.get(source).ready.catch(reportError.bind(null, source));
+    mutateWeakMap(readyByLayer, source, "=", Promise.resolve().then(readyNativeGPU.bind(null, state)));
+    readyByLayer.get(source).catch(reportError.bind(null, source));
   }
 
   // src/globals/cameraAngles.js
@@ -6794,8 +7077,14 @@
     return bounds;
   }
 
+  // src/weakmaps/cameraMaps.js
+  var cameraMaps = /* @__PURE__ */ new WeakSet();
+
+  // src/weakmaps/cameraReadyByMap.js
+  var cameraReadyByMap = /* @__PURE__ */ new WeakMap();
+
   // src/camera/initializeCameraMap.js
-  init_cameraByMap();
+  init_mutateWeakMap();
   init_mapSetPitchAndBearing();
   init_updateSky();
 
@@ -6804,17 +7093,19 @@
     if (this.options.maxBounds) this._panInsideMaxBounds();
   }
 
+  // src/weakmaps/cameraDraggableByMap.js
+  var cameraDraggableByMap = /* @__PURE__ */ new WeakMap();
+
   // src/camera/cleanupCameraMap.js
-  init_cameraByMap();
+  init_pitchSkyByMap();
   init_cancelCameraAnimation();
 
   // src/controls/adjustCameraDrag.js
-  init_cameraByMap();
   init_mapGetPitch();
   init_mapGetBearing();
   function adjustCameraDrag() {
     const map = this;
-    const draggable = cameraByMap.get(map)._cameraDraggable;
+    const draggable = cameraDraggableByMap.get(map);
     if (!mapGetPitch(map) && !mapGetBearing(map)) return;
     const half = map.getSize().divideBy(2), delta = draggable._newPos.subtract(draggable._startPos);
     const ground = half.subtract(project(map, half.subtract(delta), true));
@@ -6824,19 +7115,19 @@
   // src/camera/cleanupCameraMap.js
   function cleanupCameraMap() {
     cancelCameraAnimation(this);
-    cameraByMap.get(this)._pitchSky?.remove();
-    if (cameraByMap.get(this)._cameraDraggable) {
-      cameraByMap.get(this)._cameraDraggable.off("predrag", adjustCameraDrag, this);
-      delete cameraByMap.get(this)._cameraDraggable;
+    pitchSkyByMap.get(this)?.remove();
+    if (cameraDraggableByMap.get(this)) {
+      cameraDraggableByMap.get(this).off("predrag", adjustCameraDrag, this);
+      cameraDraggableByMap.delete(this);
     }
   }
 
   // src/camera/cameraMapReady.js
-  init_cameraByMap();
+  init_mutateWeakMap();
   function cameraMapReady() {
     const draggable = this.dragging?._draggable;
     if (!draggable) return;
-    cameraByMap.get(this)._cameraDraggable = draggable;
+    mutateWeakMap(cameraDraggableByMap, this, "=", draggable);
     draggable.on("predrag", adjustCameraDrag, this);
   }
 
@@ -6861,11 +7152,7 @@
 
   // src/camera/initializeCameraMap.js
   function initializeCameraMap() {
-    cameraByMap.set(
-      this,
-      /* alloc */
-      {}
-    );
+    cameraMaps.add(this);
     if (!document.getElementById("leaflet-camera-zoom-style")) {
       const style = document.createElement("style");
       style.id = "leaflet-camera-zoom-style";
@@ -6878,8 +7165,8 @@
     this.once("unload", cleanupCameraMap, this);
     this.whenReady(cameraMapReady, this);
     if (this.options.rotate || this.options.trackContainerMutation) {
-      cameraByMap.get(this).cameraReady = loadCameraControls(this);
-      cameraByMap.get(this).cameraReady.catch(noOperation);
+      mutateWeakMap(cameraReadyByMap, this, "=", loadCameraControls(this));
+      cameraReadyByMap.get(this).catch(noOperation);
     }
   }
 
@@ -6919,21 +7206,24 @@
     }
   }
 
+  // src/core/markerUpdateZIndex.js
+  init_mutateWeakMap();
+
   // src/core/refreshNativeLayerContract.js
   function refreshNativeLayerContract(layer = this) {
-    const native = sceneByLayer.get(layer)?._nativeGPU;
+    const native = nativeGPUByLayer.get(layer);
     if (native?.backend && !native.disposed) refreshNativeLayer(native);
   }
 
   // src/core/markerUpdateZIndex.js
   function markerUpdateZIndex(offset) {
     markerMethods.value._updateZIndex.call(this, offset);
-    const changed = sceneByLayer.get(this)._cameraZIndexOffset !== offset;
-    sceneByLayer.get(this)._cameraZIndexOffset = offset;
+    const changed = cameraZIndexOffsetByLayer.get(this) !== offset;
+    mutateWeakMap(cameraZIndexOffsetByLayer, this, "=", offset);
     if (changed) refreshNativeLayerContract(this);
   }
 
-  // src/globals/dragByHandler.js
+  // src/weakmaps/dragByHandler.js
   var dragByHandler = /* @__PURE__ */ new WeakMap();
 
   // src/core/cameraMarkerOnDrag.js
@@ -7186,11 +7476,49 @@
     _getTiledPixelBounds: gridlayerGetTiledPixelBounds
   });
 
+  // src/weakmaps/addedByLayer.js
+  var addedByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/areasByLayer.js
+  var areasByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/countStatusByLayer.js
+  var countStatusByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/directoriesByLayer.js
+  var directoriesByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/geojsonByLayer.js
+  var geojsonByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/inflightByLayer.js
+  var inflightByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/modelUrlByLayer.js
+  var modelUrlByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/state3dByLayer.js
+  var state3dByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/urlByLayer.js
+  var urlByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/scene/init3D.js
+  init_mutateWeakMap();
   init_L();
 
+  // src/weakmaps/rendererReadyByLayer.js
+  var rendererReadyByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainBaseYByLayer.js
+  var terrainBaseYByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/scene/attach.js
+  init_mutateWeakMap();
   init_radians();
+
+  // src/sources/pump.js
+  init_mutateWeakMap();
 
   // src/globals/lampDirections.js
   var lampDirections = [
@@ -7457,7 +7785,7 @@
   }
 
   // src/sources/updateStatus.js
-  function updateStatus(backend, enabled = true) {
+  function updateStatus(layer, enabled = true) {
     const progress = (
       /* alloc */
       { enabled, loaded: 0, skipped: 0, pending: 0, errors: (
@@ -7466,17 +7794,20 @@
       ) }
     );
     let area2;
-    for (area2 of sceneByLayer.get(backend)._areas.values()) {
+    for (area2 of areasByLayer.get(layer).values()) {
       if (area2.error) progress.errors.push(area2.error);
       else if (!area2.done) progress.pending++;
       progress.loaded += area2.buildings ?? 0;
       progress.skipped += area2.skipped ?? 0;
     }
-    backend.fire("progress", progress);
+    layer.fire("progress", progress);
   }
 
   // src/globals/archiveDecoder.js
   var archiveDecoder = new TextDecoder();
+
+  // src/weakmaps/sceneLayers.js
+  var sceneLayers = /* @__PURE__ */ new WeakSet();
 
   // src/archives/tileId.js
   function tileId(z, x, y) {
@@ -7504,6 +7835,9 @@
     }
     return id;
   }
+
+  // src/weakmaps/archiveHeaderByLayer.js
+  var archiveHeaderByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/globals/headerOffsets.js
   var headerOffsets = [
@@ -7552,8 +7886,12 @@
     return header;
   }
 
+  // src/weakmaps/etagByLayer.js
+  var etagByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/archives/read.js
-  async function read(backend, offset, length, signal) {
+  init_mutateWeakMap();
+  async function read(layer, offset, length, signal) {
     signal?.throwIfAborted();
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
       throw (
@@ -7562,7 +7900,7 @@
       );
     }
     const response = await fetch(
-      sceneByLayer.get(backend).url,
+      urlByLayer.get(layer),
       /* alloc */
       {
         headers: (
@@ -7579,13 +7917,13 @@
       );
     }
     const etag = response.headers.get("ETag");
-    if (sceneByLayer.get(backend)._etag && etag !== sceneByLayer.get(backend)._etag) {
+    if (etagByLayer.get(layer) && etag !== etagByLayer.get(layer)) {
       throw (
         /* alloc */
         new Error("PMTiles archive changed; recreate the layer")
       );
     }
-    if (etag) sceneByLayer.get(backend)._etag = etag;
+    if (etag) mutateWeakMap(etagByLayer, layer, "=", etag);
     let data = await response.arrayBuffer();
     if (response.status === 200) {
       data = data.slice(offset, offset + length);
@@ -7606,9 +7944,14 @@
 
   // src/archives/getHeader.js
   function getHeader(layer) {
-    if (!sceneByLayer.has(layer)) return layer.getHeader();
+    if (!sceneLayers.has(layer)) return layer.getHeader();
     if (layer.options.archive && layer.options.archive !== layer) return getHeader(layer.options.archive);
-    return sceneByLayer.get(layer)._header ||= read(layer, 0, 127).then(decodeHeader);
+    let header = archiveHeaderByLayer.get(layer);
+    if (!header) {
+      header = read(layer, 0, 127).then(decodeHeader);
+      archiveHeaderByLayer.set(layer, header);
+    }
+    return header;
   }
 
   // src/globals/directoryReader.js
@@ -7740,17 +8083,17 @@
   }
 
   // src/archives/loadDirectory.js
-  async function loadDirectory(backend, offset, length, compression) {
-    return decodeDirectory(await decompress(await read(backend, offset, length), compression));
+  async function loadDirectory(layer, offset, length, compression) {
+    return decodeDirectory(await decompress(await read(layer, offset, length), compression));
   }
 
   // src/archives/getDirectoryEntries.js
-  async function getDirectoryEntries(backend, offset, length, compression) {
-    const directories = sceneByLayer.get(backend)._directories;
+  async function getDirectoryEntries(layer, offset, length, compression) {
+    const directories = directoriesByLayer.get(layer);
     const key = `${offset}:${length}`;
     if (!directories.has(key)) {
       if (directories.size >= 32) directories.delete(directories.keys().next().value);
-      directories.set(key, loadDirectory(backend, offset, length, compression));
+      directories.set(key, loadDirectory(layer, offset, length, compression));
     }
     const pending = directories.get(key);
     try {
@@ -7773,7 +8116,7 @@
   }
 
   // src/archives/getTileData.js
-  async function getTileData(backend, header, entry, id, signal) {
+  async function getTileData(layer, header, entry, id, signal) {
     if (id - entry.tileId >= entry.runLength) return;
     if (entry.offset + entry.length > header.tileDataLength) {
       throw (
@@ -7782,7 +8125,7 @@
       );
     }
     const data = await decompress(
-      await read(backend, header.tileDataOffset + entry.offset, entry.length, signal),
+      await read(layer, header.tileDataOffset + entry.offset, entry.length, signal),
       header.tileCompression
     );
     signal?.throwIfAborted();
@@ -7793,7 +8136,7 @@
   }
 
   // src/archives/findTile.js
-  async function findTile(backend, header, id, signal) {
+  async function findTile(layer, header, id, signal) {
     let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
     let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
     let depth, entries, entry, tile;
@@ -7807,12 +8150,12 @@
       if (depth === 0) firstOffset = offset;
       else if (depth === 1) secondOffset = offset;
       else if (depth === 2) thirdOffset = offset;
-      entries = await getDirectoryEntries(backend, offset, length, header.internalCompression);
+      entries = await getDirectoryEntries(layer, offset, length, header.internalCompression);
       signal?.throwIfAborted();
       entry = findDirectoryEntry(entries, id);
       if (!entry) return;
       if (entry.runLength) {
-        tile = await getTileData(backend, header, entry, id, signal);
+        tile = await getTileData(layer, header, entry, id, signal);
         return tile;
       }
       if (entry.offset + entry.length > header.leafDirectoryLength) {
@@ -7831,22 +8174,22 @@
   }
 
   // src/archives/getZxy.js
-  async function getZxy(backend, z, x, y, signal) {
-    if (!sceneByLayer.has(backend)) return backend.getZxy(z, x, y, signal);
-    if (backend.options.archive && backend.options.archive !== backend) {
-      return getZxy(backend.options.archive, z, x, y, signal);
+  async function getZxy(layer, z, x, y, signal) {
+    if (!sceneLayers.has(layer)) return layer.getZxy(z, x, y, signal);
+    if (layer.options.archive && layer.options.archive !== layer) {
+      return getZxy(layer.options.archive, z, x, y, signal);
     }
     const id = tileId(z, x, y);
     signal?.throwIfAborted();
-    const header = await getHeader(backend);
+    const header = await getHeader(layer);
     signal?.throwIfAborted();
     if (z < header.minZoom || z > header.maxZoom) return;
-    return findTile(backend, header, id, signal);
+    return findTile(layer, header, id, signal);
   }
 
   // src/archives/loadSource.js
   async function loadSource(layer, area2) {
-    if (sceneByLayer.get(layer)._geojson) {
+    if (geojsonByLayer.get(layer)) {
       const { data, url } = layer.options;
       if (data !== void 0 && url) {
         throw (
@@ -7892,28 +8235,27 @@
   }
 
   // src/sources/buildArea.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/sources/buildAreaFeature.js
   init_L();
 
   // src/sources/projectedTree.js
   init_L();
-  init_cameraByMap();
   function projectedTree(context, lon, lat) {
-    const { backend, crs, origin, metres, map } = context;
+    const { backend: layer, crs, origin, metres, map } = context;
     const location = (
       /* alloc */
       new L.LatLng(lat, lon)
     );
     const point = crs.project(location);
-    const elevation = cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, location) : void 0;
+    const elevation = mapElevationOf(map, location), root = rootByLayer.get(layer);
     return (
       /* alloc */
       {
         x: (point.x - origin.x) * metres,
         y: (point.y - origin.y) * metres,
-        ground: Number.isFinite(elevation) && Number.isFinite(sceneByLayer.get(backend).root.position[1]) ? elevation - sceneByLayer.get(backend).root.position[1] : 0
+        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
       }
     );
   }
@@ -7928,7 +8270,7 @@
 
   // src/sources/addTriangle.js
   function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
-    const { backend, positions, normals, colors, uvs } = context;
+    const { backend: layer, positions, normals, colors, uvs } = context;
     const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
     const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
     if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
@@ -7951,7 +8293,7 @@
     );
     normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
     colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
-    if (backend.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
+    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
   }
 
   // src/sources/addGeneratedTriangle.js
@@ -7971,10 +8313,10 @@
 
   // src/sources/buildAreaPoint.js
   function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-    const { backend } = context;
+    const { backend: layer } = context;
     const { top } = style;
     const projected = projectedTree(context, lon, lat);
-    if (backend.options.nightLight) {
+    if (layer.options.nightLight) {
       if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw (
         /* alloc */
         new Error("Invalid light flux")
@@ -8005,9 +8347,8 @@
 
   // src/sources/projectRing.js
   init_L();
-  init_cameraByMap();
   function projectRing(context, ring3) {
-    const { backend, crs, origin, metres, map } = context;
+    const { backend: layer, crs, origin, metres, map } = context;
     if (ring3.length < 4) throw (
       /* alloc */
       new Error("Invalid GeoJSON polygon ring")
@@ -8016,6 +8357,7 @@
       /* alloc */
       []
     );
+    const root = rootByLayer.get(layer);
     let i, lng, lat, location, point, elevation;
     for (i = 0; i < ring3.length - 1; i++) {
       lng = ring3[i][0], lat = ring3[i][1];
@@ -8026,13 +8368,13 @@
       location = /* alloc */
       new L.LatLng(lat, lng);
       point = crs.project(location);
-      elevation = cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, location) : void 0;
+      elevation = mapElevationOf(map, location);
       path.push(
         /* alloc */
         {
           x: (point.x - origin.x) * metres,
           y: (point.y - origin.y) * metres,
-          ground: Number.isFinite(elevation) && Number.isFinite(sceneByLayer.get(backend).root.position[1]) ? elevation - sceneByLayer.get(backend).root.position[1] : 0
+          ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
         }
       );
     }
@@ -8094,8 +8436,8 @@
   }
 
   // src/sources/extrusionStyle.js
-  function extrusionStyle(backend, feature) {
-    const style = backend.options.style(feature);
+  function extrusionStyle(layer, feature) {
+    const style = layer.options.style(feature);
     if (style === null) return null;
     if (!style || typeof style !== "object") throw (
       /* alloc */
@@ -8113,9 +8455,9 @@
 
   // src/sources/buildAreaFeature.js
   function buildAreaFeature(context, feature) {
-    const { backend, area: area2, map } = context;
+    const { backend: layer, area: area2, map } = context;
     const coords = area2.coords;
-    const coordinates = featureAnchor(feature, backend.options.nightLight);
+    const coordinates = featureAnchor(feature, layer.options.nightLight);
     const geometry = feature.geometry, isTree = geometry.type === "Point";
     const lon = coordinates[0], lat = coordinates[1];
     if (coords) {
@@ -8126,7 +8468,7 @@
       );
       if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
     }
-    const style = extrusionStyle(backend, feature);
+    const style = extrusionStyle(layer, feature);
     if (style === null) {
       context.skipped++;
       return;
@@ -8196,12 +8538,12 @@
 
   // src/sources/attachAreaMesh.js
   function attachAreaMesh(context) {
-    const { backend, area: area2 } = context;
+    const { backend: layer, area: area2 } = context;
     if (!context.positions.length) {
       area2.mesh = null, area2.buildings = 0, area2.skipped = context.skipped, area2.done = true;
       return;
     }
-    const device = sceneByLayer.get(backend).renderer.device;
+    const device = rendererByLayer.get(layer).device;
     const data = instanceAreaGeometry(context);
     const attributes = (
       /* alloc */
@@ -8231,7 +8573,7 @@
     );
     if (data.instanceOffsets) attributes.instanceOffset = /* alloc */
     { size: 4, data: data.instanceOffsets };
-    if (backend.options.nightLight) attributes.uv = /* alloc */
+    if (layer.options.nightLight) attributes.uv = /* alloc */
     { size: 2, data: (
       /* alloc */
       new Float32Array(context.uvs)
@@ -8266,16 +8608,16 @@
       device,
       geometry: meshGeometry,
       program: createProgram(
-        backend,
+        layer,
         /* alloc */
         {
           instanced: Boolean(data.instanceOffsets),
           vertexColors: true,
-          roofTexture: backend.options.roofTexture,
-          wallTexture: backend.options.wallTexture,
-          nightLight: Boolean(backend.options.nightLight),
-          alphaMode: backend.options.nightLight ? "BLEND" : void 0,
-          doubleSided: Boolean(backend.options.nightLight)
+          roofTexture: layer.options.roofTexture,
+          wallTexture: layer.options.wallTexture,
+          nightLight: Boolean(layer.options.nightLight),
+          alphaMode: layer.options.nightLight ? "BLEND" : void 0,
+          doubleSided: Boolean(layer.options.nightLight)
         }
       ),
       id: nextId.value++,
@@ -8289,23 +8631,23 @@
     area2.buildings = context.featureFaces.length;
     area2.skipped = context.skipped;
     area2.done = true;
-    setParent(area2.mesh, sceneByLayer.get(backend).root);
-    update(backend);
+    setParent(area2.mesh, rootByLayer.get(layer));
+    update(layer);
   }
 
   // src/sources/sourceAreaContext.js
   init_radians();
-  function sourceAreaContext(backend, area2, map) {
-    const crs = map.options.crs, origin = crs.project(sceneByLayer.get(backend).location);
+  function sourceAreaContext(layer, area2, map) {
+    const crs = map.options.crs, origin = crs.project(locationByLayer.get(layer));
     return (
       /* alloc */
       {
-        backend,
+        backend: layer,
         area: area2,
         map,
         crs,
         origin,
-        metres: Math.cos(sceneByLayer.get(backend).location.lat * radians),
+        metres: Math.cos(locationByLayer.get(layer).lat * radians),
         positions: (
           /* alloc */
           []
@@ -8340,14 +8682,14 @@
   }
 
   // src/sources/buildArea.js
-  async function buildArea(backend, area2, map) {
+  async function buildArea(layer, area2, map) {
     let feature;
     try {
       await /* alloc */
       new Promise(requestAnimationFrame);
-      await sceneByLayer.get(cameraByMap.get(map)._terrain3D)?._terrainPromise;
+      await cameraViewByMap.get(map);
       if (area2.request.signal.aborted) return;
-      const data = await loadSource(backend, area2);
+      const data = await loadSource(layer, area2);
       if (area2.request.signal.aborted) return;
       if (data?.type !== "FeatureCollection" || !Array.isArray(data.features)) {
         throw (
@@ -8355,13 +8697,13 @@
           new Error("Invalid GeoJSON response")
         );
       }
-      if (sceneByLayer.get(backend)._geojson && typeof backend.options.style !== "function") {
+      if (geojsonByLayer.get(layer) && typeof layer.options.style !== "function") {
         throw (
           /* alloc */
           new Error("style must be a function")
         );
       }
-      const context = sourceAreaContext(backend, area2, map);
+      const context = sourceAreaContext(layer, area2, map);
       let deadline = performance.now() + 4;
       for (feature of data.features) {
         if (area2.request.signal.aborted) return;
@@ -8377,15 +8719,15 @@
     } catch (error) {
       if (!area2.request.signal.aborted) {
         area2.error = error.message;
-        backend.fire(
+        layer.fire(
           "error",
           /* alloc */
           { error }
         );
       }
     } finally {
-      sceneByLayer.get(backend)._inflight--;
-      pump(backend, map);
+      mutateWeakMap(inflightByLayer, layer, "--", void 0, false);
+      pump(layer, map);
     }
   }
 
@@ -8402,7 +8744,7 @@
     );
     let layer, area2, center;
     for (layer of layers) {
-      for (area2 of sceneByLayer.get(layer)._areas.values()) {
+      for (area2 of areasByLayer.get(layer).values()) {
         if (area2.started || area2.request.signal.aborted) continue;
         center = area2.coords && map.project(map.getCenter(), area2.coords.z).divideBy(256);
         pending.push(
@@ -8420,91 +8762,111 @@
   }
 
   // src/sources/pump.js
-  function pump(backend, map = backend._map) {
+  function pump(layer, map = layer._map) {
     const shared = map && renderers.get(map);
     if (!shared) return;
     const layers = (
       /* alloc */
       []
     );
-    let layer, area2, areaBackend;
-    for (layer of sceneByLayer.get(shared)._layers) {
-      if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
+    let sourceLayer, area2, areaBackend;
+    for (sourceLayer of layersByLayer.get(shared)) {
+      if (Number.isFinite(inflightByLayer.get(sourceLayer)) && areasByLayer.get(sourceLayer) && (urlByLayer.get(sourceLayer) || geojsonByLayer.get(sourceLayer))) layers.push(sourceLayer);
     }
     const pending = pendingSourceAreas(layers, map);
     let inflight = 0;
-    for (layer of layers) inflight += sceneByLayer.get(layer)._inflight;
+    for (sourceLayer of layers) inflight += inflightByLayer.get(sourceLayer);
     for ({ layer: areaBackend, area: area2 } of pending) {
       if (inflight >= 4) break;
-      if (sceneByLayer.get(areaBackend)._inflight >= 2) continue;
+      if (inflightByLayer.get(areaBackend) >= 2) continue;
       area2.started = true;
-      sceneByLayer.get(areaBackend)._inflight++;
+      mutateWeakMap(inflightByLayer, areaBackend, "++", void 0, false);
       inflight++;
       buildArea(areaBackend, area2, map);
     }
-    for (layer of layers) updateStatus(layer);
+    for (sourceLayer of layers) updateStatus(sourceLayer);
   }
 
+  // src/weakmaps/highlightedFeatureByLayer.js
+  var highlightedFeatureByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/hoveredFeatureByLayer.js
+  var hoveredFeatureByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/sources/releaseArea.js
+  init_mutateWeakMap();
+
   // src/picking/setHighlight.js
-  function setHighlight(backend, feature) {
+  init_mutateWeakMap();
+  function setHighlight(layer, feature) {
     if (feature?.model) feature = null;
-    if (sceneByLayer.get(backend).highlightedFeature?.mesh === feature?.mesh && sceneByLayer.get(backend).highlightedFeature?.vertexStart === feature?.vertexStart) return;
-    if (sceneByLayer.get(backend).highlightedFeature) sceneByLayer.get(backend).highlightedFeature.mesh.highlight = null;
-    sceneByLayer.get(backend).highlightedFeature = feature;
+    if (highlightedFeatureByLayer.get(layer)?.mesh === feature?.mesh && highlightedFeatureByLayer.get(layer)?.vertexStart === feature?.vertexStart) return;
+    if (highlightedFeatureByLayer.get(layer)) highlightedFeatureByLayer.get(layer).mesh.highlight = null;
+    mutateWeakMap(highlightedFeatureByLayer, layer, "=", feature);
     if (feature) {
       feature.mesh.highlightRange[0] = feature.vertexStart;
       feature.mesh.highlightRange[1] = feature.vertexEnd;
       feature.mesh.highlight = feature.mesh.highlightRange;
     }
-    update(backend);
+    update(layer);
   }
 
+  // src/weakmaps/containerByLayer.js
+  var containerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/cursorByLayer.js
+  var cursorByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/tooltipByLayer.js
+  var tooltipByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/picking/showFeature.js
-  function showFeature(backend, feature, event) {
-    const tooltip2 = sceneByLayer.get(backend)._tooltip;
+  init_mutateWeakMap();
+  function showFeature(layer, feature, event) {
+    const tooltip2 = tooltipByLayer.get(layer);
     if (!tooltip2) return;
     if (feature) {
-      tooltip2.replaceChildren(backend.options.tooltip(feature));
+      tooltip2.replaceChildren(layer.options.tooltip(feature));
       tooltip2.hidden = false;
-      const rect = sceneByLayer.get(backend).container.getBoundingClientRect();
+      const rect = containerByLayer.get(layer).getBoundingClientRect();
       const x = event.clientX - rect.left, y = event.clientY - rect.top;
       tooltip2.style.left = `${x + tooltip2.offsetWidth + 16 > rect.width ? x - tooltip2.offsetWidth - 12 : x + 12}px`;
       tooltip2.style.top = `${y + tooltip2.offsetHeight + 16 > rect.height ? y - tooltip2.offsetHeight - 12 : y + 12}px`;
     } else {
       tooltip2.hidden = true;
     }
-    const shared = sceneByLayer.get(backend)._shared;
-    let layer;
+    const shared = sharedByLayer.get(layer);
+    let sharedLayer;
     if (shared) {
       let visible = false;
-      for (layer of sceneByLayer.get(shared)._layers) {
-        if (sceneByLayer.get(layer)._tooltip && !sceneByLayer.get(layer)._tooltip.hidden) {
+      for (sharedLayer of layersByLayer.get(shared)) {
+        if (tooltipByLayer.get(sharedLayer) && !tooltipByLayer.get(sharedLayer).hidden) {
           visible = true;
           break;
         }
       }
       if (visible) {
-        if (sceneByLayer.get(shared)._cursor === void 0) sceneByLayer.get(shared)._cursor = sceneByLayer.get(backend).container.style.cursor;
-        sceneByLayer.get(backend).container.style.cursor = "pointer";
-      } else if (sceneByLayer.get(shared)._cursor !== void 0) {
-        sceneByLayer.get(backend).container.style.cursor = sceneByLayer.get(shared)._cursor;
-        delete sceneByLayer.get(shared)._cursor;
+        if (cursorByLayer.get(shared) === void 0) mutateWeakMap(cursorByLayer, shared, "=", containerByLayer.get(layer).style.cursor);
+        containerByLayer.get(layer).style.cursor = "pointer";
+      } else if (cursorByLayer.get(shared) !== void 0) {
+        containerByLayer.get(layer).style.cursor = cursorByLayer.get(shared);
+        cursorByLayer.delete(shared);
       }
     }
   }
 
   // src/sources/releaseArea.js
-  function releaseArea(backend, area2) {
+  function releaseArea(layer, area2) {
     area2.request.abort();
     let attribute;
     if (area2.mesh) {
-      if (sceneByLayer.get(backend).highlightedFeature?.mesh === area2.mesh) {
-        setHighlight(backend, null);
-        sceneByLayer.get(backend).hoveredFeature = null;
-        showFeature(backend, null);
+      if (highlightedFeatureByLayer.get(layer)?.mesh === area2.mesh) {
+        setHighlight(layer, null);
+        mutateWeakMap(hoveredFeatureByLayer, layer, "=", null);
+        showFeature(layer, null);
       }
       setParent(area2.mesh, null);
-      update(backend);
+      update(layer);
       const geometry = area2.mesh.geometry;
       for (attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
       area2.mesh.program.pipelineCache.clear();
@@ -8517,11 +8879,11 @@
   }
 
   // src/sources/updateArea.js
-  function updateArea(backend) {
-    if (!backend._map || !sceneByLayer.get(backend)._shared) return;
-    if (sceneByLayer.get(backend)._geojson) {
-      if (!sceneByLayer.get(backend)._areas.has("geojson")) {
-        sceneByLayer.get(backend)._areas.set(
+  function updateArea(layer) {
+    if (!layer._map || !sharedByLayer.get(layer)) return;
+    if (geojsonByLayer.get(layer)) {
+      if (!areasByLayer.get(layer).has("geojson")) {
+        areasByLayer.get(layer).set(
           "geojson",
           /* alloc */
           { request: (
@@ -8530,23 +8892,23 @@
           ) }
         );
       }
-      pump(backend);
+      pump(layer);
       return;
     }
-    if (!sceneByLayer.get(backend).header) return;
-    const z = sceneByLayer.get(backend).header.minZoom;
-    const center = backend._map.project(backend._map.getCenter(), z).divideBy(256).floor();
-    const bounds = backend._map.getBounds();
-    const nw = backend._map.project(bounds.getNorthWest(), z).divideBy(256).floor();
-    const se = backend._map.project(bounds.getSouthEast(), z).divideBy(256).floor();
-    const archiveNW = backend._map.project(
+    if (!headerByLayer.get(layer)) return;
+    const z = headerByLayer.get(layer).minZoom;
+    const center = layer._map.project(layer._map.getCenter(), z).divideBy(256).floor();
+    const bounds = layer._map.getBounds();
+    const nw = layer._map.project(bounds.getNorthWest(), z).divideBy(256).floor();
+    const se = layer._map.project(bounds.getSouthEast(), z).divideBy(256).floor();
+    const archiveNW = layer._map.project(
       /* alloc */
-      [sceneByLayer.get(backend).header.maxLat, sceneByLayer.get(backend).header.minLon],
+      [headerByLayer.get(layer).maxLat, headerByLayer.get(layer).minLon],
       z
     ).divideBy(256).floor();
-    const archiveSE = backend._map.project(
+    const archiveSE = layer._map.project(
       /* alloc */
-      [sceneByLayer.get(backend).header.minLat, sceneByLayer.get(backend).header.maxLon],
+      [headerByLayer.get(layer).minLat, headerByLayer.get(layer).maxLon],
       z
     ).divideBy(256).floor();
     const wanted = (
@@ -8563,10 +8925,10 @@
         );
       }
     }
-    for ([key, area2] of sceneByLayer.get(backend)._areas) {
+    for ([key, area2] of areasByLayer.get(layer)) {
       if (!wanted.has(key)) {
-        releaseArea(backend, area2);
-        sceneByLayer.get(backend)._areas.delete(key);
+        releaseArea(layer, area2);
+        areasByLayer.get(layer).delete(key);
       }
     }
     const areas = (
@@ -8580,7 +8942,7 @@
     areas.sort(compareAreaDistance);
     for (coords of areas) {
       key = `${coords.x}/${coords.y}`;
-      if (!sceneByLayer.get(backend)._areas.has(key)) sceneByLayer.get(backend)._areas.set(
+      if (!areasByLayer.get(layer).has(key)) areasByLayer.get(layer).set(
         key,
         /* alloc */
         { coords, request: (
@@ -8589,18 +8951,18 @@
         ) }
       );
     }
-    pump(backend);
+    pump(layer);
   }
 
   // src/terrain/setTerrainHeight.js
-  init_cameraByMap();
+  init_mutateWeakMap();
   function setTerrainHeight(layer) {
-    if (!sceneByLayer.get(layer).root || !sceneByLayer.get(layer).location) return;
-    sceneByLayer.get(layer)._terrainBaseY ??= sceneByLayer.get(layer).root.position[1];
-    const terrain = cameraByMap.get(layer._map)?._terrain3D;
-    const elevation = terrain && getElevation(terrain, sceneByLayer.get(layer).location);
+    if (!rootByLayer.get(layer) || !locationByLayer.get(layer)) return;
+    if (terrainBaseYByLayer.get(layer) == null) terrainBaseYByLayer.set(layer, rootByLayer.get(layer).position[1]);
+    const terrain = terrain3DByMap.get(layer._map);
+    const elevation = terrain && getElevation(terrain, locationByLayer.get(layer));
     const offset = Number.isFinite(elevation) ? layer.options.terrainOffset ?? 0 : 0;
-    sceneByLayer.get(layer).root.position[1] = sceneByLayer.get(layer)._terrainBaseY + (elevation ?? 0) + offset;
+    rootByLayer.get(layer).position[1] = terrainBaseYByLayer.get(layer) + (elevation ?? 0) + offset;
   }
 
   // src/scene/restoreGeometry.js
@@ -8655,13 +9017,13 @@
   }
 
   // src/scene/restoreObject.js
-  function restoreObject(object, backend) {
-    const shared = sceneByLayer.get(backend)._shared;
+  function restoreObject(object, layer) {
+    const shared = sharedByLayer.get(layer);
     let texture;
-    if (object.geometry && object.geometry.device !== sceneByLayer.get(shared).renderer.device) {
+    if (object.geometry && object.geometry.device !== rendererByLayer.get(shared).device) {
       const geometry = object.geometry;
       const material = object.program._layerMaterial;
-      const device = sceneByLayer.get(shared).renderer.device;
+      const device = rendererByLayer.get(shared).device;
       restoreGeometry(geometry, device);
       object.bindGroup = null;
       if (object.boundTextures) object.boundTextures.length = 0;
@@ -8669,13 +9031,13 @@
       [];
       restoreMaterialTextures(material, device);
       object.program.pipelineCache.clear();
-      object.program = createProgram(backend, material);
+      object.program = createProgram(layer, material);
       object.device = device;
     }
-    if (object.texture && object.texture.device !== sceneByLayer.get(shared).renderer.device) {
+    if (object.texture && object.texture.device !== rendererByLayer.get(shared).device) {
       texture = object.texture;
-      texture.device = sceneByLayer.get(shared).renderer.device;
-      texture.texture = sceneByLayer.get(shared).renderer.device.createTexture(
+      texture.device = rendererByLayer.get(shared).device;
+      texture.texture = rendererByLayer.get(shared).device.createTexture(
         /* alloc */
         {
           size: (
@@ -8686,12 +9048,15 @@
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         }
       );
-      texture.sampler = sceneByLayer.get(shared).renderer.device.createSampler(texture.samplerOptions);
+      texture.sampler = rendererByLayer.get(shared).device.createSampler(texture.samplerOptions);
       texture.uploaded = null;
     }
   }
 
-  // src/globals/rendererDevices.js
+  // src/scene/initializeSharedRenderer.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/rendererDevices.js
   var rendererDevices = /* @__PURE__ */ new WeakMap();
 
   // src/scene/showWebGPUWarning.js
@@ -8713,36 +9078,36 @@
   }
 
   // src/scene/failAttachment.js
-  function failAttachment(error, backend, map) {
+  function failAttachment(error, layer, map) {
     showWebGPUWarning(map);
-    sceneByLayer.get(backend)._rendererReady.reject(error);
+    rendererReadyByLayer.get(layer).reject(error);
     renderers.delete(map);
     throw error;
   }
 
   // src/scene/requestAdapter.js
-  async function requestAdapter(backend, map) {
+  async function requestAdapter(layer, map) {
     let adapter;
     try {
       adapter = await navigator.gpu.requestAdapter();
     } catch (error) {
-      failAttachment(error, backend, map);
+      failAttachment(error, layer, map);
     }
     if (!adapter) failAttachment(
       /* alloc */
       new Error("Unable to acquire a WebGPU adapter"),
-      backend,
+      layer,
       map
     );
     return adapter;
   }
 
   // src/scene/requestDevice.js
-  async function requestDevice(adapter, backend, map) {
+  async function requestDevice(adapter, layer, map) {
     try {
       return await adapter.requestDevice();
     } catch (error) {
-      failAttachment(error, backend, map);
+      failAttachment(error, layer, map);
     }
   }
 
@@ -8750,10 +9115,10 @@
   function rendererDeviceError(event) {
     const map = rendererDevices.get(event.currentTarget);
     const owner = renderers.get(map);
-    if (sceneByLayer.get(owner)?.renderer?.device !== event.currentTarget) return;
-    if (!sceneByLayer.get(owner)._layers) return;
+    if (rendererByLayer.get(owner)?.device !== event.currentTarget) return;
+    if (!layersByLayer.get(owner)) return;
     let layer;
-    for (layer of sceneByLayer.get(owner)._layers) layer.fire(
+    for (layer of layersByLayer.get(owner)) layer.fire(
       "error",
       /* alloc */
       { error: event.error }
@@ -8764,13 +9129,13 @@
   function rendererDeviceLost([info, device]) {
     const map = rendererDevices.get(device);
     const owner = renderers.get(map);
-    if (!owner || sceneByLayer.get(owner).renderer?.device !== device) return;
+    if (!owner || rendererByLayer.get(owner)?.device !== device) return;
     const error = (
       /* alloc */
       new Error(`WebGPU device lost: ${info.message || info.reason}`)
     );
     let layer;
-    for (layer of sceneByLayer.get(owner)._layers) layer.fire(
+    for (layer of layersByLayer.get(owner)) layer.fire(
       "error",
       /* alloc */
       { error }
@@ -8843,7 +9208,7 @@
   sceneSunlightUniforms[0] = sceneSunlightUniforms[5] = sceneSunlightUniforms[10] = sceneSunlightUniforms[15] = 1;
 
   // src/scene/initializeRendererResources.js
-  function initializeRendererResources(backend, device) {
+  function initializeRendererResources(layer, device) {
     const layout = device.createBindGroupLayout(
       /* alloc */
       {
@@ -8874,26 +9239,26 @@
         )
       }
     );
-    const buffer = sceneByLayer.get(backend).renderer.device.createBuffer(
+    const buffer = rendererByLayer.get(layer).device.createBuffer(
       /* alloc */
       { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }
     );
-    const sampler = sceneByLayer.get(backend).renderer.device.createSampler(
+    const sampler = rendererByLayer.get(layer).device.createSampler(
       /* alloc */
       { compare: "less-equal", minFilter: "linear", magFilter: "linear" }
     );
-    const lights = sceneByLayer.get(backend).renderer.device.createBuffer(
+    const lights = rendererByLayer.get(layer).device.createBuffer(
       /* alloc */
       { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }
     );
-    sceneByLayer.get(backend).renderer.sunlight = /* alloc */
+    rendererByLayer.get(layer).sunlight = /* alloc */
     { layout, buffer, sampler, lights, size: 0 };
-    sceneByLayer.get(backend).renderer.device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
-    resizeSunlight(backend, 1);
+    rendererByLayer.get(layer).device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
+    resizeSunlight(layer, 1);
     const emptyImage = document.createElement("canvas");
     emptyImage.width = 1;
     emptyImage.height = 1;
-    sceneByLayer.get(backend).renderer.roofFallbackTexture = /* alloc */
+    rendererByLayer.get(layer).roofFallbackTexture = /* alloc */
     {
       device,
       texture: device.createTexture(
@@ -8921,14 +9286,24 @@
     };
   }
 
+  // src/scene/mountRenderer.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/queuedByLayer.js
+  var queuedByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/scene/onMapChange.js
+  init_mutateWeakMap();
+
   // src/globals/pendingMapChanges.js
   var pendingMapChanges = [];
 
   // src/scene/renderPendingMapChange.js
+  init_mutateWeakMap();
   function renderPendingMapChange() {
     const layer = pendingMapChanges.shift();
-    sceneByLayer.get(layer)._queued = false;
-    if (sceneByLayer.get(layer)._shared !== layer || !sceneByLayer.get(layer).renderer) return;
+    mutateWeakMap(queuedByLayer, layer, "=", false);
+    if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) return;
     if (layer._map._animatingZoom) update(layer);
     else render(layer);
   }
@@ -8936,16 +9311,23 @@
   // src/scene/onMapChange.js
   function onMapChange() {
     const layer = this;
-    if (sceneByLayer.get(layer)._queued) return;
-    sceneByLayer.get(layer)._queued = true;
+    if (queuedByLayer.get(layer)) return;
+    mutateWeakMap(queuedByLayer, layer, "=", true);
     pendingMapChanges.push(layer);
     queueMicrotask(renderPendingMapChange);
   }
 
+  // src/weakmaps/zoomLevelByLayer.js
+  var zoomLevelByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/scene/startZoom.js
+  init_mutateWeakMap();
   function startZoom() {
-    sceneByLayer.get(this)._zoomLevel = null;
+    mutateWeakMap(zoomLevelByLayer, this, "=", null);
   }
+
+  // src/scene/onZoomAnim.js
+  init_mutateWeakMap();
 
   // src/globals/pendingZoomAnimations.js
   var pendingZoomAnimations = [];
@@ -8953,21 +9335,26 @@
   // src/scene/renderPendingZoomAnimation.js
   function renderPendingZoomAnimation() {
     const layer = pendingZoomAnimations.shift();
-    if (sceneByLayer.get(layer)._shared === layer && sceneByLayer.get(layer).renderer) render(layer);
+    if (sharedByLayer.get(layer) === layer && rendererByLayer.get(layer)) render(layer);
   }
 
   // src/scene/onZoomAnim.js
   function onZoomAnim(event) {
     const map = this._map;
-    if (event && !sceneByLayer.get(this)._zoomView) {
-      sceneByLayer.get(this)._zoomView = /* alloc */
-      {
-        from: map.getCenter(),
-        zoom: map.getZoom(),
-        to: event.center,
-        targetZoom: event.zoom,
-        start: performance.now()
-      };
+    if (event && !zoomViewByLayer.get(this)) {
+      mutateWeakMap(
+        zoomViewByLayer,
+        this,
+        "=",
+        /* alloc */
+        {
+          from: map.getCenter(),
+          zoom: map.getZoom(),
+          to: event.center,
+          targetZoom: event.zoom,
+          start: performance.now()
+        }
+      );
       map.getContainer().classList.add("leaflet-camera-zoom");
     }
     pendingZoomAnimations.push(this);
@@ -8975,29 +9362,29 @@
   }
 
   // src/scene/endZoom.js
-  init_cameraByMap();
+  init_mutateWeakMap();
   function endZoom() {
-    const backend = this;
+    const layer = this;
     let animation;
-    if (sceneByLayer.get(backend)._zoomTransitions) {
-      for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.finish();
+    if (zoomTransitionsByLayer.get(layer)) {
+      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.finish();
     }
-    sceneByLayer.get(backend)._zoomTransitions = null;
-    sceneByLayer.get(backend)._zoomView = null;
-    delete cameraByMap.get(backend._map)._cameraView;
-    backend._map.getContainer().classList.remove("leaflet-camera-zoom");
-    mapUpdateCameraOverlays(backend._map);
-    sceneByLayer.get(backend)._zoomLevel = null;
-    update(backend);
+    mutateWeakMap(zoomTransitionsByLayer, layer, "=", null);
+    mutateWeakMap(zoomViewByLayer, layer, "=", null);
+    cameraViewByMap.delete(layer._map);
+    layer._map.getContainer().classList.remove("leaflet-camera-zoom");
+    mapUpdateCameraOverlays(layer._map);
+    mutateWeakMap(zoomLevelByLayer, layer, "=", null);
+    update(layer);
   }
 
   // src/scene/mountRenderer.js
-  function mountRenderer(backend, map, canvas) {
-    sceneByLayer.get(backend)._size = null;
+  function mountRenderer(layer, map, canvas) {
+    mutateWeakMap(sizeByLayer, layer, "=", null);
     canvas.className = "leaflet-3d";
     canvas.style.cssText = "position:absolute;top:0;left:0;pointer-events:none";
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", backend.options.ariaLabel ?? "3D scene");
+    canvas.setAttribute("aria-label", layer.options.ariaLabel ?? "3D scene");
     let pane = map.getPane("webgpuPane");
     if (!pane) {
       pane = map.createPane("webgpuPane", map.getContainer());
@@ -9005,25 +9392,25 @@
       pane.style.pointerEvents = "none";
     }
     pane.append(canvas);
-    map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, backend);
-    map.on("zoomstart", startZoom, backend);
-    map.on("zoomanim", onZoomAnim, backend);
-    map.on("zoomend", endZoom, backend);
+    map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
+    map.on("zoomstart", startZoom, layer);
+    map.on("zoomanim", onZoomAnim, layer);
+    map.on("zoomend", endZoom, layer);
   }
 
   // src/scene/initializeSharedRenderer.js
-  async function initializeSharedRenderer(backend, map) {
+  async function initializeSharedRenderer(layer, map) {
     const canvas = document.createElement("canvas");
     if (!navigator.gpu) {
       failAttachment(
         /* alloc */
         new Error("Layer3D requires WebGPU"),
-        backend,
+        layer,
         map
       );
     }
-    const adapter = await requestAdapter(backend, map);
-    const device = await requestDevice(adapter, backend, map);
+    const adapter = await requestAdapter(layer, map);
+    const device = await requestDevice(adapter, layer, map);
     rendererDevices.set(device, map);
     device.addEventListener("uncapturederror", rendererDeviceError);
     Promise.all(
@@ -9036,7 +9423,7 @@
       failAttachment(
         /* alloc */
         new Error("Unable to create a WebGPU canvas context"),
-        backend,
+        layer,
         map
       );
     }
@@ -9046,83 +9433,104 @@
       { device, format, alphaMode: "premultiplied" }
     );
     map.getContainer().querySelector(".leaflet-webgpu-warning")?.remove();
-    sceneByLayer.get(backend)._shared = backend;
-    sceneByLayer.get(backend)._layers = /* alloc */
-    /* @__PURE__ */ new Set();
-    sceneByLayer.get(backend)._sceneOrigin = sceneByLayer.get(backend).location;
-    sceneByLayer.get(backend).scene = emptyNode();
-    sceneByLayer.get(backend).camera = createSceneCamera();
-    sceneByLayer.get(backend).renderer = /* alloc */
-    {
-      device,
-      context,
-      format,
-      canvas,
-      dpr: Math.min(window.devicePixelRatio, 2)
-    };
-    initializeRendererResources(backend, device);
-    mountRenderer(backend, map, canvas);
+    mutateWeakMap(sharedByLayer, layer, "=", layer);
+    mutateWeakMap(
+      layersByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    mutateWeakMap(sceneOriginByLayer, layer, "=", locationByLayer.get(layer));
+    mutateWeakMap(sceneByLayer, layer, "=", emptyNode());
+    mutateWeakMap(cameraByLayer, layer, "=", createSceneCamera());
+    mutateWeakMap(
+      rendererByLayer,
+      layer,
+      "=",
+      /* alloc */
+      {
+        device,
+        context,
+        format,
+        canvas,
+        dpr: Math.min(window.devicePixelRatio, 2)
+      }
+    );
+    initializeRendererResources(layer, device);
+    mountRenderer(layer, map, canvas);
   }
 
   // src/scene/attach.js
-  async function attach(backend, map) {
+  async function attach(layer, map) {
     let shared = renderers.get(map);
-    if (sceneByLayer.get(shared)?._rendererReady) {
-      await sceneByLayer.get(shared)._rendererReady.promise;
+    if (rendererReadyByLayer.get(shared)) {
+      await rendererReadyByLayer.get(shared).promise;
     }
     if (!shared) {
-      shared = backend;
-      sceneByLayer.get(backend)._rendererReady = Promise.withResolvers();
-      sceneByLayer.get(backend)._rendererReady.promise.catch(noOperation);
+      shared = layer;
+      mutateWeakMap(rendererReadyByLayer, layer, "=", Promise.withResolvers());
+      rendererReadyByLayer.get(layer).promise.catch(noOperation);
       renderers.set(map, shared);
-      await initializeSharedRenderer(backend, map);
-      sceneByLayer.get(backend)._rendererReady.resolve();
-      delete sceneByLayer.get(shared)._rendererReady;
+      await initializeSharedRenderer(layer, map);
+      rendererReadyByLayer.get(layer).resolve();
+      rendererReadyByLayer.delete(shared);
       render(shared);
       renderers.set(map, shared);
     }
-    const origin = map.options.crs.project(sceneByLayer.get(shared)._sceneOrigin);
-    const point = map.options.crs.project(sceneByLayer.get(backend).location);
-    const metres = Math.cos(sceneByLayer.get(shared)._sceneOrigin.lat * radians);
-    sceneByLayer.get(backend)._terrainBaseY ??= sceneByLayer.get(backend).root.position[1];
-    sceneByLayer.get(backend).root.position[0] = (point.x - origin.x) * metres;
-    sceneByLayer.get(backend).root.position[1] = sceneByLayer.get(backend)._terrainBaseY;
-    sceneByLayer.get(backend).root.position[2] = -(point.y - origin.y) * metres;
-    setTerrainHeight(backend);
-    sceneByLayer.get(backend).root.scale.fill(metres / Math.cos(sceneByLayer.get(backend).location.lat * radians));
-    sceneByLayer.get(backend)._shared = shared;
-    sceneByLayer.get(backend).renderer = sceneByLayer.get(shared).renderer;
-    sceneByLayer.get(backend).scene = sceneByLayer.get(shared).scene;
-    sceneByLayer.get(backend).camera = sceneByLayer.get(shared).camera;
-    sceneByLayer.get(shared)._layers.add(backend);
-    setParent(sceneByLayer.get(backend).root, sceneByLayer.get(shared).scene);
-    traverse(sceneByLayer.get(backend).root, restoreObject, backend);
+    const origin = map.options.crs.project(sceneOriginByLayer.get(shared));
+    const point = map.options.crs.project(locationByLayer.get(layer));
+    const metres = Math.cos(sceneOriginByLayer.get(shared).lat * radians);
+    if (terrainBaseYByLayer.get(layer) == null) terrainBaseYByLayer.set(layer, rootByLayer.get(layer).position[1]);
+    rootByLayer.get(layer).position[0] = (point.x - origin.x) * metres;
+    rootByLayer.get(layer).position[1] = terrainBaseYByLayer.get(layer);
+    rootByLayer.get(layer).position[2] = -(point.y - origin.y) * metres;
+    setTerrainHeight(layer);
+    rootByLayer.get(layer).scale.fill(metres / Math.cos(locationByLayer.get(layer).lat * radians));
+    mutateWeakMap(sharedByLayer, layer, "=", shared);
+    mutateWeakMap(rendererByLayer, layer, "=", rendererByLayer.get(shared));
+    mutateWeakMap(sceneByLayer, layer, "=", sceneByLayer.get(shared));
+    mutateWeakMap(cameraByLayer, layer, "=", cameraByLayer.get(shared));
+    layersByLayer.get(shared).add(layer);
+    setParent(rootByLayer.get(layer), sceneByLayer.get(shared));
+    traverse(rootByLayer.get(layer), restoreObject, layer);
     update(shared);
-    if (sceneByLayer.get(backend).header && sceneByLayer.get(backend).kind !== "raster" || sceneByLayer.get(backend)._geojson) updateArea(backend);
+    if (headerByLayer.get(layer) && kindByLayer.get(layer) !== "raster" || geojsonByLayer.get(layer)) updateArea(layer);
   }
 
+  // src/weakmaps/pointerEventsByLayer.js
+  var pointerEventsByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/scene/onAdd3DLayer.js
+  init_mutateWeakMap();
   init_L();
 
+  // src/picking/onClick.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/modelByLayer.js
+  var modelByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/picking/findFeature.js
-  function findFeature(backend, event) {
-    if (!sceneByLayer.get(backend).root || !sceneByLayer.get(backend).camera) {
+  function findFeature(layer, event) {
+    const model = modelByLayer.get(layer);
+    if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
       return null;
     }
     let hit2, object, ranges, low, high, middle, range;
-    for (hit2 of raycast(backend, event, sceneByLayer.get(backend).root.children, Boolean(sceneByLayer.get(backend).model))) {
-      if (sceneByLayer.get(backend).model) {
+    for (hit2 of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
+      if (model) {
         object = hit2.object;
-        while (object && object !== sceneByLayer.get(backend).model) {
+        while (object && object !== model) {
           object = object.parent;
         }
-        if (object === sceneByLayer.get(backend).model) {
+        if (object === model) {
           return (
             /* alloc */
             {
-              id: sceneByLayer.get(backend).model.id,
-              properties: sceneByLayer.get(backend).model.extras,
-              model: sceneByLayer.get(backend).model,
+              id: model.id,
+              properties: model.extras,
+              model,
               mesh: hit2.object,
               point: hit2.point
             }
@@ -9159,7 +9567,7 @@
   // src/picking/onClick.js
   function onClick(layer, event) {
     const feature = findFeature(layer, event);
-    sceneByLayer.get(layer).hoveredFeature = feature;
+    mutateWeakMap(hoveredFeatureByLayer, layer, "=", feature);
     setHighlight(layer, feature);
     showFeature(layer, feature, event);
     layer.fire(
@@ -9170,8 +9578,9 @@
   }
 
   // src/picking/onPointerLeave.js
+  init_mutateWeakMap();
   function onPointerLeave(layer) {
-    sceneByLayer.get(layer).hoveredFeature = null;
+    mutateWeakMap(hoveredFeatureByLayer, layer, "=", null);
     setHighlight(layer, null);
     showFeature(layer, null);
     layer.fire(
@@ -9182,15 +9591,16 @@
   }
 
   // src/picking/onPointerMove.js
+  init_mutateWeakMap();
   function onPointerMove(layer, event) {
-    sceneByLayer.get(layer).hoveredFeature = findFeature(layer, event);
-    setHighlight(layer, sceneByLayer.get(layer).hoveredFeature);
-    showFeature(layer, sceneByLayer.get(layer).hoveredFeature, event);
+    mutateWeakMap(hoveredFeatureByLayer, layer, "=", findFeature(layer, event));
+    setHighlight(layer, hoveredFeatureByLayer.get(layer));
+    showFeature(layer, hoveredFeatureByLayer.get(layer), event);
     layer.fire(
       "featurehover",
       /* alloc */
       {
-        feature: sceneByLayer.get(layer).hoveredFeature,
+        feature: hoveredFeatureByLayer.get(layer),
         originalEvent: event
       }
     );
@@ -9212,12 +9622,12 @@
   }
 
   // src/scene/attachLayer.js
-  async function attachLayer(backend, map) {
+  async function attachLayer(layer, map) {
     try {
-      await attach(backend, map);
-      sceneByLayer.get(backend)._added.resolve();
+      await attach(layer, map);
+      addedByLayer.get(layer).resolve();
     } catch (error) {
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error }
@@ -9226,48 +9636,201 @@
   }
 
   // src/scene/onAdd3DLayer.js
-  function onAdd3DLayer(backend, map) {
-    if (!sceneByLayer.get(backend).location) {
+  function onAdd3DLayer(layer, map) {
+    if (!locationByLayer.get(layer)) {
       const center = map.getCenter();
-      sceneByLayer.get(backend).location = /* alloc */
-      new L.LatLng(center.lat, center.lng);
+      mutateWeakMap(
+        locationByLayer,
+        layer,
+        "=",
+        /* alloc */
+        new L.LatLng(center.lat, center.lng)
+      );
     }
-    if (sceneByLayer.get(backend).url || sceneByLayer.get(backend)._geojson || backend.options.tooltip || sceneByLayer.get(backend).modelUrl) {
-      sceneByLayer.get(backend).container = map.getContainer();
-      sceneByLayer.get(backend)._pointerEvents ||= /* alloc */
-      {
-        mousemove: pointerMove,
-        click: pointerClick,
-        mouseleave: pointerLeave
-      };
-      if (backend.options.tooltip) {
-        sceneByLayer.get(backend)._tooltip = L.DomUtil.create("div", "leaflet-3d-tooltip", sceneByLayer.get(backend).container);
-        sceneByLayer.get(backend)._tooltip.hidden = true;
-        sceneByLayer.get(backend)._tooltip.setAttribute("role", "tooltip");
-        sceneByLayer.get(backend)._tooltip.setAttribute("aria-live", "polite");
-        sceneByLayer.get(backend)._tooltip.style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
+      mutateWeakMap(containerByLayer, layer, "=", map.getContainer());
+      if (!pointerEventsByLayer.get(layer)) {
+        pointerEventsByLayer.set(
+          layer,
+          /* alloc */
+          {
+            mousemove: pointerMove,
+            click: pointerClick,
+            mouseleave: pointerLeave
+          }
+        );
       }
-      L.DomEvent.on(sceneByLayer.get(backend).container, sceneByLayer.get(backend)._pointerEvents, backend);
+      if (layer.options.tooltip) {
+        mutateWeakMap(tooltipByLayer, layer, "=", L.DomUtil.create("div", "leaflet-3d-tooltip", containerByLayer.get(layer)));
+        tooltipByLayer.get(layer).hidden = true;
+        tooltipByLayer.get(layer).setAttribute("role", "tooltip");
+        tooltipByLayer.get(layer).setAttribute("aria-live", "polite");
+        tooltipByLayer.get(layer).style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
+      }
+      L.DomEvent.on(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
     }
-    if (sceneByLayer.get(backend).root) {
-      attachLayer(backend, map);
+    if (rootByLayer.get(layer)) {
+      attachLayer(layer, map);
     }
   }
 
+  // src/weakmaps/bridgeMeshByLayer.js
+  var bridgeMeshByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/controlByLayer.js
+  var controlByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/demByLayer.js
+  var demByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/eventMapByLayer.js
+  var eventMapByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/eventsByLayer.js
+  var eventsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/fadeFrameByLayer.js
+  var fadeFrameByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/fadeVersionByLayer.js
+  var fadeVersionByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/groupByLayer.js
+  var groupByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rasterGeometryByLayer.js
+  var rasterGeometryByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rasterProgramByLayer.js
+  var rasterProgramByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainArchiveByLayer.js
+  var terrainArchiveByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainBoundsByLayer.js
+  var terrainBoundsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainControllerByLayer.js
+  var terrainControllerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainGridsByLayer.js
+  var terrainGridsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainLoadingByLayer.js
+  var terrainLoadingByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainOriginElevationByLayer.js
+  var terrainOriginElevationByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainPromiseByLayer.js
+  var terrainPromiseByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainSourceByLayer.js
+  var terrainSourceByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/typeByLayer.js
+  var typeByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/walkerByLayer.js
+  var walkerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneFields.js
+  var sceneFields = {
+    "_3d": state3dByLayer,
+    "_added": addedByLayer,
+    "_areas": areasByLayer,
+    "_bridgeMesh": bridgeMeshByLayer,
+    "_bridges": bridgesByLayer,
+    "_cameraZIndexOffset": cameraZIndexOffsetByLayer,
+    "_countStatus": countStatusByLayer,
+    "_cursor": cursorByLayer,
+    "_dem": demByLayer,
+    "_directories": directoriesByLayer,
+    "_etag": etagByLayer,
+    "_fadeFrame": fadeFrameByLayer,
+    "_fadeVersion": fadeVersionByLayer,
+    "_frame": frameByLayer,
+    "_geojson": geojsonByLayer,
+    "_header": archiveHeaderByLayer,
+    "_inflight": inflightByLayer,
+    "_layers": layersByLayer,
+    "_loadingTiles": loadingTilesByLayer,
+    "_nativeGPU": nativeGPUByLayer,
+    "_pointerEvents": pointerEventsByLayer,
+    "_pruneAfter": pruneAfterByLayer,
+    "_pruneVersion": pruneVersionByLayer,
+    "_pruneWanted": pruneWantedByLayer,
+    "_queued": queuedByLayer,
+    "_rasterGeometry": rasterGeometryByLayer,
+    "_rasterProgram": rasterProgramByLayer,
+    "_rasterTiles": rasterTilesByLayer,
+    "_rasterVersion": rasterVersionByLayer,
+    "_rendererReady": rendererReadyByLayer,
+    "_roofRaster": roofRasterByLayer,
+    "_roofRasters": roofRastersByLayer,
+    "_sceneOrigin": sceneOriginByLayer,
+    "_shadowMeshes": shadowMeshesByLayer,
+    "_shared": sharedByLayer,
+    "_size": sizeByLayer,
+    "_terrain3D": terrain3DByLayer,
+    "_terrainArchive": terrainArchiveByLayer,
+    "_terrainBaseY": terrainBaseYByLayer,
+    "_terrainBounds": terrainBoundsByLayer,
+    "_terrainController": terrainControllerByLayer,
+    "_terrainGrids": terrainGridsByLayer,
+    "_terrainLoading": terrainLoadingByLayer,
+    "_terrainOriginElevation": terrainOriginElevationByLayer,
+    "_terrainPromise": terrainPromiseByLayer,
+    "_terrainReady": terrainReadyByLayer,
+    "_terrainRequest": terrainRequestByLayer,
+    "_terrainTiles": terrainTilesByLayer,
+    "_terrainZoom": terrainZoomByLayer,
+    "_tileZoom": tileZoomByLayer,
+    "_tooltip": tooltipByLayer,
+    "_type": typeByLayer,
+    "_visibleMeshes": visibleMeshesByLayer,
+    "_wantedRasterTiles": wantedRasterTilesByLayer,
+    "_zoomLevel": zoomLevelByLayer,
+    "_zoomTransitions": zoomTransitionsByLayer,
+    "_zoomView": zoomViewByLayer,
+    "camera": cameraByLayer,
+    "container": containerByLayer,
+    "control": controlByLayer,
+    "eventMap": eventMapByLayer,
+    "events": eventsByLayer,
+    "group": groupByLayer,
+    "header": headerByLayer,
+    "highlightedFeature": highlightedFeatureByLayer,
+    "hoveredFeature": hoveredFeatureByLayer,
+    "kind": kindByLayer,
+    "location": locationByLayer,
+    "model": modelByLayer,
+    "modelUrl": modelUrlByLayer,
+    "raycaster": raycasterByLayer,
+    "ready": readyByLayer,
+    "renderer": rendererByLayer,
+    "root": rootByLayer,
+    "scene": sceneByLayer,
+    "terrainSource": terrainSourceByLayer,
+    "url": urlByLayer,
+    "walker": walkerByLayer
+  };
+
   // src/scene/onRemove3DLayer.js
+  init_mutateWeakMap();
   init_L();
 
   // src/globals/sceneTransferFields.js
   var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
 
   // src/scene/releaseSharedScene.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/globals/sceneCleanupFields.js
   var sceneCleanupFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_cursor"];
 
   // src/scene/releaseRenderer.js
-  async function releaseRenderer(renderer, backend) {
+  async function releaseRenderer(renderer, layer) {
     try {
       await renderer.device.queue.onSubmittedWorkDone();
       renderer.depthTexture?.destroy();
@@ -9277,7 +9840,7 @@
       renderer.sunlight?.buffer?.destroy();
       renderer.sunlight?.lights?.destroy();
     } catch (error) {
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error }
@@ -9287,56 +9850,57 @@
   }
 
   // src/scene/releaseSharedScene.js
-  function releaseSharedScene(backend, map) {
-    if (sceneByLayer.get(backend)._roofRaster) destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
-    sceneByLayer.get(backend)._roofRaster = null;
-    if (sceneByLayer.get(backend)._zoomTransitions) {
+  function releaseSharedScene(layer, map) {
+    if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
+    mutateWeakMap(roofRasterByLayer, layer, "=", null);
+    if (zoomTransitionsByLayer.get(layer)) {
       let animation;
-      for (animation of sceneByLayer.get(backend)._zoomTransitions.keys()) animation.play();
+      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.play();
     }
-    sceneByLayer.get(backend)._zoomTransitions = null;
-    sceneByLayer.get(backend)._zoomView = null;
-    delete cameraByMap.get(map)._cameraView;
+    mutateWeakMap(zoomTransitionsByLayer, layer, "=", null);
+    mutateWeakMap(zoomViewByLayer, layer, "=", null);
+    cameraViewByMap.delete(map);
     map.getContainer().classList.remove("leaflet-camera-zoom");
-    const renderer = sceneByLayer.get(backend).renderer;
+    const renderer = rendererByLayer.get(layer);
     renderer.canvas.remove();
-    releaseRenderer(renderer, backend);
+    releaseRenderer(renderer, layer);
     renderers.delete(map);
     let key;
-    for (key of sceneCleanupFields) delete sceneByLayer.get(backend)[key];
+    for (key of sceneCleanupFields) sceneFields[key].delete(layer);
   }
 
   // src/scene/onRemove3DLayer.js
-  function onRemove3DLayer(backend, map) {
-    sceneByLayer.get(backend)._added = Promise.withResolvers();
-    if (sceneByLayer.get(backend).container) {
-      onPointerLeave(backend);
-      L.DomEvent.off(sceneByLayer.get(backend).container, sceneByLayer.get(backend)._pointerEvents, backend);
-      sceneByLayer.get(backend).container = null;
+  function onRemove3DLayer(layer, map) {
+    mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+    if (containerByLayer.get(layer)) {
+      onPointerLeave(layer);
+      L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
+      mutateWeakMap(containerByLayer, layer, "=", null);
     }
-    let area2, key, layer;
-    for (area2 of sceneByLayer.get(backend)._areas.values()) releaseArea(backend, area2);
-    sceneByLayer.get(backend)._areas.clear();
-    sceneByLayer.get(backend)._tooltip?.remove();
-    sceneByLayer.get(backend)._tooltip = null;
-    if (sceneByLayer.get(backend).url || sceneByLayer.get(backend)._geojson) updateStatus(backend, false);
-    const shared = sceneByLayer.get(backend)._shared;
+    let area2, key, sceneLayer, field;
+    for (area2 of areasByLayer.get(layer).values()) releaseArea(layer, area2);
+    areasByLayer.get(layer).clear();
+    tooltipByLayer.get(layer)?.remove();
+    mutateWeakMap(tooltipByLayer, layer, "=", null);
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
+    const shared = sharedByLayer.get(layer);
     if (!shared) return;
-    setParent(sceneByLayer.get(backend).root, null);
-    sceneByLayer.get(shared)._layers.delete(backend);
-    if (shared === backend) {
-      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, backend);
-      map.off("zoomstart", startZoom, backend);
-      map.off("zoomanim", onZoomAnim, backend);
-      map.off("zoomend", endZoom, backend);
-      cancelUpdate(backend);
-      if (sceneByLayer.get(backend)._layers.size) {
-        const next = sceneByLayer.get(backend)._layers.values().next().value;
+    setParent(rootByLayer.get(layer), null);
+    layersByLayer.get(shared).delete(layer);
+    if (shared === layer) {
+      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
+      map.off("zoomstart", startZoom, layer);
+      map.off("zoomanim", onZoomAnim, layer);
+      map.off("zoomend", endZoom, layer);
+      cancelUpdate(layer);
+      if (layersByLayer.get(layer).size) {
+        const next = layersByLayer.get(layer).values().next().value;
         for (key of sceneTransferFields) {
-          sceneByLayer.get(next)[key] = sceneByLayer.get(backend)[key];
-          delete sceneByLayer.get(backend)[key];
+          field = sceneFields[key];
+          mutateWeakMap(field, next, "=", field.get(layer));
+          field.delete(layer);
         }
-        for (layer of sceneByLayer.get(next)._layers) sceneByLayer.get(layer)._shared = next;
+        for (sceneLayer of layersByLayer.get(next)) mutateWeakMap(sharedByLayer, sceneLayer, "=", next);
         renderers.set(map, next);
         map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, next);
         map.on("zoomstart", startZoom, next);
@@ -9344,25 +9908,28 @@
         map.on("zoomend", endZoom, next);
         update(next);
       } else {
-        releaseSharedScene(backend, map);
+        releaseSharedScene(layer, map);
       }
     } else update(shared);
-    sceneByLayer.get(backend)._shared = sceneByLayer.get(backend).renderer = sceneByLayer.get(backend).scene = sceneByLayer.get(backend).camera = null;
+    mutateWeakMap(sharedByLayer, layer, "=", null);
+    mutateWeakMap(rendererByLayer, layer, "=", null);
+    mutateWeakMap(sceneByLayer, layer, "=", null);
+    mutateWeakMap(cameraByLayer, layer, "=", null);
   }
 
   // src/terrain/onTerrainChange.js
   function onTerrainChange(layer) {
     if (!layer._map) return;
     let area2;
-    for (area2 of sceneByLayer.get(layer)._areas.values()) {
+    for (area2 of areasByLayer.get(layer).values()) {
       releaseArea(layer, area2);
     }
-    sceneByLayer.get(layer)._areas.clear();
+    areasByLayer.get(layer).clear();
     updateArea(layer);
   }
 
   // src/models/loadModel.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/globals/geometryDecoder.js
   var geometryDecoder = new TextDecoder();
@@ -9485,15 +10052,15 @@
 
   // src/geometry/conformModelToTerrain.js
   function conformModelToTerrain(layer, terrain) {
-    if (!sceneByLayer.get(layer).model) return;
+    if (!modelByLayer.get(layer)) return;
     const meshes = (
       /* alloc */
       []
     );
-    collectMeshes2(sceneByLayer.get(layer).model, meshes);
+    collectMeshes2(modelByLayer.get(layer), meshes);
     let mesh, positions, geometry, position, normals, attribute, normal, world, inverse, i, x, y, z;
     let worldY, weight, worldX, worldZ, point, elevation, offset;
-    if (!sceneByLayer.get(terrain)?._terrainReady || !layer.options.terrainConform) {
+    if (!terrainReadyByLayer.get(terrain) || !layer.options.terrainConform) {
       for (mesh of meshes) {
         positions = mesh.geometry._terrainBasePositions;
         if (!positions) continue;
@@ -9509,11 +10076,11 @@
       }
       return;
     }
-    updateWorldMatrix(sceneByLayer.get(layer).root);
+    updateWorldMatrix(rootByLayer.get(layer));
     const map = layer._map, crs = map.options.crs;
-    const origin = crs.project(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin);
-    const metres = Math.cos(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin.lat * radians);
-    const pixelScale = crs.scale(sceneByLayer.get(terrain)._terrainZoom);
+    const origin = crs.project(sceneOriginByLayer.get(sharedByLayer.get(layer)));
+    const metres = Math.cos(sceneOriginByLayer.get(sharedByLayer.get(layer)).lat * radians);
+    const pixelScale = crs.scale(terrainZoomByLayer.get(terrain));
     for (mesh of meshes) {
       geometry = mesh.geometry, attribute = geometry.attributes.position;
       geometry._terrainBasePositions ||= attribute.data.slice();
@@ -9525,7 +10092,7 @@
       for (i = 0; i < attribute.data.length; i += 3) {
         x = attribute.data[i], y = attribute.data[i + 1], z = attribute.data[i + 2];
         worldY = world[1] * x + world[5] * y + world[9] * z + world[13];
-        weight = Math.max(0, Math.min(1, 1 - (worldY - sceneByLayer.get(layer).root.position[1]) / HEIGHT));
+        weight = Math.max(0, Math.min(1, 1 - (worldY - rootByLayer.get(layer).position[1]) / HEIGHT));
         if (!weight) continue;
         worldX = world[0] * x + world[4] * y + world[8] * z + world[12];
         worldZ = world[2] * x + world[6] * y + world[10] * z + world[14];
@@ -9551,9 +10118,6 @@
     }
     update(layer);
   }
-
-  // src/models/loadModelResources.js
-  init_cameraByMap();
 
   // src/models/loadBuffer.js
   async function loadBuffer(buffer, directory) {
@@ -9603,7 +10167,7 @@
   }
 
   // src/models/loadModelResources.js
-  async function loadModelResources(backend, description, directory) {
+  async function loadModelResources(layer, description, directory) {
     const bufferRequests = (
       /* alloc */
       []
@@ -9611,7 +10175,7 @@
     let buffer;
     for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
     await Promise.all(bufferRequests);
-    await sceneByLayer.get(backend)._added.promise;
+    await addedByLayer.get(layer).promise;
     const imageRequests = (
       /* alloc */
       []
@@ -9619,7 +10183,7 @@
     let image;
     for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
     const images = await Promise.all(imageRequests);
-    await sceneByLayer.get(cameraByMap.get(backend._map)?._terrain3D)?._terrainPromise;
+    await cameraViewByMap.get(layer._map);
     return images;
   }
 
@@ -9638,7 +10202,7 @@
 
   // src/models/textureFor.js
   function textureFor2(context, reference, color = false) {
-    const { backend, description, images, textures } = context;
+    const { backend: layer, description, images, textures } = context;
     if (!reference) return null;
     if ((reference.texCoord || 0) !== 0 || reference.extensions) {
       throw (
@@ -9646,7 +10210,7 @@
         new Error("Model textures currently require untransformed TEXCOORD_0 UVs")
       );
     }
-    const device = sceneByLayer.get(backend).renderer.device;
+    const device = rendererByLayer.get(layer).device;
     const key = `${reference.index}:${color}`;
     if (!textures.has(key)) {
       const texture = description.textures[reference.index];
@@ -9685,7 +10249,7 @@
 
   // src/models/materialFor.js
   function materialFor(context, material) {
-    const { backend } = context;
+    const { backend: layer } = context;
     const pbr = material.pbrMetallicRoughness;
     return (
       /* alloc */
@@ -9704,7 +10268,7 @@
         emissive: material.emissiveFactor || /* alloc */
         [0, 0, 0],
         occlusionStrength: material.occlusionTexture?.strength ?? 1,
-        alphaMode: backend.options.alphaMode || material.alphaMode || "OPAQUE",
+        alphaMode: layer.options.alphaMode || material.alphaMode || "OPAQUE",
         alphaCutoff: material.alphaCutoff ?? 0.5,
         doubleSided: material.doubleSided
       }
@@ -9712,11 +10276,11 @@
   }
 
   // src/models/createModelContext.js
-  function createModelContext(backend, description, images) {
+  function createModelContext(layer, description, images) {
     const context = (
       /* alloc */
       {
-        backend,
+        backend: layer,
         description,
         images,
         textures: (
@@ -10010,7 +10574,7 @@
     }
     const program = createProgram(context.backend, style);
     context.resources.push(program);
-    const device = sceneByLayer.get(context.backend).renderer.device;
+    const device = rendererByLayer.get(context.backend).device;
     if (attributes.index?.data instanceof Uint8Array) attributes.index.data = Uint16Array.from(attributes.index.data);
     let name, attribute;
     for ([name, attribute] of Object.entries(attributes)) {
@@ -10046,7 +10610,7 @@
 
   // src/models/modelNode.js
   function modelNode(context, index) {
-    const { backend, description, active } = context;
+    const { backend: layer, description, active } = context;
     if (active.has(index)) throw (
       /* alloc */
       new Error("Cyclic glTF nodes")
@@ -10107,14 +10671,14 @@
   }
 
   // src/models/buildModelNodes.js
-  function buildModelNodes(context, scene) {
+  function buildModelNodes(context, scene2) {
     const nodes = (
       /* alloc */
       []
     );
     let index;
     try {
-      for (index of scene.nodes) nodes.push(modelNode(context, index));
+      for (index of scene2.nodes) nodes.push(modelNode(context, index));
     } catch (error) {
       releaseModelResources(context);
       throw error;
@@ -10123,16 +10687,16 @@
   }
 
   // src/models/applyModelTransform.js
-  function applyModelTransform(backend) {
-    const model = sceneByLayer.get(backend).model;
-    if (backend.options.rotation) {
-      const [x, y = x, z = x] = backend.options.rotation;
+  function applyModelTransform(layer) {
+    const model = modelByLayer.get(layer);
+    if (layer.options.rotation) {
+      const [x, y = x, z = x] = layer.options.rotation;
       model.rotation[0] = x;
       model.rotation[1] = y;
       model.rotation[2] = z;
     }
-    if (backend.options.scale) {
-      const [x, y = x, z = x] = backend.options.scale;
+    if (layer.options.scale) {
+      const [x, y = x, z = x] = layer.options.scale;
       model.scale[0] = x;
       model.scale[1] = y;
       model.scale[2] = z;
@@ -10140,11 +10704,11 @@
   }
 
   // src/models/loadModel.js
-  async function loadModel(backend) {
-    await sceneByLayer.get(backend)._added.promise;
+  async function loadModel(layer) {
+    await addedByLayer.get(layer).promise;
     const url = (
       /* alloc */
-      new URL(sceneByLayer.get(backend).modelUrl, document.baseURI).href
+      new URL(modelUrlByLayer.get(layer), document.baseURI).href
     );
     const response = await fetch(url);
     if (!response.ok) {
@@ -10159,14 +10723,14 @@
       /* alloc */
       new URL(".", url).href
     );
-    const images = await loadModelResources(backend, description, directory);
-    const context = createModelContext(backend, description, images);
-    const scene = description.scenes?.[description.scene || 0];
-    if (!scene) throw (
+    const images = await loadModelResources(layer, description, directory);
+    const context = createModelContext(layer, description, images);
+    const scene2 = description.scenes?.[description.scene || 0];
+    if (!scene2) throw (
       /* alloc */
       new Error("Missing glTF scene")
     );
-    const nodes = buildModelNodes(context, scene);
+    const nodes = buildModelNodes(context, scene2);
     const model = (
       /* alloc */
       {
@@ -10182,10 +10746,10 @@
     );
     let node;
     for (node of nodes) setParent(node, model);
-    sceneByLayer.get(backend).model = model;
-    applyModelTransform(backend);
-    setParent(sceneByLayer.get(backend).model, sceneByLayer.get(backend).root);
-    conformModelToTerrain(backend, cameraByMap.get(backend._map)?._terrain3D);
+    mutateWeakMap(modelByLayer, layer, "=", model);
+    applyModelTransform(layer);
+    setParent(modelByLayer.get(layer), rootByLayer.get(layer));
+    conformModelToTerrain(layer, terrain3DByMap.get(layer._map));
   }
 
   // src/scene/get3DEvents.js
@@ -10194,48 +10758,54 @@
       /* alloc */
       {}
     );
-    if (sceneByLayer.get(layer).url) {
+    if (urlByLayer.get(layer)) {
       events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
     }
-    if (sceneByLayer.get(layer)._geojson || sceneByLayer.get(layer).url) {
+    if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
       events.terrainchange = onTerrainChange.bind(null, layer);
     }
     return events;
   }
 
   // src/scene/ready3D.js
+  init_mutateWeakMap();
   async function ready3D(layer) {
     try {
-      sceneByLayer.get(layer).root = emptyNode();
-      sceneByLayer.get(layer).raycaster = /* alloc */
-      {
-        origin: (
-          /* alloc */
-          [0, 0, 0]
-        ),
-        direction: (
-          /* alloc */
-          [0, 0, 0]
-        ),
-        inverse: (
-          /* alloc */
-          new DOMMatrix()
-        ),
-        meshes: (
-          /* alloc */
-          []
-        )
-      };
-      if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson) {
-        sceneByLayer.get(layer).group = sceneByLayer.get(layer).root;
-        if (sceneByLayer.get(layer).url) sceneByLayer.get(layer).header = await getHeader(layer);
+      mutateWeakMap(rootByLayer, layer, "=", emptyNode());
+      mutateWeakMap(
+        raycasterByLayer,
+        layer,
+        "=",
+        /* alloc */
+        {
+          origin: (
+            /* alloc */
+            [0, 0, 0]
+          ),
+          direction: (
+            /* alloc */
+            [0, 0, 0]
+          ),
+          inverse: (
+            /* alloc */
+            new DOMMatrix()
+          ),
+          meshes: (
+            /* alloc */
+            []
+          )
+        }
+      );
+      if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) {
+        mutateWeakMap(groupByLayer, layer, "=", rootByLayer.get(layer));
+        if (urlByLayer.get(layer)) mutateWeakMap(headerByLayer, layer, "=", await getHeader(layer));
       }
       if (layer._map) {
         await attach(layer, layer._map);
-        sceneByLayer.get(layer)._added.resolve();
+        addedByLayer.get(layer).resolve();
       }
-      if (sceneByLayer.get(layer).modelUrl) await loadModel(layer);
-      if (sceneByLayer.get(layer)._shared) update(layer);
+      if (modelUrlByLayer.get(layer)) await loadModel(layer);
+      if (sharedByLayer.get(layer)) update(layer);
       layer.fire("ready");
       return layer;
     } catch (error) {
@@ -10329,18 +10899,18 @@
   }
 
   // src/scene/layerCountTitle.js
-  function layerCountTitle(scene, formatted, pending, error) {
-    return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
+  function layerCountTitle(scene2, formatted, pending, error) {
+    return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene2.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
   }
 
   // src/scene/renderLayerCount.js
-  function renderLayerCount(scene, count, pending, error) {
-    const status = scene._countStatus;
-    if (scene.modelUrl) count = scene.model ? 1 : 0;
-    const loading2 = pending || (scene.modelUrl ? !scene.model : !scene.header && !scene._geojson);
+  function renderLayerCount(scene2, count, pending, error) {
+    const status = scene2._countStatus;
+    if (scene2.modelUrl) count = scene2.model ? 1 : 0;
+    const loading2 = pending || (scene2.modelUrl ? !scene2.model : !scene2.header && !scene2._geojson);
     const formatted = count.toLocaleString("en-US");
     const text = error ? "Error" : `${formatted}${loading2 ? "\u2026" : ""}`;
-    const title = layerCountTitle(scene, formatted, pending, error);
+    const title = layerCountTitle(scene2, formatted, pending, error);
     if (status.textContent !== text) status.textContent = text;
     if (status.title !== title) status.title = title;
     if (error && status.getAttribute("role") !== "alert") status.setAttribute("role", "alert");
@@ -10349,7 +10919,7 @@
 
   // src/scene/updateLayerCount.js
   function updateLayerCount(event) {
-    const layer = event.target, scene = sceneByLayer.get(layer), status = scene._countStatus;
+    const layer = event.target, status = countStatusByLayer.get(layer);
     if (!layer._map) return;
     if (event.type === "add") underEntry(layer, status);
     let count = 0, pending = 0, error = event.error, area2;
@@ -10358,7 +10928,7 @@
       pending = event.pending ?? 0;
       error ||= event.errors?.[0];
     } else {
-      for (area2 of scene._areas.values()) {
+      for (area2 of areasByLayer.get(layer).values()) {
         count += area2.buildings ?? 0;
         if (!area2.done && !area2.error) pending++;
         error ||= area2.error;
@@ -10369,42 +10939,61 @@
 
   // src/scene/init3D.js
   function init3D(layer, options = sceneEmptyOptions) {
-    sceneByLayer.get(layer)._3d = true;
+    mutateWeakMap(state3dByLayer, layer, "=", true);
     L.Util.setOptions(
       layer,
       /* alloc */
       { ariaLabel: "3D scene", ...options }
     );
-    sceneByLayer.get(layer).kind = "3d";
-    const isModel = !sceneByLayer.get(layer)._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
-    sceneByLayer.get(layer).modelUrl = isModel ? layer.options.url : null;
-    sceneByLayer.get(layer).url = layer.options.url && !isModel && !sceneByLayer.get(layer)._geojson ? (
+    mutateWeakMap(kindByLayer, layer, "=", "3d");
+    const isModel = !geojsonByLayer.get(layer) && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
+    mutateWeakMap(modelUrlByLayer, layer, "=", isModel ? layer.options.url : null);
+    mutateWeakMap(urlByLayer, layer, "=", layer.options.url && !isModel && !geojsonByLayer.get(layer) ? (
       /* alloc */
       new URL(layer.options.url, document.baseURI).href
-    ) : null;
-    sceneByLayer.get(layer)._directories = /* alloc */
-    /* @__PURE__ */ new Map();
+    ) : null);
+    mutateWeakMap(
+      directoriesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
     if (layer.options.center) {
-      sceneByLayer.get(layer).location = /* alloc */
-      new L.LatLng(layer.options.center[0], layer.options.center[1]);
+      mutateWeakMap(
+        locationByLayer,
+        layer,
+        "=",
+        /* alloc */
+        new L.LatLng(layer.options.center[0], layer.options.center[1])
+      );
     }
-    sceneByLayer.get(layer)._areas = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer)._inflight = 0;
-    if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson || isModel) {
+    mutateWeakMap(
+      areasByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(inflightByLayer, layer, "=", 0);
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || isModel) {
       const status = L.DomUtil.create("small", "layer-count");
       status.style.cssText = "float:right;margin-left:12px;color:#555;font-variant-numeric:tabular-nums";
-      sceneByLayer.get(layer)._countStatus = status;
+      mutateWeakMap(countStatusByLayer, layer, "=", status);
       layer.on("add error", updateLayerCount);
       layer.on("ready progress", L.Util.throttle(updateLayerCount, 250, layer));
     }
-    sceneByLayer.get(layer)._added = Promise.withResolvers();
-    sceneByLayer.get(layer).ready = Promise.resolve().then(ready3D.bind(null, layer));
-    sceneByLayer.get(layer).ready.catch(noOperation);
+    mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+    mutateWeakMap(readyByLayer, layer, "=", Promise.resolve().then(ready3D.bind(null, layer)));
+    readyByLayer.get(layer).catch(noOperation);
   }
 
   // src/raster/initRaster.js
+  init_mutateWeakMap();
   init_L();
+
+  // src/raster/updateRasterTiles.js
+  init_mutateWeakMap();
 
   // src/globals/wantedTiles.js
   var wantedTiles = /* @__PURE__ */ new Map();
@@ -10417,18 +11006,26 @@
     return a.tile.coords.z - b.tile.coords.z || a.distance - b.distance;
   }
 
+  // src/raster/loadRasterTile.js
+  init_mutateWeakMap();
+
+  // src/raster/finishRasterTile.js
+  init_mutateWeakMap();
+
   // src/globals/blobParts.js
   var blobParts = [null];
 
   // src/raster/addRasterTile.js
   init_radians();
-  init_cameraByMap();
 
   // src/globals/rasterPoint.js
   var rasterPoint = {
     x: 0,
     y: 0
   };
+
+  // src/terrain/rasterProgram.js
+  init_mutateWeakMap();
 
   // src/globals/demTexture.js
   var demTexture = {
@@ -10486,40 +11083,50 @@
   }
 
   // src/terrain/rasterProgram.js
-  function rasterProgram(backend, texture) {
-    const state = sceneByLayer.get(backend), device = state.renderer.device;
-    if (state._rasterProgram?.device === device) return state._rasterProgram;
-    const bounds = state._terrainBounds, columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
-    const { elevations, low, high } = terrainAtlas(state._terrainTiles, bounds);
-    if (state._dem) destroyTexture(backend, state._dem.texture);
-    state._dem = /* alloc */
-    {
-      texture: device.createTexture((demTexture.size[0] = columns * 256, demTexture.size[1] = rows * 256, demTexture.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST, demTexture)),
-      low: Number.isFinite(low) ? low : state._terrainOriginElevation,
-      high: Number.isFinite(high) ? high : state._terrainOriginElevation
-    };
+  function rasterProgram(layer, texture) {
+    const device = rendererByLayer.get(layer).device;
+    if (rasterProgramByLayer.get(layer)?.device === device) return rasterProgramByLayer.get(layer);
+    const bounds = terrainBoundsByLayer.get(layer), columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
+    const { elevations, low, high } = terrainAtlas(terrainTilesByLayer.get(layer), bounds);
+    if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
+    mutateWeakMap(
+      demByLayer,
+      layer,
+      "=",
+      /* alloc */
+      {
+        texture: device.createTexture((demTexture.size[0] = columns * 256, demTexture.size[1] = rows * 256, demTexture.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST, demTexture)),
+        low: Number.isFinite(low) ? low : terrainOriginElevationByLayer.get(layer),
+        high: Number.isFinite(high) ? high : terrainOriginElevationByLayer.get(layer)
+      }
+    );
     device.queue.writeTexture(
-      (demTarget.texture = state._dem.texture, demTarget),
+      (demTarget.texture = demByLayer.get(layer).texture, demTarget),
       elevations,
       (demLayout.bytesPerRow = columns * 1024, demLayout),
       (demSize[0] = columns * 256, demSize[1] = rows * 256, demSize)
     );
     demTarget.texture = null;
-    state._terrainGrids = /* alloc */
-    /* @__PURE__ */ new Map();
-    state._rasterProgram = createProgram(
-      backend,
+    mutateWeakMap(
+      terrainGridsByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(rasterProgramByLayer, layer, "=", createProgram(
+      layer,
       /* alloc */
       {
         baseTexture: texture,
         unlit: true,
-        terrain: state._dem,
+        terrain: demByLayer.get(layer),
         alphaMode: "BLEND",
         depthWrite: true,
-        doubleSided: backend.options.doubleSided
+        doubleSided: layer.options.doubleSided
       }
-    );
-    return state._rasterProgram;
+    ));
+    return rasterProgramByLayer.get(layer);
   }
 
   // src/globals/demBuffer.js
@@ -10592,9 +11199,9 @@
   }
 
   // src/terrain/terrainBuffers.js
-  function terrainBuffers(backend, divisions) {
-    const state = sceneByLayer.get(backend), device = state.renderer.device;
-    let attributes = state._terrainGrids.get(divisions);
+  function terrainBuffers(layer, divisions) {
+    const device = rendererByLayer.get(layer).device;
+    let attributes = terrainGridsByLayer.get(layer).get(divisions);
     if (!attributes) {
       attributes = terrainGrid(divisions);
       let name, attribute;
@@ -10605,19 +11212,19 @@
         attribute.buffer = device.createBuffer((demBuffer.size = Math.max(4, attribute.data.byteLength), demBuffer.usage = name === "index" ? GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, demBuffer));
         device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
       }
-      state._terrainGrids.set(divisions, attributes);
+      terrainGridsByLayer.get(layer).set(divisions, attributes);
     }
     return attributes;
   }
 
   // src/raster/terrainTileGeometry.js
-  function terrainTileGeometry(backend, attributes, sizeX, sizeZ) {
-    const scene = sceneByLayer.get(backend), base = scene._terrainOriginElevation;
-    const bottom = Math.min(scene._dem.low, base) - base, top = Math.max(scene._dem.high, base) - base;
+  function terrainTileGeometry(layer, attributes, sizeX, sizeZ) {
+    const base = terrainOriginElevationByLayer.get(layer);
+    const bottom = Math.min(demByLayer.get(layer).low, base) - base, top = Math.max(demByLayer.get(layer).high, base) - base;
     return (
       /* alloc */
       {
-        device: scene.renderer.device,
+        device: rendererByLayer.get(layer).device,
         attributes,
         drawRange: (
           /* alloc */
@@ -10647,15 +11254,15 @@
   }
 
   // src/raster/addRasterTile.js
-  async function addRasterTile(backend, layer, coords, tile) {
-    const ready = await sceneByLayer.get(backend)._terrainPromise;
-    if (!ready || !backend._map || cameraByMap.get(backend._map)._terrain3D !== backend || sceneByLayer.get(layer)._terrain3D !== backend || tile.request.signal.aborted || !sceneByLayer.get(layer)._rasterTiles.has(`${coords.z}/${coords.x}/${coords.y}`) || sceneByLayer.get(backend)._rasterTiles.has(tile)) {
+  async function addRasterTile(layer, rasterLayer, coords, tile) {
+    const ready = await terrainPromiseByLayer.get(layer);
+    if (!ready || !layer._map || terrain3DByMap.get(layer._map) !== layer || terrain3DByLayer.get(rasterLayer) !== layer || tile.request.signal.aborted || !rasterTilesByLayer.get(rasterLayer).has(`${coords.z}/${coords.x}/${coords.y}`) || rasterTilesByLayer.get(layer).has(tile)) {
       return;
     }
-    const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - sceneByLayer.get(backend)._terrainZoom)));
-    const map = backend._map, crs = map.options.crs;
-    const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
-    const scale = crs.scale(coords.z), terrainScale = 2 ** (sceneByLayer.get(backend)._terrainZoom - coords.z);
+    const divisions = Math.max(1, Math.min(64, 256 / 2 ** (coords.z - terrainZoomByLayer.get(layer))));
+    const map = layer._map, crs = map.options.crs;
+    const origin = crs.project(locationByLayer.get(layer)), metres = Math.cos(locationByLayer.get(layer).lat * radians);
+    const scale = crs.scale(coords.z), terrainScale = 2 ** (terrainZoomByLayer.get(layer) - coords.z);
     const point = rasterPoint;
     point.x = coords.x * 256;
     point.y = coords.y * 256;
@@ -10663,13 +11270,13 @@
     point.x = (coords.x + 1) * 256;
     point.y = (coords.y + 1) * 256;
     const opposite = crs.transformation.untransform(point, scale);
-    const device = sceneByLayer.get(backend).renderer.device;
+    const device = rendererByLayer.get(layer).device;
     const texture = tile.texture;
-    const program = rasterProgram(backend, texture);
-    const attributes = terrainBuffers(backend, divisions);
-    const base = sceneByLayer.get(backend)._terrainOriginElevation;
+    const program = rasterProgram(layer, texture);
+    const attributes = terrainBuffers(layer, divisions);
+    const base = terrainOriginElevationByLayer.get(layer);
     const sizeX = (opposite.x - corner.x) * metres, sizeZ = -(opposite.y - corner.y) * metres;
-    const geometry = terrainTileGeometry(backend, attributes, sizeX, sizeZ);
+    const geometry = terrainTileGeometry(layer, attributes, sizeX, sizeZ);
     const mesh = (
       /* alloc */
       {
@@ -10702,35 +11309,35 @@
         terrain: (
           /* alloc */
           [
-            coords.x * 256 * terrainScale - sceneByLayer.get(backend)._terrainBounds.min.x * 256,
-            coords.y * 256 * terrainScale - sceneByLayer.get(backend)._terrainBounds.min.y * 256,
+            coords.x * 256 * terrainScale - terrainBoundsByLayer.get(layer).min.x * 256,
+            coords.y * 256 * terrainScale - terrainBoundsByLayer.get(layer).min.y * 256,
             256 * terrainScale,
             base
           ]
         ),
         tile,
-        opacity: layer.options.opacity ?? 1,
+        opacity: rasterLayer.options.opacity ?? 1,
         id: nextId.value++,
-        renderOrder: layer.options.zIndex || 0,
+        renderOrder: rasterLayer.options.zIndex || 0,
         fadeDuration: 250,
         fadeStart: tile.loadedAt,
         ground: true,
-        _rasterSource: layer
+        _rasterSource: rasterLayer
       }
     );
     tile.mesh.visible = false;
-    setParent(mesh, sceneByLayer.get(backend).root);
-    update(backend);
-    sceneByLayer.get(backend)._rasterTiles.set(tile, mesh);
+    setParent(mesh, rootByLayer.get(layer));
+    update(layer);
+    rasterTilesByLayer.get(layer).set(tile, mesh);
   }
 
   // src/raster/registerTerrainTile.js
-  async function registerTerrainTile(backend, coords, tile) {
-    if (sceneByLayer.get(backend)._terrain3D && tile.done && !tile.request.signal.aborted && sceneByLayer.get(backend)._rasterTiles.get(`${coords.z}/${coords.x}/${coords.y}`) === tile) {
+  async function registerTerrainTile(layer, coords, tile) {
+    if (terrain3DByLayer.get(layer) && tile.done && !tile.request.signal.aborted && rasterTilesByLayer.get(layer).get(`${coords.z}/${coords.x}/${coords.y}`) === tile) {
       try {
-        await addRasterTile(sceneByLayer.get(backend)._terrain3D, backend, coords, tile);
+        await addRasterTile(terrain3DByLayer.get(layer), layer, coords, tile);
       } catch (error) {
-        backend.fire(
+        layer.fire(
           "tileerror",
           /* alloc */
           { tile, coords, error }
@@ -10740,6 +11347,7 @@
   }
 
   // src/raster/createRasterMesh.js
+  init_mutateWeakMap();
   init_radians();
 
   // src/globals/rasterTexture.js
@@ -10827,8 +11435,8 @@
   }
 
   // src/raster/createRasterMesh.js
-  function createRasterMesh(backend, tile) {
-    const device = sceneByLayer.get(backend).renderer.device;
+  function createRasterMesh(layer, tile) {
+    const device = rendererByLayer.get(layer).device;
     const texture = (
       /* alloc */
       {
@@ -10853,23 +11461,23 @@
     source.source = null;
     destination.texture = null;
     texture.uploaded = tile.image;
-    if (!sceneByLayer.get(backend)._rasterProgram) {
-      sceneByLayer.get(backend)._rasterProgram = createProgram(
-        backend,
+    if (!rasterProgramByLayer.get(layer)) {
+      mutateWeakMap(rasterProgramByLayer, layer, "=", createProgram(
+        layer,
         /* alloc */
         {
           baseTexture: texture,
           unlit: true,
           alphaMode: "BLEND",
-          doubleSided: backend.options.doubleSided
+          doubleSided: layer.options.doubleSided
         }
-      );
+      ));
     }
-    if (!sceneByLayer.get(backend)._rasterGeometry) sceneByLayer.get(backend)._rasterGeometry = createGeometry(device);
+    if (!rasterGeometryByLayer.get(layer)) mutateWeakMap(rasterGeometryByLayer, layer, "=", createGeometry(device));
     const { coords } = tile;
-    const crs = backend._map.options.crs;
-    const origin = crs.project(sceneByLayer.get(backend).location);
-    const metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
+    const crs = layer._map.options.crs;
+    const origin = crs.project(locationByLayer.get(layer));
+    const metres = Math.cos(locationByLayer.get(layer).lat * radians);
     const scale = crs.scale(coords.z);
     const point = rasterPoint;
     point.x = coords.x * TILE_SIZE;
@@ -10905,26 +11513,26 @@
       ),
       visible: true,
       device,
-      geometry: sceneByLayer.get(backend)._rasterGeometry,
-      program: sceneByLayer.get(backend)._rasterProgram,
+      geometry: rasterGeometryByLayer.get(layer),
+      program: rasterProgramByLayer.get(layer),
       texture,
-      opacity: backend.options.opacity,
+      opacity: layer.options.opacity,
       id: nextId.value++,
-      renderOrder: backend.options.zIndex || 0,
+      renderOrder: layer.options.zIndex || 0,
       tile,
       fadeDuration: 250,
       ground: true,
-      _rasterSource: backend
+      _rasterSource: layer
     };
-    setParent(tile.mesh, sceneByLayer.get(backend).root);
+    setParent(tile.mesh, rootByLayer.get(layer));
   }
 
   // src/raster/finishRasterTile.js
-  async function finishRasterTile(backend, tile) {
+  async function finishRasterTile(layer, tile) {
     try {
-      await sceneByLayer.get(backend).ready;
+      await readyByLayer.get(layer);
       const result = await getZxy(
-        backend.options.archive,
+        layer.options.archive,
         tile.coords.z,
         tile.coords.x,
         tile.coords.y,
@@ -10961,59 +11569,59 @@
         tile.image = null;
         return;
       }
-      createRasterMesh(backend, tile);
+      createRasterMesh(layer, tile);
       tile.loadedAt = performance.now();
       tile.done = true;
-      sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
-      registerTerrainTile(backend, tile.coords, tile);
-      backend.fire(
+      mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+      registerTerrainTile(layer, tile.coords, tile);
+      layer.fire(
         "tileload",
         /* alloc */
         { tile, coords: tile.coords }
       );
-      update(backend);
+      update(layer);
     } catch (error) {
       if (tile.request.signal.aborted) return;
       tile.error = error.message;
-      sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
-      backend.fire(
+      mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+      layer.fire(
         "tileerror",
         /* alloc */
         { tile, coords: tile.coords, error }
       );
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error, coords: tile.coords }
       );
     } finally {
-      sceneByLayer.get(backend)._loadingTiles--;
-      if (backend._map) {
-        pumpRasterTiles(backend);
-        pruneRasterTiles(backend);
-        if (!sceneByLayer.get(backend)._loadingTiles) backend.fire("load");
-        update(backend);
+      mutateWeakMap(loadingTilesByLayer, layer, "--", void 0, false);
+      if (layer._map) {
+        pumpRasterTiles(layer);
+        pruneRasterTiles(layer);
+        if (!loadingTilesByLayer.get(layer)) layer.fire("load");
+        update(layer);
       }
     }
   }
 
   // src/raster/loadRasterTile.js
-  function loadRasterTile(backend, tile) {
+  function loadRasterTile(layer, tile) {
     tile.started = true;
-    const first = sceneByLayer.get(backend)._loadingTiles === 0;
-    sceneByLayer.get(backend)._loadingTiles++;
-    backend.fire(
+    const first = loadingTilesByLayer.get(layer) === 0;
+    mutateWeakMap(loadingTilesByLayer, layer, "++", void 0, false);
+    layer.fire(
       "tileloadstart",
       /* alloc */
       { tile, coords: tile.coords }
     );
-    if (first) backend.fire("loading");
-    return finishRasterTile(backend, tile);
+    if (first) layer.fire("loading");
+    return finishRasterTile(layer, tile);
   }
 
   // src/raster/pumpRasterTiles.js
-  function pumpRasterTiles(backend) {
-    const map = backend._map;
+  function pumpRasterTiles(layer) {
+    const map = layer._map;
     if (!map) return;
     const center = map.project(map.getCenter(), 0).divideBy(TILE_SIZE);
     const pending = (
@@ -11021,7 +11629,7 @@
       []
     );
     let tile, coords;
-    for (tile of sceneByLayer.get(backend)._rasterTiles.values()) {
+    for (tile of rasterTilesByLayer.get(layer).values()) {
       if (tile.started || tile.request.signal.aborted) continue;
       ({ coords } = tile);
       pending.push(
@@ -11034,17 +11642,17 @@
     }
     pending.sort(comparePendingTiles);
     for ({ tile } of pending) {
-      if (sceneByLayer.get(backend)._loadingTiles >= 4) break;
-      loadRasterTile(backend, tile);
+      if (loadingTilesByLayer.get(layer) >= 4) break;
+      loadRasterTile(layer, tile);
     }
   }
 
   // src/raster/retainRasterTiles.js
-  function retainRasterTiles(backend, required) {
-    const tiles = sceneByLayer.get(backend)._rasterTiles;
+  function retainRasterTiles(layer, required) {
+    const tiles = rasterTilesByLayer.get(layer);
     let key, tile, coords;
     for ([key, tile] of tiles) {
-      if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
+      if (!required.has(key) && !tile.done) releaseRasterTile(layer, tile);
     }
     for ([key, coords] of required) {
       if (tiles.has(key)) continue;
@@ -11090,16 +11698,16 @@
   }
 
   // src/raster/updateRasterTiles.js
-  function updateRasterTiles(backend) {
-    const map = backend._map;
-    if (!map || !sceneByLayer.get(backend)._shared || !sceneByLayer.get(backend).header) return;
-    const zoom = Math.max(sceneByLayer.get(backend).header.minZoom ?? 0, Math.min(
+  function updateRasterTiles(layer) {
+    const map = layer._map;
+    if (!map || !sharedByLayer.get(layer) || !headerByLayer.get(layer)) return;
+    const zoom = Math.max(headerByLayer.get(layer).minZoom ?? 0, Math.min(
       Math.round(map.getZoom()),
-      backend.options.maxZoom,
-      backend.options.maxNativeZoom
+      layer.options.maxZoom,
+      layer.options.maxNativeZoom
     ));
-    sceneByLayer.get(backend)._tileZoom = zoom;
-    const range = rasterTileRange(map, sceneByLayer.get(backend).header, zoom);
+    mutateWeakMap(tileZoomByLayer, layer, "=", zoom);
+    const range = rasterTileRange(map, headerByLayer.get(layer), zoom);
     const wanted = wantedTiles;
     wanted.clear();
     let x, y, key, coords, parent;
@@ -11112,14 +11720,19 @@
         );
       }
     }
-    sceneByLayer.get(backend)._wantedRasterTiles = /* alloc */
-    new Set(wanted.keys());
+    mutateWeakMap(
+      wantedRasterTilesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      new Set(wanted.keys())
+    );
     const coverage = coverageTiles;
     coverage.clear();
-    const parentZoom = Math.max(sceneByLayer.get(backend).header.minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
+    const parentZoom = Math.max(headerByLayer.get(layer).minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
     if (parentZoom < zoom) {
       for ([key, coords] of wanted) {
-        if (sceneByLayer.get(backend)._rasterTiles.get(key)?.done) continue;
+        if (rasterTilesByLayer.get(layer).get(key)?.done) continue;
         parent = /* alloc */
         { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
         coverage.set(`${parent.z}/${parent.x}/${parent.y}`, parent);
@@ -11132,9 +11745,9 @@
     for ([key, coords] of wanted) required.set(key, coords);
     wanted.clear();
     coverage.clear();
-    retainRasterTiles(backend, required);
-    pumpRasterTiles(backend);
-    pruneRasterTiles(backend);
+    retainRasterTiles(layer, required);
+    pumpRasterTiles(layer);
+    pruneRasterTiles(layer);
   }
 
   // src/raster/getRasterEvents.js
@@ -11147,10 +11760,11 @@
   }
 
   // src/raster/readyRaster.js
+  init_mutateWeakMap();
   async function readyRaster(layer, archive) {
     const header = await getHeader(archive);
     layer.options.archive = archive;
-    sceneByLayer.get(layer).header = header;
+    mutateWeakMap(headerByLayer, layer, "=", header);
     if (layer.options.maxNativeZoom === void 0) {
       layer.options.maxNativeZoom = header.maxZoom;
     }
@@ -11169,36 +11783,37 @@
     throw error;
   }
 
-  // src/raster/finishAttachment.js
-  init_cameraByMap();
+  // src/raster/onPMTileAdd.js
+  init_mutateWeakMap();
 
   // src/raster/setRasterTerrain.js
-  function setRasterTerrain(backend, terrain) {
-    if (!sceneByLayer.get(backend)._rasterTiles || sceneByLayer.get(backend)._terrain3D === terrain) return;
+  init_mutateWeakMap();
+  function setRasterTerrain(layer, terrain) {
+    if (!rasterTilesByLayer.get(layer) || terrain3DByLayer.get(layer) === terrain) return;
     let tile;
-    for (tile of sceneByLayer.get(backend)._rasterTiles.values()) {
-      if (sceneByLayer.get(backend)._terrain3D) removeRasterTile(sceneByLayer.get(backend)._terrain3D, tile);
+    for (tile of rasterTilesByLayer.get(layer).values()) {
+      if (terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
       if (tile.mesh) {
         tile.mesh.visible = true;
-        setParent(tile.mesh, sceneByLayer.get(backend).root);
+        setParent(tile.mesh, rootByLayer.get(layer));
       }
     }
-    sceneByLayer.get(backend)._terrain3D = terrain || null;
+    mutateWeakMap(terrain3DByLayer, layer, "=", terrain || null);
     if (terrain) {
-      for (tile of sceneByLayer.get(backend)._rasterTiles.values()) {
-        if (tile.done) registerTerrainTile(backend, tile.coords, tile);
+      for (tile of rasterTilesByLayer.get(layer).values()) {
+        if (tile.done) registerTerrainTile(layer, tile.coords, tile);
       }
     }
   }
 
   // src/raster/finishAttachment.js
-  async function finishAttachment(backend, map, attached) {
+  async function finishAttachment(layer, map, attached) {
     try {
       await attached;
-      sceneByLayer.get(backend)._added.resolve();
-      setRasterTerrain(backend, cameraByMap.get(map)._terrain3D);
+      addedByLayer.get(layer).resolve();
+      setRasterTerrain(layer, terrain3DByMap.get(map));
     } catch (error) {
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error }
@@ -11207,15 +11822,15 @@
   }
 
   // src/raster/updateAttachedTiles.js
-  async function updateAttachedTiles(backend, map, attached) {
+  async function updateAttachedTiles(layer, map, attached) {
     try {
       await Promise.all(
         /* alloc */
-        [attached, sceneByLayer.get(backend).ready]
+        [attached, readyByLayer.get(layer)]
       );
-      if (backend._map === map && map.hasLayer(backend)) updateRasterTiles(backend);
+      if (layer._map === map && map.hasLayer(layer)) updateRasterTiles(layer);
     } catch (error) {
-      backend.fire(
+      layer.fire(
         "error",
         /* alloc */
         { error }
@@ -11224,32 +11839,36 @@
   }
 
   // src/raster/onPMTileAdd.js
-  function onPMTileAdd(backend, map) {
-    if (!sceneByLayer.get(backend).location) sceneByLayer.get(backend).location = map.getCenter();
-    const attached = attach(backend, map);
-    finishAttachment(backend, map, attached);
-    updateAttachedTiles(backend, map, attached);
+  function onPMTileAdd(layer, map) {
+    if (!locationByLayer.get(layer)) mutateWeakMap(locationByLayer, layer, "=", map.getCenter());
+    const attached = attach(layer, map);
+    finishAttachment(layer, map, attached);
+    updateAttachedTiles(layer, map, attached);
   }
 
+  // src/raster/onPMTileRemove.js
+  init_mutateWeakMap();
+
   // src/raster/releaseRasterTiles.js
-  function releaseRasterTiles(backend) {
+  init_mutateWeakMap();
+  function releaseRasterTiles(layer) {
     let tile, attribute;
-    for (tile of sceneByLayer.get(backend)._rasterTiles.values()) releaseRasterTile(backend, tile);
-    sceneByLayer.get(backend)._rasterProgram?.pipelineCache.clear();
-    sceneByLayer.get(backend)._rasterProgram = null;
-    if (sceneByLayer.get(backend)._rasterGeometry) {
-      for (attribute of Object.values(sceneByLayer.get(backend)._rasterGeometry.attributes)) {
-        destroyTexture(backend, attribute.buffer);
+    for (tile of rasterTilesByLayer.get(layer).values()) releaseRasterTile(layer, tile);
+    rasterProgramByLayer.get(layer)?.pipelineCache.clear();
+    mutateWeakMap(rasterProgramByLayer, layer, "=", null);
+    if (rasterGeometryByLayer.get(layer)) {
+      for (attribute of Object.values(rasterGeometryByLayer.get(layer).attributes)) {
+        destroyTexture(layer, attribute.buffer);
       }
-      sceneByLayer.get(backend)._rasterGeometry = null;
+      mutateWeakMap(rasterGeometryByLayer, layer, "=", null);
     }
   }
 
   // src/raster/onPMTileRemove.js
-  function onPMTileRemove(backend, map) {
-    releaseRasterTiles(backend);
-    sceneByLayer.get(backend)._terrain3D = null;
-    onRemove3DLayer(backend, map);
+  function onPMTileRemove(layer, map) {
+    releaseRasterTiles(layer);
+    mutateWeakMap(terrain3DByLayer, layer, "=", null);
+    onRemove3DLayer(layer, map);
   }
 
   // src/raster/getRasterTileSize.js
@@ -11257,74 +11876,100 @@
 
   // src/raster/initRaster.js
   function initRaster(layer, options) {
-    sceneByLayer.get(layer).kind = "raster";
+    mutateWeakMap(kindByLayer, layer, "=", "raster");
     options = /* alloc */
     { ariaLabel: "PMTiles raster", maxZoom: 18, opacity: 1, zIndex: 0, ...options };
     L.Util.setOptions(layer, options);
-    sceneByLayer.get(layer).root = emptyNode();
-    sceneByLayer.get(layer)._areas = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer)._rasterTiles = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer)._loadingTiles = 0;
-    sceneByLayer.get(layer)._added = Promise.withResolvers();
-    sceneByLayer.get(layer).url = /* alloc */
-    new URL(options.url, document.baseURI).href;
-    sceneByLayer.get(layer)._directories = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer).ready = Promise.resolve(layer.options.archive || layer).then(readyRaster.bind(null, layer)).catch(reportError2.bind(null, layer));
+    mutateWeakMap(rootByLayer, layer, "=", emptyNode());
+    mutateWeakMap(
+      areasByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(
+      rasterTilesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(loadingTilesByLayer, layer, "=", 0);
+    mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+    mutateWeakMap(
+      urlByLayer,
+      layer,
+      "=",
+      /* alloc */
+      new URL(options.url, document.baseURI).href
+    );
+    mutateWeakMap(
+      directoriesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(readyByLayer, layer, "=", Promise.resolve(layer.options.archive || layer).then(readyRaster.bind(null, layer)).catch(reportError2.bind(null, layer)));
   }
 
+  // src/terrain/initTerrain.js
+  init_mutateWeakMap();
+
   // src/terrain/onTerrainRemove.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/globals/renderEmpty.js
   var renderEmpty = Object.freeze([]);
 
   // src/terrain/clearLayerTerrain.js
   function clearLayerTerrain(layer) {
-    if (sceneByLayer.get(layer).kind === "raster") setRasterTerrain(layer, null);
+    if (kindByLayer.get(layer) === "raster") setRasterTerrain(layer, null);
   }
 
   // src/terrain/onTerrainRemove.js
   function onTerrainRemove(layer, map) {
-    sceneByLayer.get(layer)._terrainController?.abort();
-    sceneByLayer.get(layer)._terrainLoading = false;
-    sceneByLayer.get(layer)._terrainReady = false;
+    terrainControllerByLayer.get(layer)?.abort();
+    mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
+    mutateWeakMap(terrainReadyByLayer, layer, "=", false);
     map.eachLayer(clearLayerTerrain);
     let tile, l, grid, attribute;
-    for (tile of sceneByLayer.get(layer)._rasterTiles.keys()) removeRasterTile(layer, tile);
-    if (cameraByMap.get(map)._terrain3D === layer) delete cameraByMap.get(map)._terrain3D;
+    for (tile of rasterTilesByLayer.get(layer).keys()) removeRasterTile(layer, tile);
+    if (terrain3DByMap.get(map) === layer) terrain3DByMap.delete(map);
     for (l of Object.values(map._layers)) {
       conformModelToTerrain(l, null);
       setTerrainHeight(l);
     }
     map.fire("terrainchange");
-    sceneByLayer.get(layer)._terrainTiles.clear();
-    sceneByLayer.get(layer)._terrainOriginElevation = 0;
-    sceneByLayer.get(layer)._terrainPromise = null;
-    if (sceneByLayer.get(layer)._rasterProgram) {
-      sceneByLayer.get(layer)._rasterProgram.pipelineCache.clear();
+    terrainTilesByLayer.get(layer).clear();
+    mutateWeakMap(terrainOriginElevationByLayer, layer, "=", 0);
+    mutateWeakMap(terrainPromiseByLayer, layer, "=", null);
+    if (rasterProgramByLayer.get(layer)) {
+      rasterProgramByLayer.get(layer).pipelineCache.clear();
     }
-    sceneByLayer.get(layer)._rasterProgram = null;
-    if (sceneByLayer.get(layer)._dem) destroyTexture(layer, sceneByLayer.get(layer)._dem.texture);
-    sceneByLayer.get(layer)._dem = null;
-    for (grid of sceneByLayer.get(layer)._terrainGrids?.values() || renderEmpty) {
+    mutateWeakMap(rasterProgramByLayer, layer, "=", null);
+    if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
+    mutateWeakMap(demByLayer, layer, "=", null);
+    for (grid of terrainGridsByLayer.get(layer)?.values() || renderEmpty) {
       for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
     }
-    sceneByLayer.get(layer)._terrainGrids = null;
-    sceneByLayer.get(layer)._bridges = null;
-    disposeMesh(layer, sceneByLayer.get(layer)._bridgeMesh);
-    sceneByLayer.get(layer)._bridgeMesh = null;
+    mutateWeakMap(terrainGridsByLayer, layer, "=", null);
+    mutateWeakMap(bridgesByLayer, layer, "=", null);
+    disposeMesh(layer, bridgeMeshByLayer.get(layer));
+    mutateWeakMap(bridgeMeshByLayer, layer, "=", null);
     onRemove3DLayer(layer, map);
   }
 
   // src/terrain/onTerrainAdd.js
-  init_cameraByMap();
+  init_mutateWeakMap();
+
+  // src/terrain/loadTerrain.js
+  init_mutateWeakMap();
 
   // src/terrain/loadTerrainTiles.js
   async function loadTerrainTiles(state) {
-    const { backend, archive, controller, tiles } = state;
+    const { backend: layer, archive, controller, tiles } = state;
     let coords, result;
     while (state.next < tiles.length) {
       controller.signal.throwIfAborted();
@@ -11336,7 +11981,7 @@
           new Error(`Missing or invalid Float32 terrain tile ${coords.z}/${coords.x}/${coords.y}`)
         );
       }
-      sceneByLayer.get(backend)._terrainTiles.set(
+      terrainTilesByLayer.get(layer).set(
         `${coords.x}/${coords.y}`,
         /* alloc */
         new Float32Array(result.data)
@@ -11354,29 +11999,35 @@
   }
 
   // src/terrain/terrainTileQueue.js
+  init_mutateWeakMap();
   init_L();
-  function terrainTileQueue(backend, header) {
-    const scene = sceneByLayer.get(backend), map = backend._map;
-    scene._terrainZoom = header.maxZoom;
+  function terrainTileQueue(layer, header) {
+    const map = layer._map;
+    mutateWeakMap(terrainZoomByLayer, layer, "=", header.maxZoom);
     archiveNorthWest[0] = header.maxLat;
     archiveNorthWest[1] = header.minLon;
-    const northwest = map.project(archiveNorthWest, scene._terrainZoom).divideBy(256).floor();
+    const northwest = map.project(archiveNorthWest, terrainZoomByLayer.get(layer)).divideBy(256).floor();
     archiveSouthEast[0] = header.minLat;
     archiveSouthEast[1] = header.maxLon;
-    const southeast = map.project(archiveSouthEast, scene._terrainZoom).divideBy(256).floor();
-    scene._terrainBounds = /* alloc */
-    new L.Bounds(northwest, southeast);
+    const southeast = map.project(archiveSouthEast, terrainZoomByLayer.get(layer)).divideBy(256).floor();
+    mutateWeakMap(
+      terrainBoundsByLayer,
+      layer,
+      "=",
+      /* alloc */
+      new L.Bounds(northwest, southeast)
+    );
     const tiles = (
       /* alloc */
       []
     );
-    const center = map.project(map.getCenter(), scene._terrainZoom).divideBy(256);
+    const center = map.project(map.getCenter(), terrainZoomByLayer.get(layer)).divideBy(256);
     let x, y;
     for (x = northwest.x; x <= southeast.x; x++) {
       for (y = northwest.y; y <= southeast.y; y++) {
         tiles.push(
           /* alloc */
-          { z: scene._terrainZoom, x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) }
+          { z: terrainZoomByLayer.get(layer), x, y, distance: Math.hypot(x + 0.5 - center.x, y + 0.5 - center.y) }
         );
       }
     }
@@ -11384,7 +12035,11 @@
     return tiles;
   }
 
+  // src/terrain/applyTerrain.js
+  init_mutateWeakMap();
+
   // src/geometry/addBridges.js
+  init_mutateWeakMap();
   init_radians();
 
   // src/geometry/bridgeLocal.js
@@ -11421,7 +12076,7 @@
   }
 
   // src/geometry/indexBridge.js
-  function indexBridge(backend, pixels, triangles) {
+  function indexBridge(layer, pixels, triangles) {
     const bridgeTriangles = (
       /* alloc */
       []
@@ -11457,8 +12112,8 @@
     for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
       for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
         key = `${x}/${y}`;
-        bucket = sceneByLayer.get(backend)._bridges.get(key);
-        if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* alloc */
+        bucket = bridgesByLayer.get(layer).get(key);
+        if (!bucket) bridgesByLayer.get(layer).set(key, bucket = /* alloc */
         []);
         bucket.push(bridge);
       }
@@ -11515,7 +12170,7 @@
 
   // src/geometry/bridgePolygon.js
   function bridgePolygon(context, polygon2) {
-    const { backend, map, zoom, crs, origin, metres, base } = context;
+    const { backend: layer, map, zoom, crs, origin, metres, base } = context;
     const rings = (
       /* alloc */
       []
@@ -11552,16 +12207,16 @@
     } catch {
       return;
     }
-    indexBridge(backend, pixels, triangles);
+    indexBridge(layer, pixels, triangles);
     bridgeFaces(context, points, triangles);
     bridgeSides(context, points, rings);
   }
 
   // src/geometry/addBridges.js
-  function addBridges(backend, geojson) {
-    const map = backend._map, crs = map.options.crs, zoom = sceneByLayer.get(backend)._terrainZoom;
-    const origin = crs.project(sceneByLayer.get(backend).location), metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
-    const base = sceneByLayer.get(backend).root.position[1];
+  function addBridges(layer, geojson) {
+    const map = layer._map, crs = map.options.crs, zoom = terrainZoomByLayer.get(layer);
+    const origin = crs.project(locationByLayer.get(layer)), metres = Math.cos(locationByLayer.get(layer).lat * radians);
+    const base = rootByLayer.get(layer).position[1];
     const position = (
       /* alloc */
       []
@@ -11572,11 +12227,16 @@
       /* alloc */
       []
     );
-    sceneByLayer.get(backend)._bridges = /* alloc */
-    /* @__PURE__ */ new Map();
+    mutateWeakMap(
+      bridgesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
     const context = (
       /* alloc */
-      { backend, map, crs, zoom, origin, metres, base, position, normal, color }
+      { backend: layer, map, crs, zoom, origin, metres, base, position, normal, color }
     );
     let geometry, polygons, polygonIndex;
     for ({ geometry } of geojson.features) {
@@ -11587,68 +12247,72 @@
       }
     }
     if (position.length) {
-      sceneByLayer.get(backend)._bridgeMesh = createMesh(
-        backend,
+      mutateWeakMap(bridgeMeshByLayer, layer, "=", createMesh(
+        layer,
         /* alloc */
         { position, normal, color }
-      );
+      ));
     }
   }
 
   // src/terrain/applyTerrain.js
-  function applyTerrain(backend, map, bridges) {
-    const scene = sceneByLayer.get(backend);
-    scene._terrainReady = true;
-    scene._terrainOriginElevation = getElevation(backend, scene.location) ?? 0;
-    let layer;
-    for (layer of Object.values(map._layers)) {
-      setTerrainHeight(layer);
-      conformModelToTerrain(layer, backend);
+  function applyTerrain(layer, map, bridges) {
+    mutateWeakMap(terrainReadyByLayer, layer, "=", true);
+    mutateWeakMap(terrainOriginElevationByLayer, layer, "=", getElevation(layer, locationByLayer.get(layer)) ?? 0);
+    let mapLayer;
+    for (mapLayer of Object.values(map._layers)) {
+      setTerrainHeight(mapLayer);
+      conformModelToTerrain(mapLayer, layer);
     }
-    if (bridges) addBridges(backend, bridges);
+    if (bridges) addBridges(layer, bridges);
     map.fire("terrainchange");
-    update(backend);
-    backend.fire("terrainready");
+    update(layer);
+    layer.fire("terrainready");
   }
 
   // src/terrain/loadTerrain.js
-  async function loadTerrain(backend) {
-    if (sceneByLayer.get(backend)._terrainLoading || !backend._map) return;
-    sceneByLayer.get(backend)._terrainLoading = true;
-    sceneByLayer.get(backend)._terrainReady = false;
-    const controller = sceneByLayer.get(backend)._terrainController = /* alloc */
-    new AbortController();
+  async function loadTerrain(layer) {
+    if (terrainLoadingByLayer.get(layer) || !layer._map) return;
+    mutateWeakMap(terrainLoadingByLayer, layer, "=", true);
+    mutateWeakMap(terrainReadyByLayer, layer, "=", false);
+    const controller = mutateWeakMap(
+      terrainControllerByLayer,
+      layer,
+      "=",
+      /* alloc */
+      new AbortController()
+    );
     let i;
     try {
-      if (!sceneByLayer.get(backend).terrainSource) throw (
+      if (!terrainSourceByLayer.get(layer)) throw (
         /* alloc */
         new Error("Terrain layer requires a PMTiles or COG elevation archive")
       );
-      const archive = sceneByLayer.get(backend)._terrainArchive = createLayer(
+      const archive = mutateWeakMap(terrainArchiveByLayer, layer, "=", createLayer(
         /* alloc */
         { source: (
           /* alloc */
           {
-            type: backend.options.asset !== void 0 || /\.tiff?(?:[?#]|$)/i.test(sceneByLayer.get(backend).terrainSource) ? "cog" : "pmtiles",
-            url: sceneByLayer.get(backend).terrainSource,
-            archive: backend.options.archive,
-            asset: backend.options.asset
+            type: layer.options.asset !== void 0 || /\.tiff?(?:[?#]|$)/i.test(terrainSourceByLayer.get(layer)) ? "cog" : "pmtiles",
+            url: terrainSourceByLayer.get(layer),
+            archive: layer.options.archive,
+            asset: layer.options.asset
           }
         ) }
-      );
-      await sceneByLayer.get(archive).ready;
-      const header = sceneByLayer.get(archive).header;
+      ));
+      await readyByLayer.get(archive);
+      const header = headerByLayer.get(archive);
       if (header.tileType !== 0 || header.minZoom !== header.maxZoom) {
         throw (
           /* alloc */
           new Error("Expected a single-zoom Float32 terrain archive")
         );
       }
-      const map = backend._map;
-      const tiles = terrainTileQueue(backend, header);
+      const map = layer._map;
+      const tiles = terrainTileQueue(layer, header);
       const state = (
         /* alloc */
-        { backend, archive, controller, tiles, next: 0 }
+        { backend: layer, archive, controller, tiles, next: 0 }
       );
       const workers = (
         /* alloc */
@@ -11656,23 +12320,23 @@
       );
       for (i = 0; i < Math.min(4, tiles.length); i++) workers.push(loadTerrainTiles(state));
       await Promise.all(workers);
-      const bridges = backend.options.bridges && await fetch(
-        backend.options.bridges,
+      const bridges = layer.options.bridges && await fetch(
+        layer.options.bridges,
         /* alloc */
         { signal: controller.signal }
       ).then(readBridges);
-      if (controller.signal.aborted || backend._map !== map) return;
-      applyTerrain(backend, map, bridges);
+      if (controller.signal.aborted || layer._map !== map) return;
+      applyTerrain(layer, map, bridges);
       return true;
     } catch (error) {
-      if (!controller.signal.aborted) backend.fire(
+      if (!controller.signal.aborted) layer.fire(
         "error",
         /* alloc */
         { error }
       );
       return false;
     } finally {
-      sceneByLayer.get(backend)._terrainLoading = false;
+      mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
     }
   }
 
@@ -11683,31 +12347,31 @@
 
   // src/terrain/setLayerTerrain.js
   function setLayerTerrain(layer) {
-    if (sceneByLayer.get(layer).kind === "raster") setRasterTerrain(layer, this);
+    if (kindByLayer.get(layer) === "raster") setRasterTerrain(layer, this);
   }
 
   // src/terrain/onTerrainAdd.js
-  function onTerrainAdd(backend, map) {
-    if (cameraByMap.get(map)._terrain3D && cameraByMap.get(map)._terrain3D !== backend) {
+  function onTerrainAdd(layer, map) {
+    if (terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
       throw (
         /* alloc */
         new Error("Only one terrain layer can be active per map")
       );
     }
-    cameraByMap.get(map)._terrain3D = backend;
-    onAdd3DLayer(backend, map);
-    if (sceneByLayer.get(backend).root) sceneByLayer.get(backend)._terrainPromise = loadTerrain(backend);
+    mutateWeakMap(terrain3DByMap, map, "=", layer);
+    onAdd3DLayer(layer, map);
+    if (rootByLayer.get(layer)) mutateWeakMap(terrainPromiseByLayer, layer, "=", loadTerrain(layer));
     else {
       const pending = Promise.withResolvers();
-      sceneByLayer.get(backend)._terrainPromise = pending.promise;
-      backend.once(
+      mutateWeakMap(terrainPromiseByLayer, layer, "=", pending.promise);
+      layer.once(
         "ready",
         loadReadyTerrain,
         /* alloc */
-        { backend, ...pending }
+        { backend: layer, ...pending }
       );
     }
-    map.eachLayer(setLayerTerrain, backend);
+    map.eachLayer(setLayerTerrain, layer);
     map.fire("terrainchange");
   }
 
@@ -11720,33 +12384,46 @@
     );
     delete layerOptions.url;
     init3D(layer, layerOptions);
-    sceneByLayer.get(layer).terrainSource = terrainSource;
-    sceneByLayer.get(layer)._terrainTiles = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer)._rasterTiles = /* alloc */
-    /* @__PURE__ */ new Map();
-    sceneByLayer.get(layer)._terrainReady = false;
-    sceneByLayer.get(layer).kind = "terrain";
+    mutateWeakMap(terrainSourceByLayer, layer, "=", terrainSource);
+    mutateWeakMap(
+      terrainTilesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(
+      rasterTilesByLayer,
+      layer,
+      "=",
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    mutateWeakMap(terrainReadyByLayer, layer, "=", false);
+    mutateWeakMap(kindByLayer, layer, "=", "terrain");
   }
 
   // src/sunlight/initSunlight.js
   init_L();
 
-  // src/sunlight/onAddSun.js
-  init_cameraByMap();
+  // src/weakmaps/timeControlByMap.js
+  var timeControlByMap = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/sunlightByControl.js
+  // src/sunlight/onAddSun.js
+  init_mutateWeakMap();
+
+  // src/weakmaps/sunlightByControl.js
   var sunlightByControl = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/sunByMap.js
+  // src/weakmaps/sunByMap.js
   var sunByMap = /* @__PURE__ */ new WeakMap();
 
   // src/sunlight/createSun.js
   init_L();
 
   // src/sunlight/updateSky.js
+  init_pitchSkyByMap();
   init_radians();
-  init_cameraByMap();
   init_mapGetPitch();
   init_mapGetBearing();
 
@@ -11779,7 +12456,7 @@
 
   // src/sunlight/updateSky.js
   function updateSky2({ map, originalSky, sunDisc, moonDisc, projection }) {
-    const sun = cameraByMap.get(map)._sunlight, sky = cameraByMap.get(map)._pitchSky;
+    const sun = sunlightByMap.get(map), sky = pitchSkyByMap.get(map);
     if (sun) map.getContainer().style.setProperty("--leaflet-sky-background", sun.background);
     else if (originalSky) map.getContainer().style.setProperty("--leaflet-sky-background", originalSky);
     else map.getContainer().style.removeProperty("--leaflet-sky-background");
@@ -11789,7 +12466,7 @@
   }
 
   // src/sunlight/updateSun.js
-  init_cameraByMap();
+  init_mutateWeakMap();
 
   // src/globals/atmosphereStops.js
   var atmosphereStops = [
@@ -11971,7 +12648,7 @@
       slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
       output.textContent = `${time.slice(11, 16)} UTC${control.live ? " \xB7 now" : ""}`;
       const center = map.getCenter();
-      const sun = cameraByMap.get(map)._sunlight = solarPosition(control.time, center.lat, center.lng);
+      const sun = mutateWeakMap(sunlightByMap, map, "=", solarPosition(control.time, center.lat, center.lng));
       Object.assign(sun, atmosphere(sun.altitude));
       sun.moon = moonPosition(control.time, center.lat, center.lng);
       status.textContent = sun.altitude <= 0 ? "Night \xB7 no direct sunlight" : sun.altitude < 3 ? "Low sun \xB7 shadows paused" : `Sun altitude ${sun.altitude.toFixed(1)}\xB0`;
@@ -11989,7 +12666,7 @@
       updateSky2(state);
       render2(map);
     } catch (error) {
-      delete cameraByMap.get(map)._sunlight;
+      sunlightByMap.delete(map);
       updateSky2(state);
       render2(map);
       status.textContent = `Error: ${error.message}`;
@@ -12004,7 +12681,6 @@
   }
 
   // src/sunlight/useSelectedTime.js
-  init_cameraByMap();
   function useSelectedTime(state) {
     const { control, map, date, slider, status } = state;
     control.live = false;
@@ -12016,7 +12692,7 @@
         /* alloc */
         { time: null, live: false }
       );
-      delete cameraByMap.get(map)._sunlight;
+      sunlightByMap.delete(map);
       updateSky2(state);
       render2(map);
       status.textContent = "Error: choose a valid solar date";
@@ -12120,7 +12796,7 @@
     }
     state.control = control;
     state.originalSky = map.getContainer().style.getPropertyValue("--leaflet-sky-background");
-    cameraByMap.get(map)._timeControl = control;
+    mutateWeakMap(timeControlByMap, map, "=", control);
     sunlightByControl.set(control, state);
     state.update();
     state.timer = setInterval(tickSun, 6e4, state);
@@ -12130,17 +12806,18 @@
   }
 
   // src/sunlight/initialize.js
+  init_mutateWeakMap();
   init_L();
 
   // src/sunlight/addTimeLayer.js
   function addTimeLayer(map) {
-    return sceneByLayer.get(this).control.addTo(map);
+    return controlByLayer.get(this).addTo(map);
   }
 
   // src/sunlight/removeTimeLayer.js
   init_L();
   function removeTimeLayer() {
-    return L.Control.prototype.remove.call(sceneByLayer.get(this).control);
+    return L.Control.prototype.remove.call(controlByLayer.get(this));
   }
 
   // src/sunlight/initialize.js
@@ -12149,8 +12826,8 @@
     this.live = true;
     this.layer = /* alloc */
     new L.Layer();
-    sceneByLayer.get(this.layer).control = this;
-    sceneByLayer.get(this.layer).kind = "time";
+    mutateWeakMap(controlByLayer, this.layer, "=", this);
+    mutateWeakMap(kindByLayer, this.layer, "=", "time");
   }
 
   // src/sunlight/onAdd.js
@@ -12190,12 +12867,11 @@
   }
 
   // src/sunlight/removeSun.js
-  init_cameraByMap();
   function removeSun(state) {
     const { map, timer, sunDisc, moonDisc } = state;
     const shared = sunByMap.get(map);
     clearInterval(timer);
-    delete cameraByMap.get(map)._timeControl;
+    timeControlByMap.delete(map);
     map.fire(
       "simulationtimechange",
       /* alloc */
@@ -12203,7 +12879,7 @@
     );
     map.off("moveend", state.update);
     map.off("move rotate pitch resize", state.updateSky);
-    delete cameraByMap.get(map)._sunlight;
+    sunlightByMap.delete(map);
     updateSky2(state);
     sunDisc.remove();
     moonDisc.remove();
@@ -12776,11 +13452,12 @@
   }
 
   // src/traffic/disposeTrafficObject.js
+  init_mutateWeakMap();
   function disposeTrafficObject(state, object) {
     if (!object) return;
-    if (sceneByLayer.get(state.layer).highlightedFeature?.mesh === object) {
+    if (highlightedFeatureByLayer.get(state.layer)?.mesh === object) {
       setHighlight(state.layer, null);
-      sceneByLayer.get(state.layer).hoveredFeature = null;
+      mutateWeakMap(hoveredFeatureByLayer, state.layer, "=", null);
       showFeature(state.layer, null);
     }
     ;
@@ -12819,9 +13496,8 @@
   }
 
   // src/traffic/trafficNow.js
-  init_cameraByMap();
   function trafficNow(state) {
-    const control = cameraByMap.get(state.layer._map)?._timeControl;
+    const control = timeControlByMap.get(state.layer._map);
     const live = control ? control.live : true;
     return (
       /* alloc */
@@ -13187,7 +13863,7 @@
 
   // src/traffic/rebaseTraffic.js
   function rebaseTraffic(state) {
-    const { device } = sceneByLayer.get(state.layer).renderer;
+    const { device } = rendererByLayer.get(state.layer);
     if (state.gpu?.device !== device) {
       destroyTrafficGpu(state);
       const template = (
@@ -13370,7 +14046,7 @@
   function tickTraffic(state) {
     state.frame = void 0;
     if (!state.ready || !state.layer._map) return;
-    if (!sceneByLayer.get(state.layer).renderer) {
+    if (!rendererByLayer.get(state.layer)) {
       state.frame = requestAnimationFrame(state.tick);
       return;
     }
@@ -13450,15 +14126,21 @@
   init_radians();
   init_L();
 
+  // src/terrain/readyTerrainOf.js
+  function readyTerrainOf(map) {
+    const terrain = terrain3DByMap.get(map);
+    return terrainReadyByLayer.get(terrain) && terrain;
+  }
+
   // src/traffic/groundTraffic.js
-  init_cameraByMap();
   function groundTraffic(state) {
     const { layer, lanes } = state;
-    const terrain = sceneByLayer.get(cameraByMap.get(layer._map)._terrain3D)?._terrainReady && cameraByMap.get(layer._map)._terrain3D, base = sceneByLayer.get(layer).root.position[1];
+    const terrain = readyTerrainOf(layer._map);
+    const base = rootByLayer.get(layer).position[1];
     let lane, i, elevation;
     for (lane of lanes) {
       for (i = 0; i < lane.points.length; i++) {
-        elevation = terrain && (lane.elevation ?? getElevation(terrain, lane.latlngs[i]));
+        elevation = terrain && (lane.elevation ?? mapElevationOf(layer._map, lane.latlngs[i]));
         lane.points[i][2] = Number.isFinite(elevation) && Number.isFinite(base) ? elevation - base : 0;
       }
     }
@@ -13469,8 +14151,8 @@
   // src/traffic/prepareTraffic.js
   function prepareTraffic(state) {
     const { layer, lanes } = state;
-    const crs = layer._map.options.crs, origin = crs.project(sceneByLayer.get(layer).location);
-    const metres = Math.cos(sceneByLayer.get(layer).location.lat * radians);
+    const crs = layer._map.options.crs, origin = crs.project(locationByLayer.get(layer));
+    const metres = Math.cos(locationByLayer.get(layer).lat * radians);
     let lane, lat, lng, point, i;
     for (lane of lanes) {
       lane.points = /* alloc */
@@ -13533,7 +14215,7 @@
 
   // src/traffic/updateTraffic.js
   function updateTraffic(state, event) {
-    if (event?.layer && !sceneByLayer.get(event.layer).control?.time) return;
+    if (event?.layer && !controlByLayer.get(event.layer)?.time) return;
     cancelAnimationFrame(state.frame);
     loadTraffic(state);
     state.tick();
@@ -13639,6 +14321,7 @@
   init_L();
 
   // src/walk/createWalk.js
+  init_mutateWeakMap();
   init_L();
 
   // src/walk/onBlur.js
@@ -13692,15 +14375,15 @@
 
   // src/walk/local.js
   init_radians();
-  init_cameraByMap();
   function local2(output) {
     const { layer, state } = this;
-    const map = layer._map, crs = map.options.crs, origin = crs.project(sceneByLayer.get(layer).location);
-    const metres = Math.cos(sceneByLayer.get(layer).location.lat * radians);
-    const p = crs.project(state.latlng), terrain = sceneByLayer.get(cameraByMap.get(map)._terrain3D)?._terrainReady && cameraByMap.get(map)._terrain3D;
-    const ground = terrain && getElevation(terrain, state.latlng) || 0;
+    const map = layer._map, crs = map.options.crs;
+    const location = locationByLayer.get(layer), root = rootByLayer.get(layer);
+    const origin = crs.project(location), metres = Math.cos(location.lat * radians);
+    const p = crs.project(state.latlng);
+    const ground = mapElevationOf(map, state.latlng) || 0;
     output[0] = (p.x - origin.x) * metres;
-    output[1] = ground + (state.height ?? 0) - sceneByLayer.get(layer).root.position[1];
+    output[1] = ground + (state.height ?? 0) - root.position[1];
     output[2] = -(p.y - origin.y) * metres;
     return output;
   }
@@ -13790,18 +14473,18 @@
 
   // src/picking/shouldSkipOther.js
   function shouldSkipOther(other, layer) {
-    return other === layer || sceneByLayer.get(other)._type === "terrain" || sceneByLayer.get(other)._type === "traffic";
+    return other === layer || typeByLayer.get(other) === "terrain" || typeByLayer.get(other) === "traffic";
   }
 
   // src/walk/land.js
   function land(previousY) {
-    const state = sceneByLayer.get(this.layer), ray = state.raycaster;
-    const feet = local2.call(this, this.local), root = state.root;
+    const ray = raycasterByLayer.get(this.layer);
+    const feet = local2.call(this, this.local), root = rootByLayer.get(this.layer);
     const x = root.position[0] + feet[0] * root.scale[0];
     const y = root.position[1] + feet[1] * root.scale[1];
     const z = root.position[2] + feet[2] * root.scale[2];
     if (y > previousY || this.verticalSpeed > 0) return;
-    updateWorldMatrix(state.scene);
+    updateWorldMatrix(sceneByLayer.get(this.layer));
     ray.origin[0] = x;
     ray.origin[1] = previousY + 0.01;
     ray.origin[2] = z;
@@ -13810,9 +14493,9 @@
     ray.direction[2] = 0;
     ray.meshes.length = 0;
     let layer, hit2;
-    for (layer of sceneByLayer.get(state._shared)._layers) {
-      if (shouldSkipOther(layer, this.layer) || sceneByLayer.get(layer).kind === "raster" || layer.options.nightLight) continue;
-      traverse(sceneByLayer.get(layer).root, collectVisibleMesh2, ray.meshes);
+    for (layer of layersByLayer.get(sharedByLayer.get(this.layer))) {
+      if (shouldSkipOther(layer, this.layer) || kindByLayer.get(layer) === "raster" || layer.options.nightLight) continue;
+      traverse(rootByLayer.get(layer), collectVisibleMesh2, ray.meshes);
     }
     for (hit2 of intersectMeshes(ray, ray.meshes)) {
       if (hit2.point[1] < y - 1e-3) break;
@@ -13830,7 +14513,7 @@
   // src/globals/CELL.js
   var CELL = 8;
 
-  // src/globals/colliders.js
+  // src/weakmaps/colliders.js
   var colliders = /* @__PURE__ */ new WeakMap();
 
   // src/collision/transformTriangle.js
@@ -13974,13 +14657,13 @@
 
   // src/picking/hit.js
   function hit(layer, x, y, z, dx, dz, reach, data) {
-    updateWorldMatrix(sceneByLayer.get(layer).scene);
+    updateWorldMatrix(sceneByLayer.get(layer));
     data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
     data.best = reach, data.found = false;
     let other;
-    for (other of sceneByLayer.get(sceneByLayer.get(layer)._shared)._layers) {
+    for (other of layersByLayer.get(sharedByLayer.get(layer))) {
       if (shouldSkipOther(other, layer)) continue;
-      traverse(sceneByLayer.get(other).root, hitMesh, data);
+      traverse(rootByLayer.get(other), hitMesh, data);
     }
     return data.found ? data.normal : null;
   }
@@ -13994,7 +14677,7 @@
   // src/walk/moveWalker.js
   function moveWalker(forward, dt) {
     const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
-    const { position, scale } = sceneByLayer.get(this.layer).root;
+    const { position, scale } = rootByLayer.get(this.layer);
     let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
     const feet = local2.call(this, this.local);
     let i;
@@ -14056,7 +14739,7 @@
     this.frame = requestAnimationFrame(this.step);
     const dt = Math.min(0.1, (now - (this.last ?? now)) / 1e3);
     this.last = now;
-    if (!sceneByLayer.get(layer).renderer) return;
+    if (!rendererByLayer.get(layer)) return;
     let changed = false;
     let part, key;
     if (!this.meshes) {
@@ -14065,7 +14748,7 @@
       for ([part] of limbs) this.meshes.push(createMesh(layer, build(parts[part])));
       changed = true;
     }
-    const previousY = sceneByLayer.get(layer).root.position[1] + local2.call(this, this.local)[1] * sceneByLayer.get(layer).root.scale[1];
+    const previousY = rootByLayer.get(layer).position[1] + local2.call(this, this.local)[1] * rootByLayer.get(layer).scale[1];
     if (stepWalkerHeight.call(this, dt)) changed = true;
     let forward = 0, turn = 0;
     for (key of this.keys) {
@@ -14146,7 +14829,7 @@
       /* alloc */
       new L.Layer()
     );
-    sceneByLayer.get(layer)._type = "walk";
+    mutateWeakMap(typeByLayer, layer, "=", "walk");
     init3D(layer, options);
     const keys = (
       /* alloc */
@@ -14183,8 +14866,13 @@
         saved: null,
         hitData: null,
         local: null,
-        state: control.walker = sceneByLayer.get(layer).walker = /* alloc */
-        { latlng: null, heading: 0, phase: 0, height: 0 }
+        state: control.walker = mutateWeakMap(
+          walkerByLayer,
+          layer,
+          "=",
+          /* alloc */
+          { latlng: null, heading: 0, phase: 0, height: 0 }
+        )
       }
     );
     context.step = step.bind(context);
@@ -14278,15 +14966,16 @@
   });
 
   // src/core/initializeNativeLayer.js
+  init_mutateWeakMap();
   init_L();
 
-  // src/globals/closestMethods.js
+  // src/weakmaps/closestMethods.js
   var closestMethods = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/boundsMethods.js
+  // src/weakmaps/boundsMethods.js
   var boundsMethods = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/gridInitializers.js
+  // src/weakmaps/gridInitializers.js
   var gridInitializers = /* @__PURE__ */ new WeakMap();
 
   // src/scene/emptyEvents.js
@@ -14316,6 +15005,9 @@
     this._container.remove();
   }
 
+  // src/core/cancelGridFade.js
+  init_mutateWeakMap();
+
   // src/globals/pendingGridFades.js
   var pendingGridFades = /* @__PURE__ */ new Map();
 
@@ -14325,14 +15017,18 @@
   // src/core/cancelGridFade.js
   function cancelGridFade(layer) {
     pendingGridFades.delete(layer);
-    sceneByLayer.get(layer)._fadeFrame = null;
+    mutateWeakMap(fadeFrameByLayer, layer, "=", null);
     if (!pendingGridFades.size && gridFadeFrame.value !== null) {
       cancelAnimationFrame(gridFadeFrame.value);
       gridFadeFrame.value = null;
     }
   }
 
+  // src/core/scheduleGridFade.js
+  init_mutateWeakMap();
+
   // src/core/runGridFades.js
+  init_mutateWeakMap();
   function runGridFades() {
     gridFadeFrame.value = null;
     const layers = (
@@ -14343,17 +15039,17 @@
     for ([layer, version] of layers) {
       if (pendingGridFades.get(layer) !== version) continue;
       pendingGridFades.delete(layer);
-      sceneByLayer.get(layer)._fadeFrame = null;
+      mutateWeakMap(fadeFrameByLayer, layer, "=", null);
       updateGridOpacity.call(layer);
     }
   }
 
   // src/core/scheduleGridFade.js
   function scheduleGridFade(layer) {
-    sceneByLayer.get(layer)._fadeVersion = (sceneByLayer.get(layer)._fadeVersion || 0) + 1;
-    pendingGridFades.set(layer, sceneByLayer.get(layer)._fadeVersion);
+    mutateWeakMap(fadeVersionByLayer, layer, "=", (fadeVersionByLayer.get(layer) || 0) + 1);
+    pendingGridFades.set(layer, fadeVersionByLayer.get(layer));
     if (gridFadeFrame.value === null) gridFadeFrame.value = requestAnimationFrame(runGridFades);
-    sceneByLayer.get(layer)._fadeFrame = gridFadeFrame.value;
+    mutateWeakMap(fadeFrameByLayer, layer, "=", gridFadeFrame.value);
   }
 
   // src/core/updateGridOpacity.js
@@ -14408,7 +15104,7 @@
     if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
       this.beforeAdd = this._updateBounds = noOperation;
       this.redraw = redrawPath;
-      sceneByLayer.get(this).kind = "path";
+      mutateWeakMap(kindByLayer, this, "=", "path");
       if (this instanceof L.Polyline) {
         closestMethods.set(this, this.closestLayerPoint);
         this.closestLayerPoint = closestCameraLayerPoint;
@@ -14422,24 +15118,25 @@
       this._initContainer = initializeGridContainer;
       this._updateOpacity = updateGridOpacity;
     } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
-      sceneByLayer.get(this).kind = "image";
+      mutateWeakMap(kindByLayer, this, "=", "image");
       this._reset = refreshNativeLayerContract;
     }
   }
 
   // src/scene/layerLayerAdd.js
+  init_mutateWeakMap();
   init_L();
 
   // src/scene/removeLayerEvents.js
+  init_mutateWeakMap();
   function removeLayerEvents() {
-    const state = sceneByLayer.get(this);
-    state.eventMap.off(state.events, this);
-    state.events = state.eventMap = null;
+    eventMapByLayer.get(this).off(eventsByLayer.get(this), this);
+    mutateWeakMap(eventsByLayer, this, "=", mutateWeakMap(eventMapByLayer, this, "=", null));
   }
 
   // src/scene/addSceneLayer.js
   function addSceneLayer(layer, map) {
-    switch (sceneByLayer.get(layer).kind) {
+    switch (kindByLayer.get(layer)) {
       case "3d":
         return onAdd3DLayer(layer, map);
       case "raster":
@@ -14456,7 +15153,7 @@
   // src/scene/isNativeLayer.js
   init_L();
   function isNativeLayer(layer) {
-    return !sceneByLayer.get(layer)._3d && (layer instanceof L.GridLayer || layer instanceof L.Polyline || layer instanceof L.CircleMarker || layer instanceof L.Marker && !(layer.options.icon instanceof L.DivIcon) || layer instanceof L.ImageOverlay && !(layer instanceof L.VideoOverlay) && !(layer instanceof L.SVGOverlay));
+    return !state3dByLayer.get(layer) && (layer instanceof L.GridLayer || layer instanceof L.Polyline || layer instanceof L.CircleMarker || layer instanceof L.Marker && !(layer.options.icon instanceof L.DivIcon) || layer instanceof L.ImageOverlay && !(layer instanceof L.VideoOverlay) && !(layer instanceof L.SVGOverlay));
   }
 
   // src/scene/layerLayerAdd.js
@@ -14468,15 +15165,15 @@
       }
       if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
     }
-    const map = event.target, state = sceneByLayer.get(this);
+    const map = event.target;
     if (!map.hasLayer(this)) return;
-    if (state.kind) {
+    if (kindByLayer.get(this)) {
       this._map = map;
       this._zoomAnimated = map._zoomAnimated;
-      if (state.kind !== "pending" && state.kind !== "time") {
-        state.events = state.kind === "raster" ? getRasterEvents(this) : state._3d ? get3DEvents(this) : emptyEvents();
-        state.eventMap = map;
-        map.on(state.events, this);
+      if (kindByLayer.get(this) !== "pending" && kindByLayer.get(this) !== "time") {
+        mutateWeakMap(eventsByLayer, this, "=", kindByLayer.get(this) === "raster" ? getRasterEvents(this) : state3dByLayer.get(this) ? get3DEvents(this) : emptyEvents());
+        mutateWeakMap(eventMapByLayer, this, "=", map);
+        map.on(eventsByLayer.get(this), this);
         this.once("remove", removeLayerEvents, this);
       }
       addSceneLayer(this, map);
@@ -14494,6 +15191,7 @@
   }
 
   // src/scene/layerInitialize.js
+  init_mutateWeakMap();
   init_L();
 
   // src/globals/pendingInitializations.js
@@ -14503,8 +15201,9 @@
   var loading = { value: Promise.resolve() };
 
   // src/sources/initializeGeoJSON.js
+  init_mutateWeakMap();
   function initializeGeoJSON(layer, options) {
-    sceneByLayer.get(layer)._geojson = true;
+    mutateWeakMap(geojsonByLayer, layer, "=", true);
     init3D(layer, options);
   }
 
@@ -15174,10 +15873,10 @@
     try {
       const map = layer._map;
       map?.removeLayer(layer);
-      delete sceneByLayer.get(layer).kind;
+      kindByLayer.delete(layer);
       task.initialize(layer, task.settings);
       map?.addLayer(layer);
-      return sceneByLayer.get(layer).ready === ready ? layer : sceneByLayer.get(layer).ready;
+      return readyByLayer.get(layer) === ready ? layer : readyByLayer.get(layer);
     } catch (error) {
       layer.fire(
         "error",
@@ -15190,12 +15889,8 @@
 
   // src/scene/layerInitialize.js
   function layerInitialize(options = sceneEmptyOptions) {
-    if (!sceneByLayer.has(this)) {
-      sceneByLayer.set(
-        this,
-        /* alloc */
-        {}
-      );
+    if (!sceneLayers.has(this)) {
+      sceneLayers.add(this);
     }
     if (Object.getPrototypeOf(this) !== L.Layer.prototype || !options?.source) {
       if (layerProto.value.initialize) return layerProto.value.initialize.apply(this, arguments);
@@ -15214,19 +15909,19 @@
       { ...source, ...core }
     );
     L.Util.setOptions(this, core);
-    sceneByLayer.get(this)._type = type;
+    mutateWeakMap(typeByLayer, this, "=", type);
     if (type === "3d") {
       init3D(this, settings);
       return;
     }
-    sceneByLayer.get(this).kind = "pending";
+    mutateWeakMap(kindByLayer, this, "=", "pending");
     const task = (
       /* alloc */
       { layer: this, type, settings, ready: null }
     );
     pendingInitializations.push(task);
     loading.value = loading.value.catch(noOperation).then(resolveNextInitialization);
-    const ready = sceneByLayer.get(this).ready = loading.value.then(initializeLayer);
+    const ready = mutateWeakMap(readyByLayer, this, "=", loading.value.then(initializeLayer));
     task.ready = ready;
     ready.catch(noOperation);
   }
@@ -15236,7 +15931,7 @@
 
   // src/scene/removeSceneLayer.js
   function removeSceneLayer(layer, map) {
-    switch (sceneByLayer.get(layer).kind) {
+    switch (kindByLayer.get(layer)) {
       case "3d":
         return onRemove3DLayer(layer, map);
       case "raster":
@@ -15252,8 +15947,7 @@
   function removeLayer2(layer) {
     const id = L.Util.stamp(layer);
     if (!this._layers[id]) return this;
-    const state = sceneByLayer.get(layer);
-    if (!state.kind) return removeLayer.value.call(this, layer);
+    if (!kindByLayer.get(layer)) return removeLayer.value.call(this, layer);
     if (this._loaded) removeSceneLayer(layer, this);
     delete this._layers[id];
     if (this._loaded) {
@@ -15299,12 +15993,8 @@
 
   // src/core/layerCallInitHooks.js
   function layerCallInitHooks2() {
-    if (!sceneByLayer.has(this)) {
-      sceneByLayer.set(
-        this,
-        /* alloc */
-        {}
-      );
+    if (!sceneLayers.has(this)) {
+      sceneLayers.add(this);
     }
     const initialized = this._initHooksCalled;
     layerCallInitHooks.value.call(this);

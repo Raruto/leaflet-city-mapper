@@ -1,4 +1,4 @@
-import { boundsMethods } from '../globals/boundsMethods.js';
+import { boundsMethods } from '../weakmaps/boundsMethods.js';
 
 
 export function cameraCircleBounds() {

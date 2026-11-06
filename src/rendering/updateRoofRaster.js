@@ -1,25 +1,29 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
+import { roofRastersByLayer } from '../weakmaps/roofRastersByLayer.js';
 import { updateRoofAtlas } from './updateRoofAtlas.js';
 import { destroyTexture } from './destroyTexture.js';
 
-export function updateRoofRaster(backend, now) {
-  const map = backend._map;
-  const rasters = sceneByLayer.get(backend)._roofRasters ||= /* alloc */ [];
+export function updateRoofRaster(layer, now) {
+  const map = layer._map;
+  let rasters = roofRastersByLayer.get(layer);
+  if (!rasters) roofRastersByLayer.set(layer, rasters = /* alloc */ []);
   rasters.length = 0;
   let hasRoofTexture = false;
-  let layer;
-  for (layer of sceneByLayer.get(backend)._layers) {
-    if (layer.options.roofTexture || layer.options.wallTexture) { hasRoofTexture = true; break; }
+  let sceneLayer, rasterLayer;
+  for (sceneLayer of layersByLayer.get(layer)) {
+    if (sceneLayer.options.roofTexture || sceneLayer.options.wallTexture) { hasRoofTexture = true; break; }
   }
   if (hasRoofTexture) {
-    for (layer of Object.values(map._layers)) {
-      if (sceneByLayer.get(layer).kind === 'raster' && sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0) rasters.push(layer);
+    for (rasterLayer of Object.values(map._layers)) {
+      if (kindByLayer.get(rasterLayer) === 'raster' && rasterTilesByLayer.get(rasterLayer) && rasterLayer.options.opacity > 0) rasters.push(rasterLayer);
     }
-    updateRoofAtlas(backend, rasters, now);
-  } else if (sceneByLayer.get(backend)._roofRaster) {
-    destroyTexture(backend, sceneByLayer.get(backend)._roofRaster.texture.texture);
-    sceneByLayer.get(backend)._roofRaster = null;
+    updateRoofAtlas(layer, rasters, now);
+  } else if (roofRasterByLayer.get(layer)) {
+    destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
+    roofRasterByLayer.set(layer, null);
   }
   return rasters;
 }

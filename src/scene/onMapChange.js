@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { queuedByLayer } from '../weakmaps/queuedByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { pendingMapChanges } from '../globals/pendingMapChanges.js';
 
 
@@ -11,8 +13,8 @@ import { renderPendingMapChange } from './renderPendingMapChange.js';
 
 export function onMapChange() {
   const layer = this;
-  if (sceneByLayer.get(layer)._queued) return;
-  sceneByLayer.get(layer)._queued = true;
+  if (queuedByLayer.get(layer)) return;
+  mutateWeakMap(queuedByLayer, layer, "=", true);
   pendingMapChanges.push(layer);
   queueMicrotask(renderPendingMapChange);
 }

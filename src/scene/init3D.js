@@ -1,6 +1,19 @@
+import { addedByLayer } from '../weakmaps/addedByLayer.js';
+import { areasByLayer } from '../weakmaps/areasByLayer.js';
+import { countStatusByLayer } from '../weakmaps/countStatusByLayer.js';
+import { directoriesByLayer } from '../weakmaps/directoriesByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+import { state3dByLayer } from '../weakmaps/state3dByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { attach } from './attach.js';
@@ -18,26 +31,26 @@ import { noOperation } from '../utils/noOperation.js';
 import { updateLayerCount } from './updateLayerCount.js';
 
 export function init3D(layer, options = sceneEmptyOptions) {
-  sceneByLayer.get(layer)._3d = true;
+  mutateWeakMap(state3dByLayer, layer, "=", true);
   L.Util.setOptions(layer, /* alloc */ { ariaLabel: '3D scene', ...options });
-  sceneByLayer.get(layer).kind = '3d';
-  const isModel = !sceneByLayer.get(layer)._geojson && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
-  sceneByLayer.get(layer).modelUrl = isModel ? layer.options.url : null;
-  sceneByLayer.get(layer).url = layer.options.url && !isModel && !sceneByLayer.get(layer)._geojson ? /* alloc */ new URL(layer.options.url, document.baseURI).href : null;
-  sceneByLayer.get(layer)._directories = /* alloc */ new Map();
+  mutateWeakMap(kindByLayer, layer, "=", '3d');
+  const isModel = !geojsonByLayer.get(layer) && /\.(glb|gltf)(?:[?#]|$)/i.test(layer.options.url);
+  mutateWeakMap(modelUrlByLayer, layer, "=", isModel ? layer.options.url : null);
+  mutateWeakMap(urlByLayer, layer, "=", layer.options.url && !isModel && !geojsonByLayer.get(layer) ? /* alloc */ new URL(layer.options.url, document.baseURI).href : null);
+  mutateWeakMap(directoriesByLayer, layer, "=", /* alloc */ new Map());
   if (layer.options.center) {
-    sceneByLayer.get(layer).location = /* alloc */ new L.LatLng(layer.options.center[0], layer.options.center[1]);
+    mutateWeakMap(locationByLayer, layer, "=", /* alloc */ new L.LatLng(layer.options.center[0], layer.options.center[1]));
   }
-  sceneByLayer.get(layer)._areas = /* alloc */ new Map();
-  sceneByLayer.get(layer)._inflight = 0;
-  if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson || isModel) {
+  mutateWeakMap(areasByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(inflightByLayer, layer, "=", 0);
+  if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || isModel) {
     const status = L.DomUtil.create('small', 'layer-count');
     status.style.cssText = 'float:right;margin-left:12px;color:#555;font-variant-numeric:tabular-nums';
-    sceneByLayer.get(layer)._countStatus = status;
+    mutateWeakMap(countStatusByLayer, layer, "=", status);
     layer.on('add error', updateLayerCount);
     layer.on('ready progress', L.Util.throttle(updateLayerCount, 250, layer));
   }
-  sceneByLayer.get(layer)._added = Promise.withResolvers();
-  sceneByLayer.get(layer).ready = Promise.resolve().then(ready3D.bind(null, layer));
-  sceneByLayer.get(layer).ready.catch(noOperation);
+  mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+  mutateWeakMap(readyByLayer, layer, "=", Promise.resolve().then(ready3D.bind(null, layer)));
+  readyByLayer.get(layer).catch(noOperation);
 }

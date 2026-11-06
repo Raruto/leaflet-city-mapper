@@ -233,6 +233,8 @@ Feature: Performance-oriented source style
       | src/geometry/example.js      | export const HEIGHT = 8;                                  | 1          |
       | src/globals/HEIGHT.js        | export const HEIGHT = 8;                                  | 0          |
       | src/globals/HEIGHT.js        | const HEIGHT = 8; export { HEIGHT };                      | 0          |
+      | src/weakmaps/directoriesByLayer.js | export const directoriesByLayer = new WeakMap();      | 0          |
+      | src/weakmaps/example.js      | export const other = new WeakMap();                      | 1          |
       | src\globals\HEIGHT.js        | export const HEIGHT = 8;                                  | 0          |
       | src/state.js                 | const state = {};                                         | 1          |
       | src/state.js                 | export let state = {};                                    | 1          |

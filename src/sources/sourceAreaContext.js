@@ -1,12 +1,13 @@
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+
 import { radians } from '../globals/radians.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
-export function sourceAreaContext(backend, area, map) {
-  const crs = map.options.crs, origin = crs.project(sceneByLayer.get(backend).location);
+export function sourceAreaContext(layer, area, map) {
+  const crs = map.options.crs, origin = crs.project(locationByLayer.get(layer));
   return /* alloc */ {
-    backend, area, map, crs, origin,
-    metres: Math.cos(sceneByLayer.get(backend).location.lat * radians),
+    backend: layer, area, map, crs, origin,
+    metres: Math.cos(locationByLayer.get(layer).lat * radians),
     positions: /* alloc */ [],
     normals: /* alloc */ [],
     colors: /* alloc */ [],

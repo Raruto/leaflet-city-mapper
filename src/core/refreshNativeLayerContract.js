@@ -1,8 +1,9 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
+
 
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function refreshNativeLayerContract(layer = this) {
-  const native = sceneByLayer.get(layer)?._nativeGPU;
+  const native = nativeGPUByLayer.get(layer);
   if (native?.backend && !native.disposed) refreshNativeLayer(native);
 }

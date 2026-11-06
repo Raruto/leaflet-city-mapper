@@ -1,4 +1,4 @@
-import { sunlightByControl } from '../globals/sunlightByControl.js';
+import { sunlightByControl } from '../weakmaps/sunlightByControl.js';
 
 import { removeSun } from './removeSun.js';
 

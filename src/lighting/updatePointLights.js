@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 
 
 import { destroyTexture } from '../rendering/destroyTexture.js';
@@ -6,14 +9,14 @@ import { bindSunlight } from '../shadows/bindSunlight.js';
 import { cacheLightGrid } from './cacheLightGrid.js';
 import { collectLightMeshes } from './collectLightMeshes.js';
 
-export function updatePointLights(backend) {
-  const { device, sunlight: sun } = sceneByLayer.get(backend).renderer;
+export function updatePointLights(layer) {
+  const { device, sunlight: sun } = rendererByLayer.get(layer);
   const fixed = /* alloc */ [];
   const moving = /* alloc */ [];
-  let layer;
-  for (layer of sceneByLayer.get(backend)._layers) {
-    if (!layer.options.nightLight || !sceneByLayer.get(layer).root.visible) continue;
-    collectLightMeshes(sceneByLayer.get(layer).root, fixed, moving);
+  let sceneLayer;
+  for (sceneLayer of layersByLayer.get(layer)) {
+    if (!sceneLayer.options.nightLight || !rootByLayer.get(sceneLayer).visible) continue;
+    collectLightMeshes(rootByLayer.get(sceneLayer), fixed, moving);
   }
   const maxBytes = device.limits.maxStorageBufferBindingSize;
   const staticGrid = cacheLightGrid(fixed, sun.staticLightGrid, maxBytes);
@@ -23,9 +26,9 @@ export function updatePointLights(backend) {
   if (size > maxBytes) throw /* alloc */ new Error('Streetlight grid exceeds GPU storage limit');
   let uploadStatic = staticGrid !== sun.staticLightGrid;
   if (sun.lights.size < size) {
-    destroyTexture(backend, sun.lights);
+    destroyTexture(layer, sun.lights);
     sun.lights = device.createBuffer(/* alloc */ { size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    bindSunlight(backend);
+    bindSunlight(layer);
     uploadStatic = true;
   }
   // The spare header component points to a second grid in the same storage binding.

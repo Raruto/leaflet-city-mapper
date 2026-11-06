@@ -1,5 +1,10 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { trafficByLayer } from '../globals/trafficByLayer.js';
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { raycasterByLayer } from '../weakmaps/raycasterByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
+
+import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
 
 
 import { intersectMeshes } from '../collision/intersectMeshes.js';
@@ -20,18 +25,18 @@ import { validateCameraInverse } from './validateCameraInverse.js';
  * @returns {Object[]} Nearest hit per mesh: object, shared-world point/distance and triangle faceIndex.
  */
 
-export function raycast(backend, event, objects = sceneByLayer.get(backend).root.children, recursive = true) {
-  if (!sceneByLayer.get(backend).renderer) {
+export function raycast(layer, event, objects = rootByLayer.get(layer).children, recursive = true) {
+  if (!rendererByLayer.get(layer)) {
     return /* alloc */ [];
   }
-  const traffic = trafficByLayer.get(backend);
+  const traffic = trafficByLayer.get(layer);
   if (traffic) placeTraffic(traffic);
-  const rect = backend._map.getContainer().getBoundingClientRect();
-  updateWorldMatrix(sceneByLayer.get(backend).scene);
-  updateCamera(sceneByLayer.get(backend).camera);
+  const rect = layer._map.getContainer().getBoundingClientRect();
+  updateWorldMatrix(sceneByLayer.get(layer));
+  updateCamera(cameraByLayer.get(layer));
   // Unproject the mouse (-1..1) into a world-space ray from the camera.
-  const inverseCamera = sceneByLayer.get(backend).raycaster.inverse;
-  const matrix = sceneByLayer.get(backend).camera.projectionViewMatrix;
+  const inverseCamera = raycasterByLayer.get(layer).inverse;
+  const matrix = cameraByLayer.get(layer).projectionViewMatrix;
   inverseCamera.m11 = matrix[0], inverseCamera.m12 = matrix[1], inverseCamera.m13 = matrix[2], inverseCamera.m14 = matrix[3];
   inverseCamera.m21 = matrix[4], inverseCamera.m22 = matrix[5], inverseCamera.m23 = matrix[6], inverseCamera.m24 = matrix[7];
   inverseCamera.m31 = matrix[8], inverseCamera.m32 = matrix[9], inverseCamera.m33 = matrix[10], inverseCamera.m34 = matrix[11];
@@ -45,22 +50,22 @@ export function raycast(backend, event, objects = sceneByLayer.get(backend).root
   const endW = inverseCamera.m14 * x + inverseCamera.m24 * y + inverseCamera.m44;
   let object;
   validateCameraInverse(inverseCamera);
-  sceneByLayer.get(backend).raycaster.origin[0] = sceneByLayer.get(backend).camera.position[0];
-  sceneByLayer.get(backend).raycaster.origin[1] = sceneByLayer.get(backend).camera.position[1];
-  sceneByLayer.get(backend).raycaster.origin[2] = sceneByLayer.get(backend).camera.position[2];
-  sceneByLayer.get(backend).raycaster.direction[0] = endX / endW - sceneByLayer.get(backend).raycaster.origin[0];
-  sceneByLayer.get(backend).raycaster.direction[1] = endY / endW - sceneByLayer.get(backend).raycaster.origin[1];
-  sceneByLayer.get(backend).raycaster.direction[2] = endZ / endW - sceneByLayer.get(backend).raycaster.origin[2];
-  const direction = sceneByLayer.get(backend).raycaster.direction;
+  raycasterByLayer.get(layer).origin[0] = cameraByLayer.get(layer).position[0];
+  raycasterByLayer.get(layer).origin[1] = cameraByLayer.get(layer).position[1];
+  raycasterByLayer.get(layer).origin[2] = cameraByLayer.get(layer).position[2];
+  raycasterByLayer.get(layer).direction[0] = endX / endW - raycasterByLayer.get(layer).origin[0];
+  raycasterByLayer.get(layer).direction[1] = endY / endW - raycasterByLayer.get(layer).origin[1];
+  raycasterByLayer.get(layer).direction[2] = endZ / endW - raycasterByLayer.get(layer).origin[2];
+  const direction = raycasterByLayer.get(layer).direction;
   const rayLength = Math.hypot(direction[0], direction[1], direction[2]) || 1;
-  sceneByLayer.get(backend).raycaster.direction[0] /= rayLength;
-  sceneByLayer.get(backend).raycaster.direction[1] /= rayLength;
-  sceneByLayer.get(backend).raycaster.direction[2] /= rayLength;
-  const meshes = sceneByLayer.get(backend).raycaster.meshes;
+  raycasterByLayer.get(layer).direction[0] /= rayLength;
+  raycasterByLayer.get(layer).direction[1] /= rayLength;
+  raycasterByLayer.get(layer).direction[2] /= rayLength;
+  const meshes = raycasterByLayer.get(layer).meshes;
   meshes.length = 0;
   for (object of objects) {
     if (recursive) traverse(object, collectVisibleMesh, meshes);
     else if (object.geometry && object.visible && object._appearance !== 0) meshes.push(object);
   }
-  return intersectMeshes(sceneByLayer.get(backend).raycaster, meshes, sceneByLayer.get(backend).renderer.uniformData?.[55]);
+  return intersectMeshes(raycasterByLayer.get(layer), meshes, rendererByLayer.get(layer).uniformData?.[55]);
 }

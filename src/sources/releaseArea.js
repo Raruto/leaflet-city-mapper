@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { highlightedFeatureByLayer } from '../weakmaps/highlightedFeatureByLayer.js';
+import { hoveredFeatureByLayer } from '../weakmaps/hoveredFeatureByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { setHighlight } from '../picking/setHighlight.js';
@@ -7,17 +10,17 @@ import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 
 /** Cancel pending work and dispose this block's GPU data, including any hover highlight. */
-export function releaseArea(backend, area) {
+export function releaseArea(layer, area) {
   area.request.abort();
   let attribute;
   if (area.mesh) {
-    if (sceneByLayer.get(backend).highlightedFeature?.mesh === area.mesh) {
-      setHighlight(backend, null);
-      sceneByLayer.get(backend).hoveredFeature = null;
-      showFeature(backend, null);
+    if (highlightedFeatureByLayer.get(layer)?.mesh === area.mesh) {
+      setHighlight(layer, null);
+      mutateWeakMap(hoveredFeatureByLayer, layer, "=", null);
+      showFeature(layer, null);
     }
     setParent(area.mesh, null);
-    update(backend);
+    update(layer);
     const geometry = area.mesh.geometry;
     for (attribute of Object.values(geometry.attributes)) attribute.buffer.destroy();
     area.mesh.program.pipelineCache.clear();

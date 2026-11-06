@@ -1,7 +1,7 @@
 import { textureFor } from './textureFor.js';
 
 export function materialFor(context, material) {
-  const { backend } = context;
+  const { backend: layer } = context;
   const pbr = material.pbrMetallicRoughness;
   return /* alloc */ {
     color: pbr?.baseColorFactor ? pbr.baseColorFactor.slice(0, 3) : /* alloc */ [1, 1, 1],
@@ -14,7 +14,7 @@ export function materialFor(context, material) {
     occlusionTexture: textureFor(context, material.occlusionTexture),
     emissive: material.emissiveFactor || /* alloc */ [0, 0, 0],
     occlusionStrength: material.occlusionTexture?.strength ?? 1,
-    alphaMode: backend.options.alphaMode || material.alphaMode || 'OPAQUE',
+    alphaMode: layer.options.alphaMode || material.alphaMode || 'OPAQUE',
     alphaCutoff: material.alphaCutoff ?? 0.5,
     doubleSided: material.doubleSided,
   };

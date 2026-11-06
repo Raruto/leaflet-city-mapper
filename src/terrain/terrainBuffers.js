@@ -1,10 +1,12 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { terrainGridsByLayer } from '../weakmaps/terrainGridsByLayer.js';
+
 import { demBuffer } from '../globals/demBuffer.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { terrainGrid } from './terrainGrid.js';
 
-export function terrainBuffers(backend, divisions) {
-  const state = sceneByLayer.get(backend), device = state.renderer.device;
-  let attributes = state._terrainGrids.get(divisions);
+export function terrainBuffers(layer, divisions) {
+  const device = rendererByLayer.get(layer).device
+  let attributes = terrainGridsByLayer.get(layer).get(divisions);
   if (!attributes) {
     attributes = terrainGrid(divisions);
     let name, attribute;
@@ -21,7 +23,7 @@ export function terrainBuffers(backend, divisions) {
       ));
       device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
     }
-    state._terrainGrids.set(divisions, attributes);
+    terrainGridsByLayer.get(layer).set(divisions, attributes);
   }
   return attributes;
 }

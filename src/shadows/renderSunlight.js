@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { disabledShadow } from '../globals/disabledShadow.js';
 import { shadowValues } from '../globals/shadowValues.js';
 
@@ -10,8 +11,8 @@ import { resizeSunlight } from './resizeSunlight.js';
 
 /** One shared directional depth map. Off-screen but loaded geometry can cast shadows. */
 
-export function renderSunlight(backend, encoder, meshes, sunlight) {
-  const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+export function renderSunlight(layer, encoder, meshes, sunlight) {
+  const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
   if (!meshes.length || !sunlight || sunlight.altitude < 3) {
     if (!sun.enabled) return;
     device.queue.writeBuffer(sun.buffer, 0, disabledShadow);
@@ -22,7 +23,7 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
   if (shadowCacheMatches(sun, meshes, sunlight)) return;
   const values = shadowValues;
   sun.enabled = true;
-  resizeSunlight(backend, Math.min(2048, device.limits.maxTextureDimension2D));
+  resizeSunlight(layer, Math.min(2048, device.limits.maxTextureDimension2D));
   values.set(shadowMatrix(meshes, sunlight));
   values[16] = 1;
   device.queue.writeBuffer(sun.buffer, 0, values);
@@ -34,7 +35,7 @@ export function renderSunlight(backend, encoder, meshes, sunlight) {
       break;
     }
   }
-  drawShadowMeshes(backend, encoder, meshes);
+  drawShadowMeshes(layer, encoder, meshes);
   const snapshots = /* alloc */ new Map();
   let mesh2;
   for (mesh2 of meshes) {

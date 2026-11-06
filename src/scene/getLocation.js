@@ -1,7 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+
 
 
 
 export function getLocation(layer) {
-  return sceneByLayer.get(layer)?.location;
+  return locationByLayer.get(layer);
 }

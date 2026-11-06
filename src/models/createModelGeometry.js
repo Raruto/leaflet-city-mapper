@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { vertexNormals } from '../geometry/vertexNormals.js';
 import { createProgram } from '../rendering/createProgram.js';
 
@@ -16,7 +17,7 @@ export function createModelGeometry(context, primitive, attributes) {
   }
   const program = createProgram(context.backend, style);
   context.resources.push(program);
-  const device = sceneByLayer.get(context.backend).renderer.device;
+  const device = rendererByLayer.get(context.backend).device;
   if (attributes.index?.data instanceof Uint8Array) attributes.index.data = Uint16Array.from(attributes.index.data);
   let name, attribute;
   for ([name, attribute] of Object.entries(attributes)) {

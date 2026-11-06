@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { areasByLayer } from '../weakmaps/areasByLayer.js';
+
 
 
 import { releaseArea } from '../sources/releaseArea.js';
@@ -9,9 +10,9 @@ import { updateArea } from "../sources/updateArea.js";
 export function onTerrainChange(layer) {
   if (!layer._map) return;
   let area;
-  for (area of sceneByLayer.get(layer)._areas.values()) {
+  for (area of areasByLayer.get(layer).values()) {
     releaseArea(layer, area);
   }
-  sceneByLayer.get(layer)._areas.clear();
+  areasByLayer.get(layer).clear();
   updateArea(layer);
 }

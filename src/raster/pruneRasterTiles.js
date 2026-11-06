@@ -1,29 +1,36 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { pruneAfterByLayer } from '../weakmaps/pruneAfterByLayer.js';
+import { pruneVersionByLayer } from '../weakmaps/pruneVersionByLayer.js';
+import { pruneWantedByLayer } from '../weakmaps/pruneWantedByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
+import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { releaseRasterTile } from './releaseRasterTile.js';
 
-export function pruneRasterTiles(backend) {
-  const wanted = sceneByLayer.get(backend)._wantedRasterTiles;
+export function pruneRasterTiles(layer) {
+  const wanted = wantedRasterTilesByLayer.get(layer);
   const now = performance.now();
-  if (sceneByLayer.get(backend)._pruneVersion === sceneByLayer.get(backend)._rasterVersion && sceneByLayer.get(backend)._pruneWanted === wanted &&
-    now < sceneByLayer.get(backend)._pruneAfter) return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
-  sceneByLayer.get(backend)._pruneVersion = sceneByLayer.get(backend)._rasterVersion;
-  sceneByLayer.get(backend)._pruneWanted = wanted;
-  sceneByLayer.get(backend)._pruneAfter = Infinity;
+  if (pruneVersionByLayer.get(layer) === rasterVersionByLayer.get(layer) && pruneWantedByLayer.get(layer) === wanted &&
+    now < pruneAfterByLayer.get(layer)) return Number.isFinite(pruneAfterByLayer.get(layer));
+  mutateWeakMap(pruneVersionByLayer, layer, "=", rasterVersionByLayer.get(layer));
+  mutateWeakMap(pruneWantedByLayer, layer, "=", wanted);
+  mutateWeakMap(pruneAfterByLayer, layer, "=", Infinity);
   const pending = /* alloc */ [];
   let key, tile, parts, overlaps, coords, zoom;
   for (key of wanted) {
-    tile = sceneByLayer.get(backend)._rasterTiles.get(key);
+    tile = rasterTilesByLayer.get(layer).get(key);
     if (tile?.done && now - tile.loadedAt < 250) {
-      sceneByLayer.get(backend)._pruneAfter = Math.min(sceneByLayer.get(backend)._pruneAfter, tile.loadedAt + 250);
+      mutateWeakMap(pruneAfterByLayer, layer, "=", Math.min(pruneAfterByLayer.get(layer), tile.loadedAt + 250));
     }
     if (!tile?.done || now - tile.loadedAt < 250) {
       parts = key.split('/');
       pending.push(/* alloc */ { z: Number(parts[0]), x: Number(parts[1]), y: Number(parts[2]) });
     }
   }
-  for ([key, tile] of sceneByLayer.get(backend)._rasterTiles) {
+  for ([key, tile] of rasterTilesByLayer.get(layer)) {
     if (wanted.has(key)) continue;
     overlaps = false;
     for (coords of pending) {
@@ -34,7 +41,7 @@ export function pruneRasterTiles(backend) {
         break;
       }
     }
-    if (!overlaps) releaseRasterTile(backend, tile);
+    if (!overlaps) releaseRasterTile(layer, tile);
   }
-  return Number.isFinite(sceneByLayer.get(backend)._pruneAfter);
+  return Number.isFinite(pruneAfterByLayer.get(layer));
 }

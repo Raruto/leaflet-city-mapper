@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { modelByLayer } from '../weakmaps/modelByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 
 
 import { raycast } from './raycast.js';
@@ -9,21 +12,22 @@ import { raycast } from './raycast.js';
  * @returns {PickedFeature|null}
  */
 
-export function findFeature(backend, event) {
-  if (!sceneByLayer.get(backend).root || !sceneByLayer.get(backend).camera) {
+export function findFeature(layer, event) {
+  const model = modelByLayer.get(layer)
+  if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
     return null;
   }
   let hit, object, ranges, low, high, middle, range;
-  for (hit of raycast(backend, event, sceneByLayer.get(backend).root.children, Boolean(sceneByLayer.get(backend).model))) {
-    if (sceneByLayer.get(backend).model) {
+  for (hit of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
+    if (model) {
       object = hit.object;
-      while (object && object !== sceneByLayer.get(backend).model) {
+      while (object && object !== model) {
         object = object.parent;
       }
-      if (object === sceneByLayer.get(backend).model) {
+      if (object === model) {
         return /* alloc */ {
-          id: sceneByLayer.get(backend).model.id, properties: sceneByLayer.get(backend).model.extras,
-          model: sceneByLayer.get(backend).model, mesh: hit.object, point: hit.point
+          id: model.id, properties: model.extras,
+          model, mesh: hit.object, point: hit.point
         };
       }
     }

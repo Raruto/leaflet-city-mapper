@@ -102,7 +102,7 @@ sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
  * @property {number} [skipped] Features skipped by style.
  * @property {string} [error] Failed load/build message.
  *
- * @param {L.Layer} backend
+ * @param {L.Layer} layer
  * @param {Layer3DOptions} [options] World origin comes from center or the first map centre.
  */
 

@@ -1,15 +1,17 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { sizeByLayer } from '../weakmaps/sizeByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { onMapChange } from './onMapChange.js';
 import { startZoom } from './startZoom.js';
 import { onZoomAnim } from './onZoomAnim.js';
 import { endZoom } from './endZoom.js';
 
-export function mountRenderer(backend, map, canvas) {
-  sceneByLayer.get(backend)._size = null;
+export function mountRenderer(layer, map, canvas) {
+  mutateWeakMap(sizeByLayer, layer, "=", null);
   canvas.className = 'leaflet-3d';
   canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none';
   canvas.setAttribute('role', 'img');
-  canvas.setAttribute('aria-label', backend.options.ariaLabel ?? '3D scene');
+  canvas.setAttribute('aria-label', layer.options.ariaLabel ?? '3D scene');
   let pane = map.getPane('webgpuPane');
   if (!pane) {
     pane = map.createPane('webgpuPane', map.getContainer());
@@ -18,8 +20,8 @@ export function mountRenderer(backend, map, canvas) {
     pane.style.pointerEvents = 'none';
   }
   pane.append(canvas);
-  map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange, backend);
-  map.on('zoomstart', startZoom, backend);
-  map.on('zoomanim', onZoomAnim, backend);
-  map.on('zoomend', endZoom, backend);
+  map.on('move zoom rotate pitch resize viewreset layeradd layerremove', onMapChange, layer);
+  map.on('zoomstart', startZoom, layer);
+  map.on('zoomanim', onZoomAnim, layer);
+  map.on('zoomend', endZoom, layer);
 }

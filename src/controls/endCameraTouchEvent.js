@@ -1,4 +1,4 @@
-import { touchByContainer } from '../globals/touchByContainer.js';
+import { touchByContainer } from '../weakmaps/touchByContainer.js';
 
 
 import { endCameraTouch } from './endCameraTouch.js';

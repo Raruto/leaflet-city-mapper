@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { frameByLayer } from '../weakmaps/frameByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { pendingUpdates } from '../globals/pendingUpdates.js';
 
 
@@ -8,16 +11,16 @@ import { renderPendingUpdates } from './renderPendingUpdates.js';
 
 /** Scene graph, shared camera and frame rendering. */
 /** Content changes: render once on the next animation frame. */
-export function update(backend) {
-  const shared = sceneByLayer.get(backend)._shared;
-  if (!shared) return backend;
-  if (shared !== backend) {
+export function update(layer) {
+  const shared = sharedByLayer.get(layer);
+  if (!shared) return layer;
+  if (shared !== layer) {
     update(shared);
-    return backend;
+    return layer;
   }
-  if (sceneByLayer.get(backend)._frame != null) return backend;
+  if (frameByLayer.get(layer) != null) return layer;
   const first = pendingUpdates.values().next().value;
-  pendingUpdates.add(backend);
-  sceneByLayer.get(backend)._frame = first ? sceneByLayer.get(first)._frame : requestAnimationFrame(renderPendingUpdates);
-  return backend;
+  pendingUpdates.add(layer);
+  mutateWeakMap(frameByLayer, layer, "=", first ? frameByLayer.get(first) : requestAnimationFrame(renderPendingUpdates));
+  return layer;
 }

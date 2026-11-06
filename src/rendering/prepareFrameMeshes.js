@@ -1,16 +1,19 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
+import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
+
 
 
 import { sortMeshes } from "./sortMeshes.js";
 import { revealRoofMesh } from './revealRoofMesh.js';
 
-export function prepareFrameMeshes(backend, rasters, now, meshes) {
-  const candidates = sceneByLayer.get(backend)._visibleMeshes, shadowMeshes = sceneByLayer.get(backend)._shadowMeshes, renderer = sceneByLayer.get(backend).renderer;
+export function prepareFrameMeshes(layer, rasters, now, meshes) {
+  const candidates = visibleMeshesByLayer.get(layer), shadowMeshes = shadowMeshesByLayer.get(layer), renderer = rendererByLayer.get(layer);
   let appearing = false;
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   let mesh, progress;
   for (mesh of candidates) {
-    if (!revealRoofMesh(backend, mesh, rasters)) continue;
+    if (!revealRoofMesh(layer, mesh, rasters)) continue;
     if (mesh.fadeDuration) {
       mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
       progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);

@@ -1,5 +1,11 @@
-import { renderers } from '../globals/renderers.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { areasByLayer } from '../weakmaps/areasByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
+import { renderers } from '../weakmaps/renderers.js';
 
 
 
@@ -21,24 +27,24 @@ import { buildArea } from './buildArea.js';
 import { pendingSourceAreas } from './pendingSourceAreas.js';
 
 /** Share four load/build slots across source layers, nearest ground blocks first. */
-export function pump(backend, map = backend._map) {
+export function pump(layer, map = layer._map) {
   const shared = map && renderers.get(map);
   if (!shared) return;
   const layers = /* alloc */ [];
-  let layer, area, areaBackend;
-  for (layer of sceneByLayer.get(shared)._layers) {
-    if (Number.isFinite(sceneByLayer.get(layer)._inflight) && sceneByLayer.get(layer)._areas && (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson)) layers.push(layer);
+  let sourceLayer, area, areaBackend;
+  for (sourceLayer of layersByLayer.get(shared)) {
+    if (Number.isFinite(inflightByLayer.get(sourceLayer)) && areasByLayer.get(sourceLayer) && (urlByLayer.get(sourceLayer) || geojsonByLayer.get(sourceLayer))) layers.push(sourceLayer);
   }
   const pending = pendingSourceAreas(layers, map);
   let inflight = 0;
-  for (layer of layers) inflight += sceneByLayer.get(layer)._inflight;
+  for (sourceLayer of layers) inflight += inflightByLayer.get(sourceLayer);
   for ({ layer: areaBackend, area } of pending) {
     if (inflight >= 4) break;
-    if (sceneByLayer.get(areaBackend)._inflight >= 2) continue;
+    if (inflightByLayer.get(areaBackend) >= 2) continue;
     area.started = true;
-    sceneByLayer.get(areaBackend)._inflight++;
+    mutateWeakMap(inflightByLayer, areaBackend, "++", undefined, false);
     inflight++;
     buildArea(areaBackend, area, map);
   }
-  for (layer of layers) updateStatus(layer);
+  for (sourceLayer of layers) updateStatus(sourceLayer);
 }

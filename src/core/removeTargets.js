@@ -1,9 +1,11 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 import { disposeNativeLayer } from './disposeNativeLayer.js';
 
 export function removeTargets(state) {
-  if (sceneByLayer.get(state.source)._nativeGPU === state) sceneByLayer.get(state.source)._nativeGPU = null;
+  if (nativeGPUByLayer.get(state.source) === state) mutateWeakMap(nativeGPUByLayer, state.source, "=", null);
   if (state.backend) disposeNativeLayer.call(state);
   let element;
   for (element of state.hidden) {

@@ -1,4 +1,14 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { addedByLayer } from '../weakmaps/addedByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { groupByLayer } from '../weakmaps/groupByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
+import { raycasterByLayer } from '../weakmaps/raycasterByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { emptyNode } from './emptyNode.js';
@@ -9,23 +19,23 @@ import { update } from './update.js';
 
 export async function ready3D(layer) {
   try {
-    sceneByLayer.get(layer).root = emptyNode();
-    sceneByLayer.get(layer).raycaster = /* alloc */ {
+    mutateWeakMap(rootByLayer, layer, "=", emptyNode());
+    mutateWeakMap(raycasterByLayer, layer, "=", /* alloc */ {
       origin: /* alloc */ [0, 0, 0],
       direction: /* alloc */ [0, 0, 0],
       inverse: /* alloc */ new DOMMatrix(),
       meshes: /* alloc */ [],
-    };
-    if (sceneByLayer.get(layer).url || sceneByLayer.get(layer)._geojson) {
-      sceneByLayer.get(layer).group = sceneByLayer.get(layer).root;
-      if (sceneByLayer.get(layer).url) sceneByLayer.get(layer).header = await getHeader(layer);
+    });
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) {
+      mutateWeakMap(groupByLayer, layer, "=", rootByLayer.get(layer));
+      if (urlByLayer.get(layer)) mutateWeakMap(headerByLayer, layer, "=", await getHeader(layer));
     }
     if (layer._map) {
       await attach(layer, layer._map);
-      sceneByLayer.get(layer)._added.resolve();
+      addedByLayer.get(layer).resolve();
     }
-    if (sceneByLayer.get(layer).modelUrl) await loadModel(layer);
-    if (sceneByLayer.get(layer)._shared) update(layer);
+    if (modelUrlByLayer.get(layer)) await loadModel(layer);
+    if (sharedByLayer.get(layer)) update(layer);
     layer.fire('ready');
     return layer;
   } catch (error) {

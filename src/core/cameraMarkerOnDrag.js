@@ -1,5 +1,5 @@
 import { L } from '../globals/L.js';
-import { dragByHandler } from '../globals/dragByHandler.js';
+import { dragByHandler } from '../weakmaps/dragByHandler.js';
 
 
 

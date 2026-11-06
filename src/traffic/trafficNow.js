@@ -1,8 +1,9 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
+
 
 
 export function trafficNow(state) {
-  const control = cameraByMap.get(state.layer._map)?._timeControl;
+  const control = timeControlByMap.get(state.layer._map);
   const live = control ? control.live : true;
   return /* alloc */ {
     live, time: live ? /* alloc */ new Date() : control.time,

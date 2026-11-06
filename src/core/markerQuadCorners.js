@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 import { coreMatrixKeys } from '../globals/coreMatrixKeys.js';
 import { markerCameraIconPoint } from './markerCameraIconPoint.js';
 
@@ -8,7 +10,8 @@ import { transformNativePoint } from './transformNativePoint.js';
 import { markerImageBounds } from './markerImageBounds.js';
 
 export function markerQuadCorners(state, key, image) {
-  const { source, map, backend } = state;
+  const { source, map, backend: layer } = state;
+
   const position = localPosition(state, source.getLatLng());
   const size = map.getSize();
   const matrices = state.markerMatrices ||= /* alloc */ {
@@ -17,7 +20,7 @@ export function markerQuadCorners(state, key, image) {
     point: /* alloc */ { x: 0, y: 0, z: 0, w: 1 },
   };
   const root = matrices.root, camera = matrices.camera, point = matrices.point;
-  const worldMatrix = sceneByLayer.get(backend).root.worldMatrix, projection = sceneByLayer.get(backend).camera.projectionViewMatrix;
+  const worldMatrix = rootByLayer.get(layer).worldMatrix, projection = cameraByLayer.get(layer).projectionViewMatrix;
   let i, keyName;
   for (i = 0; i < 16; i++) {
     keyName = coreMatrixKeys[i];

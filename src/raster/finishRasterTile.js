@@ -1,4 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
+import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { blobParts } from '../globals/blobParts.js';
 
 import { update } from "../scene/update.js";
@@ -8,10 +12,10 @@ import { pumpRasterTiles } from './pumpRasterTiles.js';
 import { createRasterMesh } from './createRasterMesh.js';
 import { getZxy } from '../archives/getZxy.js';
 
-export async function finishRasterTile(backend, tile) {
+export async function finishRasterTile(layer, tile) {
   try {
-    await sceneByLayer.get(backend).ready;
-    const result = await getZxy(backend.options.archive,
+    await readyByLayer.get(layer);
+    const result = await getZxy(layer.options.archive,
       tile.coords.z, tile.coords.x, tile.coords.y, tile.request.signal
     );
     if (tile.request.signal.aborted) {
@@ -36,26 +40,26 @@ export async function finishRasterTile(backend, tile) {
       tile.image = null;
       return;
     }
-    createRasterMesh(backend, tile);
+    createRasterMesh(layer, tile);
     tile.loadedAt = performance.now();
     tile.done = true;
-    sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
-    registerTerrainTile(backend, tile.coords, tile);
-    backend.fire('tileload', /* alloc */ { tile, coords: tile.coords });
-    update(backend);
+    mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+    registerTerrainTile(layer, tile.coords, tile);
+    layer.fire('tileload', /* alloc */ { tile, coords: tile.coords });
+    update(layer);
   } catch (error) {
     if (tile.request.signal.aborted) return;
     tile.error = error.message;
-    sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
-    backend.fire('tileerror', /* alloc */ { tile, coords: tile.coords, error });
-    backend.fire('error', /* alloc */ { error, coords: tile.coords });
+    mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
+    layer.fire('tileerror', /* alloc */ { tile, coords: tile.coords, error });
+    layer.fire('error', /* alloc */ { error, coords: tile.coords });
   } finally {
-    sceneByLayer.get(backend)._loadingTiles--;
-    if (backend._map) {
-      pumpRasterTiles(backend);
-      pruneRasterTiles(backend);
-      if (!sceneByLayer.get(backend)._loadingTiles) backend.fire('load');
-      update(backend);
+    mutateWeakMap(loadingTilesByLayer, layer, "--", undefined, false);
+    if (layer._map) {
+      pumpRasterTiles(layer);
+      pruneRasterTiles(layer);
+      if (!loadingTilesByLayer.get(layer)) layer.fire('load');
+      update(layer);
     }
   }
 }

@@ -1,11 +1,14 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
+
 
 
 import { prepareFrameBuffer } from './prepareFrameBuffer.js';
 import { updatePointLights } from '../lighting/updatePointLights.js';
 
-export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
-  const renderer = sceneByLayer.get(backend).renderer, camera = sceneByLayer.get(backend).camera;
+export function prepareFrameUniforms(layer, meshes, shadowMeshes, sunlight) {
+  const renderer = rendererByLayer.get(layer), camera = cameraByLayer.get(layer);
   const view = camera.viewMatrix, direction = sunlight?.direction;
   const x = direction ? direction[0] : -300;
   const y = direction ? direction[1] : 500;
@@ -16,11 +19,11 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   const lightLength = Math.hypot(lightX, lightY, lightZ) || 1;
   const skyLength = Math.hypot(view[4], view[5], view[6]) || 1;
   // One uniform upload per frame: per-mesh writeBuffer calls dominate Firefox's GPU process.
-  prepareFrameBuffer(backend, meshes, shadowMeshes);
+  prepareFrameBuffer(layer, meshes, shadowMeshes);
   const frameData = renderer.uniformData;
   frameData.set(camera.viewMatrix, 0);
   frameData.set(camera.projectionMatrix, 16);
-  if (sceneByLayer.get(backend)._roofRaster?.matrix) frameData.set(sceneByLayer.get(backend)._roofRaster.matrix, 32);
+  if (roofRasterByLayer.get(layer)?.matrix) frameData.set(roofRasterByLayer.get(layer).matrix, 32);
   else {
     frameData.fill(0, 32, 48);
     frameData[32] = frameData[37] = frameData[42] = frameData[47] = 1;
@@ -39,6 +42,6 @@ export function prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight) {
   frameData[57] = tint ? tint[1] : 1;
   frameData[58] = tint ? tint[2] : 1;
   frameData[59] = 0;
-  if (night > 0) updatePointLights(backend);
+  if (night > 0) updatePointLights(layer);
   renderer.uniformSlot = 1;
 }

@@ -1,4 +1,4 @@
-import { dragByHandler } from '../globals/dragByHandler.js';
+import { dragByHandler } from '../weakmaps/dragByHandler.js';
 
 
 import { cameraMarkerOnDrag } from './cameraMarkerOnDrag.js';

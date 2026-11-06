@@ -1,4 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+
 
 
 
@@ -12,13 +16,13 @@ import { hitMesh } from './hitMesh.js';
 // ponytail: traffic vehicles and boats move on the GPU and are not obstacles.
 
 export function hit(layer, x, y, z, dx, dz, reach, data) {
-  updateWorldMatrix(sceneByLayer.get(layer).scene);
+  updateWorldMatrix(sceneByLayer.get(layer));
   data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
   data.best = reach, data.found = false;
   let other;
-  for (other of sceneByLayer.get(sceneByLayer.get(layer)._shared)._layers) {
+  for (other of layersByLayer.get(sharedByLayer.get(layer))) {
     if (shouldSkipOther(other, layer)) continue;
-    traverse(sceneByLayer.get(other).root, hitMesh, data);
+    traverse(rootByLayer.get(other), hitMesh, data);
   }
   return data.found ? data.normal : null;
 }

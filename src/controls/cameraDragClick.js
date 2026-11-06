@@ -1,4 +1,4 @@
-import { dragStates } from '../globals/dragStates.js';
+import { dragStates } from '../weakmaps/dragStates.js';
 
 
 export function cameraDragClick(event) {

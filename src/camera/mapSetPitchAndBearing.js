@@ -1,4 +1,7 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraBearingByMap } from '../weakmaps/cameraBearingByMap.js';
+import { cameraPitchByMap } from '../weakmaps/cameraPitchByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
@@ -11,8 +14,8 @@ export function mapSetPitchAndBearing(map, pitch, bearing) {
     throw /* alloc */ new TypeError('maxPitch must be between 0 and 180 degrees');
   }
   const previousPitch = mapGetPitch(map), previousBearing = mapGetBearing(map);
-  cameraByMap.get(map)._cameraPitch = Math.max(0, Math.min(map.options.maxPitch, pitch));
-  cameraByMap.get(map)._cameraBearing = ((bearing % 360) + 360) % 360;
+  mutateWeakMap(cameraPitchByMap, map, "=", Math.max(0, Math.min(map.options.maxPitch, pitch)));
+  mutateWeakMap(cameraBearingByMap, map, "=", ((bearing % 360) + 360) % 360);
   if (map._loaded) {
     updateSky.call(map);
     if (previousBearing !== mapGetBearing(map)) map.fire('rotate', /* alloc */ { bearing: mapGetBearing(map) });

@@ -1,7 +1,13 @@
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+import { rasterGeometryByLayer } from '../weakmaps/rasterGeometryByLayer.js';
+import { rasterProgramByLayer } from '../weakmaps/rasterProgramByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { radians } from '../globals/radians.js';
 import { rasterTexture } from '../globals/rasterTexture.js';
 import { rasterSampler } from '../globals/rasterSampler.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { meshImage } from '../globals/meshImage.js';
 import { meshTarget } from '../globals/meshTarget.js';
 import { meshCopySize } from '../globals/meshCopySize.js';
@@ -16,8 +22,8 @@ import { setParent } from "../scene/setParent.js";
 
 import { createGeometry } from './createGeometry.js';
 
-export function createRasterMesh(backend, tile) {
-  const device = sceneByLayer.get(backend).renderer.device;
+export function createRasterMesh(layer, tile) {
+  const device = rendererByLayer.get(layer).device;
   const texture = /* alloc */ {
     device,
     texture: device.createTexture((
@@ -42,16 +48,16 @@ export function createRasterMesh(backend, tile) {
   destination.texture = null;
   texture.uploaded = tile.image;
 
-  if (!sceneByLayer.get(backend)._rasterProgram) {
-    sceneByLayer.get(backend)._rasterProgram = createProgram(backend, /* alloc */ {
-      baseTexture: texture, unlit: true, alphaMode: 'BLEND', doubleSided: backend.options.doubleSided,
-    });
+  if (!rasterProgramByLayer.get(layer)) {
+    mutateWeakMap(rasterProgramByLayer, layer, "=", createProgram(layer, /* alloc */ {
+      baseTexture: texture, unlit: true, alphaMode: 'BLEND', doubleSided: layer.options.doubleSided,
+    }));
   }
-  if (!sceneByLayer.get(backend)._rasterGeometry) sceneByLayer.get(backend)._rasterGeometry = createGeometry(device);
+  if (!rasterGeometryByLayer.get(layer)) mutateWeakMap(rasterGeometryByLayer, layer, "=", createGeometry(device));
   const { coords } = tile;
-  const crs = backend._map.options.crs;
-  const origin = crs.project(sceneByLayer.get(backend).location);
-  const metres = Math.cos(sceneByLayer.get(backend).location.lat * radians);
+  const crs = layer._map.options.crs;
+  const origin = crs.project(locationByLayer.get(layer));
+  const metres = Math.cos(locationByLayer.get(layer).lat * radians);
   const scale = crs.scale(coords.z);
   const point = rasterPoint;
   point.x = coords.x * TILE_SIZE; point.y = coords.y * TILE_SIZE;
@@ -66,11 +72,11 @@ export function createRasterMesh(backend, tile) {
     rotation: /* alloc */ [0, 0, 0],
     scale: /* alloc */ [sizeX, 1, sizeZ],
     worldMatrix: /* alloc */ [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    children: /* alloc */ [], visible: true, device, geometry: sceneByLayer.get(backend)._rasterGeometry,
-    program: sceneByLayer.get(backend)._rasterProgram, texture,
-    opacity: backend.options.opacity, id: nextId.value++,
-    renderOrder: backend.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
-    _rasterSource: backend,
+    children: /* alloc */ [], visible: true, device, geometry: rasterGeometryByLayer.get(layer),
+    program: rasterProgramByLayer.get(layer), texture,
+    opacity: layer.options.opacity, id: nextId.value++,
+    renderOrder: layer.options.zIndex || 0, tile, fadeDuration: 250, ground: true,
+    _rasterSource: layer,
   };
-  setParent(tile.mesh, sceneByLayer.get(backend).root);
+  setParent(tile.mesh, rootByLayer.get(layer));
 }

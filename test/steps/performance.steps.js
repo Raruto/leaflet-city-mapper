@@ -397,11 +397,11 @@ function inspectModuleVariables(node, path, exported, errors) {
   if (node.type === 'VariableDeclaration') {
     const file = path.join('/');
     const name = path.at(-1).replace(/\.js$/, '');
-    if (path.length !== 3 || path[0] !== 'src' || path[1] !== 'globals' ||
+    if (path.length !== 3 || path[0] !== 'src' || !['globals', 'weakmaps'].includes(path[1]) ||
         node.kind !== 'const' || node.declarations.length !== 1 ||
         node.declarations[0].id.type !== 'Identifier' || node.declarations[0].id.name !== name ||
         !exported.has(name)) {
-      errors.push(`${file}:${node.loc.start.line} module variables must be a single exported const matching their src/globals filename`);
+      errors.push(`${file}:${node.loc.start.line} module variables must be a single exported const matching their dedicated module filename`);
     }
   }
   for (const value of Object.values(node)) {
@@ -428,9 +428,11 @@ Then('module constants and state use dedicated global modules', { timeout: 60000
   assert.deepEqual(errors, []);
   assert.ok(!(await readdir('src')).includes('constants'), 'src/constants must not be reintroduced');
   assert.ok(!(await readdir('src')).includes('state.js'), 'The shared state aggregator must not be reintroduced');
-  for (const file of await readdir('src/globals')) {
-    const module = await import(`../../src/globals/${file}`);
-    assert.deepEqual(Object.keys(module), [file.replace(/\.js$/, '')]);
+  for (const directory of ['globals', 'weakmaps']) {
+    for (const file of await readdir(`src/${directory}`)) {
+      const module = await import(`../../src/${directory}/${file}`);
+      assert.deepEqual(Object.keys(module), [file.replace(/\.js$/, '')]);
+    }
   }
 });
 

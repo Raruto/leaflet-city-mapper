@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 import { limbs } from '../globals/limbs.js';
 import { parts } from '../globals/parts.js';
 import { moves } from '../globals/moves.js';
@@ -20,7 +22,7 @@ export function step(now) {
   this.frame = requestAnimationFrame(this.step);
   const dt = Math.min(0.1, (now - (this.last ?? now)) / 1000);
   this.last = now;
-  if (!sceneByLayer.get(layer).renderer) return;
+  if (!rendererByLayer.get(layer)) return;
   let changed = false;
   let part, key;
   if (!this.meshes) {
@@ -28,8 +30,8 @@ export function step(now) {
     for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));
     changed = true;
   }
-  const previousY = sceneByLayer.get(layer).root.position[1] +
-    local.call(this, this.local)[1] * sceneByLayer.get(layer).root.scale[1];
+  const previousY = rootByLayer.get(layer).position[1] +
+    local.call(this, this.local)[1] * rootByLayer.get(layer).scale[1];
   if (stepWalkerHeight.call(this, dt)) changed = true;
   let forward = 0, turn = 0;
   for (key of this.keys) { forward += moves[key]?.[0] || 0; turn += moves[key]?.[1] || 0; }

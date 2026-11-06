@@ -1,4 +1,10 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
+import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { wantedTiles } from '../globals/wantedTiles.js';
 import { coverageTiles } from '../globals/coverageTiles.js';
 
@@ -12,17 +18,17 @@ import { rasterTileRange } from './rasterTileRange.js';
 
 // ponytail: cap horizon views at 169 tiles; raise the radius if extreme pitches need more.
 
-export function updateRasterTiles(backend) {
-  const map = backend._map;
-  if (!map || !sceneByLayer.get(backend)._shared || !sceneByLayer.get(backend).header) return;
+export function updateRasterTiles(layer) {
+  const map = layer._map;
+  if (!map || !sharedByLayer.get(layer) || !headerByLayer.get(layer)) return;
 
-  const zoom = Math.max(sceneByLayer.get(backend).header.minZoom ?? 0, Math.min(
+  const zoom = Math.max(headerByLayer.get(layer).minZoom ?? 0, Math.min(
     Math.round(map.getZoom()),
-    backend.options.maxZoom,
-    backend.options.maxNativeZoom
+    layer.options.maxZoom,
+    layer.options.maxNativeZoom
   ));
-  sceneByLayer.get(backend)._tileZoom = zoom;
-  const range = rasterTileRange(map, sceneByLayer.get(backend).header, zoom);
+  mutateWeakMap(tileZoomByLayer, layer, "=", zoom);
+  const range = rasterTileRange(map, headerByLayer.get(layer), zoom);
   const wanted = wantedTiles;
   wanted.clear();
   let x, y, key, coords, parent;
@@ -31,13 +37,13 @@ export function updateRasterTiles(backend) {
       wanted.set(`${zoom}/${x}/${y}`, /* alloc */ { z: zoom, x, y });
     }
   }
-  sceneByLayer.get(backend)._wantedRasterTiles = /* alloc */ new Set(wanted.keys());
+  mutateWeakMap(wantedRasterTilesByLayer, layer, "=", /* alloc */ new Set(wanted.keys()));
   const coverage = coverageTiles;
   coverage.clear();
-  const parentZoom = Math.max(sceneByLayer.get(backend).header.minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
+  const parentZoom = Math.max(headerByLayer.get(layer).minZoom ?? 0, zoom - 2), factor = 2 ** (zoom - parentZoom);
   if (parentZoom < zoom) {
     for ([key, coords] of wanted) {
-      if (sceneByLayer.get(backend)._rasterTiles.get(key)?.done) continue;
+      if (rasterTilesByLayer.get(layer).get(key)?.done) continue;
       parent = /* alloc */ { z: parentZoom, x: Math.floor(coords.x / factor), y: Math.floor(coords.y / factor) };
       coverage.set(`${parent.z}/${parent.x}/${parent.y}`, parent);
     }
@@ -45,7 +51,7 @@ export function updateRasterTiles(backend) {
   const required = /* alloc */ new Map(coverage);
   for ([key, coords] of wanted) required.set(key, coords);
   wanted.clear(); coverage.clear();
-  retainRasterTiles(backend, required);
-  pumpRasterTiles(backend);
-  pruneRasterTiles(backend);
+  retainRasterTiles(layer, required);
+  pumpRasterTiles(layer);
+  pruneRasterTiles(layer);
 }

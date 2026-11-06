@@ -1,5 +1,8 @@
+import { typeByLayer } from '../weakmaps/typeByLayer.js';
+import { walkerByLayer } from '../weakmaps/walkerByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { init3D } from '../scene/init3D.js';
@@ -18,7 +21,7 @@ export function createWalk(control, {
   ...options
 }) {
   const layer = /* alloc */ new L.Layer();
-  sceneByLayer.get(layer)._type = 'walk';
+  mutateWeakMap(typeByLayer, layer, "=", 'walk');
   init3D(layer, options);
   const keys = /* alloc */ new Set();
   const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
@@ -51,7 +54,7 @@ export function createWalk(control, {
     saved: null,
     hitData: null,
     local: null,
-    state: control.walker = sceneByLayer.get(layer).walker = /* alloc */ { latlng: null, heading: 0, phase: 0, height: 0 }
+    state: control.walker = mutateWeakMap(walkerByLayer, layer, "=", /* alloc */ { latlng: null, heading: 0, phase: 0, height: 0 })
   }
   context.step = step.bind(context);
   context.onKey = onKey.bind(context);

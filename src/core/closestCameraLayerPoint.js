@@ -1,4 +1,4 @@
-import { closestMethods } from '../globals/closestMethods.js';
+import { closestMethods } from '../weakmaps/closestMethods.js';
 
 
 export function closestCameraLayerPoint(point) {

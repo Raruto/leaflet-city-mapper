@@ -1,8 +1,10 @@
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { closestMethods } from '../globals/closestMethods.js';
-import { boundsMethods } from '../globals/boundsMethods.js';
-import { gridInitializers } from '../globals/gridInitializers.js';
+import { closestMethods } from '../weakmaps/closestMethods.js';
+import { boundsMethods } from '../weakmaps/boundsMethods.js';
+import { gridInitializers } from '../weakmaps/gridInitializers.js';
 
 
 import { noOperation } from '../utils/noOperation.js';
@@ -20,7 +22,7 @@ export function initializeNativeLayer() {
   if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
     this.beforeAdd = this._updateBounds = noOperation;
     this.redraw = redrawPath;
-    sceneByLayer.get(this).kind = 'path';
+    mutateWeakMap(kindByLayer, this, "=", 'path');
     if (this instanceof L.Polyline) {
       closestMethods.set(this, this.closestLayerPoint);
       this.closestLayerPoint = closestCameraLayerPoint;
@@ -34,7 +36,7 @@ export function initializeNativeLayer() {
     this._initContainer = initializeGridContainer;
     this._updateOpacity = updateGridOpacity;
   } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
-    sceneByLayer.get(this).kind = 'image';
+    mutateWeakMap(kindByLayer, this, "=", 'image');
     this._reset = refreshNativeLayerContract;
   }
 }

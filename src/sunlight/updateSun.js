@@ -1,4 +1,6 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { atmosphere } from './atmosphere.js';
@@ -16,7 +18,7 @@ export function updateSun(state) {
     slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
     output.textContent = `${time.slice(11, 16)} UTC${control.live ? ' · now' : ''}`;
     const center = map.getCenter();
-    const sun = cameraByMap.get(map)._sunlight = solarPosition(control.time, center.lat, center.lng);
+    const sun = mutateWeakMap(sunlightByMap, map, "=", solarPosition(control.time, center.lat, center.lng));
     Object.assign(sun, atmosphere(sun.altitude));
     sun.moon = moonPosition(control.time, center.lat, center.lng);
     status.textContent = sun.altitude <= 0
@@ -31,7 +33,7 @@ export function updateSun(state) {
     updateSky(state);
     render(map);
   } catch (error) {
-    delete cameraByMap.get(map)._sunlight;
+    sunlightByMap.delete(map);
     updateSky(state);
     render(map);
     status.textContent = `Error: ${error.message}`;

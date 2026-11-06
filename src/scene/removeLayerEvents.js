@@ -1,9 +1,12 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { eventMapByLayer } from '../weakmaps/eventMapByLayer.js';
+import { eventsByLayer } from '../weakmaps/eventsByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 
 export function removeLayerEvents() {
-  const state = sceneByLayer.get(this);
-  state.eventMap.off(state.events, this);
-  state.events = state.eventMap = null;
+
+  eventMapByLayer.get(this).off(eventsByLayer.get(this), this);
+  mutateWeakMap(eventsByLayer, this, "=", mutateWeakMap(eventMapByLayer, this, "=", null));
 }

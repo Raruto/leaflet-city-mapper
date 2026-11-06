@@ -1,6 +1,8 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
+import { rotateControlByMap } from '../weakmaps/rotateControlByMap.js';
+
 import { cameraTouchStates } from '../globals/cameraTouchStates.js';
-import { touchByContainer } from '../globals/touchByContainer.js';
+import { touchByContainer } from '../weakmaps/touchByContainer.js';
 
 
 import { endCameraTouch } from './endCameraTouch.js';
@@ -12,7 +14,7 @@ import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { changeCameraTouch } from './changeCameraTouch.js';
 
 export function cleanupCameraTouch() {
-  const state = cameraByMap.get(this)._cameraTouchState;
+  const state = cameraTouchStateByMap.get(this);
   if (!state) return;
   const { container, map } = state;
   endCameraTouch(state);
@@ -23,7 +25,7 @@ export function cleanupCameraTouch() {
   cameraTouchStates.delete(state);
   if (!cameraTouchStates.size) window.removeEventListener('blur', endAllCameraTouches);
   map.off('cameratouchchange', changeCameraTouch, map);
-  cameraByMap.get(map).rotateControl?.remove();
+  rotateControlByMap.get(map)?.remove();
   touchByContainer.delete(container);
-  delete cameraByMap.get(map)._cameraTouchState;
+  cameraTouchStateByMap.delete(map);
 }

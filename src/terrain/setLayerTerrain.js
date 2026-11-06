@@ -1,8 +1,9 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+
 
 
 import { setRasterTerrain } from '../raster/setRasterTerrain.js';
 
 export function setLayerTerrain(layer) {
-  if (sceneByLayer.get(layer).kind === 'raster') setRasterTerrain(layer, this);
+  if (kindByLayer.get(layer) === 'raster') setRasterTerrain(layer, this);
 }

@@ -1,4 +1,7 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraMaps } from '../weakmaps/cameraMaps.js';
+import { cameraReadyByMap } from '../weakmaps/cameraReadyByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
 
@@ -10,7 +13,7 @@ import { loadCameraControls } from '../controls/loadCameraControls.js';
 import { noOperation } from '../utils/noOperation.js';
 
 export function initializeCameraMap() {
-  cameraByMap.set(this, /* alloc */ {});
+  cameraMaps.add(this);
   if (!document.getElementById('leaflet-camera-zoom-style')) {
     const style = document.createElement('style');
     style.id = 'leaflet-camera-zoom-style';
@@ -24,7 +27,7 @@ export function initializeCameraMap() {
   this.once('unload', cleanupCameraMap, this);
   this.whenReady(cameraMapReady, this);
   if (this.options.rotate || this.options.trackContainerMutation) {
-    cameraByMap.get(this).cameraReady = loadCameraControls(this);
-    cameraByMap.get(this).cameraReady.catch(noOperation);
+    mutateWeakMap(cameraReadyByMap, this, "=", loadCameraControls(this));
+    cameraReadyByMap.get(this).catch(noOperation);
   }
 }

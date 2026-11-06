@@ -1,6 +1,12 @@
+import { modelByLayer } from '../weakmaps/modelByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
+
 import { radians } from '../globals/radians.js';
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { HEIGHT } from '../globals/HEIGHT.js';
 
 
@@ -12,12 +18,12 @@ import { vertexNormals } from './vertexNormals.js';
 import { collectMeshes } from '../collision/collectMeshes.js';
 
 export function conformModelToTerrain(layer, terrain) {
-  if (!sceneByLayer.get(layer).model) return;
+  if (!modelByLayer.get(layer)) return;
   const meshes = /* alloc */ [];
-  collectMeshes(sceneByLayer.get(layer).model, meshes);
+  collectMeshes(modelByLayer.get(layer), meshes);
   let mesh, positions, geometry, position, normals, attribute, normal, world, inverse, i, x, y, z;
   let worldY, weight, worldX, worldZ, point, elevation, offset;
-  if (!sceneByLayer.get(terrain)?._terrainReady || !layer.options.terrainConform) {
+  if (!terrainReadyByLayer.get(terrain) || !layer.options.terrainConform) {
     for (mesh of meshes) {
       positions = mesh.geometry._terrainBasePositions;
       if (!positions) continue;
@@ -34,11 +40,11 @@ export function conformModelToTerrain(layer, terrain) {
     return;
   }
 
-  updateWorldMatrix(sceneByLayer.get(layer).root);
+  updateWorldMatrix(rootByLayer.get(layer));
   const map = layer._map, crs = map.options.crs;
-  const origin = crs.project(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin);
-  const metres = Math.cos(sceneByLayer.get(sceneByLayer.get(layer)._shared)._sceneOrigin.lat * radians);
-  const pixelScale = crs.scale(sceneByLayer.get(terrain)._terrainZoom);
+  const origin = crs.project(sceneOriginByLayer.get(sharedByLayer.get(layer)));
+  const metres = Math.cos(sceneOriginByLayer.get(sharedByLayer.get(layer)).lat * radians);
+  const pixelScale = crs.scale(terrainZoomByLayer.get(terrain));
 
   for (mesh of meshes) {
     geometry = mesh.geometry, attribute = geometry.attributes.position;
@@ -50,7 +56,7 @@ export function conformModelToTerrain(layer, terrain) {
     for (i = 0; i < attribute.data.length; i += 3) {
       x = attribute.data[i], y = attribute.data[i + 1], z = attribute.data[i + 2];
       worldY = world[1] * x + world[5] * y + world[9] * z + world[13];
-      weight = Math.max(0, Math.min(1, 1 - (worldY - sceneByLayer.get(layer).root.position[1]) / HEIGHT));
+      weight = Math.max(0, Math.min(1, 1 - (worldY - rootByLayer.get(layer).position[1]) / HEIGHT));
       if (!weight) continue;
       worldX = world[0] * x + world[4] * y + world[8] * z + world[12];
       worldZ = world[2] * x + world[6] * y + world[10] * z + world[14];

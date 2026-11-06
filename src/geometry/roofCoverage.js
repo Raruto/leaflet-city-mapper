@@ -1,21 +1,24 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
+
 import { roofFootprint } from './roofFootprint.js';
 import { subtractRoofTile } from './subtractRoofTile.js';
 
 /** Test the mesh's ground footprint against loaded imagery, including coarse parent tiles. */
-export function roofCoverage(mesh, backend, rasters) {
+export function roofCoverage(mesh, layer, rasters) {
   let intersectsArchive = false, pending = false;
-  let layer, footprint, remaining, tile;
-  for (layer of rasters) {
-    if (!sceneByLayer.get(layer).header) { pending = true; continue; }
-    footprint = roofFootprint(mesh, backend, layer);
+  let rasterLayer, footprint, remaining, tile;
+  for (rasterLayer of rasters) {
+    if (!headerByLayer.get(rasterLayer)) { pending = true; continue; }
+    footprint = roofFootprint(mesh, layer, rasterLayer);
     if (!footprint) continue;
     intersectsArchive = true;
     remaining = /* alloc */ [footprint];
-    for (tile of sceneByLayer.get(layer)._rasterTiles.values()) {
+    for (tile of rasterTilesByLayer.get(rasterLayer).values()) {
       // Failed imagery already reports an error; do not hide the building indefinitely.
       if (!tile.done && !tile.error) continue;
-      remaining = subtractRoofTile(remaining, tile, sceneByLayer.get(layer)._tileZoom);
+      remaining = subtractRoofTile(remaining, tile, tileZoomByLayer.get(rasterLayer));
       if (!remaining.length) return true;
     }
   }

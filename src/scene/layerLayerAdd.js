@@ -1,5 +1,10 @@
+import { eventMapByLayer } from '../weakmaps/eventMapByLayer.js';
+import { eventsByLayer } from '../weakmaps/eventsByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { state3dByLayer } from '../weakmaps/state3dByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { layerProto } from '../globals/layerProto.js';
 
 
@@ -20,16 +25,16 @@ export function layerLayerAdd(event) {
     }
     if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
   }
-  const map = event.target, state = sceneByLayer.get(this);
+  const map = event.target
   if (!map.hasLayer(this)) return;
-  if (state.kind) {
+  if (kindByLayer.get(this)) {
     this._map = map;
     this._zoomAnimated = map._zoomAnimated;
-    if (state.kind !== 'pending' && state.kind !== 'time') {
-      state.events = state.kind === 'raster' ? getRasterEvents(this) :
-        state._3d ? get3DEvents(this) : emptyEvents();
-      state.eventMap = map;
-      map.on(state.events, this);
+    if (kindByLayer.get(this) !== 'pending' && kindByLayer.get(this) !== 'time') {
+      mutateWeakMap(eventsByLayer, this, "=", kindByLayer.get(this) === 'raster' ? getRasterEvents(this) :
+        state3dByLayer.get(this) ? get3DEvents(this) : emptyEvents());
+      mutateWeakMap(eventMapByLayer, this, "=", map);
+      map.on(eventsByLayer.get(this), this);
       this.once('remove', removeLayerEvents, this);
     }
     addSceneLayer(this, map);

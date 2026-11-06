@@ -1,4 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { fadeFrameByLayer } from '../weakmaps/fadeFrameByLayer.js';
+import { fadeVersionByLayer } from '../weakmaps/fadeVersionByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { pendingGridFades } from '../globals/pendingGridFades.js';
 import { gridFadeFrame } from '../globals/gridFadeFrame.js';
 
@@ -7,8 +10,8 @@ import { gridFadeFrame } from '../globals/gridFadeFrame.js';
 import { runGridFades } from './runGridFades.js';
 
 export function scheduleGridFade(layer) {
-  sceneByLayer.get(layer)._fadeVersion = (sceneByLayer.get(layer)._fadeVersion || 0) + 1;
-  pendingGridFades.set(layer, sceneByLayer.get(layer)._fadeVersion);
+  mutateWeakMap(fadeVersionByLayer, layer, "=", (fadeVersionByLayer.get(layer) || 0) + 1);
+  pendingGridFades.set(layer, fadeVersionByLayer.get(layer));
   if (gridFadeFrame.value === null) gridFadeFrame.value = requestAnimationFrame(runGridFades);
-  sceneByLayer.get(layer)._fadeFrame = gridFadeFrame.value;
+  mutateWeakMap(fadeFrameByLayer, layer, "=", gridFadeFrame.value);
 }

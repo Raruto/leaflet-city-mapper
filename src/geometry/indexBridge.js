@@ -1,6 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
 
-export function indexBridge(backend, pixels, triangles) {
+
+export function indexBridge(layer, pixels, triangles) {
   const bridgeTriangles = /* alloc */ [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let t, triangle, i, p, x, y, key, bucket;
@@ -21,8 +22,8 @@ export function indexBridge(backend, pixels, triangles) {
   for (x = Math.floor(bridge.min[0] / 64); x <= Math.floor(bridge.max[0] / 64); x++) {
     for (y = Math.floor(bridge.min[1] / 64); y <= Math.floor(bridge.max[1] / 64); y++) {
       key = `${x}/${y}`;
-      bucket = sceneByLayer.get(backend)._bridges.get(key);
-      if (!bucket) sceneByLayer.get(backend)._bridges.set(key, bucket = /* alloc */ []);
+      bucket = bridgesByLayer.get(layer).get(key);
+      if (!bucket) bridgesByLayer.get(layer).set(key, bucket = /* alloc */ []);
       bucket.push(bridge);
     }
   }

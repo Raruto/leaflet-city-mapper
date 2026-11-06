@@ -1,11 +1,12 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+
 import { releaseRasterTile } from './releaseRasterTile.js';
 
-export function retainRasterTiles(backend, required) {
-  const tiles = sceneByLayer.get(backend)._rasterTiles;
+export function retainRasterTiles(layer, required) {
+  const tiles = rasterTilesByLayer.get(layer);
   let key, tile, coords;
   for ([key, tile] of tiles) {
-    if (!required.has(key) && !tile.done) releaseRasterTile(backend, tile);
+    if (!required.has(key) && !tile.done) releaseRasterTile(layer, tile);
   }
   for ([key, coords] of required) {
     if (tiles.has(key)) continue;

@@ -1,6 +1,8 @@
+import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
+import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
+
 import { degrees } from '../globals/degrees.js';
-import { touchByContainer } from '../globals/touchByContainer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { touchByContainer } from '../weakmaps/touchByContainer.js';
 
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 
@@ -13,7 +15,7 @@ export function moveCameraTouch(event) {
   middle.x = (a.clientX + b.clientX) / 2 - rect.left;
   middle.y = (a.clientY + b.clientY) / 2 - rect.top;
   const delta = Math.atan2(Math.sin(angle - touch.angle), Math.cos(angle - touch.angle)) * degrees;
-  mapSetPitchAndBearing(map, cameraByMap.get(map).touchPitch.enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, cameraByMap.get(map).touchRotate.enabled() ? touch.bearing + delta : touch.bearing);
+  mapSetPitchAndBearing(map, touchPitchByMap.get(map).enabled() ? touch.pitch - (middle.y - touch.middle.y) * 0.25 : touch.pitch, touchRotateByMap.get(map).enabled() ? touch.bearing + delta : touch.bearing);
   const distance = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
   if (distance < 1) return;
   const zoom = touch.zooming ? Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(),

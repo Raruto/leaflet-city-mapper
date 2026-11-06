@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 
 
 import { update as updateScene } from '../scene/update.js';
@@ -9,7 +10,7 @@ import { updateTrafficPose } from './updateTrafficPose.js';
 export function tickTraffic(state) {
   state.frame = undefined;
   if (!state.ready || !state.layer._map) return;
-  if (!sceneByLayer.get(state.layer).renderer) { state.frame = requestAnimationFrame(state.tick); return; }
+  if (!rendererByLayer.get(state.layer)) { state.frame = requestAnimationFrame(state.tick); return; }
   if (state.mesh && !(state.mesh.geometry.attributes.position.buffer.usage & GPUBufferUsage.STORAGE)) {
     state.tripsKey = null;
     state.nextCheck = -Infinity;

@@ -5,10 +5,10 @@ import { lightGeometry } from '../geometry/lightGeometry.js';
 import { treeGeometry } from '../geometry/treeGeometry.js';
 
 export function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-  const { backend } = context;
+  const { backend: layer } = context;
   const { top } = style;
   const projected = projectedTree(context, lon, lat);
-  if (backend.options.nightLight) {
+  if (layer.options.nightLight) {
     if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw /* alloc */ new Error('Invalid light flux');
     const support = feature.properties?.cod_ouvrag || `${lon},${lat}`;
     if (style.poleRadius > 0 && !context.supports.has(support)) {

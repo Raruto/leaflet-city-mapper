@@ -1,7 +1,10 @@
+import { nativeGPUBackByMap } from '../weakmaps/nativeGPUBackByMap.js';
+import { nativeGPUOrderByMap } from '../weakmaps/nativeGPUOrderByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
 import { nativeMethodHandlers } from '../globals/nativeMethodHandlers.js';
-import { nativeRenderByLayer } from '../globals/nativeRenderByLayer.js';
+import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
 
 import { createLayer } from '../scene/createLayer.js';
 
@@ -44,7 +47,7 @@ import { beforeNativeRender } from './beforeNativeRender.js';
 /** Render from coordinates and detached raster sources; only accessible marker controls remain DOM. */
 export async function nativeLayer(state) {
   const { source, map } = state;
-  const backend = state.backend = createLayer(/* alloc */ {
+  const layer = state.backend = createLayer(/* alloc */ {
     source: /* alloc */ { type: '3d' },
   });
   state.meshes = /* alloc */ new Map();
@@ -52,12 +55,12 @@ export async function nativeLayer(state) {
   state.methods = /* alloc */ new Map();
   state.originalMethods = /* alloc */ new Map();
   state.images = /* alloc */ new Set();
-  cameraByMap.get(map)._nativeGPUOrder ||= 0;
-  cameraByMap.get(map)._nativeGPUBack ||= 0;
+  if (!nativeGPUOrderByMap.get(map)) nativeGPUOrderByMap.set(map, 0);
+  if (!nativeGPUBackByMap.get(map)) nativeGPUBackByMap.set(map, 0);
   state.dirty = true;
   state.viewDirty = true;
   state.failed = false;
-  state.order = ++cameraByMap.get(map)._nativeGPUOrder;
+  state.order = mutateWeakMap(nativeGPUOrderByMap, map, "++", undefined, true);
   state.marker = source instanceof L.Marker;
   state.paneOrder = Number(getComputedStyle(source.getPane()).zIndex) || 0;
   state.disposed = false;
@@ -75,11 +78,11 @@ export async function nativeLayer(state) {
     source[name] = nativeMethodHandlers[name];
   }
   const ready = state.ready = Promise.withResolvers();
-  backend.once('ready', resolveNativeReady, state);
-  backend.once('error', rejectNativeReady, state);
-  backend.on('error', forwardNativeError, state);
+  layer.once('ready', resolveNativeReady, state);
+  layer.once('error', rejectNativeReady, state);
+  layer.on('error', forwardNativeError, state);
   refreshNativeLayer(state);
-  backend.addTo(map);
+  layer.addTo(map);
   try {
     await ready.promise;
   } catch (error) {
@@ -88,7 +91,7 @@ export async function nativeLayer(state) {
   }
   if (!current(state)) return source;
 
-  nativeRenderByLayer.set(backend, state);
+  nativeRenderByLayer.set(layer, state);
   try {
     synchronizeNativeLayer(state);
   } catch (error) {

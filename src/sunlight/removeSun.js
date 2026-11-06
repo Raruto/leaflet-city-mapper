@@ -1,5 +1,7 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
-import { sunByMap } from '../globals/sunByMap.js';
+import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
+import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
+
+import { sunByMap } from '../weakmaps/sunByMap.js';
 
 
 import { render } from './render.js';
@@ -9,11 +11,11 @@ export function removeSun(state) {
   const { map, timer, sunDisc, moonDisc } = state;
   const shared = sunByMap.get(map);
   clearInterval(timer);
-  delete cameraByMap.get(map)._timeControl;
+  timeControlByMap.delete(map);
   map.fire('simulationtimechange', /* alloc */ { time: null, live: false });
   map.off('moveend', state.update);
   map.off('move rotate pitch resize', state.updateSky);
-  delete cameraByMap.get(map)._sunlight;
+  sunlightByMap.delete(map);
   updateSky(state);
   sunDisc.remove(); moonDisc.remove();
   render(map);

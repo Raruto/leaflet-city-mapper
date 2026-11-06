@@ -1,11 +1,14 @@
+import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
+import { rotateControlByMap } from '../weakmaps/rotateControlByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
 import { Compass } from '../globals/Compass.js';
 import { ContainerResize } from '../globals/ContainerResize.js';
 import { PitchDrag } from '../globals/PitchDrag.js';
 import { ShiftRotate } from '../globals/ShiftRotate.js';
 import { TouchMode } from '../globals/TouchMode.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
-import { touchByContainer } from '../globals/touchByContainer.js';
+import { touchByContainer } from '../weakmaps/touchByContainer.js';
 import { cameraTouchStates } from '../globals/cameraTouchStates.js';
 import { cameraListenerOptions } from '../globals/cameraListenerOptions.js';
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
@@ -74,7 +77,7 @@ export function cameraControls(map) {
   addCameraHandler(map, 'touchRotate', TouchMode.value);
   addCameraHandler(map, 'touchPitch', TouchMode.value);
   const container = map.getContainer();
-  const state = cameraByMap.get(map)._cameraTouchState = /* alloc */ { map, container, touch: null, nativeZoom: undefined };
+  const state = mutateWeakMap(cameraTouchStateByMap, map, "=", /* alloc */ { map, container, touch: null, nativeZoom: undefined });
   touchByContainer.set(container, state);
   cameraTouchStates.add(state);
   container.addEventListener('touchstart', startCameraTouch, cameraListenerOptions);
@@ -84,8 +87,8 @@ export function cameraControls(map) {
   window.addEventListener('blur', endAllCameraTouches);
   map.on('cameratouchchange', changeCameraTouch, map);
   if (map.options.rotateControl) {
-    cameraByMap.get(map).rotateControl = /* alloc */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions);
-    cameraByMap.get(map).rotateControl.addTo(map);
+    mutateWeakMap(rotateControlByMap, map, "=", /* alloc */ new L.Control.Rotate(typeof map.options.rotateControl === 'object' ? map.options.rotateControl : cameraEmptyOptions));
+    rotateControlByMap.get(map).addTo(map);
   }
   map.once('unload', cleanupCameraTouch, map);
 }

@@ -1,11 +1,13 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
+
 import { scenePass } from '../globals/scenePass.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { drawGeometry } from './drawGeometry.js';
 
-export function drawSceneMeshes(backend, encoder, meshes) {
-  const renderer = sceneByLayer.get(backend).renderer;
+export function drawSceneMeshes(layer, encoder, meshes) {
+  const renderer = rendererByLayer.get(layer);
   const pass = encoder.beginRenderPass((
     scenePass.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(),
     scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(),
@@ -23,7 +25,7 @@ export function drawSceneMeshes(backend, encoder, meshes) {
       mesh.program.uniforms.opacity.value = mesh.opacity;
     }
     uniforms = mesh.program.uniforms;
-    if (uniforms.roofTexture) uniforms.roofTexture.value = sceneByLayer.get(backend)._roofRaster?.texture || renderer.roofFallbackTexture;
+    if (uniforms.roofTexture) uniforms.roofTexture.value = roofRasterByLayer.get(layer)?.texture || renderer.roofFallbackTexture;
     if (!mesh._frontFace || mesh._frontFaceWorldVersion !== mesh._worldMatrixVersion ||
         mesh._worldMatrixVersion === undefined) {
       determinant = world[0] * (world[5] * world[10] - world[6] * world[9]) -
@@ -38,10 +40,10 @@ export function drawSceneMeshes(backend, encoder, meshes) {
     frontFace = mesh._frontFace;
     program = mesh.program;
     if (program.transparent && program._layerMaterial.doubleSided && !mesh._nativeSource) {
-      drawGeometry(backend, mesh, pass, 'front', frontFace);
-      drawGeometry(backend, mesh, pass, 'back', frontFace);
+      drawGeometry(layer, mesh, pass, 'front', frontFace);
+      drawGeometry(layer, mesh, pass, 'back', frontFace);
     } else {
-      drawGeometry(backend, mesh, pass, program.cullMode, frontFace);
+      drawGeometry(layer, mesh, pass, program.cullMode, frontFace);
     }
   }
   pass.end();

@@ -1,6 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { controlByLayer } from '../weakmaps/controlByLayer.js';
+
 
 
 export function addTimeLayer(map) {
-  return sceneByLayer.get(this).control.addTo(map);
+  return controlByLayer.get(this).addTo(map);
 }

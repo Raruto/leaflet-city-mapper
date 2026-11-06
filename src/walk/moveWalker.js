@@ -1,12 +1,13 @@
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { local } from './local.js';
 import { blocked } from './blocked.js';
 
 export function moveWalker(forward, dt) {
   const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
-  const { position, scale } = sceneByLayer.get(this.layer).root;
+  const { position, scale } = rootByLayer.get(this.layer);
   let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
   const feet = local.call(this, this.local);
   let i;

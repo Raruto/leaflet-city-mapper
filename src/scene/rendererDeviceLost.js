@@ -1,14 +1,16 @@
-import { rendererDevices } from '../globals/rendererDevices.js';
-import { renderers } from '../globals/renderers.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
+import { rendererDevices } from '../weakmaps/rendererDevices.js';
+import { renderers } from '../weakmaps/renderers.js';
 
 
 
 export function rendererDeviceLost([info, device]) {
   const map = rendererDevices.get(device);
   const owner = renderers.get(map);
-  if (!owner || sceneByLayer.get(owner).renderer?.device !== device) return;
+  if (!owner || rendererByLayer.get(owner)?.device !== device) return;
   const error = /* alloc */ new Error(`WebGPU device lost: ${info.message || info.reason}`);
   let layer;
-  for (layer of sceneByLayer.get(owner)._layers) layer.fire('error', /* alloc */ { error });
+  for (layer of layersByLayer.get(owner)) layer.fire('error', /* alloc */ { error });
 }

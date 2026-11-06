@@ -1,6 +1,8 @@
+import { fadeFrameByLayer } from '../weakmaps/fadeFrameByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { gridFadeFrame } from '../globals/gridFadeFrame.js';
 import { pendingGridFades } from '../globals/pendingGridFades.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 
@@ -13,7 +15,7 @@ export function runGridFades() {
   for ([layer, version] of layers) {
     if (pendingGridFades.get(layer) !== version) continue;
     pendingGridFades.delete(layer);
-    sceneByLayer.get(layer)._fadeFrame = null;
+    mutateWeakMap(fadeFrameByLayer, layer, "=", null);
     updateGridOpacity.call(layer);
   }
 }

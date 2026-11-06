@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 
 
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
@@ -6,7 +7,7 @@ import { trafficStorage } from './trafficStorage.js';
 import { uploadTrafficLanes } from './uploadTrafficLanes.js';
 
 export function rebaseTraffic(state) {
-  const { device } = sceneByLayer.get(state.layer).renderer;
+  const { device } = rendererByLayer.get(state.layer);
   if (state.gpu?.device !== device) {
     destroyTrafficGpu(state);
     const template = /* alloc */ new Float32Array(

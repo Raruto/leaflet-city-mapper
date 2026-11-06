@@ -643,12 +643,12 @@ const checks = {
         status: 206, headers: { 'Content-Range': 'bytes 0-0/127', ETag: '"changed"' },
       });
       await assert.rejects(readArchive(backend, 0, 1), /archive changed/);
-      delete backend._etag;
+      delete globals.sceneByLayer.get(backend)._etag;
       await assert.rejects(readArchive(backend, 1, 1), /Invalid PMTiles range response/);
       globalThis.fetch = async () => new Response(Uint8Array.of(1), {
         status: 206, headers: { 'Content-Range': 'bytes 0-1/127' },
       });
-      delete backend._etag;
+      delete globals.sceneByLayer.get(backend)._etag;
       await assert.rejects(readArchive(backend, 0, 2), /Truncated PMTiles range/);
     } finally {
       globalThis.fetch = originalFetch;
@@ -1067,7 +1067,7 @@ const checks = {
     updateSky(control);
     assert.equal(control.moonDisc.hidden, true);
     assert.equal(control.sunDisc.hidden, false);
-    delete map._sunlight;
+    delete globals.cameraByMap.get(map)._sunlight;
     updateSky(control);
     assert.equal(control.sunDisc.hidden, true);
     assert.equal(control.moonDisc.hidden, true);

@@ -1,11 +1,12 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+
 import { archiveDecoder } from '../globals/archiveDecoder.js';
 
 import { getZxy } from './getZxy.js';
 
 
 export async function loadSource(layer, area) {
-  if (sceneByLayer.get(layer)._geojson) {
+  if (geojsonByLayer.get(layer)) {
     const { data, url } = layer.options;
     if (data !== undefined && url) {
       throw /* alloc */ new Error('GeoJSON source requires either data or url');

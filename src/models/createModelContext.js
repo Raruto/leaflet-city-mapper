@@ -1,9 +1,9 @@
 import { geometryEmpty } from '../globals/geometryEmpty.js';
 import { materialFor } from './materialFor.js';
 
-export function createModelContext(backend, description, images) {
+export function createModelContext(layer, description, images) {
   const context = /* alloc */ {
-    backend, description, images,
+    backend: layer, description, images,
     textures: /* alloc */ new Map(),
     materials: /* alloc */ [],
     active: /* alloc */ new Set(),

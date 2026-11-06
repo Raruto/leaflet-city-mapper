@@ -1,7 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
+
 
 
 
 export function isLoading(layer) {
-  return sceneByLayer.get(layer)._loadingTiles > 0;
+  return loadingTilesByLayer.get(layer) > 0;
 }

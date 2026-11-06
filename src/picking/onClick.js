@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { hoveredFeatureByLayer } from '../weakmaps/hoveredFeatureByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { findFeature } from './findFeature.js';
@@ -9,7 +11,7 @@ import { showFeature } from './showFeature.js';
 
 export function onClick(layer, event) {
   const feature = findFeature(layer, event);
-  sceneByLayer.get(layer).hoveredFeature = feature;
+  mutateWeakMap(hoveredFeatureByLayer, layer, "=", feature);
   setHighlight(layer, feature);
   showFeature(layer, feature, event);
   layer.fire('featureclick', /* alloc */ { feature, originalEvent: event });

@@ -1,4 +1,4 @@
-import { colliders } from '../globals/colliders.js';
+import { colliders } from '../weakmaps/colliders.js';
 import { transformTriangle } from './transformTriangle.js';
 import { indexTriangle } from './indexTriangle.js';
 

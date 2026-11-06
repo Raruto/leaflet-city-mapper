@@ -1,5 +1,9 @@
+import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
+import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { bridgeElevation } from '../geometry/bridgeElevation.js';
@@ -7,8 +11,8 @@ import { terrainElevation } from './terrainElevation.js';
 
 /** @param {L.LatLng|L.Point} location LatLng, or a pixel point at the terrain zoom. */
 
-export function getElevation(backend, location) {
-  if (!backend._map || !sceneByLayer.get(backend)._terrainReady) return null;
-  const point = location instanceof L.Point ? location : backend._map.project(location, sceneByLayer.get(backend)._terrainZoom);
-  return bridgeElevation(point, sceneByLayer.get(backend)._bridges) ?? terrainElevation(point, sceneByLayer.get(backend)._terrainTiles);
+export function getElevation(layer, location) {
+  if (!layer._map || !terrainReadyByLayer.get(layer)) return null;
+  const point = location instanceof L.Point ? location : layer._map.project(location, terrainZoomByLayer.get(layer));
+  return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
 }

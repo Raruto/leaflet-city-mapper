@@ -1,5 +1,5 @@
-export function extrusionStyle(backend, feature) {
-  const style = backend.options.style(feature);
+export function extrusionStyle(layer, feature) {
+  const style = layer.options.style(feature);
   if (style === null) return null;
   if (!style || typeof style !== 'object') throw /* alloc */ new Error('style must return an extrusion style or null');
   const { top, bottom = 0 } = style;

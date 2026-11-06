@@ -1,9 +1,10 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { defaultMaterial } from '../globals/defaultMaterial.js';
 import { vertexShader } from '../globals/vertexShader.js';
 import { fragmentShader } from '../globals/fragmentShader.js';
 import { pipelineLayout as sharedPipelineLayout } from '../globals/pipelineLayout.js';
 import { elevationWGSL } from '../globals/elevationWGSL.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { positionLayout } from '../globals/positionLayout.js';
 import { normalLayout } from '../globals/normalLayout.js';
 import { colorLayout } from '../globals/colorLayout.js';
@@ -17,23 +18,23 @@ import { materialShaders } from '../shaders/materialShaders.js';
 
 import { reportCompilation } from './reportCompilation.js';
 
-export function createProgram(backend, material = defaultMaterial) {
+export function createProgram(layer, material = defaultMaterial) {
   const shaders = materialShaders(
     material,
-    !!backend.options.nightSparkle,
+    !!layer.options.nightSparkle,
     material.terrain ? elevationWGSL : ''
   );
-  const vertex = sceneByLayer.get(backend).renderer.device.createShaderModule((
+  const vertex = rendererByLayer.get(layer).device.createShaderModule((
     vertexShader.code = shaders.vertex,
     vertexShader
   ));
   vertexShader.code = null;
-  const fragment = sceneByLayer.get(backend).renderer.device.createShaderModule((
+  const fragment = rendererByLayer.get(layer).device.createShaderModule((
     fragmentShader.code = shaders.fragment,
     fragmentShader
   ));
   fragmentShader.code = null;
-  reportCompilation(backend, /* alloc */ [
+  reportCompilation(layer, /* alloc */ [
     vertex.getCompilationInfo(),
     fragment.getCompilationInfo()
   ]);
@@ -44,17 +45,17 @@ export function createProgram(backend, material = defaultMaterial) {
     shaders.textured ? uVLayout : null,
   ];
   if (material.instanced) vertexBuffers.push(instanceLayout);
-  const bindGroupLayout = createProgramLayout(sceneByLayer.get(backend).renderer.device, shaders);
-  const pipelineLayout = sceneByLayer.get(backend).renderer.device.createPipelineLayout((
+  const bindGroupLayout = createProgramLayout(rendererByLayer.get(layer).device, shaders);
+  const pipelineLayout = rendererByLayer.get(layer).device.createPipelineLayout((
     sharedPipelineLayout.bindGroupLayouts[0] = bindGroupLayout,
-    sharedPipelineLayout.bindGroupLayouts[1] = sceneByLayer.get(backend).renderer.sunlight.layout,
+    sharedPipelineLayout.bindGroupLayouts[1] = rendererByLayer.get(layer).sunlight.layout,
     sharedPipelineLayout
   ));
   sharedPipelineLayout.bindGroupLayouts[0] = null;
   sharedPipelineLayout.bindGroupLayouts[1] = null;
   const uniforms = createProgramUniforms(material);
   return /* alloc */ {
-    device: sceneByLayer.get(backend).renderer.device,
+    device: rendererByLayer.get(layer).device,
     vertex,
     fragment,
     bindings: shaders.bindings,
@@ -68,7 +69,7 @@ export function createProgram(backend, material = defaultMaterial) {
     depthTest: material.depthTest !== false,
     terrain: material.terrain,
     nightLight: Boolean(material.nightLight),
-    nightSparkle: !!backend.options.nightSparkle,
+    nightSparkle: !!layer.options.nightSparkle,
     uniforms,
     _layerMaterial: material,
   };

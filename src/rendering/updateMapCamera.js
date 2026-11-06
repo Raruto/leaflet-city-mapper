@@ -1,35 +1,39 @@
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
+import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
+
+
 import { radians } from '../globals/radians.js';
 import { cameraFov } from '../globals/cameraFov.js';
 import { earthCirc } from '../globals/earthCirc.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { mapElevationOf } from '../terrain/mapElevationOf.js';
 import { mapMethods } from '../globals/mapMethods.js';
-import { walkByMap } from '../globals/walkByMap.js';
+import { walkByMap } from '../weakmaps/walkByMap.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
 import { updateCamera } from "../scene/updateCamera.js";
-import { getElevation } from "../terrain/getElevation.js";
 
 import { animationPoint } from '../camera/animationPoint.js';
 
-export function updateMapCamera(backend, size) {
-  const map = backend._map;
+export function updateMapCamera(layer, size) {
+  const map = layer._map;
   // Match the map's perspective, including the intermediate view of an animated zoom.
-  const zoom = cameraByMap.get(map)._cameraView?.zoom ?? map.getZoom();
-  const pixelsPerMeter = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+  const zoom = cameraViewByMap.get(map)?.zoom ?? map.getZoom();
+  const pixelsPerMeter = map.options.crs.scale(zoom) /
+    (earthCirc * Math.cos(sceneOriginByLayer.get(layer).lat * radians));
   const origin = animationPoint(map, mapMethods.value.layerPointToContainerPoint.call(map,
-    map.project(sceneByLayer.get(backend)._sceneOrigin).subtract(map.getPixelOrigin())));
+    map.project(sceneOriginByLayer.get(layer)).subtract(map.getPixelOrigin())));
   const distance = size.y * 1.5 / pixelsPerMeter;
   const targetX = (size.x / 2 - origin.x) / pixelsPerMeter;
   // CSS zoom keeps the logical view's ground plane until zoomend.
   const walker = walkByMap.get(map)?.control?._walk;
-  const targetY = ((cameraByMap.get(map)._terrain3D ? getElevation(cameraByMap.get(map)._terrain3D, map.getCenter()): undefined) ?? 0) +
+  const targetY = (mapElevationOf(map, map.getCenter()) ?? 0) +
     (walker?.saved ? walker.state.height : 0);
   const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
   const pitch = mapGetPitch(map) * radians;
   const bearing = mapGetBearing(map) * radians;
-  const camera = sceneByLayer.get(backend).camera;
+  const camera = cameraByLayer.get(layer);
   camera.fov = cameraFov;
   camera.aspect = size.x / size.y;
   camera.near = Math.max(0.1, distance / 10000);

@@ -1,6 +1,7 @@
-import { nativeEventMaps } from '../globals/nativeEventMaps.js';
-import { renderers } from '../globals/renderers.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
+import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
+import { renderers } from '../weakmaps/renderers.js';
 import { coreEventTypes } from '../globals/coreEventTypes.js';
 
 
@@ -12,7 +13,7 @@ import { bypassNativeEvent } from './bypassNativeEvent.js';
 export function handleNativeMapEvent(event, type = event.type, targets) {
   const map = this, context = nativeEventMaps.get(map), fireDOMEvent = context.fireDOMEvent;
   const owner = renderers.get(map);
-  if (!sceneByLayer.get(owner)?.renderer || targets || !coreEventTypes.has(type)) {
+  if (!rendererByLayer.get(owner) || targets || !coreEventTypes.has(type)) {
     return fireDOMEvent.call(this, event, type, targets);
   }
   if (bypassNativeEvent(map, context, event, type)) {

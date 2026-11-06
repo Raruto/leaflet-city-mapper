@@ -1,12 +1,13 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { frameBuffer } from '../globals/frameBuffer.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { destroyTexture } from './destroyTexture.js';
 
-export function prepareFrameBuffer(backend, meshes, shadowMeshes) {
-  const renderer = sceneByLayer.get(backend).renderer;
+export function prepareFrameBuffer(layer, meshes, shadowMeshes) {
+  const renderer = rendererByLayer.get(layer);
   // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).
   if (!renderer.uniformBuffer || renderer.uniformBuffer.size < (meshes.length * 2 + shadowMeshes.length + 1) * 256) {
-    if (renderer.uniformBuffer) destroyTexture(backend, renderer.uniformBuffer);
+    if (renderer.uniformBuffer) destroyTexture(layer, renderer.uniformBuffer);
     renderer.uniformBuffer = renderer.device.createBuffer((
       frameBuffer.size = Math.max(64, meshes.length * 4 + shadowMeshes.length * 2) * 256,
       frameBuffer.usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

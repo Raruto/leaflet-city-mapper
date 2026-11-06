@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { coreSampler } from '../globals/coreSampler.js';
 
 import { disposeMesh } from '../rendering/disposeMesh.js';
@@ -11,20 +12,20 @@ export function textureFor(state, key, image) {
   if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
     throw /* alloc */ new Error('WebGPU native raster layers require image or canvas tiles');
   }
-  const { backend, textures, meshes } = state;
+  const { backend: layer, textures, meshes } = state;
   let texture = textures.get(key);
   const url = image.currentSrc || image.src;
   if (!texture || texture.image !== image || texture.url !== url) {
     if (texture) {
       const mesh = meshes.get(key);
-      if (mesh) disposeMesh(backend, mesh);
+      if (mesh) disposeMesh(layer, mesh);
       meshes.delete(key);
-      destroyTexture(backend, texture.texture);
+      destroyTexture(layer, texture.texture);
       textures.delete(key);
     }
     const width = image.naturalWidth || image.width, height = image.naturalHeight || image.height;
     if (!width || !height) return;
-    const { device } = sceneByLayer.get(backend).renderer;
+    const { device } = rendererByLayer.get(layer);
     texture = /* alloc */ {
       device, image, url, format: 'rgba8unorm', uploaded: null,
       texture: device.createTexture(/* alloc */ {

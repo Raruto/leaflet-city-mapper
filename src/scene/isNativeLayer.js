@@ -1,8 +1,9 @@
+import { state3dByLayer } from '../weakmaps/state3dByLayer.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 export function isNativeLayer(layer) {
-  return !sceneByLayer.get(layer)._3d && (
+  return !state3dByLayer.get(layer) && (
     layer instanceof L.GridLayer ||
     layer instanceof L.Polyline ||
     layer instanceof L.CircleMarker ||

@@ -1,5 +1,15 @@
+import { addedByLayer } from '../weakmaps/addedByLayer.js';
+import { areasByLayer } from '../weakmaps/areasByLayer.js';
+import { directoriesByLayer } from '../weakmaps/directoriesByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { isLoading } from './isLoading.js';
@@ -17,17 +27,17 @@ import { setPMTileOpacity } from './setPMTileOpacity.js';
 import { setPMTileZIndex } from './setPMTileZIndex.js';
 
 export function initRaster(layer, options) {
-  sceneByLayer.get(layer).kind = 'raster';
+  mutateWeakMap(kindByLayer, layer, "=", 'raster');
   options = /* alloc */ { ariaLabel: 'PMTiles raster', maxZoom: 18, opacity: 1, zIndex: 0, ...options };
   L.Util.setOptions(layer, options);
-  sceneByLayer.get(layer).root = emptyNode();
-  sceneByLayer.get(layer)._areas = /* alloc */ new Map();
-  sceneByLayer.get(layer)._rasterTiles = /* alloc */ new Map();
-  sceneByLayer.get(layer)._loadingTiles = 0;
-  sceneByLayer.get(layer)._added = Promise.withResolvers();
-  sceneByLayer.get(layer).url = /* alloc */ new URL(options.url, document.baseURI).href;
-  sceneByLayer.get(layer)._directories = /* alloc */ new Map();
-  sceneByLayer.get(layer).ready = Promise.resolve(layer.options.archive || layer)
+  mutateWeakMap(rootByLayer, layer, "=", emptyNode());
+  mutateWeakMap(areasByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(rasterTilesByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(loadingTilesByLayer, layer, "=", 0);
+  mutateWeakMap(addedByLayer, layer, "=", Promise.withResolvers());
+  mutateWeakMap(urlByLayer, layer, "=", /* alloc */ new URL(options.url, document.baseURI).href);
+  mutateWeakMap(directoriesByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(readyByLayer, layer, "=", Promise.resolve(layer.options.archive || layer)
     .then(readyRaster.bind(null, layer))
-    .catch(reportError.bind(null, layer));
+    .catch(reportError.bind(null, layer)));
 }

@@ -1,8 +1,10 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { zoomLevelByLayer } from '../weakmaps/zoomLevelByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 /** Preserve the outgoing tile level before Leaflet changes its logical zoom. */
 
 export function startZoom() {
-  sceneByLayer.get(this)._zoomLevel = null;
+  mutateWeakMap(zoomLevelByLayer, this, "=", null);
 }

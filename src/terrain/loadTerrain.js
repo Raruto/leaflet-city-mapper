@@ -1,4 +1,12 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+import { terrainArchiveByLayer } from '../weakmaps/terrainArchiveByLayer.js';
+import { terrainControllerByLayer } from '../weakmaps/terrainControllerByLayer.js';
+import { terrainLoadingByLayer } from '../weakmaps/terrainLoadingByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { createLayer } from '../scene/createLayer.js';
 
 import { loadTerrainTiles } from './loadTerrainTiles.js';
@@ -6,38 +14,38 @@ import { readBridges } from './readBridges.js';
 import { terrainTileQueue } from './terrainTileQueue.js';
 import { applyTerrain } from './applyTerrain.js';
 
-export async function loadTerrain(backend) {
-  if (sceneByLayer.get(backend)._terrainLoading || !backend._map) return;
-  sceneByLayer.get(backend)._terrainLoading = true;
-  sceneByLayer.get(backend)._terrainReady = false;
-  const controller = sceneByLayer.get(backend)._terrainController = /* alloc */ new AbortController();
+export async function loadTerrain(layer) {
+  if (terrainLoadingByLayer.get(layer) || !layer._map) return;
+  mutateWeakMap(terrainLoadingByLayer, layer, "=", true);
+  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
+  const controller = mutateWeakMap(terrainControllerByLayer, layer, "=", /* alloc */ new AbortController());
   let i;
   try {
-    if (!sceneByLayer.get(backend).terrainSource) throw /* alloc */ new Error('Terrain layer requires a PMTiles or COG elevation archive');
-    const archive = sceneByLayer.get(backend)._terrainArchive = createLayer(/* alloc */ { source: /* alloc */ {
-      type: backend.options.asset !== undefined || /\.tiff?(?:[?#]|$)/i.test(sceneByLayer.get(backend).terrainSource) ? 'cog' : 'pmtiles',
-      url: sceneByLayer.get(backend).terrainSource, archive: backend.options.archive, asset: backend.options.asset,
-    } });
-    await sceneByLayer.get(archive).ready;
-    const header = sceneByLayer.get(archive).header;
+    if (!terrainSourceByLayer.get(layer)) throw /* alloc */ new Error('Terrain layer requires a PMTiles or COG elevation archive');
+    const archive = mutateWeakMap(terrainArchiveByLayer, layer, "=", createLayer(/* alloc */ { source: /* alloc */ {
+      type: layer.options.asset !== undefined || /\.tiff?(?:[?#]|$)/i.test(terrainSourceByLayer.get(layer)) ? 'cog' : 'pmtiles',
+      url: terrainSourceByLayer.get(layer), archive: layer.options.archive, asset: layer.options.asset,
+    } }));
+    await readyByLayer.get(archive);
+    const header = headerByLayer.get(archive);
     if (header.tileType !== 0 || header.minZoom !== header.maxZoom) {
       throw /* alloc */ new Error('Expected a single-zoom Float32 terrain archive');
     }
-    const map = backend._map;
-    const tiles = terrainTileQueue(backend, header);
-    const state = /* alloc */ { backend, archive, controller, tiles, next: 0 };
+    const map = layer._map;
+    const tiles = terrainTileQueue(layer, header);
+    const state = /* alloc */ { backend: layer, archive, controller, tiles, next: 0 };
     const workers = /* alloc */ [];
     for (i = 0; i < Math.min(4, tiles.length); i++) workers.push(loadTerrainTiles(state));
     await Promise.all(workers);
-    const bridges = backend.options.bridges && await fetch(backend.options.bridges, /* alloc */ { signal: controller.signal })
+    const bridges = layer.options.bridges && await fetch(layer.options.bridges, /* alloc */ { signal: controller.signal })
       .then(readBridges);
-    if (controller.signal.aborted || backend._map !== map) return;
-    applyTerrain(backend, map, bridges);
+    if (controller.signal.aborted || layer._map !== map) return;
+    applyTerrain(layer, map, bridges);
     return true;
   } catch (error) {
-    if (!controller.signal.aborted) backend.fire('error', /* alloc */ { error });
+    if (!controller.signal.aborted) layer.fire('error', /* alloc */ { error });
     return false;
   } finally {
-    sceneByLayer.get(backend)._terrainLoading = false;
+    mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
   }
 }

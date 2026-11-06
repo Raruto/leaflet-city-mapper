@@ -1,4 +1,4 @@
-export async function releaseRenderer(renderer, backend) {
+export async function releaseRenderer(renderer, layer) {
   try {
     await renderer.device.queue.onSubmittedWorkDone();
     renderer.depthTexture?.destroy();
@@ -8,7 +8,7 @@ export async function releaseRenderer(renderer, backend) {
     renderer.sunlight?.buffer?.destroy();
     renderer.sunlight?.lights?.destroy();
   } catch (error) {
-    backend.fire('error', /* alloc */ { error });
+    layer.fire('error', /* alloc */ { error });
   }
   renderer.device.destroy();
 }

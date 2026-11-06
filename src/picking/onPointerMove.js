@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { hoveredFeatureByLayer } from '../weakmaps/hoveredFeatureByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { findFeature } from './findFeature.js';
@@ -8,11 +10,11 @@ import { showFeature } from './showFeature.js';
 /** Hover is transient; featurehover also reports misses with feature:null. */
 
 export function onPointerMove(layer, event) {
-  sceneByLayer.get(layer).hoveredFeature = findFeature(layer, event);
-  setHighlight(layer, sceneByLayer.get(layer).hoveredFeature);
-  showFeature(layer, sceneByLayer.get(layer).hoveredFeature, event);
+  mutateWeakMap(hoveredFeatureByLayer, layer, "=", findFeature(layer, event));
+  setHighlight(layer, hoveredFeatureByLayer.get(layer));
+  showFeature(layer, hoveredFeatureByLayer.get(layer), event);
   layer.fire('featurehover', /* alloc */ {
-    feature: sceneByLayer.get(layer).hoveredFeature,
+    feature: hoveredFeatureByLayer.get(layer),
     originalEvent: event
   });
 }

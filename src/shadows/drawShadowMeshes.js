@@ -1,11 +1,12 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { shadowPass } from '../globals/shadowPass.js';
 import { shadowBindGroup } from '../globals/shadowBindGroup.js';
 import { shadowOffsets } from '../globals/shadowOffsets.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
-export function drawShadowMeshes(backend, encoder, meshes) {
-  const renderer = sceneByLayer.get(backend).renderer, device = renderer.device, sun = renderer.sunlight;
+export function drawShadowMeshes(layer, encoder, meshes) {
+  const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
   const pass = encoder.beginRenderPass((
     shadowPass.depthStencilAttachment.view = sun.texture.createView(),
     shadowPass

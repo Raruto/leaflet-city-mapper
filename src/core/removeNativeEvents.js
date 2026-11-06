@@ -1,4 +1,4 @@
-import { nativeEventMaps } from '../globals/nativeEventMaps.js';
+import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
 
 
 export function removeNativeEvents(state) {

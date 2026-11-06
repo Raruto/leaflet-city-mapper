@@ -1,4 +1,4 @@
-import { trafficByLayer } from '../globals/trafficByLayer.js';
+import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
 
 
 import { disposeTrafficObject } from './disposeTrafficObject.js';

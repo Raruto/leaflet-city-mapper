@@ -1,5 +1,8 @@
+import { controlByLayer } from '../weakmaps/controlByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { addTimeLayer } from './addTimeLayer.js';
@@ -9,6 +12,6 @@ export function initialize(options) {
   L.Util.setOptions(this, options);
   this.live = true;
   this.layer = /* alloc */ new L.Layer();
-  sceneByLayer.get(this.layer).control = this;
-  sceneByLayer.get(this.layer).kind = 'time';
+  mutateWeakMap(controlByLayer, this.layer, "=", this);
+  mutateWeakMap(kindByLayer, this.layer, "=", 'time');
 }

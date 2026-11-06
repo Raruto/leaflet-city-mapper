@@ -1,13 +1,14 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { meshOffsets } from '../globals/meshOffsets.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { drawPipeline } from './drawPipeline.js';
 import { prepareMeshUniforms } from './prepareMeshUniforms.js';
 import { prepareMeshTextures } from './prepareMeshTextures.js';
 
 /** Upload retained CPU data and draw one mesh in the active WebGPU render pass. */
-export function drawGeometry(backend, mesh, pass, cullMode, frontFace) {
+export function drawGeometry(layer, mesh, pass, cullMode, frontFace) {
   const { geometry } = mesh;
-  const renderer = sceneByLayer.get(backend).renderer;
+  const renderer = rendererByLayer.get(layer);
   const { device } = renderer;
   const pipeline = drawPipeline(renderer, mesh, cullMode, frontFace);
   const offset = prepareMeshUniforms(renderer, mesh);

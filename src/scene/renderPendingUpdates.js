@@ -1,5 +1,9 @@
+import { frameByLayer } from '../weakmaps/frameByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { pendingUpdates } from '../globals/pendingUpdates.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 
@@ -9,12 +13,12 @@ export function renderPendingUpdates() {
   const updates = /* alloc */ [...pendingUpdates];
   pendingUpdates.clear();
   let failure;
-  let backend;
-  for (backend of updates) {
-    sceneByLayer.get(backend)._frame = null;
-    if (sceneByLayer.get(backend)._shared !== backend || !sceneByLayer.get(backend).renderer) continue;
+  let layer;
+  for (layer of updates) {
+    mutateWeakMap(frameByLayer, layer, "=", null);
+    if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) continue;
     try {
-      render(backend);
+      render(layer);
     } catch (error) {
       failure ||= error;
     }

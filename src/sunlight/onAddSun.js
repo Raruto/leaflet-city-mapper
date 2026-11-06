@@ -1,6 +1,8 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
-import { sunlightByControl } from '../globals/sunlightByControl.js';
-import { sunByMap } from '../globals/sunByMap.js';
+import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
+import { sunlightByControl } from '../weakmaps/sunlightByControl.js';
+import { sunByMap } from '../weakmaps/sunByMap.js';
 import { createSun } from './createSun.js';
 import { tickSun } from './tickSun.js';
 
@@ -17,7 +19,7 @@ export function onAddSun(control, map) {
   }
   state.control = control;
   state.originalSky = map.getContainer().style.getPropertyValue('--leaflet-sky-background');
-  cameraByMap.get(map)._timeControl = control;
+  mutateWeakMap(timeControlByMap, map, "=", control);
   sunlightByControl.set(control, state);
   state.update();
   state.timer = setInterval(tickSun, 60000, state);

@@ -1,7 +1,14 @@
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
+import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
+import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
+
+
 import { frameCommands } from '../globals/frameCommands.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { nativeRenderByLayer } from '../globals/nativeRenderByLayer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
 
 
 import { synchronizeZoomView } from './synchronizeZoomView.js';
@@ -25,45 +32,45 @@ import { beforeNativeRender } from '../core/beforeNativeRender.js';
  * Without raster tiles, logical map projection supplies the same static alignment.
  */
 
-export function render(backend) {
-  cancelUpdate(backend);
-  if (sceneByLayer.get(backend)._shared !== backend || !sceneByLayer.get(backend).renderer) return;
-  const map = backend._map;
+export function render(layer) {
+  cancelUpdate(layer);
+  if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) return;
+  const map = layer._map;
   const now = performance.now();
   const size = map.getSize();
   if (!size.x || !size.y) return;
-  synchronizeZoomView(backend, now);
-  resizeRenderer(backend, size);
-  updateMapCamera(backend, size);
-  updateWorldMatrix(sceneByLayer.get(backend).scene);
+  synchronizeZoomView(layer, now);
+  resizeRenderer(layer, size);
+  updateMapCamera(layer, size);
+  updateWorldMatrix(sceneByLayer.get(layer));
   let sceneChanged = false;
-  let layer, native;
-  for (layer of sceneByLayer.get(backend)._layers) {
-    native = nativeRenderByLayer.get(layer);
+  let sceneLayer, native;
+  for (sceneLayer of layersByLayer.get(layer)) {
+    native = nativeRenderByLayer.get(sceneLayer);
     if (!native) continue;
     beforeNativeRender(native);
     sceneChanged = true;
   }
-  const sunlight = cameraByMap.get(map)._sunlight;
-  collectFrameMeshes(backend, sunlight, sceneChanged);
-  const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes;
-  const renderer = sceneByLayer.get(backend).renderer;
-  const rasters = updateRoofRaster(backend, now);
+  const sunlight = sunlightByMap.get(map);
+  collectFrameMeshes(layer, sunlight, sceneChanged);
+  const shadowMeshes = shadowMeshesByLayer.get(layer);
+  const renderer = rendererByLayer.get(layer);
+  const rasters = updateRoofRaster(layer, now);
   const meshes = renderer.frameMeshes ||= /* alloc */ [];
   meshes.length = 0;
-  let appearing = prepareFrameMeshes(backend, rasters, now, meshes);
+  let appearing = prepareFrameMeshes(layer, rasters, now, meshes);
   const encoder = renderer.device.createCommandEncoder();
-  prepareFrameUniforms(backend, meshes, shadowMeshes, sunlight);
-  renderSunlight(backend, encoder, shadowMeshes, sunlight);
-  drawSceneMeshes(backend, encoder, meshes);
+  prepareFrameUniforms(layer, meshes, shadowMeshes, sunlight);
+  renderSunlight(layer, encoder, shadowMeshes, sunlight);
+  drawSceneMeshes(layer, encoder, meshes);
   renderer.device.queue.writeBuffer(renderer.uniformBuffer, 0, renderer.uniformData, 0, renderer.uniformSlot * 64);
   renderer.device.queue.submit((
     frameCommands[0] = encoder.finish(),
     frameCommands
   ));
   frameCommands[0] = null;
-  for (layer of sceneByLayer.get(backend)._layers) {
-    if (sceneByLayer.get(layer)._wantedRasterTiles) appearing = pruneRasterTiles(layer) || appearing;
+  for (sceneLayer of layersByLayer.get(layer)) {
+    if (wantedRasterTilesByLayer.get(sceneLayer)) appearing = pruneRasterTiles(sceneLayer) || appearing;
   }
-  if (map._animatingZoom || appearing) update(backend);
+  if (map._animatingZoom || appearing) update(layer);
 }

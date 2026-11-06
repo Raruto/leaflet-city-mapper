@@ -1,5 +1,19 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { bridgeMeshByLayer } from '../weakmaps/bridgeMeshByLayer.js';
+import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
+import { demByLayer } from '../weakmaps/demByLayer.js';
+import { rasterProgramByLayer } from '../weakmaps/rasterProgramByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { terrainControllerByLayer } from '../weakmaps/terrainControllerByLayer.js';
+import { terrainGridsByLayer } from '../weakmaps/terrainGridsByLayer.js';
+import { terrainLoadingByLayer } from '../weakmaps/terrainLoadingByLayer.js';
+import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
+import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
+import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
+
 import { renderEmpty } from '../globals/renderEmpty.js';
 
 import { destroyTexture } from '../rendering/destroyTexture.js';
@@ -12,34 +26,35 @@ import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {
-  sceneByLayer.get(layer)._terrainController?.abort();
-  sceneByLayer.get(layer)._terrainLoading = false;
-  sceneByLayer.get(layer)._terrainReady = false;
+
+  terrainControllerByLayer.get(layer)?.abort();
+  mutateWeakMap(terrainLoadingByLayer, layer, "=", false);
+  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
   map.eachLayer(clearLayerTerrain);
   let tile, l, grid, attribute;
-  for (tile of sceneByLayer.get(layer)._rasterTiles.keys()) removeRasterTile(layer, tile);
-  if (cameraByMap.get(map)._terrain3D === layer) delete cameraByMap.get(map)._terrain3D;
+  for (tile of rasterTilesByLayer.get(layer).keys()) removeRasterTile(layer, tile);
+  if (terrain3DByMap.get(map) === layer) terrain3DByMap.delete(map);
   for (l of Object.values(map._layers)) {
     conformModelToTerrain(l, null);
     setTerrainHeight(l);
   }
 
   map.fire('terrainchange');
-  sceneByLayer.get(layer)._terrainTiles.clear();
-  sceneByLayer.get(layer)._terrainOriginElevation = 0;
-  sceneByLayer.get(layer)._terrainPromise = null;
-  if (sceneByLayer.get(layer)._rasterProgram) {
-    sceneByLayer.get(layer)._rasterProgram.pipelineCache.clear();
+  terrainTilesByLayer.get(layer).clear();
+  mutateWeakMap(terrainOriginElevationByLayer, layer, "=", 0);
+  mutateWeakMap(terrainPromiseByLayer, layer, "=", null);
+  if (rasterProgramByLayer.get(layer)) {
+    rasterProgramByLayer.get(layer).pipelineCache.clear();
   }
-  sceneByLayer.get(layer)._rasterProgram = null;
-  if (sceneByLayer.get(layer)._dem) destroyTexture(layer, sceneByLayer.get(layer)._dem.texture);
-  sceneByLayer.get(layer)._dem = null;
-  for (grid of sceneByLayer.get(layer)._terrainGrids?.values() || renderEmpty) {
+  mutateWeakMap(rasterProgramByLayer, layer, "=", null);
+  if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
+  mutateWeakMap(demByLayer, layer, "=", null);
+  for (grid of terrainGridsByLayer.get(layer)?.values() || renderEmpty) {
     for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
   }
-  sceneByLayer.get(layer)._terrainGrids = null;
-  sceneByLayer.get(layer)._bridges = null;
-  disposeMesh(layer, sceneByLayer.get(layer)._bridgeMesh);
-  sceneByLayer.get(layer)._bridgeMesh = null;
+  mutateWeakMap(terrainGridsByLayer, layer, "=", null);
+  mutateWeakMap(bridgesByLayer, layer, "=", null);
+  disposeMesh(layer, bridgeMeshByLayer.get(layer));
+  mutateWeakMap(bridgeMeshByLayer, layer, "=", null);
   onRemove3DLayer(layer, map);
 }

@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { readyByLayer } from '../weakmaps/readyByLayer.js';
+
 import { reportError } from './reportError.js';
 
 
@@ -11,10 +13,10 @@ export function initializeLayer(task) {
   try {
     const map = layer._map;
     map?.removeLayer(layer);
-    delete sceneByLayer.get(layer).kind;
+    kindByLayer.delete(layer);
     task.initialize(layer, task.settings);
     map?.addLayer(layer);
-    return sceneByLayer.get(layer).ready === ready ? layer : sceneByLayer.get(layer).ready;
+    return readyByLayer.get(layer) === ready ? layer : readyByLayer.get(layer);
   } catch (error) {
     layer.fire('error', /* alloc */ { error });
     throw error;

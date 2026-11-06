@@ -6,7 +6,7 @@ import { bridgeFaces } from './bridgeFaces.js';
 import { bridgeSides } from './bridgeSides.js';
 
 export function bridgePolygon(context, polygon) {
-  const { backend, map, zoom, crs, origin, metres, base } = context;
+  const { backend: layer, map, zoom, crs, origin, metres, base } = context;
   const rings = /* alloc */ [];
   let ring, path, lng, lat, z, p, coordinate, paths, contour, holes, triangles;
   for (ring of polygon) {
@@ -25,7 +25,7 @@ export function bridgePolygon(context, polygon) {
     [contour, ...holes] = paths;
     triangles = triangulate(contour, holes);
   } catch { return; }
-  indexBridge(backend, pixels, triangles);
+  indexBridge(layer, pixels, triangles);
   bridgeFaces(context, points, triangles);
   bridgeSides(context, points, rings);
 }

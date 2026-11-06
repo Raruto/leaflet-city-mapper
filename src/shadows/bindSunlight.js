@@ -1,11 +1,12 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { sunBindGroup } from '../globals/sunBindGroup.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 
 export function bindSunlight(layer) {
-  const sun = sceneByLayer.get(layer).renderer.sunlight;
-  sun.bindGroup = sceneByLayer.get(layer).renderer.device.createBindGroup((
+  const sun = rendererByLayer.get(layer).sunlight;
+  sun.bindGroup = rendererByLayer.get(layer).device.createBindGroup((
     sunBindGroup.layout = sun.layout,
     sunBindGroup.entries[0].resource.buffer = sun.buffer,
     sunBindGroup.entries[1].resource = sun.texture.createView(),

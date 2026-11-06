@@ -1,13 +1,18 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
+import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
+import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
+
 
 
 import { updateWorldMatrix } from "../scene/updateWorldMatrix.js";
 import { collectMeshes } from './collectMeshes.js';
 
-export function collectFrameMeshes(backend, sunlight, sceneChanged) {
-  const camera = sceneByLayer.get(backend).camera;
+export function collectFrameMeshes(layer, sunlight, sceneChanged) {
+  const camera = cameraByLayer.get(layer);
   const projection = camera.projectionViewMatrix;
-  const renderer = sceneByLayer.get(backend).renderer;
+  const renderer = rendererByLayer.get(layer);
   const frustum = renderer.frustum ||= /* alloc */ [
     /* alloc */ new Float64Array(4),
     /* alloc */ new Float64Array(4),
@@ -29,10 +34,12 @@ export function collectFrameMeshes(backend, sunlight, sceneChanged) {
     }
     frustumLengths[i] = Math.hypot(plane[0], plane[1], plane[2]);
   }
-  const candidates = sceneByLayer.get(backend)._visibleMeshes ||= /* alloc */ [];
+  let candidates = visibleMeshesByLayer.get(layer);
+  if (!candidates) visibleMeshesByLayer.set(layer, candidates = /* alloc */ []);
   candidates.length = 0;
-  const shadowMeshes = sceneByLayer.get(backend)._shadowMeshes ||= /* alloc */ [];
+  let shadowMeshes = shadowMeshesByLayer.get(layer);
+  if (!shadowMeshes) shadowMeshesByLayer.set(layer, shadowMeshes = /* alloc */ []);
   shadowMeshes.length = 0;
-  if (sceneChanged) updateWorldMatrix(sceneByLayer.get(backend).scene);
-  collectMeshes(sceneByLayer.get(backend).scene, sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
+  if (sceneChanged) updateWorldMatrix(sceneByLayer.get(layer));
+  collectMeshes(sceneByLayer.get(layer), sunlight, projection, frustum, frustumLengths, candidates, shadowMeshes);
 }

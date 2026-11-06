@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+
 
 import { onAdd3DLayer } from './onAdd3DLayer.js';
 import { onPMTileAdd } from '../raster/onPMTileAdd.js';
@@ -7,7 +8,7 @@ import { addRasterImage } from '../core/addRasterImage.js';
 import { addTimeLayer } from '../sunlight/addTimeLayer.js';
 
 export function addSceneLayer(layer, map) {
-  switch (sceneByLayer.get(layer).kind) {
+  switch (kindByLayer.get(layer)) {
     case '3d': return onAdd3DLayer(layer, map);
     case 'raster': return onPMTileAdd(layer, map);
     case 'terrain': return onTerrainAdd(layer, map);

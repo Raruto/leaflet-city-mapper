@@ -3,7 +3,7 @@ import { speed as sharedSpeed } from '../globals/speed.js';
 import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
 import { vehicles } from '../globals/vehicles.js';
 import { trafficShader } from '../globals/trafficShader.js';
-import { trafficByLayer } from '../globals/trafficByLayer.js';
+import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
 
 
 ﻿/**

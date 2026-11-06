@@ -1,12 +1,12 @@
 import { decompress } from './decompress.js';
 import { read } from './read.js';
 
-export async function getTileData(backend, header, entry, id, signal) {
+export async function getTileData(layer, header, entry, id, signal) {
   if (id - entry.tileId >= entry.runLength) return;
   if (entry.offset + entry.length > header.tileDataLength) {
     throw /* alloc */ new Error('PMTiles tile outside data section');
   }
-  const data = await decompress(await read(backend, header.tileDataOffset + entry.offset, entry.length, signal),
+  const data = await decompress(await read(layer, header.tileDataOffset + entry.offset, entry.length, signal),
     header.tileCompression);
   signal?.throwIfAborted();
   return /* alloc */ { data };

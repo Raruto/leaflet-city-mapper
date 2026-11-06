@@ -1,5 +1,5 @@
 import { L } from '../globals/L.js';
-import { nativeEventMaps } from '../globals/nativeEventMaps.js';
+import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
 
 
 import { raycast } from '../picking/raycast.js';

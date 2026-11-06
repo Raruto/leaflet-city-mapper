@@ -1,4 +1,5 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraPitchByMap } from '../weakmaps/cameraPitchByMap.js';
 
 
-export function mapGetPitch(map) { return cameraByMap.get(map)?._cameraPitch ?? 0; }
+
+export function mapGetPitch(map) { return cameraPitchByMap.get(map) ?? 0; }

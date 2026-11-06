@@ -1,6 +1,8 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+
 import { defaultMaterial } from '../globals/defaultMaterial.js';
 import { meshBuffer } from '../globals/meshBuffer.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { nextId } from '../globals/nextId.js';
 
 
@@ -16,8 +18,8 @@ import { update } from '../scene/update.js';
  * A supplied `program` shares compiled shaders and pipelines across compatible meshes.
  */
 
-export function createMesh(backend, data, material = defaultMaterial, usage = 0, program) {
-  const { device } = sceneByLayer.get(backend).renderer, attributes = /* alloc */ {};
+export function createMesh(layer, data, material = defaultMaterial, usage = 0, program) {
+  const { device } = rendererByLayer.get(layer), attributes = /* alloc */ {};
   let name, values, array, size, buffer;
   for ([name, values] of Object.entries(data)) {
     array = /* alloc */ new Float32Array(values);
@@ -35,10 +37,10 @@ export function createMesh(backend, data, material = defaultMaterial, usage = 0,
     ...emptyNode(),
     device,
     geometry: /* alloc */ { device, attributes, drawRange: /* alloc */ { start: 0, count: attributes.position.count } },
-    program: program || createProgram(backend, /* alloc */ { vertexColors: true, doubleSided: true, ...material }),
+    program: program || createProgram(layer, /* alloc */ { vertexColors: true, doubleSided: true, ...material }),
     id: nextId.value++, renderOrder: 0, extras: /* alloc */ {},
   };
-  setParent(mesh, sceneByLayer.get(backend).root);
-  update(backend);
+  setParent(mesh, rootByLayer.get(layer));
+  update(layer);
   return mesh;
 }

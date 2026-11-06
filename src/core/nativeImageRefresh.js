@@ -1,4 +1,4 @@
-import { imageStates } from '../globals/imageStates.js';
+import { imageStates } from '../weakmaps/imageStates.js';
 
 
 import { refreshNativeLayer } from './refreshNativeLayer.js';

@@ -1,10 +1,13 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { demByLayer } from '../weakmaps/demByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
 
-export function terrainTileGeometry(backend, attributes, sizeX, sizeZ) {
-  const scene = sceneByLayer.get(backend), base = scene._terrainOriginElevation;
-  const bottom = Math.min(scene._dem.low, base) - base, top = Math.max(scene._dem.high, base) - base;
+
+export function terrainTileGeometry(layer, attributes, sizeX, sizeZ) {
+  const base = terrainOriginElevationByLayer.get(layer)
+  const bottom = Math.min(demByLayer.get(layer).low, base) - base, top = Math.max(demByLayer.get(layer).high, base) - base;
   return /* alloc */ {
-    device: scene.renderer.device,
+    device: rendererByLayer.get(layer).device,
     attributes,
     drawRange: /* alloc */ { start: 0, count: attributes.index.count },
     // Bounds must cover the DEM-displaced tile, although picking uses the flat grid.

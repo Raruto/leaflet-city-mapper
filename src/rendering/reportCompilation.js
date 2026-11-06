@@ -1,4 +1,4 @@
-export async function reportCompilation(backend, pending) {
+export async function reportCompilation(layer, pending) {
   let info, message;
   try {
     const infos = await Promise.all(pending);
@@ -7,11 +7,11 @@ export async function reportCompilation(backend, pending) {
       for (message of info.messages) if (message.type === 'error') errors += `${errorCount++ ? '\n' : ''}${message.message}`;
     }
     if (errorCount) {
-      backend.fire('error', /* alloc */ {
+      layer.fire('error', /* alloc */ {
         error: /* alloc */ new Error(`Unable to compile Layer3D WGSL: ${errors}`),
       });
     }
   } catch (error) {
-    backend.fire('error', /* alloc */ { error });
+    layer.fire('error', /* alloc */ { error });
   }
 }

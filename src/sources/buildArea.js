@@ -1,5 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
+import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
 import { buildAreaFeature } from './buildAreaFeature.js';
@@ -8,21 +10,21 @@ import { loadSource } from '../archives/loadSource.js';
 import { sourceAreaContext } from './sourceAreaContext.js';
 import { pump } from './pump.js';
 
-export async function buildArea(backend, area, map) {
+export async function buildArea(layer, area, map) {
   let feature;
   try {
     await /* alloc */ new Promise(requestAnimationFrame);
-    await sceneByLayer.get(cameraByMap.get(map)._terrain3D)?._terrainPromise;
+    await cameraViewByMap.get(map);
     if (area.request.signal.aborted) return;
-    const data = await loadSource(backend, area);
+    const data = await loadSource(layer, area);
     if (area.request.signal.aborted) return;
     if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) {
       throw /* alloc */ new Error('Invalid GeoJSON response');
     }
-    if (sceneByLayer.get(backend)._geojson && typeof backend.options.style !== 'function') {
+    if (geojsonByLayer.get(layer) && typeof layer.options.style !== 'function') {
       throw /* alloc */ new Error('style must be a function');
     }
-    const context = sourceAreaContext(backend, area, map);
+    const context = sourceAreaContext(layer, area, map);
     let deadline = performance.now() + 4;
     for (feature of data.features) {
       if (area.request.signal.aborted) return;
@@ -37,10 +39,10 @@ export async function buildArea(backend, area, map) {
   } catch (error) {
     if (!area.request.signal.aborted) {
       area.error = error.message;
-      backend.fire('error', /* alloc */ { error });
+      layer.fire('error', /* alloc */ { error });
     }
   } finally {
-    sceneByLayer.get(backend)._inflight--;
-    pump(backend, map);
+    mutateWeakMap(inflightByLayer, layer, "--", undefined, false);
+    pump(layer, map);
   }
 }

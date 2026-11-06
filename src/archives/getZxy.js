@@ -1,19 +1,20 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { sceneLayers } from '../weakmaps/sceneLayers.js';
+
 import { tileId } from './tileId.js';
 import { getHeader } from './getHeader.js';
 import { findTile } from './findTile.js';
 
 /** Nearest directory entry at/before the Hilbert ID, then follow leaf pointers. */
 
-export async function getZxy(backend, z, x, y, signal) {
-  if (!sceneByLayer.has(backend)) return backend.getZxy(z, x, y, signal);
-  if (backend.options.archive && backend.options.archive !== backend) {
-    return getZxy(backend.options.archive, z, x, y, signal);
+export async function getZxy(layer, z, x, y, signal) {
+  if (!sceneLayers.has(layer)) return layer.getZxy(z, x, y, signal);
+  if (layer.options.archive && layer.options.archive !== layer) {
+    return getZxy(layer.options.archive, z, x, y, signal);
   }
   const id = tileId(z, x, y);
   signal?.throwIfAborted();
-  const header = await getHeader(backend);
+  const header = await getHeader(layer);
   signal?.throwIfAborted();
   if (z < header.minZoom || z > header.maxZoom) return;
-  return findTile(backend, header, id, signal);
+  return findTile(layer, header, id, signal);
 }

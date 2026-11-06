@@ -62,8 +62,8 @@ Then('camera scratch buffers preserve independent results and matrix transforms'
   const first = angles(map), saved = first.slice(), target = [];
   assert.equal(angles(map, target), target);
   assert.deepEqual(target, saved);
-  map._cameraPitch = 0;
-  map._cameraBearing = 0;
+  globals.cameraByMap.get(map)._cameraPitch = 0;
+  globals.cameraByMap.get(map)._cameraBearing = 0;
   angles(map, target);
   assert.deepEqual(first, saved);
   assert.deepEqual(target, [1, 0, 1, 0]);

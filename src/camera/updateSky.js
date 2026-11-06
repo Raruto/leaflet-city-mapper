@@ -1,6 +1,8 @@
+import { pitchSkyByMap } from '../weakmaps/pitchSkyByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
 
 import { mapGetPitch } from './mapGetPitch.js';
 
@@ -9,14 +11,14 @@ export function updateSky() {
   const height = this.getSize().y, pitch = mapGetPitch(this) * radians;
   const far = height * this.options.pitchMaxDistance, distance = height * 1.5;
   const top = height / 2 - far * Math.abs(Math.cos(pitch)) * distance / (distance + Math.sin(pitch) * far);
-  if (top > 0 && !cameraByMap.get(this)._pitchSky) {
-    cameraByMap.get(this)._pitchSky = L.DomUtil.create('div', 'leaflet-pitch-sky', this.getContainer());
-    cameraByMap.get(this)._pitchSky.setAttribute('aria-hidden', 'true');
-    cameraByMap.get(this)._pitchSky.style.cssText = 'position:absolute;inset:0 0 auto;height:0;z-index:0;pointer-events:none;background:var(--leaflet-sky-background,linear-gradient(#9ec5e8,#dfe9f0))';
+  if (top > 0 && !pitchSkyByMap.get(this)) {
+    mutateWeakMap(pitchSkyByMap, this, "=", L.DomUtil.create('div', 'leaflet-pitch-sky', this.getContainer()));
+    pitchSkyByMap.get(this).setAttribute('aria-hidden', 'true');
+    pitchSkyByMap.get(this).style.cssText = 'position:absolute;inset:0 0 auto;height:0;z-index:0;pointer-events:none;background:var(--leaflet-sky-background,linear-gradient(#9ec5e8,#dfe9f0))';
   }
-  if (cameraByMap.get(this)._pitchSky) {
-    cameraByMap.get(this)._pitchSky.style.inset = pitch > Math.PI / 2 ? 'auto 0 0' : '0 0 auto';
-    cameraByMap.get(this)._pitchSky.style.height = `${Math.max(0, Math.ceil(top))}px`;
-    cameraByMap.get(this)._pitchSky.style.display = top > 0 ? '' : 'none';
+  if (pitchSkyByMap.get(this)) {
+    pitchSkyByMap.get(this).style.inset = pitch > Math.PI / 2 ? 'auto 0 0' : '0 0 auto';
+    pitchSkyByMap.get(this).style.height = `${Math.max(0, Math.ceil(top))}px`;
+    pitchSkyByMap.get(this).style.display = top > 0 ? '' : 'none';
   }
 }

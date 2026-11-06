@@ -1,25 +1,29 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { rootByLayer } from '../weakmaps/rootByLayer.js';
+import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { removeRasterTile } from './removeRasterTile.js';
 import { setParent } from '../scene/setParent.js';
 import { registerTerrainTile } from './registerTerrainTile.js';
 
-export function setRasterTerrain(backend, terrain) {
+export function setRasterTerrain(layer, terrain) {
   // Pending sources bind the current terrain when their raster attachment is ready.
-  if (!sceneByLayer.get(backend)._rasterTiles || sceneByLayer.get(backend)._terrain3D === terrain) return;
+  if (!rasterTilesByLayer.get(layer) || terrain3DByLayer.get(layer) === terrain) return;
   let tile;
-  for (tile of sceneByLayer.get(backend)._rasterTiles.values()) {
-    if(sceneByLayer.get(backend)._terrain3D) removeRasterTile(sceneByLayer.get(backend)._terrain3D, tile);
+  for (tile of rasterTilesByLayer.get(layer).values()) {
+    if(terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
     if (tile.mesh) {
       tile.mesh.visible = true;
-      setParent(tile.mesh, sceneByLayer.get(backend).root);
+      setParent(tile.mesh, rootByLayer.get(layer));
     }
   }
-  sceneByLayer.get(backend)._terrain3D = terrain || null;
+  mutateWeakMap(terrain3DByLayer, layer, "=", terrain || null);
   if (terrain) {
-    for (tile of sceneByLayer.get(backend)._rasterTiles.values()) {
-      if (tile.done) registerTerrainTile(backend, tile.coords, tile);
+    for (tile of rasterTilesByLayer.get(layer).values()) {
+      if (tile.done) registerTerrainTile(layer, tile.coords, tile);
     }
   }
 }

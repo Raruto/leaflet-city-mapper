@@ -1,4 +1,5 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+
 
 
 import { nativeImageRefresh } from './nativeImageRefresh.js';
@@ -30,5 +31,5 @@ export function refreshNativeLayer(state = this) {
     image.addEventListener('load', nativeImageRefresh);
     image.addEventListener('error', nativeImageError);
   }
-  if (sceneByLayer.get(state.backend)._shared) update(state.backend);
+  if (sharedByLayer.get(state.backend)) update(state.backend);
 }

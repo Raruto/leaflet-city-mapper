@@ -1,4 +1,4 @@
-import { walkByMap } from '../globals/walkByMap.js';
+import { walkByMap } from '../weakmaps/walkByMap.js';
 
 export function onRemove(map) {
   const state = walkByMap.get(map);

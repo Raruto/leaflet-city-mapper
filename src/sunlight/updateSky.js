@@ -1,5 +1,7 @@
+import { pitchSkyByMap } from '../weakmaps/pitchSkyByMap.js';
+import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
+
 import { radians } from '../globals/radians.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
 
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
@@ -7,7 +9,7 @@ import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { updateCelestialDisc } from './updateCelestialDisc.js';
 
 export function updateSky({ map, originalSky, sunDisc, moonDisc, projection }) {
-  const sun = cameraByMap.get(map)._sunlight, sky = cameraByMap.get(map)._pitchSky;
+  const sun = sunlightByMap.get(map), sky = pitchSkyByMap.get(map);
   if (sun) map.getContainer().style.setProperty('--leaflet-sky-background', sun.background);
   else if (originalSky) map.getContainer().style.setProperty('--leaflet-sky-background', originalSky);
   else map.getContainer().style.removeProperty('--leaflet-sky-background');

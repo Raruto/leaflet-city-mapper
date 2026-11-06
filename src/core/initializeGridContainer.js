@@ -1,4 +1,4 @@
-import { gridInitializers } from '../globals/gridInitializers.js';
+import { gridInitializers } from '../weakmaps/gridInitializers.js';
 
 
 export function initializeGridContainer() {

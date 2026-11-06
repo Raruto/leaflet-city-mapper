@@ -1,4 +1,4 @@
-import { walkByMap } from '../globals/walkByMap.js';
+import { walkByMap } from '../weakmaps/walkByMap.js';
 
 export function onAdd(map) {
   let state = walkByMap.get(map);

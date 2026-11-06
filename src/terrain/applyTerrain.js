@@ -1,21 +1,25 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { locationByLayer } from '../weakmaps/locationByLayer.js';
+import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { addBridges } from '../geometry/addBridges.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { getElevation } from './getElevation.js';
 import { setTerrainHeight } from './setTerrainHeight.js';
 import { update } from '../scene/update.js';
 
-export function applyTerrain(backend, map, bridges) {
-  const scene = sceneByLayer.get(backend);
-  scene._terrainReady = true;
-  scene._terrainOriginElevation = getElevation(backend, scene.location) ?? 0;
-  let layer;
-  for (layer of Object.values(map._layers)) {
-    setTerrainHeight(layer);
-    conformModelToTerrain(layer, backend);
+export function applyTerrain(layer, map, bridges) {
+
+  mutateWeakMap(terrainReadyByLayer, layer, "=", true);
+  mutateWeakMap(terrainOriginElevationByLayer, layer, "=", getElevation(layer, locationByLayer.get(layer)) ?? 0);
+  let mapLayer;
+  for (mapLayer of Object.values(map._layers)) {
+    setTerrainHeight(mapLayer);
+    conformModelToTerrain(mapLayer, layer);
   }
-  if (bridges) addBridges(backend, bridges);
+  if (bridges) addBridges(layer, bridges);
   map.fire('terrainchange');
-  update(backend);
-  backend.fire('terrainready');
+  update(layer);
+  layer.fire('terrainready');
 }

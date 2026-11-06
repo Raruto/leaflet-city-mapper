@@ -1,4 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
+import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { destroyTexture } from '../rendering/destroyTexture.js';
@@ -6,16 +10,16 @@ import { removeRasterTile } from './removeRasterTile.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/update.js';
 
-export function releaseRasterTile(backend, tile) {
+export function releaseRasterTile(layer, tile) {
   const key = `${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`;
-  if (sceneByLayer.get(backend)._rasterTiles.get(key) !== tile) return;
-  sceneByLayer.get(backend)._rasterTiles.delete(key);
-  sceneByLayer.get(backend)._rasterVersion = (sceneByLayer.get(backend)._rasterVersion || 0) + 1;
+  if (rasterTilesByLayer.get(layer).get(key) !== tile) return;
+  rasterTilesByLayer.get(layer).delete(key);
+  mutateWeakMap(rasterVersionByLayer, layer, "=", (rasterVersionByLayer.get(layer) || 0) + 1);
   tile.request.abort();
-  if(sceneByLayer.get(backend)._terrain3D) removeRasterTile(sceneByLayer.get(backend)._terrain3D, tile);
+  if(terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
   if (tile.mesh) setParent(tile.mesh, null);
-  if (tile.texture) destroyTexture(backend, tile.texture.texture);
+  if (tile.texture) destroyTexture(layer, tile.texture.texture);
   tile.image?.close();
-  backend.fire('tileunload', /* alloc */ { tile, coords: tile.coords });
-  update(backend);
+  layer.fire('tileunload', /* alloc */ { tile, coords: tile.coords });
+  update(layer);
 }

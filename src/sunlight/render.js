@@ -1,4 +1,4 @@
-import { renderers } from '../globals/renderers.js';
+import { renderers } from '../weakmaps/renderers.js';
 
 
 import { update as updateScene } from '../scene/update.js';

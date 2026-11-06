@@ -1,23 +1,26 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { etagByLayer } from '../weakmaps/etagByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
 
 
-export async function read(backend, offset, length, signal) {
+
+export async function read(layer, offset, length, signal) {
   signal?.throwIfAborted();
   if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) ||
     offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
     throw /* alloc */ new Error('Invalid PMTiles byte range');
   }
-  const response = await fetch(sceneByLayer.get(backend).url, /* alloc */ {
+  const response = await fetch(urlByLayer.get(layer), /* alloc */ {
     headers: /* alloc */ { Range: `bytes=${offset}-${offset + length - 1}` }, signal,
   });
   if (!response.ok) {
     throw /* alloc */ new Error(`Unable to read PMTiles: HTTP ${response.status}`);
   }
   const etag = response.headers.get('ETag');
-  if (sceneByLayer.get(backend)._etag && etag !== sceneByLayer.get(backend)._etag) {
+  if (etagByLayer.get(layer) && etag !== etagByLayer.get(layer)) {
     throw /* alloc */ new Error('PMTiles archive changed; recreate the layer');
   }
-  if (etag) sceneByLayer.get(backend)._etag = etag;
+  if (etag) mutateWeakMap(etagByLayer, layer, "=", etag);
   let data = await response.arrayBuffer();
   if (response.status === 200) {
     data = data.slice(offset, offset + length);

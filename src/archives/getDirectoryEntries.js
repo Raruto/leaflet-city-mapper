@@ -1,12 +1,13 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { directoriesByLayer } from '../weakmaps/directoriesByLayer.js';
+
 import { loadDirectory } from './loadDirectory.js';
 
-export async function getDirectoryEntries(backend, offset, length, compression) {
-  const directories = sceneByLayer.get(backend)._directories;
+export async function getDirectoryEntries(layer, offset, length, compression) {
+  const directories = directoriesByLayer.get(layer);
   const key = `${offset}:${length}`;
   if (!directories.has(key)) {
     if (directories.size >= 32) directories.delete(directories.keys().next().value);
-    directories.set(key, loadDirectory(backend, offset, length, compression));
+    directories.set(key, loadDirectory(layer, offset, length, compression));
   }
   const pending = directories.get(key);
   try {

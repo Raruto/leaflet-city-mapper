@@ -1,14 +1,16 @@
-import { rendererDevices } from '../globals/rendererDevices.js';
-import { renderers } from '../globals/renderers.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { layersByLayer } from '../weakmaps/layersByLayer.js';
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
+import { rendererDevices } from '../weakmaps/rendererDevices.js';
+import { renderers } from '../weakmaps/renderers.js';
 
 
 
 export function rendererDeviceError(event) {
   const map = rendererDevices.get(event.currentTarget);
   const owner = renderers.get(map);
-  if (sceneByLayer.get(owner)?.renderer?.device !== event.currentTarget) return;
-  if (!sceneByLayer.get(owner)._layers) return;
+  if (rendererByLayer.get(owner)?.device !== event.currentTarget) return;
+  if (!layersByLayer.get(owner)) return;
   let layer;
-  for (layer of sceneByLayer.get(owner)._layers) layer.fire('error', /* alloc */ { error: event.error });
+  for (layer of layersByLayer.get(owner)) layer.fire('error', /* alloc */ { error: event.error });
 }

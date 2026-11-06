@@ -1,5 +1,5 @@
 import { degrees } from '../globals/degrees.js';
-import { dragStates } from '../globals/dragStates.js';
+import { dragStates } from '../weakmaps/dragStates.js';
 
 import { mapStopPitchBearingAnimation } from '../camera/mapStopPitchBearingAnimation.js';
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';

@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { getHeader } from "../archives/getHeader.js";
@@ -6,7 +8,7 @@ import { getHeader } from "../archives/getHeader.js";
 export async function readyRaster(layer, archive) {
   const header = await getHeader(archive);
   layer.options.archive = archive;
-  sceneByLayer.get(layer).header = header;
+  mutateWeakMap(headerByLayer, layer, "=", header);
   if (layer.options.maxNativeZoom === undefined) {
     layer.options.maxNativeZoom = header.maxZoom;
   }

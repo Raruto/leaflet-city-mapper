@@ -1,5 +1,7 @@
+import { cameraAnimationByMap } from '../weakmaps/cameraAnimationByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
 import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
@@ -18,7 +20,7 @@ export function mapAnimateCamera(map, pitch, bearing, options = cameraEmptyOptio
   if (!Number.isFinite(duration) || duration < 0) throw /* alloc */ new TypeError('Camera duration must be nonnegative');
   const start = performance.now(), fromPitch = mapGetPitch(map), fromBearing = mapGetBearing(map);
   const delta = ((bearing - fromBearing) % 360 + 540) % 360 - 180;
-  const animation = cameraByMap.get(map)._cameraAnimation = /* alloc */ { duration, start, fromPitch, fromBearing, pitch, delta };
+  const animation = mutateWeakMap(cameraAnimationByMap, map, "=", /* alloc */ { duration, start, fromPitch, fromBearing, pitch, delta });
   scheduleCameraAnimation(map, animation);
   return map;
 }

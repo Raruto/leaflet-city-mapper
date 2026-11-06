@@ -1,6 +1,7 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { typeByLayer } from '../weakmaps/typeByLayer.js';
+
 
 
 export function shouldSkipOther(other, layer) {
-  return other === layer || sceneByLayer.get(other)._type === 'terrain' || sceneByLayer.get(other)._type === 'traffic';
+  return other === layer || typeByLayer.get(other) === 'terrain' || typeByLayer.get(other) === 'traffic';
 }

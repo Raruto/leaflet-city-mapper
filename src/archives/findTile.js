@@ -2,7 +2,7 @@ import { getDirectoryEntries } from './getDirectoryEntries.js';
 import { findDirectoryEntry } from './findDirectoryEntry.js';
 import { getTileData } from './getTileData.js';
 
-export async function findTile(backend, header, id, signal) {
+export async function findTile(layer, header, id, signal) {
   let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
   let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
   let depth, entries, entry, tile;
@@ -13,12 +13,12 @@ export async function findTile(backend, header, id, signal) {
     if (depth === 0) firstOffset = offset;
     else if (depth === 1) secondOffset = offset;
     else if (depth === 2) thirdOffset = offset;
-    entries = await getDirectoryEntries(backend, offset, length, header.internalCompression);
+    entries = await getDirectoryEntries(layer, offset, length, header.internalCompression);
     signal?.throwIfAborted();
     entry = findDirectoryEntry(entries, id);
     if (!entry) return;
     if (entry.runLength) {
-      tile = await getTileData(backend, header, entry, id, signal);
+      tile = await getTileData(layer, header, entry, id, signal);
       return tile;
     }
     if (entry.offset + entry.length > header.leafDirectoryLength) {

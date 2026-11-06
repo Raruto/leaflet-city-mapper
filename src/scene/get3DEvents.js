@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { urlByLayer } from '../weakmaps/urlByLayer.js';
+
 
 
 import { updateArea } from '../sources/updateArea.js';
@@ -6,10 +8,10 @@ import { onTerrainChange } from '../terrain/onTerrainChange.js';
 
 export function get3DEvents(layer) {
   const events = /* alloc */ {};
-  if (sceneByLayer.get(layer).url) {
+  if (urlByLayer.get(layer)) {
     events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
   }
-  if (sceneByLayer.get(layer)._geojson || sceneByLayer.get(layer).url) {
+  if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
     events.terrainchange = onTerrainChange.bind(null, layer);
   }
   return events;

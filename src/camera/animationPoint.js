@@ -1,8 +1,9 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
+
 
 
 export function animationPoint(map, point, inverse = false) {
-  const view = cameraByMap.get(map)._cameraView;
+  const view = cameraViewByMap.get(map);
   if (!view) return point;
   const half = map.getSize().divideBy(2), scale = map.getZoomScale(view.zoom);
   const shift = map.project(map.getCenter(), view.zoom).subtract(map.project(view.center, view.zoom));

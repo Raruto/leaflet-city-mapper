@@ -1,13 +1,14 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { addedByLayer } from '../weakmaps/addedByLayer.js';
+
 
 
 import * as attach from './attach.js';
 
-export async function attachLayer(backend, map) {
+export async function attachLayer(layer, map) {
   try {
-    await attach.attach(backend, map);
-    sceneByLayer.get(backend)._added.resolve();
+    await attach.attach(layer, map);
+    addedByLayer.get(layer).resolve();
   } catch (error) {
-    backend.fire('error', /* alloc */ { error });
+    layer.fire('error', /* alloc */ { error });
   }
 }

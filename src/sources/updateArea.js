@@ -1,4 +1,8 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { areasByLayer } from '../weakmaps/areasByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
+
 
 
 import { pump } from "./pump.js";
@@ -7,23 +11,23 @@ import { compareAreaDistance } from './compareAreaDistance.js';
 
 /** Cover the visible ground bounds and one bordering block, clipped to the archive. */
 
-export function updateArea(backend) {
-  if (!backend._map || !sceneByLayer.get(backend)._shared) return;
-  if (sceneByLayer.get(backend)._geojson) {
-    if (!sceneByLayer.get(backend)._areas.has('geojson')) {
-      sceneByLayer.get(backend)._areas.set('geojson', /* alloc */ { request: /* alloc */ new AbortController() });
+export function updateArea(layer) {
+  if (!layer._map || !sharedByLayer.get(layer)) return;
+  if (geojsonByLayer.get(layer)) {
+    if (!areasByLayer.get(layer).has('geojson')) {
+      areasByLayer.get(layer).set('geojson', /* alloc */ { request: /* alloc */ new AbortController() });
     }
-    pump(backend);
+    pump(layer);
     return;
   }
-  if (!sceneByLayer.get(backend).header) return;
-  const z = sceneByLayer.get(backend).header.minZoom;
-  const center = backend._map.project(backend._map.getCenter(), z).divideBy(256).floor();
-  const bounds = backend._map.getBounds();
-  const nw = backend._map.project(bounds.getNorthWest(), z).divideBy(256).floor();
-  const se = backend._map.project(bounds.getSouthEast(), z).divideBy(256).floor();
-  const archiveNW = backend._map.project(/* alloc */ [sceneByLayer.get(backend).header.maxLat, sceneByLayer.get(backend).header.minLon], z).divideBy(256).floor();
-  const archiveSE = backend._map.project(/* alloc */ [sceneByLayer.get(backend).header.minLat, sceneByLayer.get(backend).header.maxLon], z).divideBy(256).floor();
+  if (!headerByLayer.get(layer)) return;
+  const z = headerByLayer.get(layer).minZoom;
+  const center = layer._map.project(layer._map.getCenter(), z).divideBy(256).floor();
+  const bounds = layer._map.getBounds();
+  const nw = layer._map.project(bounds.getNorthWest(), z).divideBy(256).floor();
+  const se = layer._map.project(bounds.getSouthEast(), z).divideBy(256).floor();
+  const archiveNW = layer._map.project(/* alloc */ [headerByLayer.get(layer).maxLat, headerByLayer.get(layer).minLon], z).divideBy(256).floor();
+  const archiveSE = layer._map.project(/* alloc */ [headerByLayer.get(layer).minLat, headerByLayer.get(layer).maxLon], z).divideBy(256).floor();
   const wanted = /* alloc */ new Map();
   let x, y, key, area, coords;
   for (x = Math.max(0, nw.x - 1, archiveNW.x); x <= Math.min(2 ** z - 1, se.x + 1, archiveSE.x); x++) {
@@ -31,10 +35,10 @@ export function updateArea(backend) {
       wanted.set(`${x}/${y}`, /* alloc */ { z, x, y });
     }
   }
-  for ([key, area] of sceneByLayer.get(backend)._areas) {
+  for ([key, area] of areasByLayer.get(layer)) {
     if (!wanted.has(key)) {
-      releaseArea(backend, area);
-      sceneByLayer.get(backend)._areas.delete(key);
+      releaseArea(layer, area);
+      areasByLayer.get(layer).delete(key);
     }
   }
   // Load the nearest new blocks first without rebuilding retained geometry.
@@ -46,7 +50,7 @@ export function updateArea(backend) {
   areas.sort(compareAreaDistance);
   for (coords of areas) {
     key = `${coords.x}/${coords.y}`;
-    if (!sceneByLayer.get(backend)._areas.has(key)) sceneByLayer.get(backend)._areas.set(key, /* alloc */ { coords, request: /* alloc */ new AbortController() });
+    if (!areasByLayer.get(layer).has(key)) areasByLayer.get(layer).set(key, /* alloc */ { coords, request: /* alloc */ new AbortController() });
   }
-  pump(backend);
+  pump(layer);
 }

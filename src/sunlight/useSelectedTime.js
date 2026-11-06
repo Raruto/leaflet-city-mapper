@@ -1,4 +1,5 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
+
 
 
 import { render } from './render.js';
@@ -11,7 +12,7 @@ export function useSelectedTime(state) {
   if (!date.value || !date.validity.valid) {
     control.time = /* alloc */ new Date(NaN);
     map.fire('simulationtimechange', /* alloc */ { time: null, live: false });
-    delete cameraByMap.get(map)._sunlight;
+    sunlightByMap.delete(map);
     updateSky(state);
     render(map);
     status.textContent = 'Error: choose a valid solar date';

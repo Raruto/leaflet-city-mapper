@@ -1,15 +1,16 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+
 import { roofTexture } from '../globals/roofTexture.js';
 import { roofSampler } from '../globals/roofSampler.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { destroyTexture } from './destroyTexture.js';
 
-export function resizeRoofTexture(backend, roof, width, height) {
-  const renderer = sceneByLayer.get(backend).renderer;
+export function resizeRoofTexture(layer, roof, width, height) {
+  const renderer = rendererByLayer.get(layer);
   const descriptor = roofTexture;
   descriptor.size[0] = width; descriptor.size[1] = height;
   descriptor.usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
   if (roof.texture && (roof.texture.width !== width || roof.texture.height !== height)) {
-    destroyTexture(backend, roof.texture.texture);
+    destroyTexture(layer, roof.texture.texture);
     roof.texture.texture = renderer.device.createTexture(descriptor);
     roof.texture.width = width; roof.texture.height = height;
   }

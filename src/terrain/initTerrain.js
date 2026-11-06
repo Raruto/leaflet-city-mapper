@@ -1,4 +1,10 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
+import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
+import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
+import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { onTerrainRemove } from './onTerrainRemove.js';
@@ -15,9 +21,9 @@ export function initTerrain(layer, options) {
   const layerOptions = /* alloc */ { ...options };
   delete layerOptions.url;
   init3D(layer, layerOptions);
-  sceneByLayer.get(layer).terrainSource = terrainSource;
-  sceneByLayer.get(layer)._terrainTiles = /* alloc */ new Map();
-  sceneByLayer.get(layer)._rasterTiles = /* alloc */ new Map();
-  sceneByLayer.get(layer)._terrainReady = false;
-  sceneByLayer.get(layer).kind = 'terrain';
+  mutateWeakMap(terrainSourceByLayer, layer, "=", terrainSource);
+  mutateWeakMap(terrainTilesByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(rasterTilesByLayer, layer, "=", /* alloc */ new Map());
+  mutateWeakMap(terrainReadyByLayer, layer, "=", false);
+  mutateWeakMap(kindByLayer, layer, "=", 'terrain');
 }

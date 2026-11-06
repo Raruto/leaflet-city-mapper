@@ -1,13 +1,15 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 
 
 import { finishRasterTile } from './finishRasterTile.js';
 
-export function loadRasterTile(backend, tile) {
+export function loadRasterTile(layer, tile) {
   tile.started = true;
-  const first = sceneByLayer.get(backend)._loadingTiles === 0;
-  sceneByLayer.get(backend)._loadingTiles++;
-  backend.fire('tileloadstart', /* alloc */ { tile, coords: tile.coords });
-  if (first) backend.fire('loading');
-  return finishRasterTile(backend, tile);
+  const first = loadingTilesByLayer.get(layer) === 0;
+  mutateWeakMap(loadingTilesByLayer, layer, "++", undefined, false);
+  layer.fire('tileloadstart', /* alloc */ { tile, coords: tile.coords });
+  if (first) layer.fire('loading');
+  return finishRasterTile(layer, tile);
 }

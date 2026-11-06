@@ -1,12 +1,16 @@
+import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
+import { nativeGPUBackByMap } from '../weakmaps/nativeGPUBackByMap.js';
+import { nativeGPUOrderByMap } from '../weakmaps/nativeGPUOrderByMap.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
+
 import { L } from '../globals/L.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
-import { cameraByMap } from '../globals/cameraByMap.js';
 
 
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function nativeLayerMethod(name, source, args) {
-  const state = sceneByLayer.get(source)._nativeGPU, original = state.originalMethods.get(name);
+  const state = nativeGPUByLayer.get(source), original = state.originalMethods.get(name);
   const result = original.apply(source, args);
   let layer, zIndex;
   if ((name === 'bringToFront' || name === 'bringToBack') && source instanceof L.GridLayer) {
@@ -19,8 +23,8 @@ export function nativeLayerMethod(name, source, args) {
     const edge = name === 'bringToFront' ? extreme + 1 : extreme - 1;
     if (Number.isFinite(edge)) source.setZIndex(edge);
   }
-  if (name === 'bringToFront') state.order = ++cameraByMap.get(state.map)._nativeGPUOrder;
-  if (name === 'bringToBack') state.order = --cameraByMap.get(state.map)._nativeGPUBack;
+  if (name === 'bringToFront') state.order = mutateWeakMap(nativeGPUOrderByMap, state.map, "++", undefined, true);
+  if (name === 'bringToBack') state.order = mutateWeakMap(nativeGPUBackByMap, state.map, "--", undefined, true);
   refreshNativeLayer(state);
   return result;
 }

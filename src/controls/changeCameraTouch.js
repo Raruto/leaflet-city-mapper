@@ -1,11 +1,14 @@
-import { cameraByMap } from '../globals/cameraByMap.js';
+import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
+import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
+import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
+
 
 
 import { endCameraTouch } from './endCameraTouch.js';
 
 export function changeCameraTouch() {
-  const state = cameraByMap.get(this)._cameraTouchState, { map, container } = state;
-  const active = cameraByMap.get(map).touchRotate.enabled() || cameraByMap.get(map).touchPitch.enabled();
+  const state = cameraTouchStateByMap.get(this), { map, container } = state;
+  const active = touchRotateByMap.get(map).enabled() || touchPitchByMap.get(map).enabled();
   if (active && state.nativeZoom === undefined) {
     state.nativeZoom = map.touchZoom?.enabled();
     map.touchZoom?.disable();

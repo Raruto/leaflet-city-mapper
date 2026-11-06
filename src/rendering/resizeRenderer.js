@@ -1,24 +1,27 @@
+import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
+import { sizeByLayer } from '../weakmaps/sizeByLayer.js';
+import { mutateWeakMap } from '../weakmaps/mutateWeakMap.js';
+
 import { depthTexture as sharedDepthTexture } from '../globals/depthTexture.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
 
 import { destroyTexture } from './destroyTexture.js';
 
-export function resizeRenderer(backend, size) {
-  if (!sceneByLayer.get(backend)._size || !sceneByLayer.get(backend)._size.equals(size)) {
-    sceneByLayer.get(backend).renderer.width = size.x;
-    sceneByLayer.get(backend).renderer.height = size.y;
-    sceneByLayer.get(backend).renderer.canvas.width = Math.round(size.x * sceneByLayer.get(backend).renderer.dpr);
-    sceneByLayer.get(backend).renderer.canvas.height = Math.round(size.y * sceneByLayer.get(backend).renderer.dpr);
-    sceneByLayer.get(backend).renderer.canvas.style.width = `${size.x}px`;
-    sceneByLayer.get(backend).renderer.canvas.style.height = `${size.y}px`;
-    if (sceneByLayer.get(backend).renderer.depthTexture) destroyTexture(backend, sceneByLayer.get(backend).renderer.depthTexture);
-    sceneByLayer.get(backend).renderer.depthTexture = sceneByLayer.get(backend).renderer.device.createTexture((
-      sharedDepthTexture.size[0] = sceneByLayer.get(backend).renderer.canvas.width,
-      sharedDepthTexture.size[1] = sceneByLayer.get(backend).renderer.canvas.height,
+export function resizeRenderer(layer, size) {
+  if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {
+    rendererByLayer.get(layer).width = size.x;
+    rendererByLayer.get(layer).height = size.y;
+    rendererByLayer.get(layer).canvas.width = Math.round(size.x * rendererByLayer.get(layer).dpr);
+    rendererByLayer.get(layer).canvas.height = Math.round(size.y * rendererByLayer.get(layer).dpr);
+    rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
+    rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
+    if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
+    rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((
+      sharedDepthTexture.size[0] = rendererByLayer.get(layer).canvas.width,
+      sharedDepthTexture.size[1] = rendererByLayer.get(layer).canvas.height,
       sharedDepthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT,
       sharedDepthTexture
     ));
-    sceneByLayer.get(backend)._size = size;
+    mutateWeakMap(sizeByLayer, layer, "=", size);
   }
 }

@@ -1,4 +1,6 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { kindByLayer } from '../weakmaps/kindByLayer.js';
+
 
 import { setGeoJSONData } from '../sources/setGeoJSONData.js';
 import { getHeader } from '../archives/getHeader.js';
@@ -10,9 +12,9 @@ import { setPMTileZIndex } from '../raster/setPMTileZIndex.js';
 
 
 export function callLayer(method, layer, ...args) {
-  const scene = sceneByLayer.get(layer);
-  if (method === 'setData' && scene?._geojson) return setGeoJSONData(layer, ...args);
-  if (scene?.kind === 'raster') {
+
+  if (method === 'setData' && geojsonByLayer.get(layer)) return setGeoJSONData(layer, ...args);
+  if (kindByLayer.get(layer) === 'raster') {
     switch (method) {
       case 'getHeader': return getHeader(layer);
       case 'getZxy': return getZxy(layer, ...args);

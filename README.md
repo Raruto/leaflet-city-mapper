@@ -92,6 +92,7 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 src/
   index.js           Public entry point and source registration
   globals/           One shared constant or mutable cell per module
+  weakmaps/          One private WeakMap per map/layer state field
   camera/            Camera API, projection and animation
   controls/          Compass, dragging, touch and resizing
   core/              Leaflet layer integration, events, mutations and overlays

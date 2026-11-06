@@ -6,16 +6,16 @@ import { featureAnchor } from './featureAnchor.js';
 import { extrusionStyle } from './extrusionStyle.js';
 
 export function buildAreaFeature(context, feature) {
-  const { backend, area, map } = context;
+  const { backend: layer, area, map } = context;
   const coords = area.coords;
-  const coordinates = featureAnchor(feature, backend.options.nightLight);
+  const coordinates = featureAnchor(feature, layer.options.nightLight);
   const geometry = feature.geometry, isTree = geometry.type === 'Point';
   const lon = coordinates[0], lat = coordinates[1];
   if (coords) {
     const anchor = map.project(/* alloc */ new L.LatLng(lat, lon), coords.z);
     if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
   }
-  const style = extrusionStyle(backend, feature);
+  const style = extrusionStyle(layer, feature);
   if (style === null) {
     context.skipped++;
     return;

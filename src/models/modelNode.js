@@ -1,4 +1,3 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 import { nextId } from '../globals/nextId.js';
 import { geometryEmpty } from '../globals/geometryEmpty.js';
 
@@ -10,7 +9,7 @@ import { readModelIndices } from './readModelIndices.js';
 import { createModelGeometry } from './createModelGeometry.js';
 
 export function modelNode(context, index) {
-  const { backend, description, active } = context;
+  const { backend: layer, description, active } = context;
   // Track only the recursion path: shared mesh references are valid, cycles are not.
   if (active.has(index)) throw /* alloc */ new Error('Cyclic glTF nodes');
   const spec = description.nodes[index];

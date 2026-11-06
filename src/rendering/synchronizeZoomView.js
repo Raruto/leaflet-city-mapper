@@ -1,26 +1,28 @@
-import { sceneByLayer } from '../globals/sceneByLayer.js';
+import { zoomTransitionsByLayer } from '../weakmaps/zoomTransitionsByLayer.js';
+import { zoomViewByLayer } from '../weakmaps/zoomViewByLayer.js';
+
 import { meshStack } from '../globals/meshStack.js';
 import { updateZoomCamera } from './updateZoomCamera.js';
 
-export function synchronizeZoomView(backend, now) {
-  const map = backend._map;
+export function synchronizeZoomView(layer, now) {
+  const map = layer._map;
   let animation, time, start;
   if (map._animatingZoom) {
-    sceneByLayer.get(backend)._zoomTransitions ||= /* alloc */ new Map();
+    if (!zoomTransitionsByLayer.get(layer)) zoomTransitionsByLayer.set(layer, /* alloc */ new Map());
     for (animation of map.getContainer().getAnimations(meshStack)) {
       if (!(animation instanceof CSSTransition) || animation.transitionProperty !== 'transform' ||
         !animation.effect.target.classList.contains('leaflet-zoom-animated') ||
-        sceneByLayer.get(backend)._zoomTransitions.has(animation)) {
+        zoomTransitionsByLayer.get(layer).has(animation)) {
         continue;
       }
       time = animation.currentTime || 0;
       animation.pause();
-      sceneByLayer.get(backend)._zoomTransitions.set(animation, /* alloc */ { start: now, time });
+      zoomTransitionsByLayer.get(layer).set(animation, /* alloc */ { start: now, time });
     }
     // Freeze CSS between rendered frames: the compositor must not outrun the canvas.
-    for ([animation, { start, time }] of sceneByLayer.get(backend)._zoomTransitions) {
+    for ([animation, { start, time }] of zoomTransitionsByLayer.get(layer)) {
       animation.currentTime = Math.min(animation.effect.getComputedTiming().endTime, time + now - start);
     }
-    if (sceneByLayer.get(backend)._zoomView) updateZoomCamera(backend, now);
+    if (zoomViewByLayer.get(layer)) updateZoomCamera(layer, now);
   }
 }

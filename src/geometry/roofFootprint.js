@@ -1,12 +1,15 @@
+import { headerByLayer } from '../weakmaps/headerByLayer.js';
+import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
+import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
+
 import { radians } from '../globals/radians.js';
 import { earthCirc } from '../globals/earthCirc.js';
-import { sceneByLayer } from '../globals/sceneByLayer.js';
 
-export function roofFootprint(mesh, backend, layer) {
-  const map = backend._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
-  const state = sceneByLayer.get(layer), zoom = state._tileZoom;
-  const origin = map.project(sceneByLayer.get(backend)._sceneOrigin, zoom);
-  const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneByLayer.get(backend)._sceneOrigin.lat * radians));
+export function roofFootprint(mesh, layer, rasterLayer) {
+  const map = layer._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
+  const zoom = tileZoomByLayer.get(rasterLayer)
+  const origin = map.project(sceneOriginByLayer.get(layer), zoom);
+  const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(sceneOriginByLayer.get(layer).lat * radians));
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let i, x, y, z, px, py, nw, se;
   for (i = 0; i < 8; i++) {
@@ -17,10 +20,10 @@ export function roofFootprint(mesh, backend, layer) {
     minX = Math.min(minX, px); minY = Math.min(minY, py);
     maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
   }
-  if (state.header.maxLat !== undefined && state.header.minLon !== undefined &&
-    state.header.minLat !== undefined && state.header.maxLon !== undefined) {
-    nw = map.project(/* alloc */ [state.header.maxLat, state.header.minLon], zoom);
-    se = map.project(/* alloc */ [state.header.minLat, state.header.maxLon], zoom);
+  if (headerByLayer.get(rasterLayer).maxLat !== undefined && headerByLayer.get(rasterLayer).minLon !== undefined &&
+    headerByLayer.get(rasterLayer).minLat !== undefined && headerByLayer.get(rasterLayer).maxLon !== undefined) {
+    nw = map.project(/* alloc */ [headerByLayer.get(rasterLayer).maxLat, headerByLayer.get(rasterLayer).minLon], zoom);
+    se = map.project(/* alloc */ [headerByLayer.get(rasterLayer).minLat, headerByLayer.get(rasterLayer).maxLon], zoom);
     minX = Math.max(minX, nw.x); minY = Math.max(minY, nw.y);
     maxX = Math.min(maxX, se.x); maxY = Math.min(maxY, se.y);
     if (minX >= maxX || minY >= maxY) return null;
