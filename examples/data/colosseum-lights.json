@@ -1,7 +1,7 @@
 {
   "type": "FeatureCollection",
   "name": "Colosseum indicative night lighting",
-  "description": "Original illustrative warm facade and main-road lighting, not a surveyed inventory. Road lamps approximate Via dei Fori Imperiali, Via Labicana, Via di San Gregorio and Via Celio Vibenna. Positions, heights, fluxes and ranges are approximate; point lights do not reproduce directional floodlights or measured illuminance.",
+  "description": "Original illustrative warm facade and main-road lighting, not a surveyed inventory. Road lamps approximate Via dei Fori Imperiali, Via Labicana and Via di San Gregorio. Positions, heights, fluxes and ranges are approximate; point lights do not reproduce directional floodlights or measured illuminance.",
   "features": [
     { "type": "Feature", "id": "facade-1", "properties": { "name": "Facade light 1", "height": 12, "radius": 45, "flux": 90000, "color": "#ffd18a" }, "geometry": { "type": "Point", "coordinates": [12.49351614, 41.88976354] } },
     { "type": "Feature", "id": "facade-2", "properties": { "name": "Facade light 2", "height": 12, "radius": 45, "flux": 90000, "color": "#ffd18a" }, "geometry": { "type": "Point", "coordinates": [12.49360403, 41.89009413] } },

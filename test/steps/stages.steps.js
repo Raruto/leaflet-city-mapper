@@ -110,11 +110,12 @@ Then('submitted texture cleanup reports failures before destroying resources', a
   const events = [];
   const layer = { fire(type, payload) { events.push([type, payload.error]); } };
   const texture = { destroy() { events.push('destroy'); } };
-  const submitted = Promise.withResolvers();
-  const pending = destroyAfterSubmission(layer, texture, submitted.promise);
+  let resolve;
+  const submitted = new Promise(done => { resolve = done; });
+  const pending = destroyAfterSubmission(layer, texture, submitted);
   await Promise.resolve();
   assert.deepEqual(events, []);
-  submitted.resolve();
+  resolve();
   await pending;
   assert.deepEqual(events, ['destroy']);
   events.length = 0;

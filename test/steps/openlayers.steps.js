@@ -180,7 +180,7 @@ Given('the shared example can load OpenLayers', { timeout: 60000 }, async functi
     'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-geojson.html',
     'examples/leaflet-city-mapper-native.html',
   ].map(name => readFile(new URL(`../../${name}`, import.meta.url), 'utf8')));
-  for (const example of examples) assert.ok(example.includes('<script src="map-engine.js"></script>'));
+  for (const example of examples) assert.match(example, /<script src="https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/libs\/leaflet\.js"><\/script>/);
   this.openlayersErrors = [];
   this.leafletRequests = [];
   this.page.on('pageerror', error => this.openlayersErrors.push(error.message));
@@ -419,7 +419,7 @@ Then('the OpenLayers compass preserves the plugin appearance and gestures', { ti
 Then('the OpenLayers example preserves map and layer control interactions', { timeout: 60000 }, async function () {
   const labels = this.page.locator('.ol-city-layers label');
   const traffic = labels.filter({ hasText: /^ Traffic$/ }).locator('input');
-  const shadows = labels.filter({ hasText: /^ Shadows$/ }).locator('input');
+  const shadows = labels.filter({ hasText: /^ Time$/ }).locator('input');
   const trees = labels.filter({ hasText: /^ Trees$/ }).locator('input');
   for (const checkbox of [traffic, shadows, trees]) {
     await checkbox.uncheck();

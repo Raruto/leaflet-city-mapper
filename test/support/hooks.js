@@ -131,7 +131,8 @@ document.addEventListener`
     const version = process.env.LEAFLET_VERSION;
     let body = (await response.text())
       .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, `${baseUrl}/`)
-      .replace(/\bconst (map|esri|osm|layers|markers|path|circle|polygon|rectangle) =/g, 'const $1 = window.$1 =');
+      .replace(/\bconst (map|esri|osm|layers|markers|path|circle|polygon|rectangle) =/g, 'const $1 = window.$1 =')
+      .replace('const layers = window.layers = {', 'const layers = window.nativeLayers = window.layers = {');
     if (version === '2') {
       body = body
         .replace(

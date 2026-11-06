@@ -261,13 +261,13 @@ const openEiffelExample = async function () {
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.map && typeof testOperations.getPitch === 'function');
-  await this.page.waitForFunction(() => layers._layers.some(entry => entry.name === 'Shadows'));
+  await this.page.waitForFunction(() => layers._layers.some(entry => entry.name === 'Time'));
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => globals.sceneByLayer.get(layer).ready)));
   // Test-only shortcuts; the example keeps its layers inside the layers control.
   await this.page.evaluate(() => {
     const named = name => layers._layers.find(entry => entry.name === name).layer;
     Object.assign(window, {
-      sunlightOverlay: named('Shadows'),
+      sunlightOverlay: named('Time'),
       cruiseBoats: named('Traffic').getLayers()[0],
       streetlights: named('Streetlights'),
     });

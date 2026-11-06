@@ -240,7 +240,7 @@ Given('the cycling and pedestrian example layers are open', { timeout: 60000 }, 
     map.eachLayer(layer => { if (globals.sceneByLayer.get(layer)._added) attached.push(globals.sceneByLayer.get(layer)._added.promise); });
     await Promise.all(attached);
     for (const { name, overlay, layer } of layers._layers) {
-      if ((!overlay || !['Traffic', 'Shadows'].includes(name)) && map.hasLayer(layer)) layer.remove();
+      if ((!overlay || !['Traffic', 'Time'].includes(name)) && map.hasLayer(layer)) layer.remove();
       if (name === 'Traffic') layer.removeLayer(layer.getLayers()[0]);
     }
   });
@@ -253,7 +253,7 @@ Then('bicycles and pedestrians move with the clock and can be disabled and resto
     .every(layer => globals.sceneByLayer.get(layer).root?.children.some(mesh => mesh.extras.featureFaces.length)), null, { timeout: 120000 });
   const result = await this.page.evaluate(async () => {
     const out = [];
-    const sunlightOverlay = layers._layers.find(entry => entry.name === 'Shadows').layer;
+    const sunlightOverlay = layers._layers.find(entry => entry.name === 'Time').layer;
     globals.sceneByLayer.get(sunlightOverlay).control.live = false;
     globals.sceneByLayer.get(sunlightOverlay).control.time = new Date('2026-11-04T12:00:00Z');
     map.fire('simulationtimechange');
@@ -400,7 +400,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   await this.page.waitForFunction(() => globals.sceneByLayer.get(cruiseBoats)?.renderer && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._terrainReady);
   await this.page.evaluate(() => {
     for (const { name, overlay, layer } of layers._layers) {
-      if (overlay && !['Terrain (3D)', 'Traffic', 'Shadows'].includes(name)) layer.remove();
+      if (overlay && !['Terrain (3D)', 'Traffic', 'Time'].includes(name)) layer.remove();
       if (name === 'Traffic') {
         for (const child of layer.getLayers()) if (child !== cruiseBoats) layer.removeLayer(child);
       }

@@ -151,7 +151,7 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(initial.control, true);
   assert.equal(initial.nestedStyle, true);
   assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Eiffel Tower',
-    'Streetlights', 'Traffic', 'Shadows']);
+    'Streetlights', 'Traffic', 'Time']);
   await this.page.getByLabel('Solar date (UTC)').fill('2026-06-21');
   const slider = this.page.getByRole('slider', { name: 'Time of day (UTC)' });
   await slider.focus();
@@ -169,9 +169,9 @@ Then('the solar control starts at current time and its slider controls the sunli
   await this.page.getByRole('button', { name: 'Now', exact: true }).click();
   assert.equal(await this.page.evaluate(() =>
     globals.sceneByLayer.get(sunlightOverlay).control.live && Math.abs(globals.sceneByLayer.get(sunlightOverlay).control.time.getTime() - Date.now()) < 5000), true);
-  await this.page.getByLabel('Shadows', { exact: true }).uncheck();
+  await this.page.getByLabel('Time', { exact: true }).uncheck();
   assert.equal(await this.page.evaluate(() => globals.cameraByMap.get(map)._sunlight === undefined), true);
-  await this.page.getByLabel('Shadows', { exact: true }).check();
+  await this.page.getByLabel('Time', { exact: true }).check();
   assert.equal(await this.page.evaluate(() => !!globals.cameraByMap.get(map)._sunlight), true);
   await this.page.getByLabel('Solar date (UTC)').fill('');
   assert.match(await this.page.locator('.sunlight-status').textContent(), /Error/);

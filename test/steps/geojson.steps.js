@@ -415,12 +415,12 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
   });
   const data = await (await this.context.request.get(`${this.baseUrl}/examples/data/colosseum-lights.json`)).json();
   assert.equal(data.type, 'FeatureCollection');
-  assert.equal(data.features.length, 48);
-  assert.equal(new Set(data.features.map(feature => feature.id)).size, 48);
+  assert.equal(data.features.length, 40);
+  assert.equal(new Set(data.features.map(feature => feature.id)).size, 40);
   assert.equal(data.features.filter(feature => !feature.properties.road).length, 16);
   assert.match(data.description, /not a surveyed inventory/);
   assert.equal(data.source, undefined);
-  for (const road of ['Via dei Fori Imperiali', 'Via Labicana', 'Via di San Gregorio', 'Via Celio Vibenna']) {
+  for (const road of ['Via dei Fori Imperiali', 'Via Labicana', 'Via di San Gregorio']) {
     const lamps = data.features.filter(feature => feature.properties.road === road);
     assert.equal(lamps.length, 8, road);
     assert.ok(lamps.every(feature => feature.properties.height === 8 &&
