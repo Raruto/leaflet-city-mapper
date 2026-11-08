@@ -8,7 +8,7 @@ export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
     const [createMesh, createProgram, destroyTexture, disposeMesh,
       findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
-      renderModule, update, sortMeshes, pump, releaseArea, emptyNode, setParent, traverse,
+      renderModule, update, compareMeshes, pump, releaseArea, emptyNode, setParent, traverse,
       updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry, getElevation] = await Promise.all([
       import('/src/rendering/createMesh.js'),
       import('/src/materials/createProgram.js'),
@@ -22,7 +22,7 @@ export async function prepare3DChecks(page) {
       import('/src/picking/showFeature.js'),
       import('/src/rendering/render.js'),
       import('/src/scene/scheduleSceneUpdate.js'),
-      import('/src/rendering/sortMeshes.js'),
+      import('/src/rendering/compareMeshes.js'),
       import('/src/sources/pumpSourceAreas.js'),
       import('/src/sources/releaseArea.js'),
       import('/src/scene/createSceneNode.js'),
@@ -60,7 +60,7 @@ export async function prepare3DChecks(page) {
     const render = {
       render: renderModule.render,
       update: update.update,
-      sortMeshes: sortMeshes.sortMeshes,
+      compareMeshes: compareMeshes.compareMeshes,
     };
     const sources = { pump: pump.pump, releaseArea: releaseArea.releaseArea };
     window.nativeChecks = {

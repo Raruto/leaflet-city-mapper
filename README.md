@@ -129,12 +129,5 @@ src/
   utils/             Shared numeric and no-op helpers
 ```
 
-Folders are flat and grouped by responsibility. Domain-specific orchestration stays
-with its feature; reusable geometry, projections, transforms, textures and animation
-mechanics live in their dedicated folders. Shared values remain in `globals/`, and
-private WeakMaps remain in `weakmaps/`. Internal file renames preserve exported
-function names and the public API. Consumers read and write private state directly
-with WeakMap `get`, `set` and `delete`, without a generic mutation wrapper.
-
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--alpha.1-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)

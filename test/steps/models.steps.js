@@ -246,7 +246,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
     nativeChecks.graph.traverse(globals.sceneByLayer.get(layer).model, mesh => {
       if (mesh.program?.transparent && mesh._visibleInFrame) list.push(mesh);
     });
-    nativeChecks.render.sortMeshes(list);
+    list.sort(nativeChecks.render.compareMeshes);
     const depths = list.map(mesh => {
       const world = new DOMPoint(...mesh.geometry.bounds.center, 1).matrixTransform(new DOMMatrix(mesh.worldMatrix));
       const point = world.matrixTransform(new DOMMatrix(globals.sceneByLayer.get(layer).camera.projectionViewMatrix));

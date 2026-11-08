@@ -80,7 +80,7 @@ Then('layer-owned objects preserve values and visibility without engine classes'
         node.program.pipelineCache.clear();
       }
     });
-    const sorted = nativeChecks.render.sortMeshes(meshes).map(node => programs.indexOf(node.program) + 1).join() === '2,3,1';
+    const sorted = meshes.sort(nativeChecks.render.compareMeshes).map(node => programs.indexOf(node.program) + 1).join() === '2,3,1';
     for (const attribute of Object.values(mesh.geometry.attributes)) attribute.buffer.destroy();
     mesh.program.pipelineCache.clear();
     layer.remove();

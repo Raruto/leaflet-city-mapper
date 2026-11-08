@@ -10,10 +10,6 @@ import { urlByLayer } from '../weakmaps/urlByLayer.js';
 import { L } from '../globals/L.js';
 
 
-import * as attach from './attachSharedScene.js';
-import * as onClick from '../picking/onClick.js';
-import * as onPointerLeave from '../picking/onPointerLeave.js';
-import * as onPointerMove from '../picking/onPointerMove.js';
 import { pointerMove } from '../picking/pointerMove.js';
 import { pointerClick } from '../picking/pointerClick.js';
 import { pointerLeave } from '../picking/pointerLeave.js';

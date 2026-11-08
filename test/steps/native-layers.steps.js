@@ -22,13 +22,23 @@ Then('native WeakMap counters and event cleanup preserve their values', function
     const map = {}, otherMap = {}, source = {};
     const state = {
       source, map, hidden: new Set(), images: new Set(),
-      originalMethods: new Map(['bringToFront', 'bringToBack'].map(name => [name, () => source])),
+      methods: new Map(['bringToFront', 'bringToBack'].map(name => [name, { original: () => source }])),
     };
+    const calls = [], own = { configurable: true, value: 'retained descriptor' };
+    state.methods.set('setOpacity', { own, original(value) {
+      calls.push([this, value]);
+      return 'original result';
+    } });
     nativeGPUByLayer.set(source, state);
     nativeGPUOrderByMap.set(map, 0);
     nativeGPUBackByMap.set(map, 0);
     nativeGPUOrderByMap.set(otherMap, 10);
     nativeGPUBackByMap.set(otherMap, -10);
+    assert.equal(nativeLayerMethod('setOpacity', source, [0.5]), 'original result');
+    assert.deepEqual(calls, [[source, 0.5]]);
+    assert.equal(state.methods.get('setOpacity').own, own);
+    state.methods.set('redraw', { original() { throw new Error('Original failure'); } });
+    assert.throws(() => nativeLayerMethod('redraw', source, []), /Original failure/);
     for (const [method, expected] of [['bringToFront', 1], ['bringToFront', 2], ['bringToBack', -1]]) {
       assert.equal(nativeLayerMethod(method, source, []), source);
       assert.equal(state.order, expected);
@@ -41,11 +51,11 @@ Then('native WeakMap counters and event cleanup preserve their values', function
     }
     assert.equal(nativeGPUOrderByMap.get(otherMap), 10);
     assert.equal(nativeGPUBackByMap.get(otherMap), -10);
-    const layer = {}, events = { move() {} }, calls = [];
-    eventMapByLayer.set(layer, { off(...args) { calls.push(args); } });
+    const layer = {}, events = { move() {} }, eventCalls = [];
+    eventMapByLayer.set(layer, { off(...args) { eventCalls.push(args); } });
     eventsByLayer.set(layer, events);
     removeLayerEvents.call(layer);
-    assert.deepEqual(calls, [[events, layer]]);
+    assert.deepEqual(eventCalls, [[events, layer]]);
     assert.equal(eventMapByLayer.get(layer), null);
     assert.equal(eventsByLayer.get(layer), null);
   } finally {
@@ -80,6 +90,48 @@ Given('the native WebGPU gallery uses the {string} renderer preference', { timeo
   await this.page.waitForFunction(() => Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._nativeGPU)
     .every(layer => globals.sceneByLayer.get(layer)._nativeGPU.meshes?.size > 0) &&
     globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes?.has('shadow'));
+});
+
+Then('the native method registry restores own and inherited methods after removal', async function () {
+  const result = await this.page.evaluate(async () => {
+    const layer = new L.CircleMarker([48.858, 2.294]);
+    const originalSetRadius = layer.setRadius;
+    let calls = 0;
+    const customSetRadius = function (radius) {
+      calls++;
+      return originalSetRadius.call(this, radius);
+    };
+    Object.defineProperty(layer, 'setRadius', {
+      value: customSetRadius, writable: true, configurable: true, enumerable: false,
+    });
+    const descriptor = Object.getOwnPropertyDescriptor(layer, 'setRadius');
+    const inheritedSetStyle = layer.setStyle;
+    layer.addTo(map);
+    await globals.sceneByLayer.get(layer).ready;
+    const state = globals.sceneByLayer.get(layer)._nativeGPU;
+    const singleRegistry = !Object.hasOwn(state, 'originalMethods') &&
+      state.methods.get('setRadius').original === customSetRadius &&
+      state.methods.get('setStyle').original === inheritedSetStyle;
+    calls = 0;
+    const radiusReturnsLayer = layer.setRadius(25) === layer;
+    const radiusUpdated = layer.getRadius() === 25 && calls === 1;
+    const returnsLayer = layer.setStyle({ color: '#ff0000' }) === layer && radiusReturnsLayer;
+    const updated = radiusUpdated && layer.getRadius() === 25 && layer.options.color === '#ff0000';
+    layer.remove();
+    const restored = Object.getOwnPropertyDescriptor(layer, 'setRadius');
+    const ownRestored = restored.value === descriptor.value && restored.writable === descriptor.writable &&
+      restored.configurable === descriptor.configurable && restored.enumerable === descriptor.enumerable;
+    const inheritedRestored = !Object.hasOwn(layer, 'setStyle') && layer.setStyle === inheritedSetStyle;
+    layer.addTo(map);
+    await globals.sceneByLayer.get(layer).ready;
+    const next = globals.sceneByLayer.get(layer)._nativeGPU;
+    calls = 0;
+    const readded = next !== state && layer.setRadius(30) === layer && layer.getRadius() === 30 && calls === 1;
+    layer.remove();
+    return { singleRegistry, returnsLayer, updated, ownRestored, inheritedRestored, readded };
+  });
+  assert.deepEqual(result, { singleRegistry: true, returnsLayer: true, updated: true,
+    ownRestored: true, inheritedRestored: true, readded: true });
 });
 
 Then('native map content is drawn by WebGPU while HTML UI remains native', async function () {

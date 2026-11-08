@@ -59,7 +59,7 @@ import { routeGeometry } from '../../src/geometry/routeGeometry.js';
 import { collider } from '../../src/collision/collider.js';
 import { horizontalRay } from '../../src/collision/horizontalRay.js';
 import { materialShaders } from '../../src/shaders/materialShaders.js';
-import { sortMeshes } from '../../src/rendering/sortMeshes.js';
+import { compareMeshes } from '../../src/rendering/compareMeshes.js';
 import { projectCelestialBody } from '../../src/projections/projectCelestialBody.js';
 import { atmosphere } from '../../src/sunlight/atmosphere.js';
 import { mix } from '../../src/colors/mixColor.js';
@@ -96,21 +96,23 @@ import { ring as treeRing } from '../../src/geometry/createTreeRing.js';
 
 Then('the build generates readable and minified bundles and standalone compatibility files', async function () {
   const load = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
-  const [minified, readable, bindings, minifiedBindings, worker] = await Promise.all([
+  const [minified, readable, bindings, minifiedBindings, worker, readableWorker] = await Promise.all([
     'dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
     'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
-    'dist/leaflet-city-mapper-worker.js',
+    'dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js',
   ].map(load));
-  for (const source of [minified, readable, bindings, minifiedBindings, worker]) assert.doesNotThrow(() => new Script(source));
+  for (const source of [minified, readable, bindings, minifiedBindings, worker, readableWorker]) assert.doesNotThrow(() => new Script(source));
   assert.ok(readable.length > minified.length);
   assert.ok(readable.split('\n').length > minified.split('\n').length * 10);
+  assert.ok(readableWorker.length > worker.length);
   assert.ok(minifiedBindings.length < bindings.length);
   for (const source of [bindings, minifiedBindings]) {
     assert.ok(source.includes('.ol-city-tooltip'));
     assert.ok(source.includes('openlayersBindings'));
   }
   for (const path of ['dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
-    'dist/leaflet-city-mapper-worker.js', 'libs/openlayers-bindings.min.js']) {
+    'dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js',
+    'libs/openlayers-bindings.min.js']) {
     const source = await load(path), map = JSON.parse(await load(`${path}.map`));
     assert.ok(source.includes(`sourceMappingURL=${path.split('/').pop()}.map`));
     assert.ok(map.sources.length > 0);
@@ -118,7 +120,7 @@ Then('the build generates readable and minified bundles and standalone compatibi
     assert.ok(map.sources.every(name => path.startsWith('dist/') ? name.startsWith('../src/') : !name.includes('examples/')));
     if (path.startsWith('dist/')) {
       assert.ok(map.sources.every(name => !name.includes('openlayers-bindings')));
-      if (path.endsWith('-worker.js')) assert.ok(map.sourcesContent.some(content => content.includes('assembleAreaGeometry')));
+      if (path.includes('-worker')) assert.ok(map.sourcesContent.some(content => content.includes('assembleAreaGeometry')));
       else assert.ok(map.sourcesContent.some(content => content.includes('/* wgsl */')));
     }
   }
@@ -938,7 +940,7 @@ const checks = {
     const glassNear = mesh(3, 0.2, true), glassFar = mesh(4, 0.8, true);
     const ground = { ...mesh(5, 1, true), ground: true, tile: { coords: { z: 17 } } };
     const preview = { ...mesh(6, 1, true), ground: true, tile: { coords: { z: 15 } } };
-    assert.deepEqual(sortMeshes([far, glassNear, ground, near, glassFar, preview]).map(mesh => mesh.id),
+    assert.deepEqual([far, glassNear, ground, near, glassFar, preview].sort(compareMeshes).map(mesh => mesh.id),
       [6, 5, 2, 1, 4, 3]);
   },
 

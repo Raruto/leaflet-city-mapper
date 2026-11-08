@@ -1744,7 +1744,7 @@
     camera.projectionViewTransform ||= /* alloc */
     new DOMMatrix();
     const { position, target, up, x, y, z, viewMatrix, projectionMatrix, projectionViewMatrix } = camera;
-    let i, value;
+    let value;
     z[0] = position[0] - target[0], z[1] = position[1] - target[1], z[2] = position[2] - target[2];
     const zLength = Math.hypot(z[0], z[1], z[2]) || 1;
     z[0] /= zLength, z[1] /= zLength, z[2] /= zLength;
@@ -2469,11 +2469,6 @@
     return Number(Boolean(b.ground)) - Number(Boolean(a.ground)) || (a.ground && b.ground ? (a.renderOrder || 0) - (b.renderOrder || 0) || a.tile.coords.z - b.tile.coords.z : 0) || Number(a.program.transparent) - Number(b.program.transparent) || compareMeshDepth(a, b);
   }
 
-  // src/rendering/sortMeshes.js
-  function sortMeshes(meshes) {
-    return meshes.sort(compareMeshes);
-  }
-
   // src/weakmaps/headerByLayer.js
   var headerByLayer = /* @__PURE__ */ new WeakMap();
 
@@ -2617,7 +2612,7 @@
       meshes.push(mesh);
     }
     candidates.length = 0;
-    sortMeshes(meshes);
+    meshes.sort(compareMeshes);
     let minGroundZoom = Infinity, maxGroundZoom = -Infinity;
     for (mesh of meshes) {
       if (!mesh.ground) continue;
@@ -5926,7 +5921,7 @@
 
   // src/native/nativeLayerMethod.js
   function nativeLayerMethod(name, source, args) {
-    const state = nativeGPUByLayer.get(source), original = state.originalMethods.get(name);
+    const state = nativeGPUByLayer.get(source), original = state.methods.get(name).original;
     const result = original.apply(source, args);
     let layer, zIndex;
     if ((name === "bringToFront" || name === "bringToBack") && source instanceof L.GridLayer) {
@@ -6545,6 +6540,17 @@
     state._nativeEventContext = context;
   }
 
+  // src/native/refreshNativeEvent.js
+  function refreshNativeEvent() {
+    refreshNativeLayer(this);
+  }
+
+  // src/native/updateNativeLayerView.js
+  function updateNativeLayerView() {
+    this.viewDirty = true;
+    if (sharedByLayer.get(this.backend)) update(this.backend);
+  }
+
   // src/native/removeNativeEvents.js
   function removeNativeEvents(state) {
     const context = state._nativeEventContext;
@@ -6559,17 +6565,6 @@
     if (context.states.size) return;
     context.restore();
     nativeEventMaps.delete(map);
-  }
-
-  // src/native/refreshNativeEvent.js
-  function refreshNativeEvent() {
-    refreshNativeLayer(this);
-  }
-
-  // src/native/updateNativeLayerView.js
-  function updateNativeLayerView() {
-    this.viewDirty = true;
-    if (sharedByLayer.get(this.backend)) update(this.backend);
   }
 
   // src/native/disposeNativeLayer.js
@@ -6638,8 +6633,6 @@
     /* @__PURE__ */ new Map();
     state.methods = /* alloc */
     /* @__PURE__ */ new Map();
-    state.originalMethods = /* alloc */
-    /* @__PURE__ */ new Map();
     state.images = /* alloc */
     /* @__PURE__ */ new Set();
     if (!nativeGPUOrderByMap.get(map)) nativeGPUOrderByMap.set(map, 0);
@@ -6666,7 +6659,6 @@
         /* alloc */
         { own, original }
       );
-      state.originalMethods.set(name, original);
       source[name] = nativeMethodHandlers[name];
     }
     const ready = state.ready = Promise.withResolvers();
@@ -7466,6 +7458,129 @@
   // src/scene/init3D.js
   init_L();
 
+  // src/weakmaps/groupByLayer.js
+  var groupByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/archiveHeaderByLayer.js
+  var archiveHeaderByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneLayers.js
+  var sceneLayers = /* @__PURE__ */ new WeakSet();
+
+  // src/globals/headerOffsets.js
+  var headerOffsets = [
+    "rootDirectoryOffset",
+    "rootDirectoryLength",
+    "jsonMetadataOffset",
+    "jsonMetadataLength",
+    "leafDirectoryOffset",
+    "leafDirectoryLength",
+    "tileDataOffset",
+    "tileDataLength",
+    "numAddressedTiles",
+    "numTileEntries",
+    "numTileContents"
+  ];
+
+  // src/globals/headerFlags.js
+  var headerFlags = ["clustered", "internalCompression", "tileCompression", "tileType", "minZoom", "maxZoom"];
+
+  // src/globals/headerBounds.js
+  var headerBounds = ["minLon", "minLat", "maxLon", "maxLat"];
+
+  // src/archives/decodeHeader.js
+  function decodeHeader(data) {
+    const view = data.byteLength >= 127 ? (
+      /* alloc */
+      new DataView(data)
+    ) : null;
+    if (!view || view.getUint32(0, true) !== 1767132496 || view.getUint32(4, true) !== 57894252) {
+      throw (
+        /* alloc */
+        new Error("Expected a PMTiles v3 archive")
+      );
+    }
+    const header = (
+      /* alloc */
+      {}
+    );
+    let i;
+    for (i = 0; i < headerOffsets.length; i++) header[headerOffsets[i]] = Number(view.getBigUint64(8 + i * 8, true));
+    for (i = 0; i < headerFlags.length; i++) header[headerFlags[i]] = view.getUint8(96 + i);
+    for (i = 0; i < headerBounds.length; i++) header[headerBounds[i]] = view.getInt32(102 + i * 4, true) / 1e7;
+    header.centerZoom = view.getUint8(118);
+    header.centerLon = view.getInt32(119, true) / 1e7;
+    header.centerLat = view.getInt32(123, true) / 1e7;
+    return header;
+  }
+
+  // src/weakmaps/etagByLayer.js
+  var etagByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/archives/readArchiveRange.js
+  async function read(layer, offset, length, signal) {
+    signal?.throwIfAborted();
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles byte range")
+      );
+    }
+    const response = await fetch(
+      urlByLayer.get(layer),
+      /* alloc */
+      {
+        headers: (
+          /* alloc */
+          { Range: `bytes=${offset}-${offset + length - 1}` }
+        ),
+        signal
+      }
+    );
+    if (!response.ok) {
+      throw (
+        /* alloc */
+        new Error(`Unable to read PMTiles: HTTP ${response.status}`)
+      );
+    }
+    const etag = response.headers.get("ETag");
+    if (etagByLayer.get(layer) && etag !== etagByLayer.get(layer)) {
+      throw (
+        /* alloc */
+        new Error("PMTiles archive changed; recreate the layer")
+      );
+    }
+    if (etag) etagByLayer.set(layer, etag);
+    let data = await response.arrayBuffer();
+    if (response.status === 200) {
+      data = data.slice(offset, offset + length);
+    } else if (response.status !== 206 || !response.headers.get("Content-Range")?.startsWith(`bytes ${offset}-${offset + length - 1}/`)) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles range response")
+      );
+    }
+    if (data.byteLength !== length) {
+      throw (
+        /* alloc */
+        new Error("Truncated PMTiles range")
+      );
+    }
+    return data;
+  }
+
+  // src/archives/getHeader.js
+  function getHeader(layer) {
+    if (!sceneLayers.has(layer)) return layer.getHeader();
+    if (layer.options.archive && layer.options.archive !== layer) return getHeader(layer.options.archive);
+    let header = archiveHeaderByLayer.get(layer);
+    if (!header) {
+      header = read(layer, 0, 127).then(decodeHeader);
+      archiveHeaderByLayer.set(layer, header);
+    }
+    return header;
+  }
+
   // src/weakmaps/rendererReadyByLayer.js
   var rendererReadyByLayer = /* @__PURE__ */ new WeakMap();
 
@@ -7474,6 +7589,99 @@
 
   // src/scene/attachSharedScene.js
   init_radians();
+
+  // src/sources/updateSourceStatus.js
+  function updateStatus(layer, enabled = true) {
+    const progress = (
+      /* alloc */
+      { enabled, loaded: 0, skipped: 0, pending: 0, errors: (
+        /* alloc */
+        []
+      ) }
+    );
+    let area2;
+    for (area2 of areasByLayer.get(layer).values()) {
+      if (area2.error) progress.errors.push(area2.error);
+      else if (!area2.done) progress.pending++;
+      progress.loaded += area2.buildings ?? 0;
+      progress.skipped += area2.skipped ?? 0;
+    }
+    layer.fire("progress", progress);
+  }
+
+  // src/sources/buildAreaFeature.js
+  init_L();
+
+  // src/projections/projectTreePoint.js
+  init_L();
+  function projectedTree(context, lon, lat) {
+    const { backend: layer, crs, origin, metres, map } = context;
+    const location = (
+      /* alloc */
+      new L.LatLng(lat, lon)
+    );
+    const point = crs.project(location);
+    const elevation = mapElevationOf(map, location), root = rootByLayer.get(layer);
+    return (
+      /* alloc */
+      {
+        x: (point.x - origin.x) * metres,
+        y: (point.y - origin.y) * metres,
+        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
+      }
+    );
+  }
+
+  // src/globals/triangleContexts.js
+  var triangleContexts = [];
+
+  // src/sources/groundOffset.js
+  function groundOffset(point) {
+    return point.ground || 0;
+  }
+
+  // src/geometry/appendAreaTriangle.js
+  function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
+    const { backend: layer, positions, normals, colors, uvs } = context;
+    const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
+    const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
+    if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
+      const point = b, height = bh;
+      b = c;
+      bh = ch;
+      c = point;
+      ch = height;
+    }
+    positions.push(
+      a.x,
+      ah + groundOffset(a),
+      -a.y,
+      b.x,
+      bh + groundOffset(b),
+      -b.y,
+      c.x,
+      ch + groundOffset(c),
+      -c.y
+    );
+    normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+    colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
+    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
+  }
+
+  // src/geometry/addGeneratedTriangle.js
+  function addGeneratedTriangle(...args) {
+    addTriangle(triangleContexts[triangleContexts.length - 1], ...args);
+  }
+
+  // src/geometry/generateTreeGeometry.js
+  function generateTreeGeometry(context, generator, point, style) {
+    triangleContexts.push(context);
+    try {
+      generator(point, style, addGeneratedTriangle);
+    } finally {
+      triangleContexts.pop();
+    }
+  }
 
   // src/globals/lampDirections.js
   var lampDirections = [
@@ -7736,529 +7944,6 @@
           crown
         );
       }
-    }
-  }
-
-  // src/sources/updateSourceStatus.js
-  function updateStatus(layer, enabled = true) {
-    const progress = (
-      /* alloc */
-      { enabled, loaded: 0, skipped: 0, pending: 0, errors: (
-        /* alloc */
-        []
-      ) }
-    );
-    let area2;
-    for (area2 of areasByLayer.get(layer).values()) {
-      if (area2.error) progress.errors.push(area2.error);
-      else if (!area2.done) progress.pending++;
-      progress.loaded += area2.buildings ?? 0;
-      progress.skipped += area2.skipped ?? 0;
-    }
-    layer.fire("progress", progress);
-  }
-
-  // src/globals/archiveDecoder.js
-  var archiveDecoder = new TextDecoder();
-
-  // src/weakmaps/sceneLayers.js
-  var sceneLayers = /* @__PURE__ */ new WeakSet();
-
-  // src/archives/tileId.js
-  function tileId(z, x, y) {
-    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) || z < 0 || z > 26 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles tile coordinates")
-      );
-    }
-    let id = (4 ** z - 1) / 3;
-    const n = 2 ** z;
-    let s, rx, ry, swap;
-    for (s = n / 2; s >= 1; s /= 2) {
-      rx = x & s ? 1 : 0, ry = y & s ? 1 : 0;
-      id += s * s * (3 * rx ^ ry);
-      if (!ry) {
-        if (rx) {
-          x = n - 1 - x;
-          y = n - 1 - y;
-        }
-        swap = x;
-        x = y;
-        y = swap;
-      }
-    }
-    return id;
-  }
-
-  // src/weakmaps/archiveHeaderByLayer.js
-  var archiveHeaderByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/globals/headerOffsets.js
-  var headerOffsets = [
-    "rootDirectoryOffset",
-    "rootDirectoryLength",
-    "jsonMetadataOffset",
-    "jsonMetadataLength",
-    "leafDirectoryOffset",
-    "leafDirectoryLength",
-    "tileDataOffset",
-    "tileDataLength",
-    "numAddressedTiles",
-    "numTileEntries",
-    "numTileContents"
-  ];
-
-  // src/globals/headerFlags.js
-  var headerFlags = ["clustered", "internalCompression", "tileCompression", "tileType", "minZoom", "maxZoom"];
-
-  // src/globals/headerBounds.js
-  var headerBounds = ["minLon", "minLat", "maxLon", "maxLat"];
-
-  // src/archives/decodeHeader.js
-  function decodeHeader(data) {
-    const view = data.byteLength >= 127 ? (
-      /* alloc */
-      new DataView(data)
-    ) : null;
-    if (!view || view.getUint32(0, true) !== 1767132496 || view.getUint32(4, true) !== 57894252) {
-      throw (
-        /* alloc */
-        new Error("Expected a PMTiles v3 archive")
-      );
-    }
-    const header = (
-      /* alloc */
-      {}
-    );
-    let i;
-    for (i = 0; i < headerOffsets.length; i++) header[headerOffsets[i]] = Number(view.getBigUint64(8 + i * 8, true));
-    for (i = 0; i < headerFlags.length; i++) header[headerFlags[i]] = view.getUint8(96 + i);
-    for (i = 0; i < headerBounds.length; i++) header[headerBounds[i]] = view.getInt32(102 + i * 4, true) / 1e7;
-    header.centerZoom = view.getUint8(118);
-    header.centerLon = view.getInt32(119, true) / 1e7;
-    header.centerLat = view.getInt32(123, true) / 1e7;
-    return header;
-  }
-
-  // src/weakmaps/etagByLayer.js
-  var etagByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/archives/readArchiveRange.js
-  async function read(layer, offset, length, signal) {
-    signal?.throwIfAborted();
-    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || !Number.isSafeInteger(offset + length)) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles byte range")
-      );
-    }
-    const response = await fetch(
-      urlByLayer.get(layer),
-      /* alloc */
-      {
-        headers: (
-          /* alloc */
-          { Range: `bytes=${offset}-${offset + length - 1}` }
-        ),
-        signal
-      }
-    );
-    if (!response.ok) {
-      throw (
-        /* alloc */
-        new Error(`Unable to read PMTiles: HTTP ${response.status}`)
-      );
-    }
-    const etag = response.headers.get("ETag");
-    if (etagByLayer.get(layer) && etag !== etagByLayer.get(layer)) {
-      throw (
-        /* alloc */
-        new Error("PMTiles archive changed; recreate the layer")
-      );
-    }
-    if (etag) etagByLayer.set(layer, etag);
-    let data = await response.arrayBuffer();
-    if (response.status === 200) {
-      data = data.slice(offset, offset + length);
-    } else if (response.status !== 206 || !response.headers.get("Content-Range")?.startsWith(`bytes ${offset}-${offset + length - 1}/`)) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles range response")
-      );
-    }
-    if (data.byteLength !== length) {
-      throw (
-        /* alloc */
-        new Error("Truncated PMTiles range")
-      );
-    }
-    return data;
-  }
-
-  // src/archives/getHeader.js
-  function getHeader(layer) {
-    if (!sceneLayers.has(layer)) return layer.getHeader();
-    if (layer.options.archive && layer.options.archive !== layer) return getHeader(layer.options.archive);
-    let header = archiveHeaderByLayer.get(layer);
-    if (!header) {
-      header = read(layer, 0, 127).then(decodeHeader);
-      archiveHeaderByLayer.set(layer, header);
-    }
-    return header;
-  }
-
-  // src/globals/directoryReader.js
-  var directoryReader = {
-    bytes: null,
-    cursor: 0
-  };
-
-  // src/archives/readVarint.js
-  function varint(reader) {
-    const { bytes } = reader;
-    let value = 0;
-    let factor, byte;
-    for (factor = 1; factor <= 2 ** 49; factor *= 128) {
-      if (reader.cursor >= bytes.length) {
-        throw (
-          /* alloc */
-          new Error("Truncated PMTiles directory")
-        );
-      }
-      byte = bytes[reader.cursor++];
-      value += (byte & 127) * factor;
-      if (!Number.isSafeInteger(value)) {
-        throw (
-          /* alloc */
-          new Error("Invalid PMTiles directory integer")
-        );
-      }
-      if (byte < 128) return value;
-    }
-    throw (
-      /* alloc */
-      new Error("Invalid PMTiles directory integer")
-    );
-  }
-
-  // src/archives/decodeDirectory.js
-  function decodeDirectory(data) {
-    const reader = directoryReader;
-    const bytes = (
-      /* alloc */
-      new Uint8Array(data)
-    );
-    reader.bytes = bytes;
-    reader.cursor = 0;
-    try {
-      const count = varint(reader);
-      if (count > (bytes.length - reader.cursor) / 4) {
-        throw (
-          /* alloc */
-          new Error("Invalid PMTiles directory count")
-        );
-      }
-      const entries = (
-        /* alloc */
-        new Array(count)
-      );
-      let tileId2 = 0;
-      let i, entry, value;
-      for (i = 0; i < count; i++) {
-        tileId2 += varint(reader);
-        if (!Number.isSafeInteger(tileId2) || i && tileId2 <= entries[i - 1].tileId) {
-          throw (
-            /* alloc */
-            new Error("Invalid PMTiles directory tile IDs")
-          );
-        }
-        entries[i] = /* alloc */
-        { tileId: tileId2, runLength: 0, length: 0, offset: 0 };
-      }
-      for (entry of entries) entry.runLength = varint(reader);
-      for (entry of entries) {
-        entry.length = varint(reader);
-        if (!entry.length) {
-          throw (
-            /* alloc */
-            new Error("Invalid PMTiles directory length")
-          );
-        }
-      }
-      for (i = 0; i < entries.length; i++) {
-        entry = entries[i];
-        value = varint(reader);
-        if (!value && !i) {
-          throw (
-            /* alloc */
-            new Error("Invalid PMTiles directory offset")
-          );
-        }
-        entry.offset = value ? value - 1 : entries[i - 1].offset + entries[i - 1].length;
-      }
-      if (reader.cursor !== bytes.length) {
-        throw (
-          /* alloc */
-          new Error("Trailing PMTiles directory data")
-        );
-      }
-      return entries;
-    } finally {
-      reader.bytes = null;
-      reader.cursor = 0;
-    }
-  }
-
-  // src/archives/decompress.js
-  async function decompress(data, compression) {
-    if (compression === 1) return data;
-    if (compression !== 2) {
-      throw (
-        /* alloc */
-        new Error(`Unsupported PMTiles compression: ${compression}`)
-      );
-    }
-    const blob = (
-      /* alloc */
-      new Blob(
-        /* alloc */
-        [data]
-      )
-    );
-    const stream = (
-      /* alloc */
-      new DecompressionStream("gzip")
-    );
-    return (
-      /* alloc */
-      new Response(blob.stream().pipeThrough(stream)).arrayBuffer()
-    );
-  }
-
-  // src/archives/loadDirectory.js
-  async function loadDirectory(layer, offset, length, compression) {
-    return decodeDirectory(await decompress(await read(layer, offset, length), compression));
-  }
-
-  // src/archives/getDirectoryEntries.js
-  async function getDirectoryEntries(layer, offset, length, compression) {
-    const directories = directoriesByLayer.get(layer);
-    const key = `${offset}:${length}`;
-    if (!directories.has(key)) {
-      if (directories.size >= 32) directories.delete(directories.keys().next().value);
-      directories.set(key, loadDirectory(layer, offset, length, compression));
-    }
-    const pending = directories.get(key);
-    try {
-      return await pending;
-    } catch (error) {
-      if (directories.get(key) === pending) directories.delete(key);
-      throw error;
-    }
-  }
-
-  // src/archives/findDirectoryEntry.js
-  function findDirectoryEntry(entries, id) {
-    let low = 0, high = entries.length - 1, mid;
-    while (low <= high) {
-      mid = low + high >> 1;
-      if (entries[mid].tileId <= id) low = mid + 1;
-      else high = mid - 1;
-    }
-    return entries[high];
-  }
-
-  // src/archives/getTileData.js
-  async function getTileData(layer, header, entry, id, signal) {
-    if (id - entry.tileId >= entry.runLength) return;
-    if (entry.offset + entry.length > header.tileDataLength) {
-      throw (
-        /* alloc */
-        new Error("PMTiles tile outside data section")
-      );
-    }
-    const data = await decompress(
-      await read(layer, header.tileDataOffset + entry.offset, entry.length, signal),
-      header.tileCompression
-    );
-    signal?.throwIfAborted();
-    return (
-      /* alloc */
-      { data }
-    );
-  }
-
-  // src/archives/findTile.js
-  async function findTile(layer, header, id, signal) {
-    let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
-    let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
-    let depth, entries, entry, tile;
-    for (depth = 0; depth < 4; depth++) {
-      if (offset === firstOffset || offset === secondOffset || offset === thirdOffset) {
-        throw (
-          /* alloc */
-          new Error("Cyclic PMTiles directory")
-        );
-      }
-      if (depth === 0) firstOffset = offset;
-      else if (depth === 1) secondOffset = offset;
-      else if (depth === 2) thirdOffset = offset;
-      entries = await getDirectoryEntries(layer, offset, length, header.internalCompression);
-      signal?.throwIfAborted();
-      entry = findDirectoryEntry(entries, id);
-      if (!entry) return;
-      if (entry.runLength) {
-        tile = await getTileData(layer, header, entry, id, signal);
-        return tile;
-      }
-      if (entry.offset + entry.length > header.leafDirectoryLength) {
-        throw (
-          /* alloc */
-          new Error("PMTiles directory outside leaf section")
-        );
-      }
-      offset = header.leafDirectoryOffset + entry.offset;
-      length = entry.length;
-    }
-    throw (
-      /* alloc */
-      new Error("PMTiles directory depth exceeds four levels")
-    );
-  }
-
-  // src/archives/getZxy.js
-  async function getZxy(layer, z, x, y, signal) {
-    if (!sceneLayers.has(layer)) return layer.getZxy(z, x, y, signal);
-    if (layer.options.archive && layer.options.archive !== layer) {
-      return getZxy(layer.options.archive, z, x, y, signal);
-    }
-    const id = tileId(z, x, y);
-    signal?.throwIfAborted();
-    const header = await getHeader(layer);
-    signal?.throwIfAborted();
-    if (z < header.minZoom || z > header.maxZoom) return;
-    return findTile(layer, header, id, signal);
-  }
-
-  // src/archives/loadSource.js
-  async function loadSource(layer, area2) {
-    if (geojsonByLayer.get(layer)) {
-      const { data, url } = layer.options;
-      if (data !== void 0 && url) {
-        throw (
-          /* alloc */
-          new Error("GeoJSON source requires either data or url")
-        );
-      }
-      if (data !== void 0) return data;
-      if (!url) {
-        throw (
-          /* alloc */
-          new Error("GeoJSON source requires either data or url")
-        );
-      }
-      const sourceUrl = (
-        /* alloc */
-        new URL(url, document.baseURI)
-      );
-      const response = await fetch(
-        sourceUrl,
-        /* alloc */
-        { signal: area2.request.signal }
-      );
-      if (!response.ok) {
-        throw (
-          /* alloc */
-          new Error(`Unable to load GeoJSON: HTTP ${response.status}`)
-        );
-      }
-      return response.json();
-    }
-    const result = await getZxy(layer, area2.coords.z, area2.coords.x, area2.coords.y, area2.request.signal);
-    return result ? JSON.parse(archiveDecoder.decode(result.data)) : (
-      /* alloc */
-      {
-        type: "FeatureCollection",
-        features: (
-          /* alloc */
-          []
-        )
-      }
-    );
-  }
-
-  // src/sources/buildAreaFeature.js
-  init_L();
-
-  // src/projections/projectTreePoint.js
-  init_L();
-  function projectedTree(context, lon, lat) {
-    const { backend: layer, crs, origin, metres, map } = context;
-    const location = (
-      /* alloc */
-      new L.LatLng(lat, lon)
-    );
-    const point = crs.project(location);
-    const elevation = mapElevationOf(map, location), root = rootByLayer.get(layer);
-    return (
-      /* alloc */
-      {
-        x: (point.x - origin.x) * metres,
-        y: (point.y - origin.y) * metres,
-        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
-      }
-    );
-  }
-
-  // src/globals/triangleContexts.js
-  var triangleContexts = [];
-
-  // src/sources/groundOffset.js
-  function groundOffset(point) {
-    return point.ground || 0;
-  }
-
-  // src/geometry/appendAreaTriangle.js
-  function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
-    const { backend: layer, positions, normals, colors, uvs } = context;
-    const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
-    const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
-    if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
-      const point = b, height = bh;
-      b = c;
-      bh = ch;
-      c = point;
-      ch = height;
-    }
-    positions.push(
-      a.x,
-      ah + groundOffset(a),
-      -a.y,
-      b.x,
-      bh + groundOffset(b),
-      -b.y,
-      c.x,
-      ch + groundOffset(c),
-      -c.y
-    );
-    normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
-    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
-  }
-
-  // src/geometry/addGeneratedTriangle.js
-  function addGeneratedTriangle(...args) {
-    addTriangle(triangleContexts[triangleContexts.length - 1], ...args);
-  }
-
-  // src/geometry/generateTreeGeometry.js
-  function generateTreeGeometry(context, generator, point, style) {
-    triangleContexts.push(context);
-    try {
-      generator(point, style, addGeneratedTriangle);
-    } finally {
-      triangleContexts.pop();
     }
   }
 
@@ -8674,6 +8359,316 @@
     area2.done = true;
     setParent(area2.mesh, rootByLayer.get(layer));
     update(layer);
+  }
+
+  // src/globals/archiveDecoder.js
+  var archiveDecoder = new TextDecoder();
+
+  // src/archives/tileId.js
+  function tileId(z, x, y) {
+    if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) || z < 0 || z > 26 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles tile coordinates")
+      );
+    }
+    let id = (4 ** z - 1) / 3;
+    const n = 2 ** z;
+    let s, rx, ry, swap;
+    for (s = n / 2; s >= 1; s /= 2) {
+      rx = x & s ? 1 : 0, ry = y & s ? 1 : 0;
+      id += s * s * (3 * rx ^ ry);
+      if (!ry) {
+        if (rx) {
+          x = n - 1 - x;
+          y = n - 1 - y;
+        }
+        swap = x;
+        x = y;
+        y = swap;
+      }
+    }
+    return id;
+  }
+
+  // src/globals/directoryReader.js
+  var directoryReader = {
+    bytes: null,
+    cursor: 0
+  };
+
+  // src/archives/readVarint.js
+  function varint(reader) {
+    const { bytes } = reader;
+    let value = 0;
+    let factor, byte;
+    for (factor = 1; factor <= 2 ** 49; factor *= 128) {
+      if (reader.cursor >= bytes.length) {
+        throw (
+          /* alloc */
+          new Error("Truncated PMTiles directory")
+        );
+      }
+      byte = bytes[reader.cursor++];
+      value += (byte & 127) * factor;
+      if (!Number.isSafeInteger(value)) {
+        throw (
+          /* alloc */
+          new Error("Invalid PMTiles directory integer")
+        );
+      }
+      if (byte < 128) return value;
+    }
+    throw (
+      /* alloc */
+      new Error("Invalid PMTiles directory integer")
+    );
+  }
+
+  // src/archives/decodeDirectory.js
+  function decodeDirectory(data) {
+    const reader = directoryReader;
+    const bytes = (
+      /* alloc */
+      new Uint8Array(data)
+    );
+    reader.bytes = bytes;
+    reader.cursor = 0;
+    try {
+      const count = varint(reader);
+      if (count > (bytes.length - reader.cursor) / 4) {
+        throw (
+          /* alloc */
+          new Error("Invalid PMTiles directory count")
+        );
+      }
+      const entries = (
+        /* alloc */
+        new Array(count)
+      );
+      let tileId2 = 0;
+      let i, entry, value;
+      for (i = 0; i < count; i++) {
+        tileId2 += varint(reader);
+        if (!Number.isSafeInteger(tileId2) || i && tileId2 <= entries[i - 1].tileId) {
+          throw (
+            /* alloc */
+            new Error("Invalid PMTiles directory tile IDs")
+          );
+        }
+        entries[i] = /* alloc */
+        { tileId: tileId2, runLength: 0, length: 0, offset: 0 };
+      }
+      for (entry of entries) entry.runLength = varint(reader);
+      for (entry of entries) {
+        entry.length = varint(reader);
+        if (!entry.length) {
+          throw (
+            /* alloc */
+            new Error("Invalid PMTiles directory length")
+          );
+        }
+      }
+      for (i = 0; i < entries.length; i++) {
+        entry = entries[i];
+        value = varint(reader);
+        if (!value && !i) {
+          throw (
+            /* alloc */
+            new Error("Invalid PMTiles directory offset")
+          );
+        }
+        entry.offset = value ? value - 1 : entries[i - 1].offset + entries[i - 1].length;
+      }
+      if (reader.cursor !== bytes.length) {
+        throw (
+          /* alloc */
+          new Error("Trailing PMTiles directory data")
+        );
+      }
+      return entries;
+    } finally {
+      reader.bytes = null;
+      reader.cursor = 0;
+    }
+  }
+
+  // src/archives/decompress.js
+  async function decompress(data, compression) {
+    if (compression === 1) return data;
+    if (compression !== 2) {
+      throw (
+        /* alloc */
+        new Error(`Unsupported PMTiles compression: ${compression}`)
+      );
+    }
+    const blob = (
+      /* alloc */
+      new Blob(
+        /* alloc */
+        [data]
+      )
+    );
+    const stream = (
+      /* alloc */
+      new DecompressionStream("gzip")
+    );
+    return (
+      /* alloc */
+      new Response(blob.stream().pipeThrough(stream)).arrayBuffer()
+    );
+  }
+
+  // src/archives/loadDirectory.js
+  async function loadDirectory(layer, offset, length, compression) {
+    return decodeDirectory(await decompress(await read(layer, offset, length), compression));
+  }
+
+  // src/archives/getDirectoryEntries.js
+  async function getDirectoryEntries(layer, offset, length, compression) {
+    const directories = directoriesByLayer.get(layer);
+    const key = `${offset}:${length}`;
+    if (!directories.has(key)) {
+      if (directories.size >= 32) directories.delete(directories.keys().next().value);
+      directories.set(key, loadDirectory(layer, offset, length, compression));
+    }
+    const pending = directories.get(key);
+    try {
+      return await pending;
+    } catch (error) {
+      if (directories.get(key) === pending) directories.delete(key);
+      throw error;
+    }
+  }
+
+  // src/archives/findDirectoryEntry.js
+  function findDirectoryEntry(entries, id) {
+    let low = 0, high = entries.length - 1, mid;
+    while (low <= high) {
+      mid = low + high >> 1;
+      if (entries[mid].tileId <= id) low = mid + 1;
+      else high = mid - 1;
+    }
+    return entries[high];
+  }
+
+  // src/archives/getTileData.js
+  async function getTileData(layer, header, entry, id, signal) {
+    if (id - entry.tileId >= entry.runLength) return;
+    if (entry.offset + entry.length > header.tileDataLength) {
+      throw (
+        /* alloc */
+        new Error("PMTiles tile outside data section")
+      );
+    }
+    const data = await decompress(
+      await read(layer, header.tileDataOffset + entry.offset, entry.length, signal),
+      header.tileCompression
+    );
+    signal?.throwIfAborted();
+    return (
+      /* alloc */
+      { data }
+    );
+  }
+
+  // src/archives/findTile.js
+  async function findTile(layer, header, id, signal) {
+    let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
+    let firstOffset = -1, secondOffset = -1, thirdOffset = -1;
+    let depth, entries, entry, tile;
+    for (depth = 0; depth < 4; depth++) {
+      if (offset === firstOffset || offset === secondOffset || offset === thirdOffset) {
+        throw (
+          /* alloc */
+          new Error("Cyclic PMTiles directory")
+        );
+      }
+      if (depth === 0) firstOffset = offset;
+      else if (depth === 1) secondOffset = offset;
+      else if (depth === 2) thirdOffset = offset;
+      entries = await getDirectoryEntries(layer, offset, length, header.internalCompression);
+      signal?.throwIfAborted();
+      entry = findDirectoryEntry(entries, id);
+      if (!entry) return;
+      if (entry.runLength) {
+        tile = await getTileData(layer, header, entry, id, signal);
+        return tile;
+      }
+      if (entry.offset + entry.length > header.leafDirectoryLength) {
+        throw (
+          /* alloc */
+          new Error("PMTiles directory outside leaf section")
+        );
+      }
+      offset = header.leafDirectoryOffset + entry.offset;
+      length = entry.length;
+    }
+    throw (
+      /* alloc */
+      new Error("PMTiles directory depth exceeds four levels")
+    );
+  }
+
+  // src/archives/getZxy.js
+  async function getZxy(layer, z, x, y, signal) {
+    if (!sceneLayers.has(layer)) return layer.getZxy(z, x, y, signal);
+    if (layer.options.archive && layer.options.archive !== layer) {
+      return getZxy(layer.options.archive, z, x, y, signal);
+    }
+    const id = tileId(z, x, y);
+    signal?.throwIfAborted();
+    const header = await getHeader(layer);
+    signal?.throwIfAborted();
+    if (z < header.minZoom || z > header.maxZoom) return;
+    return findTile(layer, header, id, signal);
+  }
+
+  // src/archives/loadSource.js
+  async function loadSource(layer, area2) {
+    if (geojsonByLayer.get(layer)) {
+      const { data, url } = layer.options;
+      if (data !== void 0 && url) {
+        throw (
+          /* alloc */
+          new Error("GeoJSON source requires either data or url")
+        );
+      }
+      if (data !== void 0) return data;
+      if (!url) {
+        throw (
+          /* alloc */
+          new Error("GeoJSON source requires either data or url")
+        );
+      }
+      const sourceUrl = (
+        /* alloc */
+        new URL(url, document.baseURI)
+      );
+      const response = await fetch(
+        sourceUrl,
+        /* alloc */
+        { signal: area2.request.signal }
+      );
+      if (!response.ok) {
+        throw (
+          /* alloc */
+          new Error(`Unable to load GeoJSON: HTTP ${response.status}`)
+        );
+      }
+      return response.json();
+    }
+    const result = await getZxy(layer, area2.coords.z, area2.coords.x, area2.coords.y, area2.request.signal);
+    return result ? JSON.parse(archiveDecoder.decode(result.data)) : (
+      /* alloc */
+      {
+        type: "FeatureCollection",
+        features: (
+          /* alloc */
+          []
+        )
+      }
+    );
   }
 
   // src/sources/sourceAreaContext.js
@@ -9675,423 +9670,8 @@
     if (headerByLayer.get(layer) && kindByLayer.get(layer) !== "raster" || geojsonByLayer.get(layer)) updateArea(layer);
   }
 
-  // src/weakmaps/pointerEventsByLayer.js
-  var pointerEventsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/scene/onAdd3DLayer.js
-  init_L();
-
   // src/weakmaps/modelByLayer.js
   var modelByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/picking/findFeature.js
-  function findFeature(layer, event) {
-    const model = modelByLayer.get(layer);
-    if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
-      return null;
-    }
-    let hit2, object, ranges, low, high, middle, range;
-    for (hit2 of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
-      if (model) {
-        object = hit2.object;
-        while (object && object !== model) {
-          object = object.parent;
-        }
-        if (object === model) {
-          return (
-            /* alloc */
-            {
-              id: model.id,
-              properties: model.extras,
-              model,
-              mesh: hit2.object,
-              point: hit2.point
-            }
-          );
-        }
-      }
-      ranges = hit2.object.extras?.featureFaces;
-      if (!ranges) {
-        continue;
-      }
-      low = 0, high = ranges.length - 1;
-      while (low <= high) {
-        middle = low + high >> 1;
-        range = ranges[middle];
-        if (hit2.faceIndex < range.faceStart) {
-          high = middle - 1;
-        } else if (hit2.faceIndex >= range.faceEnd) {
-          low = middle + 1;
-        } else {
-          return (
-            /* alloc */
-            {
-              ...range,
-              mesh: hit2.object,
-              point: hit2.point
-            }
-          );
-        }
-      }
-    }
-    return null;
-  }
-
-  // src/picking/onClick.js
-  function onClick(layer, event) {
-    const feature = findFeature(layer, event);
-    hoveredFeatureByLayer.set(layer, feature);
-    setHighlight(layer, feature);
-    showFeature(layer, feature, event);
-    layer.fire(
-      "featureclick",
-      /* alloc */
-      { feature, originalEvent: event }
-    );
-  }
-
-  // src/picking/onPointerLeave.js
-  function onPointerLeave(layer) {
-    hoveredFeatureByLayer.set(layer, null);
-    setHighlight(layer, null);
-    showFeature(layer, null);
-    layer.fire(
-      "featurehover",
-      /* alloc */
-      { feature: null }
-    );
-  }
-
-  // src/picking/onPointerMove.js
-  function onPointerMove(layer, event) {
-    hoveredFeatureByLayer.set(layer, findFeature(layer, event));
-    setHighlight(layer, hoveredFeatureByLayer.get(layer));
-    showFeature(layer, hoveredFeatureByLayer.get(layer), event);
-    layer.fire(
-      "featurehover",
-      /* alloc */
-      {
-        feature: hoveredFeatureByLayer.get(layer),
-        originalEvent: event
-      }
-    );
-  }
-
-  // src/picking/pointerMove.js
-  function pointerMove(event) {
-    onPointerMove(this, event);
-  }
-
-  // src/picking/pointerClick.js
-  function pointerClick(event) {
-    onClick(this, event);
-  }
-
-  // src/picking/pointerLeave.js
-  function pointerLeave() {
-    onPointerLeave(this);
-  }
-
-  // src/scene/attachLayer.js
-  async function attachLayer(layer, map) {
-    try {
-      await attach(layer, map);
-      addedByLayer.get(layer).resolve();
-    } catch (error) {
-      layer.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    }
-  }
-
-  // src/scene/onAdd3DLayer.js
-  function onAdd3DLayer(layer, map) {
-    if (!locationByLayer.get(layer)) {
-      const center = map.getCenter();
-      locationByLayer.set(
-        layer,
-        /* alloc */
-        new L.LatLng(center.lat, center.lng)
-      );
-    }
-    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
-      containerByLayer.set(layer, map.getContainer());
-      if (!pointerEventsByLayer.get(layer)) {
-        pointerEventsByLayer.set(
-          layer,
-          /* alloc */
-          {
-            mousemove: pointerMove,
-            click: pointerClick,
-            mouseleave: pointerLeave
-          }
-        );
-      }
-      if (layer.options.tooltip) {
-        tooltipByLayer.set(layer, L.DomUtil.create("div", "leaflet-3d-tooltip", containerByLayer.get(layer)));
-        tooltipByLayer.get(layer).hidden = true;
-        tooltipByLayer.get(layer).setAttribute("role", "tooltip");
-        tooltipByLayer.get(layer).setAttribute("aria-live", "polite");
-        tooltipByLayer.get(layer).style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
-      }
-      L.DomEvent.on(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
-    }
-    if (rootByLayer.get(layer)) {
-      attachLayer(layer, map);
-    }
-  }
-
-  // src/weakmaps/bridgeMeshByLayer.js
-  var bridgeMeshByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/controlByLayer.js
-  var controlByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/demByLayer.js
-  var demByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/eventMapByLayer.js
-  var eventMapByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/eventsByLayer.js
-  var eventsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/fadeFrameByLayer.js
-  var fadeFrameByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/fadeVersionByLayer.js
-  var fadeVersionByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/groupByLayer.js
-  var groupByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/rasterGeometryByLayer.js
-  var rasterGeometryByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/rasterProgramByLayer.js
-  var rasterProgramByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainArchiveByLayer.js
-  var terrainArchiveByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainBoundsByLayer.js
-  var terrainBoundsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainControllerByLayer.js
-  var terrainControllerByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainGridsByLayer.js
-  var terrainGridsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainLoadingByLayer.js
-  var terrainLoadingByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainOriginElevationByLayer.js
-  var terrainOriginElevationByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainPromiseByLayer.js
-  var terrainPromiseByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/terrainSourceByLayer.js
-  var terrainSourceByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/typeByLayer.js
-  var typeByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/walkerByLayer.js
-  var walkerByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/sceneFields.js
-  var sceneFields = {
-    "_3d": state3dByLayer,
-    "_added": addedByLayer,
-    "_areas": areasByLayer,
-    "_bridgeMesh": bridgeMeshByLayer,
-    "_bridges": bridgesByLayer,
-    "_cameraZIndexOffset": cameraZIndexOffsetByLayer,
-    "_countStatus": countStatusByLayer,
-    "_cursor": cursorByLayer,
-    "_dem": demByLayer,
-    "_directories": directoriesByLayer,
-    "_etag": etagByLayer,
-    "_fadeFrame": fadeFrameByLayer,
-    "_fadeVersion": fadeVersionByLayer,
-    "_frame": frameByLayer,
-    "_geojson": geojsonByLayer,
-    "_header": archiveHeaderByLayer,
-    "_inflight": inflightByLayer,
-    "_layers": layersByLayer,
-    "_loadingTiles": loadingTilesByLayer,
-    "_nativeGPU": nativeGPUByLayer,
-    "_pointerEvents": pointerEventsByLayer,
-    "_pruneAfter": pruneAfterByLayer,
-    "_pruneVersion": pruneVersionByLayer,
-    "_pruneWanted": pruneWantedByLayer,
-    "_queued": queuedByLayer,
-    "_rasterGeometry": rasterGeometryByLayer,
-    "_rasterProgram": rasterProgramByLayer,
-    "_rasterTiles": rasterTilesByLayer,
-    "_rasterVersion": rasterVersionByLayer,
-    "_rendererReady": rendererReadyByLayer,
-    "_roofRaster": roofRasterByLayer,
-    "_roofRasters": roofRastersByLayer,
-    "_sceneOrigin": sceneOriginByLayer,
-    "_shadowMeshes": shadowMeshesByLayer,
-    "_shared": sharedByLayer,
-    "_size": sizeByLayer,
-    "_terrain3D": terrain3DByLayer,
-    "_terrainArchive": terrainArchiveByLayer,
-    "_terrainBaseY": terrainBaseYByLayer,
-    "_terrainBounds": terrainBoundsByLayer,
-    "_terrainController": terrainControllerByLayer,
-    "_terrainGrids": terrainGridsByLayer,
-    "_terrainLoading": terrainLoadingByLayer,
-    "_terrainOriginElevation": terrainOriginElevationByLayer,
-    "_terrainPromise": terrainPromiseByLayer,
-    "_terrainReady": terrainReadyByLayer,
-    "_terrainRequest": terrainRequestByLayer,
-    "_terrainTiles": terrainTilesByLayer,
-    "_terrainZoom": terrainZoomByLayer,
-    "_tileZoom": tileZoomByLayer,
-    "_tooltip": tooltipByLayer,
-    "_type": typeByLayer,
-    "_visibleMeshes": visibleMeshesByLayer,
-    "_wantedRasterTiles": wantedRasterTilesByLayer,
-    "_zoomLevel": zoomLevelByLayer,
-    "_zoomTransitions": zoomTransitionsByLayer,
-    "_zoomView": zoomViewByLayer,
-    "camera": cameraByLayer,
-    "container": containerByLayer,
-    "control": controlByLayer,
-    "eventMap": eventMapByLayer,
-    "events": eventsByLayer,
-    "group": groupByLayer,
-    "header": headerByLayer,
-    "highlightedFeature": highlightedFeatureByLayer,
-    "hoveredFeature": hoveredFeatureByLayer,
-    "kind": kindByLayer,
-    "location": locationByLayer,
-    "model": modelByLayer,
-    "modelUrl": modelUrlByLayer,
-    "raycaster": raycasterByLayer,
-    "ready": readyByLayer,
-    "renderer": rendererByLayer,
-    "root": rootByLayer,
-    "scene": sceneByLayer,
-    "terrainSource": terrainSourceByLayer,
-    "url": urlByLayer,
-    "walker": walkerByLayer
-  };
-
-  // src/scene/onRemove3DLayer.js
-  init_L();
-
-  // src/globals/sceneTransferFields.js
-  var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
-
-  // src/globals/sceneCleanupFields.js
-  var sceneCleanupFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_cursor"];
-
-  // src/gpu/releaseRenderer.js
-  async function releaseRenderer(renderer, layer) {
-    try {
-      await renderer.device.queue.onSubmittedWorkDone();
-      renderer.depthTexture?.destroy();
-      renderer.roofFallbackTexture?.texture?.destroy();
-      renderer.uniformBuffer?.destroy();
-      renderer.sunlight?.texture?.destroy();
-      renderer.sunlight?.buffer?.destroy();
-      renderer.sunlight?.lights?.destroy();
-    } catch (error) {
-      layer.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    }
-    renderer.device.destroy();
-  }
-
-  // src/scene/releaseSharedScene.js
-  function releaseSharedScene(layer, map) {
-    if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
-    roofRasterByLayer.set(layer, null);
-    if (zoomTransitionsByLayer.get(layer)) {
-      let animation;
-      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.play();
-    }
-    zoomTransitionsByLayer.set(layer, null);
-    zoomViewByLayer.set(layer, null);
-    cameraViewByMap.delete(map);
-    map.getContainer().classList.remove("leaflet-camera-zoom");
-    const renderer = rendererByLayer.get(layer);
-    renderer.canvas.remove();
-    releaseRenderer(renderer, layer);
-    renderers.delete(map);
-    let key;
-    for (key of sceneCleanupFields) sceneFields[key].delete(layer);
-  }
-
-  // src/scene/onRemove3DLayer.js
-  function onRemove3DLayer(layer, map) {
-    addedByLayer.set(layer, Promise.withResolvers());
-    if (containerByLayer.get(layer)) {
-      onPointerLeave(layer);
-      L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
-      containerByLayer.set(layer, null);
-    }
-    let area2, key, sceneLayer, field;
-    for (area2 of areasByLayer.get(layer).values()) releaseArea(layer, area2);
-    areasByLayer.get(layer).clear();
-    tooltipByLayer.get(layer)?.remove();
-    tooltipByLayer.set(layer, null);
-    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
-    const shared = sharedByLayer.get(layer);
-    if (!shared) return;
-    setParent(rootByLayer.get(layer), null);
-    layersByLayer.get(shared).delete(layer);
-    if (shared === layer) {
-      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
-      map.off("zoomstart", startZoom, layer);
-      map.off("zoomanim", onZoomAnim, layer);
-      map.off("zoomend", endZoom, layer);
-      cancelUpdate(layer);
-      if (layersByLayer.get(layer).size) {
-        const next = layersByLayer.get(layer).values().next().value;
-        for (key of sceneTransferFields) {
-          field = sceneFields[key];
-          field.set(next, field.get(layer));
-          field.delete(layer);
-        }
-        for (sceneLayer of layersByLayer.get(next)) sharedByLayer.set(sceneLayer, next);
-        renderers.set(map, next);
-        map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, next);
-        map.on("zoomstart", startZoom, next);
-        map.on("zoomanim", onZoomAnim, next);
-        map.on("zoomend", endZoom, next);
-        update(next);
-      } else {
-        releaseSharedScene(layer, map);
-      }
-    } else update(shared);
-    sharedByLayer.set(layer, null);
-    rendererByLayer.set(layer, null);
-    sceneByLayer.set(layer, null);
-    cameraByLayer.set(layer, null);
-  }
-
-  // src/terrain/onTerrainChange.js
-  function onTerrainChange(layer) {
-    if (!layer._map) return;
-    let area2;
-    for (area2 of areasByLayer.get(layer).values()) {
-      releaseArea(layer, area2);
-    }
-    areasByLayer.get(layer).clear();
-    updateArea(layer);
-  }
 
   // src/globals/geometryDecoder.js
   var geometryDecoder = new TextDecoder();
@@ -10914,21 +10494,6 @@
     conformModelToTerrain(layer, terrain3DByMap.get(layer._map));
   }
 
-  // src/scene/get3DEvents.js
-  function get3DEvents(layer) {
-    const events = (
-      /* alloc */
-      {}
-    );
-    if (urlByLayer.get(layer)) {
-      events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
-    }
-    if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
-      events.terrainchange = onTerrainChange.bind(null, layer);
-    }
-    return events;
-  }
-
   // src/scene/ready3D.js
   async function ready3D(layer) {
     try {
@@ -11159,6 +10724,15 @@
   // src/globals/blobParts.js
   var blobParts = [null];
 
+  // src/weakmaps/terrainBoundsByLayer.js
+  var terrainBoundsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainOriginElevationByLayer.js
+  var terrainOriginElevationByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainPromiseByLayer.js
+  var terrainPromiseByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/raster/addRasterTile.js
   init_radians();
 
@@ -11167,6 +10741,15 @@
     x: 0,
     y: 0
   };
+
+  // src/weakmaps/demByLayer.js
+  var demByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/rasterProgramByLayer.js
+  var rasterProgramByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainGridsByLayer.js
+  var terrainGridsByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/globals/demTexture.js
   var demTexture = {
@@ -11482,6 +11065,9 @@
       }
     }
   }
+
+  // src/weakmaps/rasterGeometryByLayer.js
+  var rasterGeometryByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/raster/createRasterMesh.js
   init_radians();
@@ -11989,6 +11575,236 @@
     }
   }
 
+  // src/weakmaps/pointerEventsByLayer.js
+  var pointerEventsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/bridgeMeshByLayer.js
+  var bridgeMeshByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/controlByLayer.js
+  var controlByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/eventMapByLayer.js
+  var eventMapByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/eventsByLayer.js
+  var eventsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/fadeFrameByLayer.js
+  var fadeFrameByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/fadeVersionByLayer.js
+  var fadeVersionByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainArchiveByLayer.js
+  var terrainArchiveByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainControllerByLayer.js
+  var terrainControllerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainLoadingByLayer.js
+  var terrainLoadingByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/terrainSourceByLayer.js
+  var terrainSourceByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/typeByLayer.js
+  var typeByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/walkerByLayer.js
+  var walkerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneFields.js
+  var sceneFields = {
+    "_3d": state3dByLayer,
+    "_added": addedByLayer,
+    "_areas": areasByLayer,
+    "_bridgeMesh": bridgeMeshByLayer,
+    "_bridges": bridgesByLayer,
+    "_cameraZIndexOffset": cameraZIndexOffsetByLayer,
+    "_countStatus": countStatusByLayer,
+    "_cursor": cursorByLayer,
+    "_dem": demByLayer,
+    "_directories": directoriesByLayer,
+    "_etag": etagByLayer,
+    "_fadeFrame": fadeFrameByLayer,
+    "_fadeVersion": fadeVersionByLayer,
+    "_frame": frameByLayer,
+    "_geojson": geojsonByLayer,
+    "_header": archiveHeaderByLayer,
+    "_inflight": inflightByLayer,
+    "_layers": layersByLayer,
+    "_loadingTiles": loadingTilesByLayer,
+    "_nativeGPU": nativeGPUByLayer,
+    "_pointerEvents": pointerEventsByLayer,
+    "_pruneAfter": pruneAfterByLayer,
+    "_pruneVersion": pruneVersionByLayer,
+    "_pruneWanted": pruneWantedByLayer,
+    "_queued": queuedByLayer,
+    "_rasterGeometry": rasterGeometryByLayer,
+    "_rasterProgram": rasterProgramByLayer,
+    "_rasterTiles": rasterTilesByLayer,
+    "_rasterVersion": rasterVersionByLayer,
+    "_rendererReady": rendererReadyByLayer,
+    "_roofRaster": roofRasterByLayer,
+    "_roofRasters": roofRastersByLayer,
+    "_sceneOrigin": sceneOriginByLayer,
+    "_shadowMeshes": shadowMeshesByLayer,
+    "_shared": sharedByLayer,
+    "_size": sizeByLayer,
+    "_terrain3D": terrain3DByLayer,
+    "_terrainArchive": terrainArchiveByLayer,
+    "_terrainBaseY": terrainBaseYByLayer,
+    "_terrainBounds": terrainBoundsByLayer,
+    "_terrainController": terrainControllerByLayer,
+    "_terrainGrids": terrainGridsByLayer,
+    "_terrainLoading": terrainLoadingByLayer,
+    "_terrainOriginElevation": terrainOriginElevationByLayer,
+    "_terrainPromise": terrainPromiseByLayer,
+    "_terrainReady": terrainReadyByLayer,
+    "_terrainRequest": terrainRequestByLayer,
+    "_terrainTiles": terrainTilesByLayer,
+    "_terrainZoom": terrainZoomByLayer,
+    "_tileZoom": tileZoomByLayer,
+    "_tooltip": tooltipByLayer,
+    "_type": typeByLayer,
+    "_visibleMeshes": visibleMeshesByLayer,
+    "_wantedRasterTiles": wantedRasterTilesByLayer,
+    "_zoomLevel": zoomLevelByLayer,
+    "_zoomTransitions": zoomTransitionsByLayer,
+    "_zoomView": zoomViewByLayer,
+    "camera": cameraByLayer,
+    "container": containerByLayer,
+    "control": controlByLayer,
+    "eventMap": eventMapByLayer,
+    "events": eventsByLayer,
+    "group": groupByLayer,
+    "header": headerByLayer,
+    "highlightedFeature": highlightedFeatureByLayer,
+    "hoveredFeature": hoveredFeatureByLayer,
+    "kind": kindByLayer,
+    "location": locationByLayer,
+    "model": modelByLayer,
+    "modelUrl": modelUrlByLayer,
+    "raycaster": raycasterByLayer,
+    "ready": readyByLayer,
+    "renderer": rendererByLayer,
+    "root": rootByLayer,
+    "scene": sceneByLayer,
+    "terrainSource": terrainSourceByLayer,
+    "url": urlByLayer,
+    "walker": walkerByLayer
+  };
+
+  // src/scene/onRemove3DLayer.js
+  init_L();
+
+  // src/globals/sceneTransferFields.js
+  var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
+
+  // src/picking/onPointerLeave.js
+  function onPointerLeave(layer) {
+    hoveredFeatureByLayer.set(layer, null);
+    setHighlight(layer, null);
+    showFeature(layer, null);
+    layer.fire(
+      "featurehover",
+      /* alloc */
+      { feature: null }
+    );
+  }
+
+  // src/globals/sceneCleanupFields.js
+  var sceneCleanupFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_cursor"];
+
+  // src/gpu/releaseRenderer.js
+  async function releaseRenderer(renderer, layer) {
+    try {
+      await renderer.device.queue.onSubmittedWorkDone();
+      renderer.depthTexture?.destroy();
+      renderer.roofFallbackTexture?.texture?.destroy();
+      renderer.uniformBuffer?.destroy();
+      renderer.sunlight?.texture?.destroy();
+      renderer.sunlight?.buffer?.destroy();
+      renderer.sunlight?.lights?.destroy();
+    } catch (error) {
+      layer.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    }
+    renderer.device.destroy();
+  }
+
+  // src/scene/releaseSharedScene.js
+  function releaseSharedScene(layer, map) {
+    if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
+    roofRasterByLayer.set(layer, null);
+    if (zoomTransitionsByLayer.get(layer)) {
+      let animation;
+      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.play();
+    }
+    zoomTransitionsByLayer.set(layer, null);
+    zoomViewByLayer.set(layer, null);
+    cameraViewByMap.delete(map);
+    map.getContainer().classList.remove("leaflet-camera-zoom");
+    const renderer = rendererByLayer.get(layer);
+    renderer.canvas.remove();
+    releaseRenderer(renderer, layer);
+    renderers.delete(map);
+    let key;
+    for (key of sceneCleanupFields) sceneFields[key].delete(layer);
+  }
+
+  // src/scene/onRemove3DLayer.js
+  function onRemove3DLayer(layer, map) {
+    addedByLayer.set(layer, Promise.withResolvers());
+    if (containerByLayer.get(layer)) {
+      onPointerLeave(layer);
+      L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
+      containerByLayer.set(layer, null);
+    }
+    let area2, key, sceneLayer, field;
+    for (area2 of areasByLayer.get(layer).values()) releaseArea(layer, area2);
+    areasByLayer.get(layer).clear();
+    tooltipByLayer.get(layer)?.remove();
+    tooltipByLayer.set(layer, null);
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
+    const shared = sharedByLayer.get(layer);
+    if (!shared) return;
+    setParent(rootByLayer.get(layer), null);
+    layersByLayer.get(shared).delete(layer);
+    if (shared === layer) {
+      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
+      map.off("zoomstart", startZoom, layer);
+      map.off("zoomanim", onZoomAnim, layer);
+      map.off("zoomend", endZoom, layer);
+      cancelUpdate(layer);
+      if (layersByLayer.get(layer).size) {
+        const next = layersByLayer.get(layer).values().next().value;
+        for (key of sceneTransferFields) {
+          field = sceneFields[key];
+          field.set(next, field.get(layer));
+          field.delete(layer);
+        }
+        for (sceneLayer of layersByLayer.get(next)) sharedByLayer.set(sceneLayer, next);
+        renderers.set(map, next);
+        map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, next);
+        map.on("zoomstart", startZoom, next);
+        map.on("zoomanim", onZoomAnim, next);
+        map.on("zoomend", endZoom, next);
+        update(next);
+      } else {
+        releaseSharedScene(layer, map);
+      }
+    } else update(shared);
+    sharedByLayer.set(layer, null);
+    rendererByLayer.set(layer, null);
+    sceneByLayer.set(layer, null);
+    cameraByLayer.set(layer, null);
+  }
+
   // src/raster/onPMTileRemove.js
   function onPMTileRemove(layer, map) {
     releaseRasterTiles(layer);
@@ -12432,6 +12248,156 @@
       return false;
     } finally {
       terrainLoadingByLayer.set(layer, false);
+    }
+  }
+
+  // src/scene/onAdd3DLayer.js
+  init_L();
+
+  // src/picking/findFeature.js
+  function findFeature(layer, event) {
+    const model = modelByLayer.get(layer);
+    if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
+      return null;
+    }
+    let hit2, object, ranges, low, high, middle, range;
+    for (hit2 of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
+      if (model) {
+        object = hit2.object;
+        while (object && object !== model) {
+          object = object.parent;
+        }
+        if (object === model) {
+          return (
+            /* alloc */
+            {
+              id: model.id,
+              properties: model.extras,
+              model,
+              mesh: hit2.object,
+              point: hit2.point
+            }
+          );
+        }
+      }
+      ranges = hit2.object.extras?.featureFaces;
+      if (!ranges) {
+        continue;
+      }
+      low = 0, high = ranges.length - 1;
+      while (low <= high) {
+        middle = low + high >> 1;
+        range = ranges[middle];
+        if (hit2.faceIndex < range.faceStart) {
+          high = middle - 1;
+        } else if (hit2.faceIndex >= range.faceEnd) {
+          low = middle + 1;
+        } else {
+          return (
+            /* alloc */
+            {
+              ...range,
+              mesh: hit2.object,
+              point: hit2.point
+            }
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  // src/picking/onPointerMove.js
+  function onPointerMove(layer, event) {
+    hoveredFeatureByLayer.set(layer, findFeature(layer, event));
+    setHighlight(layer, hoveredFeatureByLayer.get(layer));
+    showFeature(layer, hoveredFeatureByLayer.get(layer), event);
+    layer.fire(
+      "featurehover",
+      /* alloc */
+      {
+        feature: hoveredFeatureByLayer.get(layer),
+        originalEvent: event
+      }
+    );
+  }
+
+  // src/picking/pointerMove.js
+  function pointerMove(event) {
+    onPointerMove(this, event);
+  }
+
+  // src/picking/onClick.js
+  function onClick(layer, event) {
+    const feature = findFeature(layer, event);
+    hoveredFeatureByLayer.set(layer, feature);
+    setHighlight(layer, feature);
+    showFeature(layer, feature, event);
+    layer.fire(
+      "featureclick",
+      /* alloc */
+      { feature, originalEvent: event }
+    );
+  }
+
+  // src/picking/pointerClick.js
+  function pointerClick(event) {
+    onClick(this, event);
+  }
+
+  // src/picking/pointerLeave.js
+  function pointerLeave() {
+    onPointerLeave(this);
+  }
+
+  // src/scene/attachLayer.js
+  async function attachLayer(layer, map) {
+    try {
+      await attach(layer, map);
+      addedByLayer.get(layer).resolve();
+    } catch (error) {
+      layer.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    }
+  }
+
+  // src/scene/onAdd3DLayer.js
+  function onAdd3DLayer(layer, map) {
+    if (!locationByLayer.get(layer)) {
+      const center = map.getCenter();
+      locationByLayer.set(
+        layer,
+        /* alloc */
+        new L.LatLng(center.lat, center.lng)
+      );
+    }
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
+      containerByLayer.set(layer, map.getContainer());
+      if (!pointerEventsByLayer.get(layer)) {
+        pointerEventsByLayer.set(
+          layer,
+          /* alloc */
+          {
+            mousemove: pointerMove,
+            click: pointerClick,
+            mouseleave: pointerLeave
+          }
+        );
+      }
+      if (layer.options.tooltip) {
+        tooltipByLayer.set(layer, L.DomUtil.create("div", "leaflet-3d-tooltip", containerByLayer.get(layer)));
+        tooltipByLayer.get(layer).hidden = true;
+        tooltipByLayer.get(layer).setAttribute("role", "tooltip");
+        tooltipByLayer.get(layer).setAttribute("aria-live", "polite");
+        tooltipByLayer.get(layer).style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
+      }
+      L.DomEvent.on(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
+    }
+    if (rootByLayer.get(layer)) {
+      attachLayer(layer, map);
     }
   }
 
@@ -15221,6 +15187,32 @@
       case "time":
         return addTimeLayer.call(layer, map);
     }
+  }
+
+  // src/terrain/onTerrainChange.js
+  function onTerrainChange(layer) {
+    if (!layer._map) return;
+    let area2;
+    for (area2 of areasByLayer.get(layer).values()) {
+      releaseArea(layer, area2);
+    }
+    areasByLayer.get(layer).clear();
+    updateArea(layer);
+  }
+
+  // src/scene/get3DEvents.js
+  function get3DEvents(layer) {
+    const events = (
+      /* alloc */
+      {}
+    );
+    if (urlByLayer.get(layer)) {
+      events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
+    }
+    if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
+      events.terrainchange = onTerrainChange.bind(null, layer);
+    }
+    return events;
   }
 
   // src/scene/isNativeLayer.js

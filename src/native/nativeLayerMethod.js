@@ -9,7 +9,7 @@ import { L } from '../globals/L.js';
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function nativeLayerMethod(name, source, args) {
-  const state = nativeGPUByLayer.get(source), original = state.originalMethods.get(name);
+  const state = nativeGPUByLayer.get(source), original = state.methods.get(name).original;
   const result = original.apply(source, args);
   let layer, zIndex;
   if ((name === 'bringToFront' || name === 'bringToBack') && source instanceof L.GridLayer) {

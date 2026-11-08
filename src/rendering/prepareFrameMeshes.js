@@ -4,7 +4,7 @@ import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
 
 
 
-import { sortMeshes } from "./sortMeshes.js";
+import { compareMeshes } from './compareMeshes.js';
 import { revealRoofMesh } from './revealRoofMesh.js';
 
 export function prepareFrameMeshes(layer, rasters, now, meshes) {
@@ -23,7 +23,7 @@ export function prepareFrameMeshes(layer, rasters, now, meshes) {
     meshes.push(mesh);
   }
   candidates.length = 0;
-  sortMeshes(meshes);
+  meshes.sort(compareMeshes);
   let minGroundZoom = Infinity, maxGroundZoom = -Infinity;
   for (mesh of meshes) {
     if (!mesh.ground) continue;

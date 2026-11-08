@@ -15,16 +15,6 @@ import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
 
 
-import { attach } from './attachSharedScene.js';
-import { emptyNode } from './createSceneNode.js';
-import { onAdd3DLayer } from './onAdd3DLayer.js';
-import { onRemove3DLayer } from './onRemove3DLayer.js';
-import { update } from './scheduleSceneUpdate.js';
-import { updateArea } from '../sources/updateArea.js';
-import { onTerrainChange } from '../terrain/onTerrainChange.js';
-import { getHeader } from '../archives/getHeader.js';
-import { loadModel } from '../models/loadModel.js';
-import { get3DEvents } from './get3DEvents.js';
 import { ready3D } from './ready3D.js';
 import { noOperation } from '../utils/noOperation.js';
 import { updateLayerCount } from '../layer-controls/updateLayerCount.js';

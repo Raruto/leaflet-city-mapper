@@ -88,6 +88,13 @@ const builds = [
     sourcemap: true,
   },
   {
+    entryPoints: ['src/workers/geometryWorker.js'],
+    outfile: 'dist/leaflet-city-mapper-worker-src.js',
+    bundle: true,
+    format: 'iife',
+    sourcemap: true,
+  },
+  {
     ...options,
     outfile: 'dist/leaflet-city-mapper-src.js',
     minify: false,

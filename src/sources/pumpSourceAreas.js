@@ -8,19 +8,7 @@ import { renderers } from '../weakmaps/renderers.js';
 
 
 
-import { emptyNode } from "../scene/createSceneNode.js";
-import { isClockWise } from "../triangulation/isClockWise.js";
-import { lampPostGeometry } from "../geometry/lampPostGeometry.js";
-import { lightGeometry } from "../geometry/lightGeometry.js";
-import { parseColor } from "../colors/parseColor.js";
-import { treeGeometry } from "../geometry/treeGeometry.js";
-import { triangulate } from "../triangulation/triangulate.js";
-import { createProgram } from '../materials/createProgram.js';
 import { updateStatus } from './updateSourceStatus.js';
-import { loadSource } from '../archives/loadSource.js';
-import { setParent } from '../scene/setParent.js';
-import { update } from '../scene/scheduleSceneUpdate.js';
-import { getElevation } from "../terrain/getElevation.js";
 
 import { buildArea } from './buildArea.js';
 import { pendingSourceAreas } from './pendingSourceAreas.js';

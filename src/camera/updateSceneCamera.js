@@ -9,7 +9,7 @@ export function updateCamera(camera) {
   camera.projectionTransform ||= /* alloc */ new DOMMatrix();
   camera.projectionViewTransform ||= /* alloc */ new DOMMatrix();
   const { position, target, up, x, y, z, viewMatrix, projectionMatrix, projectionViewMatrix } = camera;
-  let i, value;
+  let value;
   z[0] = position[0] - target[0], z[1] = position[1] - target[1], z[2] = position[2] - target[2];
   const zLength = Math.hypot(z[0], z[1], z[2]) || 1;
   z[0] /= zLength, z[1] /= zLength, z[2] /= zLength;
