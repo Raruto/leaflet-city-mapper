@@ -1,4 +1,8 @@
 Feature: Traffic lanes, flows and timetables
+  @unit
+  Scenario: Traffic reuses interpolation scratch without sharing light snapshots
+    Then traffic interpolation scratch preserves lights and invalidates lighting snapshots
+
 
   @unit
   Scenario: Unchanged traffic trips are distinct from failed refreshes

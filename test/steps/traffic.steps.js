@@ -15,6 +15,57 @@ import { getLocation } from '../../src/scene/getLocation.js';
 import { cyclingCounts, mobilityLanes, trafficHour, parisMobility, parisTransit } from '../../examples/data/paris-traffic.js';
 import parisTraffic from '../../examples/data/paris-traffic.js';
 import { trafficResponse, fulfillTrafficRoute } from '../fixtures/traffic-data.js';
+import { locateTraffic } from '../../src/traffic/locateTraffic.js';
+import { updateTrafficLights } from '../../src/traffic/updateTrafficLights.js';
+import { placeTraffic } from '../../src/traffic/placeTraffic.js';
+import { cacheLightGrid } from '../../src/lighting/cacheLightGrid.js';
+
+Then('traffic interpolation scratch preserves lights and invalidates lighting snapshots', function () {
+  const lane = { points: [[0, 0, 10], [60, 0, 16]], lengths: [0, 60], length: 60 };
+  const trip = { lane, distance: 15, speed: 5 };
+  const light = { position: [1, 2, -3], radius: 10, color: [1, 0.8, 0.6], flux: 800 };
+  const state = { elapsed: 0, side: 2, trips: [trip], lights: [light],
+    mesh: { extras: {}, worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      geometry: { attributes: { position: { data: new Float32Array(3) }, normal: { data: new Float32Array(3) } } } },
+    stride: 3, template: { position: [1, 2, -3], normal: [1, 1, 1] } };
+  const originalLight = structuredClone(light);
+  const first = locateTraffic(state, trip), second = locateTraffic(state, trip), target = {};
+  assert.notEqual(first, second);
+  assert.equal(locateTraffic(state, trip, target), target);
+  assert.deepEqual(target, first);
+  updateTrafficLights(state);
+  const scratch = state.position;
+  const lights = state.mesh.extras.lights;
+  const snapshot = structuredClone(lights);
+  assert.deepEqual(lights[0].position, [18, 13.5, 3]);
+  const grid = cacheLightGrid([state.mesh], undefined, 1024);
+  const packed = grid.meshes[0].cache.data.slice();
+  assert.equal(cacheLightGrid([state.mesh], grid, 1024), grid);
+  for (const elapsed of [2, 20, -10]) {
+    state.elapsed = elapsed;
+    const position = locateTraffic(state, trip);
+    updateTrafficLights(state);
+    state.stale = true;
+    placeTraffic(state);
+    assert.equal(state.position, scratch);
+    assert.deepEqual(locateTraffic(state, trip, target), position);
+    const expected = [position.x - light.position[0] * position.dz - light.position[2] * position.dx,
+      position.y + light.position[1], position.z + light.position[0] * position.dx - light.position[2] * position.dz];
+    assert.deepEqual(state.mesh.extras.lights[0].position, expected);
+    assert.deepEqual(Array.from(state.mesh.geometry.attributes.position.data), Array.from(Float32Array.from(expected)));
+    assert.deepEqual(Array.from(state.mesh.geometry.attributes.normal.data), [-1, 1, 1]);
+    assert.notEqual(state.mesh.extras.lights, lights);
+    assert.notEqual(state.mesh.extras.lights[0].position, lights[0].position);
+    assert.notEqual(cacheLightGrid([state.mesh], grid, 1024), grid);
+  }
+  assert.deepEqual(lights, snapshot);
+  assert.deepEqual(grid.meshes[0].cache.data, packed);
+  assert.deepEqual(light, originalLight);
+  const other = { ...state, mesh: { extras: {} } };
+  delete other.position;
+  updateTrafficLights(other);
+  assert.notEqual(other.position, scratch);
+});
 
 const [cruise] = JSON.parse(readFileSync(new URL('../../examples/data/seine-cruises.geojson', import.meta.url))).features;
 const cruises = date => scheduledTrips(date, cruise.properties.timetable);

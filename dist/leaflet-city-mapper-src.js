@@ -1983,18 +1983,27 @@
     if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
     const bounds = mesh.geometry.bounds;
     const world = mesh.worldMatrix;
-    const center = bounds.center;
-    const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-    const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-    const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+    let sphere = mesh._cullingSphere;
+    if (!sphere || sphere.bounds !== bounds || sphere.matrix !== world || sphere.version !== mesh._worldMatrixVersion || mesh._worldMatrixVersion === void 0) {
+      sphere ||= mesh._cullingSphere = /* alloc */
+      {};
+      const center = bounds.center;
+      sphere.x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
+      sphere.y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
+      sphere.z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+      sphere.radius = bounds.radius * Math.max(
+        Math.hypot(world[0], world[1], world[2]),
+        Math.hypot(world[4], world[5], world[6]),
+        Math.hypot(world[8], world[9], world[10])
+      );
+      sphere.bounds = bounds;
+      sphere.matrix = world;
+      sphere.version = mesh._worldMatrixVersion;
+    }
+    const { x, y, z, radius } = sphere;
     const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
     const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
     mesh._sortDepth = clipZ / clipW;
-    const radius = bounds.radius * Math.max(
-      Math.hypot(world[0], world[1], world[2]),
-      Math.hypot(world[4], world[5], world[6]),
-      Math.hypot(world[8], world[9], world[10])
-    );
     mesh._visibleInFrame = frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] && frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] && frustum[2][0] * x + frustum[2][1] * y + frustum[2][2] * z + frustum[2][3] >= -radius * frustumLengths[2] && frustum[3][0] * x + frustum[3][1] * y + frustum[3][2] * z + frustum[3][3] >= -radius * frustumLengths[3] && frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] && frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
     if (mesh._visibleInFrame) candidates.push(mesh);
   }
@@ -6306,11 +6315,11 @@
   }
 
   // src/traffic/locateTraffic.js
-  function locateTraffic(state, trip) {
+  function locateTraffic(state, trip, target) {
     const { points, lengths, length } = trip.lane;
     let distance = trip.distance + state.elapsed * trip.speed;
     distance -= length * Math.floor(distance / length);
-    const position = along(points, lengths, distance);
+    const position = along(points, lengths, distance, target);
     position.x -= position.dz * state.side;
     position.z += position.dx * state.side;
     return position;
@@ -6321,10 +6330,12 @@
     if (!state.mesh || !state.stale) return;
     state.stale = false;
     const { position, normal } = state.mesh.geometry.attributes;
+    const target = state.position ||= /* alloc */
+    {};
     let i, trip, cx, y, cz, dx, dz, k, o, lx, lz, nx, nz;
     for (i = 0; i < state.trips.length; i++) {
       trip = state.trips[i];
-      ({ x: cx, y, z: cz, dx, dz } = locateTraffic(state, trip));
+      ({ x: cx, y, z: cz, dx, dz } = locateTraffic(state, trip, target));
       for (k = 0, o = i * state.stride; k < state.stride; k += 3, o += 3) {
         lx = state.template.position[k], lz = state.template.position[k + 2], nx = state.template.normal[k], nz = state.template.normal[k + 2];
         position.data[o] = cx - lx * dz - lz * dx;
@@ -13836,10 +13847,13 @@
       /* alloc */
       []
     );
+    const target = state.position ||= /* alloc */
+    {};
     let trip, x, y, z, dx, dz, lx, ly, lz, light;
     for (trip of state.trips) {
-      ({ x, y, z, dx, dz } = locateTraffic(state, trip));
-      for ({ position: [lx, ly, lz], ...light } of state.lights) {
+      ({ x, y, z, dx, dz } = locateTraffic(state, trip, target));
+      for (light of state.lights) {
+        [lx, ly, lz] = light.position;
         lights.push(
           /* alloc */
           {

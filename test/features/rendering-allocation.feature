@@ -1,5 +1,9 @@
 Feature: Rendering allocation ownership
   @unit
+  Scenario: Camera movement reuses culling spheres without stale visibility
+    Then culling spheres follow bounds and transforms while reusing unchanged world data
+
+  @unit
   Scenario: Bounding volumes retain their results without per-vertex square roots
     Then mesh bounds match vertex distances for static and instanced geometry
 

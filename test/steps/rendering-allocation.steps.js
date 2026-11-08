@@ -19,6 +19,69 @@ import { headerByLayer } from '../../src/weakmaps/headerByLayer.js';
 import { modelUrlByLayer } from '../../src/weakmaps/modelUrlByLayer.js';
 import { modelByLayer } from '../../src/weakmaps/modelByLayer.js';
 import { geojsonByLayer } from '../../src/weakmaps/geojsonByLayer.js';
+import { collectVisibleMesh } from '../../src/rendering/collectVisibleMesh.js';
+
+Then('culling spheres follow bounds and transforms while reusing unchanged world data', function () {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const projection = identity.slice();
+  const frustum = [[1, 0, 0, 1], [-1, 0, 0, 1], [0, 1, 0, 1],
+    [0, -1, 0, 1], [0, 0, 1, 1], [0, 0, -1, 1]];
+  const candidates = [];
+  const mesh = { worldMatrix: identity.slice(), _worldMatrixVersion: 1,
+    geometry: { bounds: { center: [0, 0, 0], radius: 0.25 } } };
+  const original = Math.hypot;
+  let calculations = 0;
+  Math.hypot = (...values) => { calculations++; return original(...values); };
+  const check = expectedCalculations => {
+    calculations = 0;
+    candidates.length = 0;
+    collectVisibleMesh(mesh, projection, frustum, [1, 1, 1, 1, 1, 1], candidates);
+    assert.equal(calculations, expectedCalculations);
+    const w = mesh.worldMatrix, c = mesh.geometry.bounds.center;
+    const center = [0, 1, 2].map(axis => w[axis] * c[0] + w[axis + 4] * c[1] + w[axis + 8] * c[2] + w[axis + 12]);
+    const radius = mesh.geometry.bounds.radius * Math.max(
+      original(...w.slice(0, 3)), original(...w.slice(4, 7)), original(...w.slice(8, 11)));
+    const expected = frustum.every(plane => plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] + plane[3] >= -radius);
+    const depth = (projection[2] * center[0] + projection[6] * center[1] + projection[10] * center[2] + projection[14]) /
+      (projection[3] * center[0] + projection[7] * center[1] + projection[11] * center[2] + projection[15]);
+    assert.equal(mesh._visibleInFrame, expected);
+    assert.deepEqual(candidates, expected ? [mesh] : []);
+    assert.equal(mesh._sortDepth, depth);
+  };
+  try {
+    check(3);
+    const sphere = mesh._cullingSphere;
+    check(0);
+    projection[14] = 0.5;
+    frustum[0][3] = -2;
+    check(0);
+    assert.equal(mesh._visibleInFrame, false);
+    mesh.worldMatrix[12] = 3;
+    mesh._worldMatrixVersion++;
+    check(3);
+    mesh.worldMatrix[0] = -4;
+    mesh.worldMatrix[5] = 2;
+    mesh._worldMatrixVersion++;
+    check(3);
+    mesh.geometry.bounds = { center: [1, -1, 2], radius: 3 };
+    check(3);
+    check(0);
+    mesh.worldMatrix = identity.slice();
+    check(3);
+    delete mesh._worldMatrixVersion;
+    mesh.worldMatrix[12] = -10;
+    check(3);
+    mesh.worldMatrix[12] = 10;
+    check(3);
+    assert.equal(mesh._cullingSphere, sphere);
+    const other = { ...mesh };
+    delete other._cullingSphere;
+    collectVisibleMesh(other, projection, frustum, [1, 1, 1, 1, 1, 1], []);
+    assert.notEqual(other._cullingSphere, sphere);
+  } finally {
+    Math.hypot = original;
+  }
+});
 
 Then('mesh bounds match vertex distances for static and instanced geometry', function () {
   for (const data of [
