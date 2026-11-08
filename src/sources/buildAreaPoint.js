@@ -1,25 +1,7 @@
 import { projectedTree } from '../projections/projectTreePoint.js';
-import { generateTreeGeometry } from '../geometry/generateTreeGeometry.js';
-import { lampPostGeometry } from '../geometry/lampPostGeometry.js';
-import { lightGeometry } from '../geometry/lightGeometry.js';
-import { treeGeometry } from '../geometry/treeGeometry.js';
+import { buildProjectedPoint } from '../geometry/buildProjectedPoint.js';
 
 export function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-  const { backend: layer } = context;
-  const { top } = style;
   const projected = projectedTree(context, lon, lat);
-  if (layer.options.nightLight) {
-    if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw /* alloc */ new Error('Invalid light flux');
-    const support = feature.properties?.cod_ouvrag || `${lon},${lat}`;
-    if (style.poleRadius > 0 && !context.supports.has(support)) {
-      generateTreeGeometry(context, lampPostGeometry, projected, style);
-      context.supports.add(support);
-    }
-    generateTreeGeometry(context, lightGeometry, projected, style);
-    context.lights.push(/* alloc */ {
-      position: /* alloc */ [projected.x, projected.ground + top, -projected.y],
-      radius: Math.hypot(top, style.lightRadius), color: /* alloc */ [baseColor.r, baseColor.g, baseColor.b],
-      flux: style.lightFlux,
-    });
-  } else generateTreeGeometry(context, treeGeometry, projected, style);
+  buildProjectedPoint(context, projected, style, baseColor, feature.properties?.cod_ouvrag || `${lon},${lat}`);
 }

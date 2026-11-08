@@ -8262,17 +8262,14 @@
     }
   }
 
-  // src/sources/buildAreaPoint.js
-  function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-    const { backend: layer } = context;
+  // src/geometry/buildProjectedPoint.js
+  function buildProjectedPoint(context, projected, style, baseColor, support) {
     const { top } = style;
-    const projected = projectedTree(context, lon, lat);
-    if (layer.options.nightLight) {
+    if (context.backend.options.nightLight) {
       if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw (
         /* alloc */
         new Error("Invalid light flux")
       );
-      const support = feature.properties?.cod_ouvrag || `${lon},${lat}`;
       if (style.poleRadius > 0 && !context.supports.has(support)) {
         generateTreeGeometry(context, lampPostGeometry, projected, style);
         context.supports.add(support);
@@ -8294,6 +8291,12 @@
         }
       );
     } else generateTreeGeometry(context, treeGeometry, projected, style);
+  }
+
+  // src/sources/buildAreaPoint.js
+  function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
+    const projected = projectedTree(context, lon, lat);
+    buildProjectedPoint(context, projected, style, baseColor, feature.properties?.cod_ouvrag || `${lon},${lat}`);
   }
 
   // src/projections/projectRing.js
@@ -8332,22 +8335,13 @@
     return path;
   }
 
-  // src/geometry/buildExtrudedPolygon.js
-  function buildAreaPolygon(context, rings, top, bottom, baseColor) {
-    if (!rings.length) throw (
-      /* alloc */
-      new Error("Empty GeoJSON polygon")
-    );
-    const paths = (
-      /* alloc */
-      []
-    );
-    let ring3, path, point, a, b, c, index, sign, i, length, nx, nz;
-    for (ring3 of rings) paths.push(projectRing(context, ring3));
+  // src/geometry/buildProjectedPolygon.js
+  function buildProjectedPolygon(context, paths, top, bottom, baseColor) {
     const points = (
       /* alloc */
       []
     );
+    let path, point, a, b, c, index, sign, i, length, nx, nz;
     for (path of paths) for (point of path) points.push(point);
     for ([a, b, c] of triangulate(paths[0], paths.slice(1))) {
       addTriangle(context, points[a], top, points[b], top, points[c], top, 0, 1, 0, baseColor);
@@ -8365,6 +8359,21 @@
         addTriangle(context, a, bottom, b, top, a, top, nx, 0, nz, baseColor);
       }
     }
+  }
+
+  // src/geometry/buildExtrudedPolygon.js
+  function buildAreaPolygon(context, rings, top, bottom, baseColor) {
+    if (!rings.length) throw (
+      /* alloc */
+      new Error("Empty GeoJSON polygon")
+    );
+    const paths = (
+      /* alloc */
+      []
+    );
+    let ring3;
+    for (ring3 of rings) paths.push(projectRing(context, ring3));
+    buildProjectedPolygon(context, paths, top, bottom, baseColor);
   }
 
   // src/sources/featureAnchor.js
@@ -8404,6 +8413,71 @@
     return style;
   }
 
+  // src/sources/prepareAreaGeometryJob.js
+  function prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor) {
+    const geometry = feature.geometry;
+    const polygons = (
+      /* alloc */
+      []
+    );
+    const rings = geometry.type === "Polygon" ? (
+      /* alloc */
+      [geometry.coordinates]
+    ) : geometry.type === "MultiPolygon" ? geometry.coordinates : (
+      /* alloc */
+      []
+    );
+    let polygon2, ring3, paths;
+    for (polygon2 of rings) {
+      if (!polygon2.length) throw (
+        /* alloc */
+        new Error("Empty GeoJSON polygon")
+      );
+      paths = /* alloc */
+      [];
+      for (ring3 of polygon2) paths.push(projectRing(context, ring3));
+      polygons.push(paths);
+    }
+    const point = geometry.type === "Point" ? projectedTree(context, lon, lat) : null;
+    const nightLight = context.backend.options.nightLight;
+    const crownColor = point ? parseColor(style.color ?? (nightLight ? void 0 : 5210683)) : baseColor;
+    const trunkColor = point && !nightLight ? parseColor(style.trunkColor ?? 7491898) : null;
+    context.jobs.push(
+      /* alloc */
+      {
+        point,
+        polygons,
+        baseColor: (
+          /* alloc */
+          { r: baseColor.r, g: baseColor.g, b: baseColor.b }
+        ),
+        support: feature.properties?.cod_ouvrag || `${lon},${lat}`,
+        style: (
+          /* alloc */
+          {
+            top: style.top,
+            bottom: style.bottom ?? 0,
+            color: (
+              /* alloc */
+              { r: crownColor.r, g: crownColor.g, b: crownColor.b }
+            ),
+            trunkColor: trunkColor ? (
+              /* alloc */
+              { r: trunkColor.r, g: trunkColor.g, b: trunkColor.b }
+            ) : void 0,
+            trunkRadius: style.trunkRadius,
+            crownRadius: style.crownRadius,
+            crownBottom: style.crownBottom,
+            crownShape: style.crownShape,
+            poleRadius: style.poleRadius,
+            lightRadius: style.lightRadius,
+            lightFlux: style.lightFlux
+          }
+        )
+      }
+    );
+  }
+
   // src/sources/buildAreaFeature.js
   function buildAreaFeature(context, feature) {
     const { backend: layer, area: area2, map } = context;
@@ -8426,6 +8500,18 @@
     }
     const { top, bottom = 0, color = 14267276 } = style;
     const baseColor = parseColor(color);
+    if (context.jobs) {
+      prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
+      context.featureFaces.push(
+        /* alloc */
+        {
+          id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
+          properties: feature.properties,
+          baseColor
+        }
+      );
+      return;
+    }
     const vertexStart = context.positions.length / 3;
     if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
     let polygon2;
@@ -8495,27 +8581,27 @@
       return;
     }
     const device = rendererByLayer.get(layer).device;
-    const data = instanceAreaGeometry(context);
+    const data = context.preparedGeometry || instanceAreaGeometry(context);
     const attributes = (
       /* alloc */
       {
         position: (
           /* alloc */
-          { size: 3, data: (
+          { size: 3, data: data.positions instanceof Float32Array ? data.positions : (
             /* alloc */
             new Float32Array(data.positions)
           ) }
         ),
         normal: (
           /* alloc */
-          { size: 3, data: (
+          { size: 3, data: data.normals instanceof Float32Array ? data.normals : (
             /* alloc */
             new Float32Array(data.normals)
           ) }
         ),
         color: (
           /* alloc */
-          { size: 3, data: (
+          { size: 3, data: data.colors instanceof Float32Array ? data.colors : (
             /* alloc */
             new Float32Array(data.colors)
           ) }
@@ -8525,10 +8611,13 @@
     if (data.instanceOffsets) attributes.instanceOffset = /* alloc */
     { size: 4, data: data.instanceOffsets };
     if (layer.options.nightLight) attributes.uv = /* alloc */
-    { size: 2, data: (
-      /* alloc */
-      new Float32Array(context.uvs)
-    ) };
+    {
+      size: 2,
+      data: context.uvs instanceof Float32Array ? context.uvs : (
+        /* alloc */
+        new Float32Array(context.uvs)
+      )
+    };
     let name, attribute;
     for (name in attributes) {
       attribute = attributes[name];
@@ -8546,6 +8635,7 @@
       /* alloc */
       {
         device,
+        bounds: data.bounds,
         attributes,
         drawRange: (
           /* alloc */
@@ -8632,6 +8722,163 @@
     );
   }
 
+  // src/globals/geometryWorkerUrl.js
+  var geometryWorkerUrl = void 0 ? new URL("../workers/geometryWorker.js", null.url).href : new URL("leaflet-city-mapper-worker.js", document.currentScript?.src || document.baseURI).href;
+
+  // src/workers/settleGeometryWorker.js
+  function settleGeometryWorker(task, event) {
+    if (event.type === "abort") task.reject(task.signal.reason);
+    else if (event.type === "error") task.reject(
+      /* alloc */
+      new Error(`Geometry worker failed: ${event.message}`)
+    );
+    else if (event.type === "messageerror") task.reject(
+      /* alloc */
+      new Error("Unable to receive geometry worker buffers")
+    );
+    else if (event.data.error) {
+      const error = (
+        /* alloc */
+        new Error(event.data.error.message)
+      );
+      error.name = event.data.error.name;
+      task.reject(error);
+    } else task.resolve(event.data);
+  }
+
+  // src/workers/startGeometryWorker.js
+  function startGeometryWorker(task, resolve, reject) {
+    task.resolve = resolve;
+    task.reject = reject;
+    task.onEvent = settleGeometryWorker.bind(null, task);
+    task.worker.addEventListener("message", task.onEvent);
+    task.worker.addEventListener("error", task.onEvent);
+    task.worker.addEventListener("messageerror", task.onEvent);
+    task.signal.addEventListener(
+      "abort",
+      task.onEvent,
+      /* alloc */
+      { once: true }
+    );
+    if (task.signal.aborted) {
+      reject(task.signal.reason);
+      return;
+    }
+    task.worker.postMessage(task.input);
+  }
+
+  // src/weakmaps/geometryWorkersByMap.js
+  var geometryWorkersByMap = /* @__PURE__ */ new WeakMap();
+
+  // src/workers/closeGeometryWorkers.js
+  function closeGeometryWorkers(pool) {
+    pool.closed = true;
+    let entry;
+    for (entry of pool.entries) {
+      entry.closed = true;
+      entry.worker.terminate();
+      if (entry.task) entry.task.reject(
+        /* alloc */
+        new DOMException("Map removed", "AbortError")
+      );
+    }
+    pool.entries.clear();
+    pool.idle.length = 0;
+  }
+
+  // src/workers/acquireGeometryWorker.js
+  function acquireGeometryWorker(map, url) {
+    let pool = map && geometryWorkersByMap.get(map);
+    if (map && !pool) {
+      pool = /* alloc */
+      { entries: (
+        /* alloc */
+        /* @__PURE__ */ new Set()
+      ), idle: (
+        /* alloc */
+        []
+      ), closed: false };
+      geometryWorkersByMap.set(map, pool);
+      map.once("unload", closeGeometryWorkers.bind(null, pool));
+    }
+    let entry, i;
+    if (pool) {
+      if (pool.closed) throw (
+        /* alloc */
+        new DOMException("Map removed", "AbortError")
+      );
+      for (i = 0; i < pool.idle.length; i++) {
+        if (pool.idle[i].url !== url) continue;
+        entry = pool.idle[i];
+        pool.idle.splice(i, 1);
+        return entry;
+      }
+      entry = pool.idle.pop();
+      if (entry) {
+        entry.closed = true;
+        entry.worker.terminate();
+        pool.entries.delete(entry);
+      }
+    }
+    entry = /* alloc */
+    {
+      url,
+      pool,
+      worker: (
+        /* alloc */
+        new Worker(
+          url,
+          /* alloc */
+          { type: "module" }
+        )
+      )
+    };
+    if (pool) pool.entries.add(entry);
+    return entry;
+  }
+
+  // src/workers/buildAreaInWorker.js
+  async function buildAreaInWorker(context, signal) {
+    const entry = acquireGeometryWorker(context.map || context.backend._map, context.backend.options.workerUrl || geometryWorkerUrl);
+    const { worker, pool } = entry;
+    const task = (
+      /* alloc */
+      {
+        worker,
+        signal,
+        input: (
+          /* alloc */
+          { jobs: context.jobs, nightLight: Boolean(context.backend.options.nightLight) }
+        )
+      }
+    );
+    entry.task = task;
+    let completed = false;
+    try {
+      const data = await /* alloc */
+      new Promise(startGeometryWorker.bind(null, task));
+      let i;
+      for (i = 0; i < data.ranges.length; i++) Object.assign(context.featureFaces[i], data.ranges[i]);
+      context.positions = data.positions;
+      context.uvs = data.uvs;
+      context.lights = data.lights;
+      context.preparedGeometry = data;
+      completed = true;
+    } finally {
+      worker.removeEventListener("message", task.onEvent);
+      worker.removeEventListener("error", task.onEvent);
+      worker.removeEventListener("messageerror", task.onEvent);
+      signal.removeEventListener("abort", task.onEvent);
+      entry.task = null;
+      if (completed && pool && !pool.closed && !signal.aborted) pool.idle.push(entry);
+      else {
+        if (!entry.closed) worker.terminate();
+        if (pool) pool.entries.delete(entry);
+      }
+      context.jobs = null;
+    }
+  }
+
   // src/sources/buildArea.js
   async function buildArea(layer, area2, map) {
     let feature;
@@ -8655,6 +8902,10 @@
         );
       }
       const context = sourceAreaContext(layer, area2, map);
+      if (layer.options.worker !== false && typeof Worker !== "undefined" && data.features.length >= 64) {
+        context.jobs = /* alloc */
+        [];
+      }
       let deadline = performance.now() + 4;
       for (feature of data.features) {
         if (area2.request.signal.aborted) return;
@@ -8666,6 +8917,8 @@
         }
         buildAreaFeature(context, feature);
       }
+      if (context.jobs) await buildAreaInWorker(context, area2.request.signal);
+      if (area2.request.signal.aborted) return;
       attachAreaMesh(context);
     } catch (error) {
       if (!area2.request.signal.aborted) {

@@ -18,14 +18,16 @@ export function attachAreaMesh(context) {
     return;
   }
   const device = rendererByLayer.get(layer).device;
-  const data = instanceAreaGeometry(context);
+  const data = context.preparedGeometry || instanceAreaGeometry(context);
   const attributes = /* alloc */ {
-    position: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.positions) },
-    normal: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.normals) },
-    color: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(data.colors) },
+    position: /* alloc */ { size: 3, data: data.positions instanceof Float32Array ? data.positions : /* alloc */ new Float32Array(data.positions) },
+    normal: /* alloc */ { size: 3, data: data.normals instanceof Float32Array ? data.normals : /* alloc */ new Float32Array(data.normals) },
+    color: /* alloc */ { size: 3, data: data.colors instanceof Float32Array ? data.colors : /* alloc */ new Float32Array(data.colors) },
   };
   if (data.instanceOffsets) attributes.instanceOffset = /* alloc */ { size: 4, data: data.instanceOffsets };
-  if (layer.options.nightLight) attributes.uv = /* alloc */ { size: 2, data: /* alloc */ new Float32Array(context.uvs) };
+  if (layer.options.nightLight) attributes.uv = /* alloc */ {
+    size: 2, data: context.uvs instanceof Float32Array ? context.uvs : /* alloc */ new Float32Array(context.uvs),
+  };
   let name, attribute;
   for (name in attributes) {
     attribute = attributes[name];
@@ -38,6 +40,7 @@ export function attachAreaMesh(context) {
   }
   const meshGeometry = /* alloc */ {
     device,
+    bounds: data.bounds,
     attributes,
     drawRange: /* alloc */ { start: 0, count: attributes.position.count },
   };

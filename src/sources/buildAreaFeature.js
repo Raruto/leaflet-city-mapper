@@ -4,6 +4,7 @@ import { buildAreaPolygon } from '../geometry/buildExtrudedPolygon.js';
 import { parseColor } from '../colors/parseColor.js';
 import { featureAnchor } from './featureAnchor.js';
 import { extrusionStyle } from './extrusionStyle.js';
+import { prepareAreaGeometryJob } from './prepareAreaGeometryJob.js';
 
 export function buildAreaFeature(context, feature) {
   const { backend: layer, area, map } = context;
@@ -22,6 +23,14 @@ export function buildAreaFeature(context, feature) {
   }
   const { top, bottom = 0, color = 0xd9b38c } = style;
   const baseColor = parseColor(color);
+  if (context.jobs) {
+    prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
+    context.featureFaces.push(/* alloc */ {
+      id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
+      properties: feature.properties, baseColor,
+    });
+    return;
+  }
   const vertexStart = context.positions.length / 3;
   if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
   let polygon;

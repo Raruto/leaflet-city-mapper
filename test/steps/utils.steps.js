@@ -96,11 +96,12 @@ import { ring as treeRing } from '../../src/geometry/createTreeRing.js';
 
 Then('the build generates readable and minified bundles and standalone compatibility files', async function () {
   const load = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
-  const [minified, readable, bindings, minifiedBindings] = await Promise.all([
+  const [minified, readable, bindings, minifiedBindings, worker] = await Promise.all([
     'dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
     'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
+    'dist/leaflet-city-mapper-worker.js',
   ].map(load));
-  for (const source of [minified, readable, bindings, minifiedBindings]) assert.doesNotThrow(() => new Script(source));
+  for (const source of [minified, readable, bindings, minifiedBindings, worker]) assert.doesNotThrow(() => new Script(source));
   assert.ok(readable.length > minified.length);
   assert.ok(readable.split('\n').length > minified.split('\n').length * 10);
   assert.ok(minifiedBindings.length < bindings.length);
@@ -109,7 +110,7 @@ Then('the build generates readable and minified bundles and standalone compatibi
     assert.ok(source.includes('openlayersBindings'));
   }
   for (const path of ['dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
-    'libs/openlayers-bindings.min.js']) {
+    'dist/leaflet-city-mapper-worker.js', 'libs/openlayers-bindings.min.js']) {
     const source = await load(path), map = JSON.parse(await load(`${path}.map`));
     assert.ok(source.includes(`sourceMappingURL=${path.split('/').pop()}.map`));
     assert.ok(map.sources.length > 0);
@@ -117,7 +118,8 @@ Then('the build generates readable and minified bundles and standalone compatibi
     assert.ok(map.sources.every(name => path.startsWith('dist/') ? name.startsWith('../src/') : !name.includes('examples/')));
     if (path.startsWith('dist/')) {
       assert.ok(map.sources.every(name => !name.includes('openlayers-bindings')));
-      assert.ok(map.sourcesContent.some(content => content.includes('/* wgsl */')));
+      if (path.endsWith('-worker.js')) assert.ok(map.sourcesContent.some(content => content.includes('assembleAreaGeometry')));
+      else assert.ok(map.sourcesContent.some(content => content.includes('/* wgsl */')));
     }
   }
 });

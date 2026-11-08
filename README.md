@@ -100,6 +100,7 @@ src/
   layer-controls/    Layer entry placement and progress indicators
   scene/             Source routing, lifecycle and graph nodes
   sources/           GeoJSON and streamed source loading and assembly
+  workers/           Cancellable geometry tasks and worker entry point
   picking/           Raycasting, highlighting and feature interaction
   rendering/         Frame stages, draw pipelines and mesh lifecycle
   gpu/               Device initialization, renderer resources and diagnostics

@@ -54,6 +54,7 @@ BeforeAll({ timeout: 900000 }, async () => {
     entryPoints: ['test/fixtures/plugin.js'],
     bundle: true,
     format: 'iife',
+    define: { 'import.meta': 'null' },
     minify: true,
     write: false,
   });

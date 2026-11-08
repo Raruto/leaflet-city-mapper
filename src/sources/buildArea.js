@@ -8,6 +8,7 @@ import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
 import { sourceAreaContext } from './sourceAreaContext.js';
 import { pump } from './pumpSourceAreas.js';
+import { buildAreaInWorker } from '../workers/buildAreaInWorker.js';
 
 export async function buildArea(layer, area, map) {
   let feature;
@@ -24,6 +25,10 @@ export async function buildArea(layer, area, map) {
       throw /* alloc */ new Error('style must be a function');
     }
     const context = sourceAreaContext(layer, area, map);
+    // ponytail: feature-count cutoff avoids startup overhead; count vertices if giant single polygons matter.
+    if (layer.options.worker !== false && typeof Worker !== 'undefined' && data.features.length >= 64) {
+      context.jobs = /* alloc */ [];
+    }
     let deadline = performance.now() + 4;
     for (feature of data.features) {
       if (area.request.signal.aborted) return;
@@ -34,6 +39,8 @@ export async function buildArea(layer, area, map) {
       }
       buildAreaFeature(context, feature);
     }
+    if (context.jobs) await buildAreaInWorker(context, area.request.signal);
+    if (area.request.signal.aborted) return;
     attachAreaMesh(context);
   } catch (error) {
     if (!area.request.signal.aborted) {
