@@ -14,6 +14,18 @@
 				padding: 0;
 			}
 			.leaflet-pitch-sky { overflow: hidden; }
+			@media (min-width: 1024px) {
+				.leaflet-control-layers:not(.leaflet-control-layers-expanded) {
+					padding: 6px 10px 6px 6px;
+				}
+				.leaflet-control-layers .leaflet-control-layers-toggle {
+					display: none;
+				}
+				.leaflet-control-layers .leaflet-control-layers-list {
+					display: block;
+					position: relative;
+				}
+			}
 		</style>
 	</head>
 	<body>
@@ -280,7 +292,7 @@
 					}),
 				]).addTo(map),
 				'Time': new L.Control.Time().layer.addTo(map),
-			}, { collapsed: false }).addTo(map);
+			}, { collapsed: true }).addTo(map);
 
 			// Third-person walk from the map centre, W/S to run, A/D to turn, drag to look around, Esc to exit.
 			const walk = new L.Control.Walk().addTo(map);

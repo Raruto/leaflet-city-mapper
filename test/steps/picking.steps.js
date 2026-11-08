@@ -3,6 +3,117 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
+import { onPointerMove } from '../../src/picking/onPointerMove.js';
+import { hoveredFeatureByLayer } from '../../src/weakmaps/hoveredFeatureByLayer.js';
+import { highlightedFeatureByLayer } from '../../src/weakmaps/highlightedFeatureByLayer.js';
+import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
+import { cameraByLayer } from '../../src/weakmaps/cameraByLayer.js';
+import { rendererByLayer } from '../../src/weakmaps/rendererByLayer.js';
+
+Then('pressed buttons, map dragging and zoom animation suspend hover picking', function () {
+  const events = [];
+  let moving = false;
+  const layer = { _map: { dragging: { moving: () => moving } }, fire: (...args) => events.push(args) };
+  const feature = { mesh: { highlight: [0, 3] }, vertexStart: 0 };
+  rootByLayer.set(layer, { get children() { throw new Error('Picking must not run during a gesture'); } });
+  cameraByLayer.set(layer, {});
+  rendererByLayer.set(layer, {});
+  try {
+    for (const mode of ['left', 'right', 'middle', 'drag', 'zoom']) {
+      hoveredFeatureByLayer.set(layer, feature);
+      highlightedFeatureByLayer.set(layer, feature);
+      feature.mesh.highlight = [0, 3];
+      moving = mode === 'drag';
+      layer._map._animatingZoom = mode === 'zoom';
+      const event = { buttons: { left: 1, right: 2, middle: 4 }[mode] || 0 };
+      const before = events.length;
+      onPointerMove(layer, event);
+      assert.equal(hoveredFeatureByLayer.get(layer), null);
+      assert.equal(highlightedFeatureByLayer.get(layer), null);
+      assert.equal(feature.mesh.highlight, null);
+      assert.equal(events.length, before + 1);
+      assert.equal(events.at(-1)[1].feature, null);
+      onPointerMove(layer, event);
+      assert.equal(events.length, before + 1, 'Clear hover only once per gesture');
+    }
+    moving = layer._map._animatingZoom = false;
+    rootByLayer.set(layer, { children: [] });
+    rendererByLayer.delete(layer);
+    onPointerMove(layer, { buttons: 0 });
+    assert.equal(events.at(-1)[1].originalEvent.buttons, 0, 'Resume normal hover after the gesture');
+  } finally {
+    for (const field of [hoveredFeatureByLayer, highlightedFeatureByLayer, rootByLayer, cameraByLayer, rendererByLayer]) field.delete(layer);
+  }
+});
+
+Then('dragging keeps GPU traffic animated without hover picking or lane requests', { timeout: 60000 }, async function () {
+  let requests = 0;
+  await this.context.route('**/drag-lanes.geojson', route => {
+    requests++;
+    return route.fulfill({ json: { type: 'FeatureCollection', features: [{
+      type: 'Feature', properties: { flow: 1200, elevation: 0 },
+      geometry: { type: 'LineString', coordinates: [[2.29, 48.85826], [2.3, 48.85826]] },
+    }] } });
+  });
+  await this.page.evaluate(async () => {
+    window.dragTraffic = new L.Layer({ source: { type: 'traffic', url: 'drag-lanes.geojson', speed: 8 } }).addTo(test3d.map);
+    await globals.sceneByLayer.get(dragTraffic).ready;
+    window.dragHovers = 0;
+    dragTraffic.on('featurehover', () => dragHovers++);
+    window.readDragVehicle = async () => {
+      const state = globals.trafficByLayer.get(dragTraffic), { device } = state.gpu;
+      const buffer = device.createBuffer({ size: 12, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+      const encoder = device.createCommandEncoder();
+      encoder.copyBufferToBuffer(state.mesh.geometry.attributes.position.buffer, 0, buffer, 0, 12);
+      device.queue.submit([encoder.finish()]);
+      await buffer.mapAsync(GPUMapMode.READ);
+      const values = [...new Float32Array(buffer.getMappedRange())];
+      buffer.unmap(); buffer.destroy();
+      return values;
+    };
+  });
+  await this.page.waitForFunction(() => globals.trafficByLayer.get(dragTraffic)?.mesh);
+  const container = this.page.locator('#first'), rect = await container.boundingBox();
+  await this.page.mouse.move(rect.x + 180, rect.y + 150);
+  const before = await this.page.evaluate(() => readDragVehicle());
+  await this.page.mouse.down();
+  try {
+    await this.page.mouse.move(rect.x + 200, rect.y + 170, { steps: 5 });
+    const start = await this.page.evaluate(() => {
+      window.dragFrames = 0;
+      const owner = globals.sceneByLayer.get(dragTraffic)._shared;
+      const context = globals.sceneByLayer.get(owner).renderer.context;
+      const original = context.getCurrentTexture;
+      window.restoreDragContext = () => { context.getCurrentTexture = original; };
+      context.getCurrentTexture = function () { dragFrames++; return original.call(this); };
+      return { hovers: dragHovers, center: test3d.map.getCenter() };
+    });
+    for (let i = 0; i < 20; i++) {
+      await this.page.mouse.move(rect.x + 200 + i * 2, rect.y + 170);
+      await this.page.waitForTimeout(25);
+    }
+    const result = await this.page.evaluate(async () => ({
+      after: await readDragVehicle(), hovers: dragHovers, frames: dragFrames,
+      center: test3d.map.getCenter(), moving: test3d.map.dragging.moving(),
+      stale: globals.trafficByLayer.get(dragTraffic).stale,
+    }));
+    assert.equal(result.moving, true);
+    assert.equal(result.hovers, start.hovers, 'Do not raycast while dragging');
+    assert.equal(result.stale, true, 'Do not reconstruct GPU traffic vertices on the CPU');
+    assert.ok(result.frames >= 2, 'Render vehicles while the mouse is still held');
+    assert.ok(result.after.some((value, i) => Math.abs(value - before[i]) > 0.05), 'GPU vertices must move before mouseup');
+    assert.notDeepEqual(result.center, start.center);
+    assert.equal(requests, 1, 'Panning must not reload traffic lanes');
+  } finally {
+    await this.page.evaluate(() => window.restoreDragContext?.());
+    await this.page.mouse.up();
+  }
+  await this.page.waitForTimeout(300);
+  const hovers = await this.page.evaluate(() => dragHovers);
+  await this.page.mouse.move(rect.x + 245, rect.y + 175);
+  assert.ok(await this.page.evaluate(() => dragHovers) > hovers, 'Resume hover after mouseup');
+  await this.page.evaluate(() => dragTraffic.remove());
+});
 
 Then('DOM tooltip content stays inside the map without interpreting text as HTML', async function () {
   const result = await this.page.evaluate(async () => {

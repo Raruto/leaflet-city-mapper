@@ -12309,6 +12309,10 @@
 
   // src/picking/onPointerMove.js
   function onPointerMove(layer, event) {
+    if (event.buttons || layer._map.dragging?.moving() || layer._map._animatingZoom) {
+      if (hoveredFeatureByLayer.get(layer)) onPointerLeave(layer);
+      return;
+    }
     hoveredFeatureByLayer.set(layer, findFeature(layer, event));
     setHighlight(layer, hoveredFeatureByLayer.get(layer));
     showFeature(layer, hoveredFeatureByLayer.get(layer), event);

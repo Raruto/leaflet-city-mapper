@@ -1,5 +1,13 @@
 @coverage
 Feature: Picking and tooltips
+  @unit
+  Scenario: Dragging skips expensive picking and clears transient hover once
+    Then pressed buttons, map dragging and zoom animation suspend hover picking
+
+  Scenario: Vehicles keep moving while dragging without HTTP reloads
+    Given a leaflet map
+    Then dragging keeps GPU traffic animated without hover picking or lane requests
+
   Scenario: DOM tooltips stay inside the map and restore the previous cursor
     Given a leaflet map
     Then DOM tooltip content stays inside the map without interpreting text as HTML
