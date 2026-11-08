@@ -1929,10 +1929,12 @@
       [-Infinity, -Infinity, -Infinity]
     );
     const data = geometry.attributes.position.data;
-    let i;
-    for (i = 0; i < data.length; i++) {
-      min[i % 3] = Math.min(min[i % 3], data[i]);
-      max[i % 3] = Math.max(max[i % 3], data[i]);
+    let i, x, y, z;
+    for (i = 0; i < data.length; i += 3) {
+      x = data[i], y = data[i + 1], z = data[i + 2];
+      min[0] = Math.min(min[0], x), max[0] = Math.max(max[0], x);
+      min[1] = Math.min(min[1], y), max[1] = Math.max(max[1], y);
+      min[2] = Math.min(min[2], z), max[2] = Math.max(max[2], z);
     }
     const instances = geometry.attributes.instanceOffset;
     if (instances) {
@@ -1956,13 +1958,21 @@
         (min[2] + max[2]) / 2
       ]
     );
-    let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : 0;
+    let radiusSquared = 0;
     for (i = 0; !instances && i < data.length; i += 3) {
-      radius = Math.max(radius, Math.hypot(
-        data[i] - center[0],
-        data[i + 1] - center[1],
-        data[i + 2] - center[2]
-      ));
+      x = data[i] - center[0], y = data[i + 1] - center[1], z = data[i + 2] - center[2];
+      radiusSquared = Math.max(radiusSquared, x * x + y * y + z * z);
+    }
+    let radius = instances ? Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 : Math.sqrt(radiusSquared);
+    if (!instances && (radiusSquared === Infinity || radiusSquared < Number.MIN_VALUE / Number.EPSILON)) {
+      radius = 0;
+      for (i = 0; i < data.length; i += 3) {
+        radius = Math.max(radius, Math.hypot(
+          data[i] - center[0],
+          data[i + 1] - center[1],
+          data[i + 2] - center[2]
+        ));
+      }
     }
     geometry.bounds = /* alloc */
     { min, max, center, radius };
@@ -3235,12 +3245,13 @@
     if (geometry.attributes.uv) pass.setVertexBuffer(3, geometry.attributes.uv.buffer);
     const instances = geometry.attributes.instanceOffset;
     if (instances) pass.setVertexBuffer(4, instances.buffer);
-    let attribute;
-    for (attribute of Object.values(geometry.attributes)) {
+    let name, attribute;
+    for (name in geometry.attributes) {
+      attribute = geometry.attributes[name];
       if (!attribute.needsUpdate) continue;
       device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
       attribute.needsUpdate = false;
-      geometry.bounds = null;
+      if (name === "position" || name === "instanceOffset") geometry.bounds = null;
     }
     const index = geometry.attributes.index;
     if (index) {
@@ -10558,14 +10569,14 @@
   }
 
   // src/models/buildModelNodes.js
-  function buildModelNodes(context, scene2) {
+  function buildModelNodes(context, scene) {
     const nodes = (
       /* alloc */
       []
     );
     let index;
     try {
-      for (index of scene2.nodes) nodes.push(modelNode(context, index));
+      for (index of scene.nodes) nodes.push(modelNode(context, index));
     } catch (error) {
       releaseModelResources(context);
       throw error;
@@ -10612,12 +10623,12 @@
     );
     const images = await loadModelResources(layer, description, directory);
     const context = createModelContext(layer, description, images);
-    const scene2 = description.scenes?.[description.scene || 0];
-    if (!scene2) throw (
+    const scene = description.scenes?.[description.scene || 0];
+    if (!scene) throw (
       /* alloc */
       new Error("Missing glTF scene")
     );
-    const nodes = buildModelNodes(context, scene2);
+    const nodes = buildModelNodes(context, scene);
     const model = (
       /* alloc */
       {
@@ -10783,18 +10794,19 @@
   }
 
   // src/layer-controls/layerCountTitle.js
-  function layerCountTitle(scene2, formatted, pending, error) {
-    return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${scene2.modelUrl ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
+  function layerCountTitle(layer, formatted, pending, error) {
+    return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${modelUrlByLayer.get(layer) ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
   }
 
   // src/layer-controls/renderLayerCount.js
-  function renderLayerCount(scene2, count, pending, error) {
-    const status = scene2._countStatus;
-    if (scene2.modelUrl) count = scene2.model ? 1 : 0;
-    const loading2 = pending || (scene2.modelUrl ? !scene2.model : !scene2.header && !scene2._geojson);
+  function renderLayerCount(layer, count, pending, error) {
+    const status = countStatusByLayer.get(layer);
+    const modelUrl = modelUrlByLayer.get(layer), model = modelByLayer.get(layer);
+    if (modelUrl) count = model ? 1 : 0;
+    const loading2 = pending || (modelUrl ? !model : !headerByLayer.get(layer) && !geojsonByLayer.get(layer));
     const formatted = count.toLocaleString("en-US");
     const text = error ? "Error" : `${formatted}${loading2 ? "\u2026" : ""}`;
-    const title = layerCountTitle(scene2, formatted, pending, error);
+    const title = layerCountTitle(layer, formatted, pending, error);
     if (status.textContent !== text) status.textContent = text;
     if (status.title !== title) status.title = title;
     if (error && status.getAttribute("role") !== "alert") status.setAttribute("role", "alert");
@@ -10818,7 +10830,7 @@
         error ||= area2.error;
       }
     }
-    renderLayerCount(scene, count, pending, error);
+    renderLayerCount(layer, count, pending, error);
   }
 
   // src/scene/init3D.js

@@ -11,6 +11,85 @@ import { terrainAtlas } from '../../src/terrain/terrainAtlas.js';
 import { terrainElevation } from '../../src/terrain/terrainElevation.js';
 import { terrainGrid } from '../../src/geometry/terrainGrid.js';
 import { terrainBuffers } from '../../src/geometry/terrainBuffers.js';
+import { computeBounds } from '../../src/geometry/computeBounds.js';
+import { updateLayerCount } from '../../src/layer-controls/updateLayerCount.js';
+import { countStatusByLayer } from '../../src/weakmaps/countStatusByLayer.js';
+import { areasByLayer } from '../../src/weakmaps/areasByLayer.js';
+import { headerByLayer } from '../../src/weakmaps/headerByLayer.js';
+import { modelUrlByLayer } from '../../src/weakmaps/modelUrlByLayer.js';
+import { modelByLayer } from '../../src/weakmaps/modelByLayer.js';
+import { geojsonByLayer } from '../../src/weakmaps/geojsonByLayer.js';
+
+Then('mesh bounds match vertex distances for static and instanced geometry', function () {
+  for (const data of [
+    [-1, 0, -2, 3, 4, 2],
+    [7, -3, 5],
+    Array.from({ length: 3000 }, (_, i) => Math.sin(i) * 1000),
+    [-3e38, 0, 0, 3e38, 1e-38, 0],
+  ]) {
+    const positions = Float32Array.from(data);
+    const geometry = { attributes: { position: { data: positions } } };
+    computeBounds(geometry);
+    const { min, max, center, radius } = geometry.bounds;
+    for (let axis = 0; axis < 3; axis++) {
+      const values = Array.from(positions).filter((_, i) => i % 3 === axis);
+      assert.equal(min[axis], Math.min(...values));
+      assert.equal(max[axis], Math.max(...values));
+      assert.equal(center[axis], (min[axis] + max[axis]) / 2);
+    }
+    let expected = 0;
+    for (let i = 0; i < positions.length; i += 3) {
+      expected = Math.max(expected, Math.hypot(
+        positions[i] - center[0], positions[i + 1] - center[1], positions[i + 2] - center[2]));
+    }
+    assert.ok(Math.abs(radius - expected) <= Math.max(1, expected) * 1e-14);
+    geometry.attributes.instanceOffset = { size: 4, data: Float32Array.from([-10, 2, -3, 0, 5, -4, 7, 0]) };
+    computeBounds(geometry);
+    assert.deepEqual(geometry.bounds.min, [Math.fround(min[0] - 10), Math.fround(min[1] - 4), Math.fround(min[2] - 3)]);
+    assert.deepEqual(geometry.bounds.max, [Math.fround(max[0] + 5), Math.fround(max[1] + 2), Math.fround(max[2] + 7)]);
+    assert.equal(geometry.bounds.radius, Math.hypot(...geometry.bounds.max.map((value, i) => value - geometry.bounds.min[i])) / 2);
+  }
+  for (const value of [1e200, 1e-200, 1e-160]) {
+    const geometry = { attributes: { position: { data: [-value, -value, -value, value, value, value] } } };
+    computeBounds(geometry);
+    assert.ok(Math.abs(geometry.bounds.radius / Math.hypot(value, value, value) - 1) < 1e-14);
+  }
+});
+
+Then('loading indicators use layer state and retain error accessibility', function () {
+  const attributes = new Map();
+  const status = { textContent: '', title: '',
+    getAttribute: name => attributes.get(name),
+    setAttribute: (name, value) => attributes.set(name, value),
+    hasAttribute: name => attributes.has(name),
+    removeAttribute: name => attributes.delete(name) };
+  const layer = { _map: {} };
+  countStatusByLayer.set(layer, status);
+  areasByLayer.set(layer, new Map([['tile', { buildings: 2, done: true }]]));
+  headerByLayer.set(layer, {});
+  updateLayerCount({ target: layer, type: 'progress' });
+  assert.equal(status.textContent, '2');
+  updateLayerCount({ target: layer, type: 'progress', loaded: 3, pending: 1 });
+  assert.equal(status.textContent, '3…');
+  assert.match(status.title, /1 blocks loading/);
+  updateLayerCount({ target: layer, type: 'error', error: new Error('Broken tile') });
+  assert.equal(status.textContent, 'Error');
+  assert.equal(status.getAttribute('role'), 'alert');
+  assert.match(status.title, /Broken tile/);
+  modelUrlByLayer.set(layer, 'model.glb');
+  updateLayerCount({ target: layer, type: 'progress', loaded: 0 });
+  assert.equal(status.textContent, '0…');
+  assert.equal(status.hasAttribute('role'), false);
+  modelByLayer.set(layer, {});
+  updateLayerCount({ target: layer, type: 'ready' });
+  assert.equal(status.textContent, '1');
+  assert.match(status.title, /models/);
+  modelUrlByLayer.delete(layer);
+  headerByLayer.delete(layer);
+  geojsonByLayer.set(layer, true);
+  updateLayerCount({ target: layer, type: 'ready' });
+  assert.equal(status.textContent, '2');
+});
 
 Then('terrain allocation results preserve grid topology and no-data sampling', function () {
   for (const divisions of [1, 2, 4, 64]) {
@@ -171,6 +250,16 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     assert.equal(geometry.bounds, null);
     assert.deepEqual(writes.at(-1), [geometry.attributes.position.buffer, 0, geometry.attributes.position.data]);
     assert.deepEqual(draws.at(-1), ['plain', geometry.drawRange.count, 3, geometry.drawRange.start, 0]);
+    for (const name of ['normal', 'color', 'uv', 'instanceOffset']) {
+      geometry.attributes[name] ||= { buffer: {}, data: new Float32Array(4) };
+      geometry.attributes[name].data ||= new Float32Array(4);
+      geometry.attributes[name].needsUpdate = true;
+      const bounds = geometry.bounds = {};
+      drawGeometry(backend, mesh, pass, 'front', 'cw');
+      assert.equal(geometry.attributes[name].needsUpdate, false);
+      assert.equal(geometry.bounds, name === 'instanceOffset' ? null : bounds);
+      assert.deepEqual(writes.at(-1), [geometry.attributes[name].buffer, 0, geometry.attributes[name].data]);
+    }
     textured.uniforms.baseTexture.value = null;
     assert.throws(() => drawGeometry(backend, mesh, pass, 'front', 'cw'), /Missing Layer3D texture: baseTexture/);
     assert.equal(globals.drawMeshEntry.resource.buffer, null);

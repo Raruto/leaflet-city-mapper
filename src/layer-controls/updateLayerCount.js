@@ -20,5 +20,5 @@ export function updateLayerCount(event) {
       error ||= area.error;
     }
   }
-  renderLayerCount(scene, count, pending, error);
+  renderLayerCount(layer, count, pending, error);
 }

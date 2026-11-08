@@ -25,12 +25,13 @@ export function drawGeometry(layer, mesh, pass, cullMode, frontFace) {
   if (geometry.attributes.uv) pass.setVertexBuffer(3, geometry.attributes.uv.buffer);
   const instances = geometry.attributes.instanceOffset;
   if (instances) pass.setVertexBuffer(4, instances.buffer);
-  let attribute;
-  for (attribute of Object.values(geometry.attributes)) {
+  let name, attribute;
+  for (name in geometry.attributes) {
+    attribute = geometry.attributes[name];
     if (!attribute.needsUpdate) continue;
     device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
     attribute.needsUpdate = false;
-    geometry.bounds = null;
+    if (name === 'position' || name === 'instanceOffset') geometry.bounds = null;
   }
   const index = geometry.attributes.index;
   if (index) {
