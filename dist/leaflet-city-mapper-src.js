@@ -2581,6 +2581,7 @@
 
   // src/rendering/revealRoofMesh.js
   function revealRoofMesh(layer, mesh, rasters, now) {
+    let raster, loading2;
     if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
     if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
       if (walkByMap.get(layer._map)?.control?._walk?.saved) {
@@ -2591,7 +2592,14 @@
         mesh._roofCoverageSignature = roofRasterByLayer.get(layer)?.signature;
         mesh._roofCovered = roofCoverage(mesh, layer, rasters);
       }
-      if (!mesh._roofRevealed && !mesh._roofCovered && rasters.some((raster) => !headerByLayer.get(raster) || loadingTilesByLayer.get(raster) > 0)) {
+      loading2 = false;
+      for (raster of rasters) {
+        if (!headerByLayer.get(raster) || loadingTilesByLayer.get(raster) > 0) {
+          loading2 = true;
+          break;
+        }
+      }
+      if (!mesh._roofRevealed && !mesh._roofCovered && loading2) {
         mesh._appearance = 0;
         return false;
       }
