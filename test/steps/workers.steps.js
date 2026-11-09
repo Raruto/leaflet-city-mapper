@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { Script } from 'node:vm';
 import { build } from 'esbuild';
 import { Then } from '@cucumber/cucumber';
 import { mockLeaflet } from '../fixtures/leaflet.js';
@@ -11,6 +12,45 @@ import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
 import { buildAreaInWorker } from '../../src/workers/buildAreaInWorker.js';
 import { geometryWorkersByMap } from '../../src/weakmaps/geometryWorkersByMap.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
+import { feature, tile } from '../fixtures/vector-tile.js';
+
+Then('the shared worker dispatches geometry and vector tiles with isolated responses', async function () {
+  for (const file of ['dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js']) {
+    const listeners = [], responses = [];
+    new Script(await readFile(file, 'utf8')).runInNewContext({
+      TextDecoder, Uint8Array, ArrayBuffer,
+      self: {
+        addEventListener(type, handler) { assert.equal(type, 'message'); listeners.push(handler); },
+        postMessage(data, transfers) { responses.push({ data, transfers }); },
+      },
+    });
+    assert.equal(listeners.length, 1, 'Only the shared entry point registers a message handler');
+    const message = data => {
+      const count = responses.length;
+      listeners[0]({ data });
+      assert.equal(responses.length, count + 1, 'Each request produces exactly one response');
+      return responses.at(-1);
+    };
+    const geometry = message({ jobs: [], nightLight: false });
+    assert.equal(geometry.data.positions.length, 0);
+    assert.equal(geometry.transfers.length, 4);
+    const input = {
+      type: 'vector', id: 7, buffer: tile([feature(2, [9, 0, 0, 10, 20, 20])]),
+      coords: { z: 0, x: 0, y: 0 }, zoom: 0,
+      style: [{ id: 'line', type: 'line', 'source-layer': 'test', paint: { 'line-width': 2 } }],
+    };
+    const vector = message(input);
+    assert.equal(vector.data.id, 7);
+    assert.equal(vector.data.error, undefined);
+    assert.equal(vector.data.batches.length, 1);
+    assert.equal(vector.data.batches[0].kind, 'line');
+    assert.equal(vector.data.labels.length, 0);
+    const failure = message({ ...input, id: 8, buffer: new Uint8Array([0]) });
+    assert.equal(failure.data.id, 8);
+    assert.match(failure.data.error, /MVT/);
+    assert.equal(message({ jobs: [], nightLight: false }).data.positions.length, 0);
+  }
+});
 
 Then('prepared geometry matches CPU vertices, lights, ranges and instancing', function () {
   const previous = mockLeaflet({ LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } });
@@ -295,6 +335,112 @@ Then('cross-origin geometry workers preserve results, report failures and releas
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+Then('cross-origin vector tile workers preserve results and release blob URLs on every exit',
+  { timeout: 60000 }, async function () {
+    const bundle = await readFile('dist/leaflet-city-mapper-worker.js');
+    const plugin = await build({
+      stdin: {
+        contents: `
+          import { onVectorTileAdd } from './src/vector-tiles/onVectorTileAdd.js';
+          import { onVectorTileRemove } from './src/vector-tiles/onVectorTileRemove.js';
+          import { vectorTileOptionsByLayer } from './src/weakmaps/vectorTileOptionsByLayer.js';
+          globalThis.vectorWorkerTest = { onVectorTileAdd, onVectorTileRemove, vectorTileOptionsByLayer };`,
+        resolveDir: process.cwd(),
+      },
+      bundle: true, format: 'iife', define: { 'import.meta': 'null' }, write: false,
+    });
+    const requests = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url);
+      response.setHeader('Access-Control-Allow-Origin', '*');
+      response.setHeader('Content-Type', 'text/javascript');
+      if (request.url === '/plugin.js') response.end(plugin.outputFiles[0].text);
+      else if (request.url === '/leaflet-city-mapper-worker.js') response.end("import './actual.js';");
+      else if (request.url === '/actual.js') response.end(bundle);
+      else response.writeHead(404).end('Not found');
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      await this.page.goto(this.baseUrl);
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      await this.page.addScriptTag({ url: `${origin}/plugin.js` });
+      const bytes = [...tile([feature(2, [9, 0, 0, 10, 20, 20])])];
+      const result = await this.page.evaluate(async ({ origin, bytes }) => {
+        const { onVectorTileAdd, onVectorTileRemove, vectorTileOptionsByLayer } = vectorWorkerTest;
+        const created = [], revoked = [];
+        const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
+        URL.createObjectURL = blob => { const url = create.call(URL, blob); created.push(url); return url; };
+        URL.revokeObjectURL = url => { revoked.push(url); revoke.call(URL, url); };
+        const map = { on() {}, off() {} };
+        const layers = [];
+        const open = workerUrl => {
+          const errors = Promise.withResolvers();
+          const layer = { options: { workerUrl }, update() {}, fire(type, event) {
+            if (type === 'error') errors.resolve(event.error.message);
+          } };
+          vectorTileOptionsByLayer.set(layer, { style: [], pane: 'test' });
+          onVectorTileAdd.call(layer, map);
+          layers.push(layer);
+          return { layer, errors };
+        };
+        const close = layer => {
+          onVectorTileRemove.call(layer, map);
+          layers.splice(layers.indexOf(layer), 1);
+        };
+        const send = async (layer, id, bytes) => {
+          const pending = Promise.withResolvers(), buffer = new Uint8Array(bytes).buffer;
+          layer.waiting.set(id, pending);
+          layer.worker.postMessage({
+            type: 'vector', id, buffer, coords: { z: 0, x: 0, y: 0 }, zoom: 0,
+            style: [{ id: 'line', type: 'line', 'source-layer': 'test', paint: { 'line-width': 2 } }],
+          }, [buffer]);
+          if (buffer.byteLength !== 0) throw new Error('Tile buffer was not transferred');
+          return pending.promise;
+        };
+        try {
+          const { layer } = open();
+          let invalid = '';
+          try { await send(layer, 1, [0]); } catch (error) { invalid = error.message; }
+          const data = await send(layer, 2, bytes);
+          const releasedAfterResponse = revoked.length === 1;
+          close(layer);
+          const early = open().layer;
+          close(early);
+          const missing = open(`${origin}/missing.js`);
+          const failure = await missing.errors.promise;
+          close(missing.layer);
+          const NativeWorker = globalThis.Worker;
+          let constructorError = '';
+          try {
+            globalThis.Worker = class { constructor() { throw new Error('Worker blocked'); } };
+            open();
+          } catch (error) { constructorError = error.message; }
+          finally { globalThis.Worker = NativeWorker; }
+          return { created, revoked, releasedAfterResponse, invalid, failure, constructorError,
+            id: data.id, batches: data.batches.length, kind: data.batches[0].kind };
+        } finally {
+          for (const layer of [...layers]) close(layer);
+          URL.createObjectURL = create;
+          URL.revokeObjectURL = revoke;
+        }
+      }, { origin, bytes });
+      assert.equal(result.created.length, 4);
+      assert.deepEqual(result.revoked, result.created);
+      assert.equal(result.releasedAfterResponse, true);
+      assert.match(result.invalid, /MVT/);
+      assert.match(result.failure, /Worker MVT:/);
+      assert.equal(result.constructorError, 'Worker blocked');
+      assert.equal(result.id, 2);
+      assert.equal(result.batches, 1);
+      assert.equal(result.kind, 'line');
+      assert.ok(requests.includes('/leaflet-city-mapper-worker.js'), 'Resolve worker relative to CDN plugin');
+      assert.ok(requests.includes('/actual.js'), 'Keep relative imports anchored to the CDN URL');
+      assert.ok(requests.includes('/missing.js'));
+    } finally {
+      await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
 
 Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancellation', { timeout: 60000 }, async function () {
   let workers = 0;

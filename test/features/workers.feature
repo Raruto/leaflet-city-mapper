@@ -1,5 +1,9 @@
 Feature: Geometry worker ownership
   @unit
+  Scenario: One worker bundle handles geometry and vector tiles
+    Then the shared worker dispatches geometry and vector tiles with isolated responses
+
+  @unit
   Scenario: Prepared geometry preserves the CPU extrusion and point pipelines
     Then prepared geometry matches CPU vertices, lights, ranges and instancing
 
@@ -12,6 +16,9 @@ Feature: Geometry worker ownership
 
   Scenario: Cross-origin geometry workers load with CORS
     Then cross-origin geometry workers preserve results, report failures and release blob URLs
+
+  Scenario: Cross-origin vector tile workers load with CORS
+    Then cross-origin vector tile workers preserve results and release blob URLs on every exit
 
   @coverage
   Scenario: Large GeoJSON blocks use workers without changing mesh ownership

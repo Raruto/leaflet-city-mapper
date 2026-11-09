@@ -8,5 +8,3 @@ export function onVectorTileMessage({ data }) {
     self.postMessage(/* alloc */ { id: data.id, error: error.message });
   }
 }
-
-self.addEventListener('message', onVectorTileMessage);

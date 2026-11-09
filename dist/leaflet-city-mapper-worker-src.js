@@ -930,8 +930,1445 @@
     return result;
   }
 
+  // src/mvt/createMvtReader.js
+  function createMvtReader(bytes) {
+    return (
+      /* alloc */
+      {
+        bytes,
+        view: (
+          /* alloc */
+          new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        ),
+        pos: 0
+      }
+    );
+  }
+
+  // src/mvt/takeMvtBytes.js
+  function takeMvtBytes(reader, size) {
+    if (!Number.isSafeInteger(size) || size < 0 || size > reader.bytes.length - reader.pos) {
+      throw (
+        /* alloc */
+        new Error("Truncated MVT field")
+      );
+    }
+    const start = reader.pos;
+    reader.pos += size;
+    return start;
+  }
+
+  // src/mvt/readMvtInteger.js
+  function readMvtInteger(reader) {
+    let value = 0n, i = 0, byte;
+    for (; i < 10; i++) {
+      byte = reader.bytes[takeMvtBytes(reader, 1)];
+      if (i === 9 && byte > 1) throw (
+        /* alloc */
+        new Error("Invalid MVT varint")
+      );
+      value |= BigInt(byte & 127) << BigInt(i * 7);
+      if (byte < 128) return value;
+    }
+    throw (
+      /* alloc */
+      new Error("Invalid MVT varint")
+    );
+  }
+
+  // src/mvt/readMvtNumber.js
+  function readMvtNumber(reader) {
+    const value = readMvtInteger(reader);
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw (
+        /* alloc */
+        new Error("MVT integer exceeds safe range")
+      );
+    }
+    return Number(value);
+  }
+
+  // src/mvt/readMvtField.js
+  function readMvtField(reader) {
+    const tag = readMvtNumber(reader);
+    const field = Math.floor(tag / 8), wire = tag % 8;
+    if (!field || field > 536870911) throw (
+      /* alloc */
+      new Error("Invalid MVT field number")
+    );
+    return (
+      /* alloc */
+      [field, wire]
+    );
+  }
+
+  // src/mvt/expectMvtWire.js
+  function expectMvtWire(wire, expected) {
+    if (wire !== expected) throw (
+      /* alloc */
+      new Error("Invalid MVT wire type")
+    );
+  }
+
+  // src/mvt/numericMvtValue.js
+  function numericMvtValue(value) {
+    return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
+  }
+
+  // src/mvt/finishMvtPath.js
+  function finishMvtPath(path, type, closed) {
+    if (path && (type === 2 && path.length < 2 || type === 3 && !closed)) {
+      throw (
+        /* alloc */
+        new Error("Incomplete MVT geometry")
+      );
+    }
+  }
+
+  // src/mvt/appendMvtCoordinates.js
+  function appendMvtCoordinates(commands, state, count) {
+    let i = 0, dx, dy;
+    for (; i < count; i++) {
+      dx = commands[state.index++];
+      dy = commands[state.index++];
+      if (dx > 4294967295 || dy > 4294967295) throw (
+        /* alloc */
+        new Error("Invalid MVT coordinate")
+      );
+      state.x += dx % 2 ? -(dx + 1) / 2 : dx / 2;
+      state.y += dy % 2 ? -(dy + 1) / 2 : dy / 2;
+      state.path.push(
+        /* alloc */
+        [state.x, state.y]
+      );
+    }
+  }
+
+  // src/mvt/beginMvtPath.js
+  function beginMvtPath(state, paths, type, count) {
+    finishMvtPath(state.path, type, state.closed);
+    if (type !== 1 && count !== 1) throw (
+      /* alloc */
+      new Error("Invalid MVT MoveTo")
+    );
+    state.path = /* alloc */
+    [];
+    paths.push(state.path);
+    state.closed = false;
+  }
+
+  // src/mvt/closeMvtPath.js
+  function closeMvtPath(state, type, count) {
+    if (type !== 3 || count !== 1 || !state.path || state.closed || state.path.length < 3) {
+      throw (
+        /* alloc */
+        new Error("Invalid MVT ClosePath")
+      );
+    }
+    state.path.push(
+      /* alloc */
+      [...state.path[0]]
+    );
+    state.closed = true;
+  }
+
+  // src/mvt/readMvtGeometry.js
+  function readMvtGeometry(commands, type) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    const state = (
+      /* alloc */
+      { x: 0, y: 0, path: null, closed: false, index: 0 }
+    );
+    let command, id, count;
+    while (state.index < commands.length) {
+      command = commands[state.index++];
+      id = command % 8;
+      count = Math.floor(command / 8);
+      if (!count || command > 4294967295) throw (
+        /* alloc */
+        new Error("Invalid MVT geometry command")
+      );
+      if (id === 7) {
+        closeMvtPath(state, type, count);
+        continue;
+      }
+      if (id !== 1 && id !== 2 || count > Math.floor((commands.length - state.index) / 2)) {
+        throw (
+          /* alloc */
+          new Error("Invalid MVT geometry parameters")
+        );
+      }
+      if (id === 1) beginMvtPath(state, paths, type, count);
+      else if (type === 1 || !state.path || state.closed) throw (
+        /* alloc */
+        new Error("Invalid MVT LineTo")
+      );
+      appendMvtCoordinates(commands, state, count);
+    }
+    finishMvtPath(state.path, type, state.closed);
+    if (!paths.length) throw (
+      /* alloc */
+      new Error("Empty MVT geometry")
+    );
+    return paths;
+  }
+
+  // src/mvt/readMvtMessage.js
+  function readMvtMessage(reader, wire) {
+    expectMvtWire(wire, 2);
+    const size = readMvtNumber(reader), start = takeMvtBytes(reader, size);
+    return createMvtReader(reader.bytes.subarray(start, start + size));
+  }
+
+  // src/mvt/readMvtNumbers.js
+  function readMvtNumbers(reader, wire, target) {
+    let packed;
+    if (wire === 0) target.push(readMvtNumber(reader));
+    else {
+      packed = readMvtMessage(reader, wire);
+      while (packed.pos < packed.bytes.length) target.push(readMvtNumber(packed));
+    }
+  }
+
+  // src/mvt/skipMvtField.js
+  function skipMvtField(reader, wire) {
+    switch (wire) {
+      case 0:
+        readMvtInteger(reader);
+        break;
+      case 1:
+        takeMvtBytes(reader, 8);
+        break;
+      case 2:
+        takeMvtBytes(reader, readMvtNumber(reader));
+        break;
+      case 5:
+        takeMvtBytes(reader, 4);
+        break;
+      default:
+        throw (
+          /* alloc */
+          new Error("Unsupported MVT wire type")
+        );
+    }
+  }
+
+  // src/mvt/readMvtFeature.js
+  function readMvtFeature(reader, keys, values) {
+    let id, type = 0, field, wire, i = 0;
+    const tags = (
+      /* alloc */
+      []
+    ), commands = (
+      /* alloc */
+      []
+    );
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field === 1) {
+        expectMvtWire(wire, 0);
+        id = numericMvtValue(readMvtInteger(reader));
+      } else if (field === 2) readMvtNumbers(reader, wire, tags);
+      else if (field === 3) {
+        expectMvtWire(wire, 0);
+        type = readMvtNumber(reader);
+      } else if (field === 4) readMvtNumbers(reader, wire, commands);
+      else skipMvtField(reader, wire);
+    }
+    if (tags.length % 2 || type > 3) throw (
+      /* alloc */
+      new Error("Invalid MVT feature")
+    );
+    const properties = /* @__PURE__ */ Object.create(null);
+    for (; i < tags.length; i += 2) {
+      if (tags[i] >= keys.length || tags[i + 1] >= values.length) {
+        throw (
+          /* alloc */
+          new Error("Invalid MVT property index")
+        );
+      }
+      properties[keys[tags[i]]] = values[tags[i + 1]];
+    }
+    return (
+      /* alloc */
+      { id, type, properties, geometry: type ? readMvtGeometry(commands, type) : (
+        /* alloc */
+        []
+      ) }
+    );
+  }
+
+  // src/globals/mvtTextDecoder.js
+  var mvtTextDecoder = new TextDecoder("utf-8", { fatal: true });
+
+  // src/mvt/readMvtString.js
+  function readMvtString(reader, wire) {
+    return mvtTextDecoder.decode(readMvtMessage(reader, wire).bytes);
+  }
+
+  // src/mvt/readMvtKnownValue.js
+  function readMvtKnownValue(reader, field, wire) {
+    let offset, integer;
+    if (field === 1) return readMvtString(reader, wire);
+    if (field === 2 || field === 3) {
+      expectMvtWire(wire, field === 2 ? 5 : 1);
+      offset = takeMvtBytes(reader, field === 2 ? 4 : 8);
+      return field === 2 ? reader.view.getFloat32(offset, true) : reader.view.getFloat64(offset, true);
+    }
+    expectMvtWire(wire, 0);
+    integer = readMvtInteger(reader);
+    if (field === 4) return numericMvtValue(BigInt.asIntN(64, integer));
+    if (field === 5) return numericMvtValue(integer);
+    if (field === 6) return numericMvtValue(integer >> 1n ^ -(integer & 1n));
+    return integer !== 0n;
+  }
+
+  // src/mvt/readMvtValue.js
+  function readMvtValue(reader) {
+    let value, found = false, field, wire;
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field < 1 || field > 7) {
+        skipMvtField(reader, wire);
+        continue;
+      }
+      if (found) throw (
+        /* alloc */
+        new Error("Multiple MVT value types")
+      );
+      found = true;
+      value = readMvtKnownValue(reader, field, wire);
+    }
+    if (!found) throw (
+      /* alloc */
+      new Error("Empty MVT value")
+    );
+    return value;
+  }
+
+  // src/mvt/readMvtLayer.js
+  function readMvtLayer(reader) {
+    let name, version, extent = 4096, field, wire, value, i = 0;
+    const keys = (
+      /* alloc */
+      []
+    ), values = (
+      /* alloc */
+      []
+    ), features = (
+      /* alloc */
+      []
+    );
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field === 1) name = readMvtString(reader, wire);
+      else if (field === 2) features.push(readMvtMessage(reader, wire));
+      else if (field === 3) keys.push(readMvtString(reader, wire));
+      else if (field === 4) values.push(readMvtValue(readMvtMessage(reader, wire)));
+      else if (field === 5 || field === 15) {
+        expectMvtWire(wire, 0);
+        value = readMvtNumber(reader);
+        if (field === 5) extent = value;
+        else version = value;
+      } else skipMvtField(reader, wire);
+    }
+    if (!name || !/* alloc */
+    [1, 2].includes(version) || !extent || extent > 4294967295) {
+      throw (
+        /* alloc */
+        new Error("Invalid MVT layer metadata")
+      );
+    }
+    for (; i < features.length; i++) features[i] = readMvtFeature(features[i], keys, values);
+    return (
+      /* alloc */
+      { name, extent, features }
+    );
+  }
+
+  // src/mvt/decodeVectorTile.js
+  function decodeVectorTile(buffer) {
+    if (!(buffer instanceof ArrayBuffer) && !(buffer instanceof Uint8Array)) {
+      throw (
+        /* alloc */
+        new TypeError("MVT input must be an ArrayBuffer or Uint8Array")
+      );
+    }
+    const bytes = buffer instanceof Uint8Array ? buffer : (
+      /* alloc */
+      new Uint8Array(buffer)
+    );
+    const reader = createMvtReader(bytes);
+    const layers = (
+      /* alloc */
+      []
+    ), names = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let field, wire, layer;
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field !== 3) {
+        skipMvtField(reader, wire);
+        continue;
+      }
+      layer = readMvtLayer(readMvtMessage(reader, wire));
+      if (names.has(layer.name)) throw (
+        /* alloc */
+        new Error("Duplicate MVT layer name")
+      );
+      names.add(layer.name);
+      layers.push(layer);
+    }
+    return layers;
+  }
+
+  // src/vector-tiles/vectorStyleDependencies.js
+  function vectorStyleDependencies(entry) {
+    const dependencies = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    const expressions = (
+      /* alloc */
+      [entry.paint, entry.filter]
+    );
+    let value, child;
+    while (expressions.length) {
+      value = expressions.pop();
+      if (!value || typeof value !== "object") continue;
+      if (Array.isArray(value) && typeof value[1] === "string" && /* alloc */
+      ["get", "has", "==", "!=", "<", ">", "<=", ">=", "in", "!in"].includes(value[0])) {
+        dependencies.add(value[1]);
+      }
+      for (child of Object.values(value)) expressions.push(child);
+    }
+    return dependencies;
+  }
+
+  // src/vector-style/evaluateBoolean.js
+  function evaluateBoolean(op, args, properties, zoom, legacy) {
+    let i = 0;
+    if (op === "all") {
+      for (i = 0; i < args.length; i++) {
+        if (!evaluateStyle(args[i], properties, zoom, legacy)) return false;
+      }
+      return true;
+    }
+    if (op === "any") {
+      for (i = 0; i < args.length; i++) {
+        if (evaluateStyle(args[i], properties, zoom, legacy)) return true;
+      }
+      return false;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateCoalesceOrCase.js
+  function evaluateCoalesceOrCase(op, args, properties, zoom, legacy) {
+    let i = 0, result = null;
+    if (op === "coalesce") {
+      for (i = 0; i < args.length; i++) {
+        result = evaluateStyle(args[i], properties, zoom);
+        if (result !== null && result !== void 0) return result;
+      }
+      return null;
+    }
+    if (op === "case") {
+      for (i = 0; i < args.length - 1; i += 2) {
+        if (evaluateStyle(args[i], properties, zoom)) {
+          return evaluateStyle(args[i + 1], properties, zoom);
+        }
+      }
+      return evaluateStyle(args[args.length - 1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateInput.js
+  function evaluateInput(value, properties, zoom, legacy) {
+    if (legacy && typeof value === "string") return properties[value];
+    return evaluateStyle(value, properties, zoom);
+  }
+
+  // src/vector-style/evaluateComparison.js
+  function evaluateComparison(op, args, properties, zoom, legacy) {
+    const left = evaluateInput(args[0], properties, zoom, legacy);
+    const right = evaluateStyle(args[1], properties, zoom);
+    switch (op) {
+      case "==":
+        return left === right;
+      case "!=":
+        return left !== right;
+      case "<=":
+        return left <= right;
+      case ">=":
+        return left >= right;
+      case "<":
+        return left < right;
+      case ">":
+        return left > right;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/globals/vectorStyleNamedColors.js
+  var vectorStyleNamedColors = {
+    black: [0, 0, 0, 1],
+    white: [255, 255, 255, 1],
+    gray: [128, 128, 128, 1],
+    blue: [0, 0, 255, 1],
+    red: [255, 0, 0, 1],
+    green: [0, 128, 0, 1]
+  };
+
+  // src/vector-style/parseFunctionalColor.js
+  function parseFunctionalColor(value) {
+    const match = /^rgba?\(([^)]+)\)$/.exec(value);
+    if (match) {
+      const values = match[1].split(",");
+      let i = 0, finite = true;
+      for (i = 0; i < values.length; i++) values[i] = Number(values[i]);
+      if (values.length === 3) values.push(1);
+      for (i = 0; i < values.length; i++) {
+        if (!Number.isFinite(values[i])) finite = false;
+      }
+      if (values.length === 4 && finite) return values;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported interpolated style color: ${value}`)
+    );
+  }
+
+  // src/vector-style/parseHexColor.js
+  function parseHexColor(value) {
+    let i = 0, offset = 0;
+    if (value.length === 4) {
+      value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+    }
+    const color = (
+      /* alloc */
+      []
+    );
+    for (i = 1; i < 6; i += 2) {
+      offset = parseInt(value.slice(i, i + 2), 16);
+      color.push(offset);
+    }
+    color.push(1);
+    return color;
+  }
+
+  // src/vector-style/styleColor.js
+  function styleColor(value) {
+    if (Object.hasOwn(vectorStyleNamedColors, value)) return vectorStyleNamedColors[value];
+    if (/^#[0-9a-f]{3}$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value)) {
+      return parseHexColor(value);
+    }
+    return parseFunctionalColor(value);
+  }
+
+  // src/vector-style/evaluateInterpolate.js
+  function evaluateInterpolate(args, properties, zoom) {
+    const result = evaluateStyle(args[1], properties, zoom);
+    const base = args[0][0] === "exponential" ? args[0][1] : 1;
+    let i = 0, lower = 0, upper = 0, ratio = 0, left = null, right = null, j = 0, color = "";
+    if (result <= args[2]) return evaluateStyle(args[3], properties, zoom);
+    for (i = 4; i < args.length; i += 2) {
+      if (result > args[i]) continue;
+      lower = args[i - 2];
+      upper = args[i];
+      ratio = base === 1 ? (result - lower) / (upper - lower) : (base ** (result - lower) - 1) / (base ** (upper - lower) - 1);
+      left = evaluateStyle(args[i - 1], properties, zoom);
+      right = evaluateStyle(args[i + 1], properties, zoom);
+      if (typeof left === "number" && typeof right === "number") return left + (right - left) * ratio;
+      left = styleColor(left);
+      right = styleColor(right);
+      for (j = 0; j < 3; j++) {
+        if (j) color += ",";
+        color += Math.round(left[j] + (right[j] - left[j]) * ratio);
+      }
+      return `rgba(${color},${left[3] + (right[3] - left[3]) * ratio})`;
+    }
+    return evaluateStyle(args.at(-1), properties, zoom);
+  }
+
+  // src/vector-style/arrayContainsRange.js
+  function arrayContainsRange(values, start, end, target) {
+    let i = 0, value = null;
+    for (i = start; i < end; i++) {
+      value = values[i];
+      if (value === target || value !== value && target !== target) return true;
+    }
+    return false;
+  }
+
+  // src/vector-style/evaluateMembership.js
+  function evaluateMembership(op, args, properties, zoom, legacy) {
+    let target = null;
+    if (op === "!in") {
+      target = evaluateInput(args[0], properties, zoom, legacy);
+      return !arrayContainsRange(args, 1, args.length, target);
+    }
+    if (legacy) {
+      target = evaluateInput(args[0], properties, zoom, true);
+      return arrayContainsRange(args, 1, args.length, target);
+    }
+    const values = evaluateStyle(args[1], properties, zoom);
+    target = evaluateInput(args[0], properties, zoom, false);
+    return values.includes(target);
+  }
+
+  // src/vector-style/evaluateIExpression.js
+  function evaluateIExpression(op, args, properties, zoom, legacy) {
+    if (op === "in") return evaluateMembership(op, args, properties, zoom, legacy);
+    if (op === "interpolate") return evaluateInterpolate(args, properties, zoom);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMath.js
+  function evaluateMath(op, args, properties, zoom) {
+    let i = 0, sum = 0;
+    if (op === "+") {
+      for (i = 0; i < args.length; i++) sum += evaluateStyle(args[i], properties, zoom);
+      return sum;
+    }
+    if (op === "-") {
+      if (args.length === 1) return -evaluateStyle(args[0], properties, zoom);
+      return evaluateStyle(args[0], properties, zoom) - evaluateStyle(args[1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMatch.js
+  function evaluateMatch(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let i = 0, matched = false;
+    for (i = 1; i < args.length - 1; i += 2) {
+      if (Array.isArray(args[i])) matched = args[i].includes(result);
+      else matched = args[i] === result;
+      if (matched) return evaluateStyle(args[i + 1], properties, zoom);
+    }
+    return evaluateStyle(args[args.length - 1], properties, zoom);
+  }
+
+  // src/vector-style/evaluateNegation.js
+  function evaluateNegation(op, args, properties, zoom, legacy) {
+    if (op === "!") return !evaluateStyle(args[0], properties, zoom, legacy);
+    if (op === "!=") {
+      return evaluateInput(args[0], properties, zoom, legacy) !== evaluateStyle(args[1], properties, zoom);
+    }
+    if (op === "!in") return evaluateMembership(op, args, properties, zoom, legacy);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluatePrimitive.js
+  function evaluatePrimitive(op, args, properties, zoom) {
+    switch (op) {
+      case "literal":
+        return args[0];
+      case "get":
+        return properties[args[0]];
+      case "has":
+        return Object.hasOwn(properties, args[0]);
+      case "zoom":
+        return zoom;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/vector-style/evaluateStep.js
+  function evaluateStep(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let output = args[1], i = 0;
+    for (i = 2; i < args.length; i += 2) {
+      if (result < args[i]) break;
+      output = args[i + 1];
+    }
+    return evaluateStyle(output, properties, zoom);
+  }
+
+  // src/vector-style/evaluateToExpression.js
+  function evaluateToExpression(op, args, properties, zoom) {
+    if (op === "to-boolean") return Boolean(evaluateStyle(args[0], properties, zoom));
+    if (op === "to-number") {
+      let i = 0, number = 0;
+      for (i = 0; i < args.length; i++) {
+        number = Number(evaluateStyle(args[i], properties, zoom));
+        if (Number.isFinite(number)) return number;
+      }
+      throw (
+        /* alloc */
+        new Error("Invalid numeric style expression")
+      );
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateStyle.js
+  function evaluateStyle(value, properties, zoom, legacy = false) {
+    if (!Array.isArray(value)) return value;
+    const op = value[0];
+    const args = value.slice(1);
+    const operation = String(op);
+    if (/^(?:literal|get|has|zoom)$/.test(operation)) {
+      return evaluatePrimitive(op, args, properties, zoom);
+    }
+    switch (operation[0]) {
+      case "a":
+        return evaluateBoolean(op, args, properties, zoom, legacy);
+      case "!":
+        return evaluateNegation(op, args, properties, zoom, legacy);
+      case "=":
+      case "<":
+      case ">":
+        return evaluateComparison(op, args, properties, zoom, legacy);
+      case "i":
+        return evaluateIExpression(op, args, properties, zoom, legacy);
+      case "t":
+        return evaluateToExpression(op, args, properties, zoom, legacy);
+      case "c":
+        return evaluateCoalesceOrCase(op, args, properties, zoom, legacy);
+      case "m":
+        return evaluateMatch(args, properties, zoom);
+      case "s":
+        return evaluateStep(args, properties, zoom);
+      default:
+        return evaluateMath(op, args, properties, zoom);
+    }
+  }
+
+  // src/vector-style/visibleStyle.js
+  function visibleStyle(layer, properties, zoom) {
+    return zoom >= (layer.minzoom ?? 0) && zoom < (layer.maxzoom ?? Infinity) && layer.layout?.visibility !== "none" && (!layer.filter || evaluateStyle(layer.filter, properties, zoom, true));
+  }
+
+  // src/vector-tiles/vectorFeatureZoom.js
+  function vectorFeatureZoom(entry, properties, zoom, maxZoom) {
+    if (visibleStyle(entry, properties, zoom)) return zoom;
+    zoom = maxZoom;
+    while (zoom >= 0 && !visibleStyle(entry, properties, zoom)) zoom--;
+    return zoom;
+  }
+
+  // src/vector-tiles/projectVectorPoint.js
+  function projectVectorPoint(point, coords, extent) {
+    const size = 2 ** coords.z;
+    const x = (coords.x + point[0] / extent) / size;
+    const y = (coords.y + point[1] / extent) / size;
+    return (
+      /* alloc */
+      [Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI, x * 360 - 180]
+    );
+  }
+
+  // src/vector-tiles/vectorLabelProperty.js
+  function vectorLabelProperty(properties, match, key) {
+    return properties[key] ?? "";
+  }
+
+  // src/vector-tiles/vectorStyleValue.js
+  function vectorStyleValue(object, key, fallback, properties, zoom) {
+    return object?.[key] === void 0 ? fallback : evaluateStyle(object[key], properties, zoom);
+  }
+
+  // src/vector-tiles/prepareVectorLabel.js
+  function prepareVectorLabel(job, layer, entry, feature, order) {
+    let text = entry.layout?.["text-field"];
+    const { properties } = feature, { zoom } = job;
+    if (Array.isArray(text)) text = evaluateStyle(text, properties, zoom);
+    if (typeof text !== "string") return;
+    text = text.replace(/\{([^}]+)\}/g, vectorLabelProperty.bind(null, properties));
+    if (!text.trim()) return;
+    if (entry.layout?.["text-transform"] === "uppercase") text = text.toUpperCase();
+    const path = feature.geometry[0];
+    if (!path?.length) return;
+    const point = path[Math.floor(path.length / 2)];
+    if (point[0] < 0 || point[0] >= layer.extent || point[1] < 0 || point[1] >= layer.extent) return;
+    job.labels.push(
+      /* alloc */
+      {
+        text,
+        latlng: projectVectorPoint(point, job.coords, layer.extent),
+        order,
+        entry,
+        properties,
+        size: vectorStyleValue(entry.layout, "text-size", 12, properties, zoom),
+        color: vectorStyleValue(entry.paint, "text-color", "#000", properties, zoom),
+        halo: vectorStyleValue(entry.paint, "text-halo-color", "#fff", properties, zoom),
+        haloWidth: vectorStyleValue(entry.paint, "text-halo-width", 0, properties, zoom),
+        priority: (
+          /* alloc */
+          ["place_labels", "place"].includes(entry["source-layer"]) ? 0 : (
+            /* alloc */
+            ["street_labels", "transportation_name"].includes(entry["source-layer"]) ? 1 : 2
+          )
+        )
+      }
+    );
+  }
+
+  // src/vector-style/readPaintValue.js
+  function readPaintValue(paint, key, fallback, properties, zoom) {
+    if (paint[key] === void 0) return fallback;
+    return evaluateStyle(paint[key], properties, zoom);
+  }
+
+  // src/vector-style/fillVectorPaint.js
+  function fillVectorPaint(paint, properties, zoom) {
+    const fill = styleColor(readPaintValue(paint, "fill-color", "#000", properties, zoom));
+    const outline = readPaintValue(paint, "fill-outline-color", null, properties, zoom);
+    const rgb = outline === null ? null : styleColor(outline);
+    const fillOpacity = readPaintValue(paint, "fill-opacity", 1, properties, zoom) * fill[3];
+    const fillColor = (
+      /* alloc */
+      { r: fill[0] / 255, g: fill[1] / 255, b: fill[2] / 255 }
+    );
+    const color = rgb ? (
+      /* alloc */
+      { r: rgb[0] / 255, g: rgb[1] / 255, b: rgb[2] / 255 }
+    ) : null;
+    return (
+      /* alloc */
+      {
+        fillColor,
+        fillOpacity,
+        color,
+        weight: 0.5
+      }
+    );
+  }
+
+  // src/vector-style/scaleDashArray.js
+  function scaleDashArray(dash, weight, properties, zoom) {
+    if (!dash) return void 0;
+    let values = dash, i = 0, result = "";
+    if (typeof dash[0] !== "number") values = evaluateStyle(dash, properties, zoom);
+    if (!Array.isArray(values)) throw (
+      /* alloc */
+      new TypeError("Style dash array must be an array")
+    );
+    for (i = 0; i < values.length; i++) {
+      if (i) result += " ";
+      result += values[i] * weight;
+    }
+    return result;
+  }
+
+  // src/vector-style/lineVectorPaint.js
+  function lineVectorPaint(layer, paint, properties, zoom) {
+    const weight = readPaintValue(paint, "line-width", 1, properties, zoom);
+    const rgb = styleColor(readPaintValue(paint, "line-color", "#000", properties, zoom));
+    const opacity = readPaintValue(paint, "line-opacity", 1, properties, zoom) * rgb[3];
+    const dashArray = scaleDashArray(paint["line-dasharray"], weight, properties, zoom);
+    const lineCap = layer.layout?.["line-cap"] || "butt";
+    const lineJoin = layer.layout?.["line-join"] || "miter";
+    const color = (
+      /* alloc */
+      { r: rgb[0] / 255, g: rgb[1] / 255, b: rgb[2] / 255 }
+    );
+    return (
+      /* alloc */
+      {
+        color,
+        opacity,
+        weight,
+        dashArray,
+        lineCap,
+        lineJoin
+      }
+    );
+  }
+
+  // src/vector-style/vectorPaint.js
+  function vectorPaint(layer, properties, zoom) {
+    const paint = layer.paint || /* alloc */
+    {};
+    if (layer.type === "fill") return fillVectorPaint(paint, properties, zoom);
+    return lineVectorPaint(layer, paint, properties, zoom);
+  }
+
+  // src/vector-tiles/vectorFeaturePaint.js
+  function vectorFeaturePaint(entry, feature, sampleZoom, maxZoom) {
+    if (entry.type === "fill") return feature.type === 3 ? vectorPaint(entry, feature.properties, sampleZoom) : null;
+    if (entry.type !== "line" || feature.type !== 2) return null;
+    let paint = vectorPaint(entry, feature.properties, sampleZoom), candidate;
+    if (paint.weight > 0 && paint.opacity > 0) return paint;
+    for (candidate = maxZoom; candidate >= 0; candidate--) {
+      if (!visibleStyle(entry, feature.properties, candidate)) continue;
+      paint = vectorPaint(entry, feature.properties, candidate);
+      if (paint.weight > 0 && paint.opacity > 0) return paint;
+    }
+    return null;
+  }
+
+  // src/mvt/mvtEdgeX.js
+  function mvtEdgeX(edge, y) {
+    return edge[0][0] + (y - edge[0][1]) * (edge[1][0] - edge[0][0]) / (edge[1][1] - edge[0][1]);
+  }
+
+  // src/mvt/addMvtCrossings.js
+  function addMvtCrossings(edges, levels) {
+    let i = 0, j, a, b, top, bottom, start, end;
+    for (; i < edges.length; i++) {
+      a = edges[i];
+      for (j = i + 1; j < edges.length; j++) {
+        b = edges[j];
+        top = Math.max(a[0][1], b[0][1]);
+        bottom = Math.min(a[1][1], b[1][1]);
+        if (top >= bottom) continue;
+        start = mvtEdgeX(a, top) - mvtEdgeX(b, top);
+        end = mvtEdgeX(a, bottom) - mvtEdgeX(b, bottom);
+        if (start * end < 0) levels.add(top + (bottom - top) * start / (start - end));
+      }
+    }
+  }
+
+  // src/mvt/mergeMvtActiveEdges.js
+  function mergeMvtActiveEdges(active, sorted, left, mid, right) {
+    let i = left, j = mid, k = left;
+    while (i < mid && j < right) {
+      if (active[j].x < active[i].x) sorted[k++] = active[j++];
+      else sorted[k++] = active[i++];
+    }
+    while (i < mid) sorted[k++] = active[i++];
+    while (j < right) sorted[k++] = active[j++];
+  }
+
+  // src/mvt/sortMvtActiveEdges.js
+  function sortMvtActiveEdges(active) {
+    const sorted = (
+      /* alloc */
+      new Array(active.length)
+    );
+    let width = 1, left, mid, right, i;
+    while (width < active.length) {
+      for (left = 0; left < active.length; left += width * 2) {
+        mid = Math.min(left + width, active.length);
+        right = Math.min(left + width * 2, active.length);
+        mergeMvtActiveEdges(active, sorted, left, mid, right);
+      }
+      for (i = 0; i < active.length; i++) active[i] = sorted[i];
+      width *= 2;
+    }
+  }
+
+  // src/mvt/appendMvtBandTriangles.js
+  function appendMvtBandTriangles(edges, top, bottom, triangles) {
+    const mid = (top + bottom) / 2, active = (
+      /* alloc */
+      []
+    );
+    let edge, i = 0, leftTop, leftBottom, rightTop, rightBottom;
+    for (edge of edges) {
+      if (edge[0][1] < mid && edge[1][1] > mid) {
+        active.push(
+          /* alloc */
+          { edge, x: mvtEdgeX(edge, mid) }
+        );
+      }
+    }
+    sortMvtActiveEdges(active);
+    if (active.length % 2) throw (
+      /* alloc */
+      new Error("Unbalanced MVT polygon edges")
+    );
+    for (; i < active.length; i += 2) {
+      leftTop = mvtEdgeX(active[i].edge, top);
+      leftBottom = mvtEdgeX(active[i].edge, bottom);
+      rightTop = mvtEdgeX(active[i + 1].edge, top);
+      rightBottom = mvtEdgeX(active[i + 1].edge, bottom);
+      if (rightTop < leftTop - 1e-8 || rightBottom < leftBottom - 1e-8) {
+        throw (
+          /* alloc */
+          new Error("Crossing MVT polygon edges")
+        );
+      }
+      if ((rightTop - leftTop) * (bottom - top) > 1e-6) {
+        triangles.push(
+          /* alloc */
+          [
+            /* alloc */
+            [leftTop, top],
+            /* alloc */
+            [rightTop, top],
+            /* alloc */
+            [leftBottom, bottom]
+          ]
+        );
+      }
+      if ((rightBottom - leftBottom) * (bottom - top) > 1e-6) {
+        triangles.push(
+          /* alloc */
+          [
+            /* alloc */
+            [rightTop, top],
+            /* alloc */
+            [rightBottom, bottom],
+            /* alloc */
+            [leftBottom, bottom]
+          ]
+        );
+      }
+    }
+  }
+
+  // src/mvt/finiteMvtCoordinate.js
+  function finiteMvtCoordinate(point) {
+    let i = 0;
+    for (; i < point.length; i++) {
+      if (!Number.isFinite(point[i])) return false;
+    }
+    return true;
+  }
+
+  // src/mvt/collectMvtEdges.js
+  function collectMvtEdges(rings, edges, levels) {
+    let ring3, i, a, b;
+    for (ring3 of rings) {
+      if (ring3.length < 4 || ring3[0][0] !== ring3.at(-1)[0] || ring3[0][1] !== ring3.at(-1)[1]) {
+        throw (
+          /* alloc */
+          new Error("MVT tessellation requires closed rings")
+        );
+      }
+      for (i = 1; i < ring3.length; i++) {
+        a = ring3[i - 1];
+        b = ring3[i];
+        if (!finiteMvtCoordinate(a) || !finiteMvtCoordinate(b)) {
+          throw (
+            /* alloc */
+            new Error("Invalid MVT ring coordinate")
+          );
+        }
+        levels.add(a[1]);
+        if (a[1] !== b[1]) edges.push(
+          /* alloc */
+          [a[1] < b[1] ? a : b, a[1] < b[1] ? b : a]
+        );
+      }
+    }
+  }
+
+  // src/mvt/sortedMvtLevels.js
+  function sortedMvtLevels(levels) {
+    const sorted = (
+      /* alloc */
+      []
+    );
+    let y, gap = 0, i = 0, j, value, count = 0;
+    for (y of levels) sorted.push(y);
+    gap = Math.floor(sorted.length / 2);
+    for (; gap > 0; gap = Math.floor(gap / 2)) {
+      for (i = gap; i < sorted.length; i++) {
+        value = sorted[i];
+        j = i;
+        while (j >= gap && sorted[j - gap] > value) {
+          sorted[j] = sorted[j - gap];
+          j -= gap;
+        }
+        sorted[j] = value;
+      }
+    }
+    for (i = 0; i < sorted.length; i++) {
+      if (!count || sorted[i] - sorted[count - 1] > 1e-8) sorted[count++] = sorted[i];
+    }
+    sorted.length = count;
+    return sorted;
+  }
+
+  // src/mvt/tessellateVectorRings.js
+  function tessellateVectorRings(rings) {
+    const edges = (
+      /* alloc */
+      []
+    ), levels = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    ), triangles = (
+      /* alloc */
+      []
+    );
+    let sorted, i = 1, top, bottom;
+    collectMvtEdges(rings, edges, levels);
+    addMvtCrossings(edges, levels);
+    sorted = sortedMvtLevels(levels);
+    for (; i < sorted.length; i++) {
+      top = sorted[i - 1];
+      bottom = sorted[i];
+      if (bottom > top) appendMvtBandTriangles(edges, top, bottom, triangles);
+    }
+    return triangles;
+  }
+
+  // src/mvt/isMvtFallbackError.js
+  function isMvtFallbackError(error) {
+    return error.message === "Polygon triangulation area mismatch" || error.message === "Degenerate polygon ring" || error.message === "Unable to triangulate polygon: invalid or self-intersecting rings" || error.message === "Unable to connect polygon hole";
+  }
+
+  // src/mvt/appendMvtPolygonTriangles.js
+  function appendMvtPolygonTriangles(rings, paths, vertices, triangles) {
+    let indices, index, triangle, points, i = 0;
+    try {
+      indices = triangulate(paths[0], paths.slice(1));
+      for (triangle of indices) {
+        points = /* alloc */
+        [];
+        for (index of triangle) points.push(
+          /* alloc */
+          [vertices[index].x, vertices[index].y]
+        );
+        triangles.push(points);
+      }
+    } catch (error) {
+      if (!isMvtFallbackError(error)) throw error;
+      indices = tessellateVectorRings(rings);
+      for (; i < indices.length; i++) triangles.push(indices[i]);
+    }
+  }
+
+  // src/mvt/groupMvtPolygons.js
+  function groupMvtPolygons(rings) {
+    const polygons = (
+      /* alloc */
+      []
+    );
+    let polygon, exteriorSign, ring3, area2, i;
+    for (ring3 of rings) {
+      if (ring3.length < 4 || ring3[0][0] !== ring3.at(-1)[0] || ring3[0][1] !== ring3.at(-1)[1]) {
+        throw (
+          /* alloc */
+          new Error("MVT tessellation requires closed rings")
+        );
+      }
+      area2 = 0;
+      for (i = 1; i < ring3.length; i++) {
+        if (!finiteMvtCoordinate(ring3[i]) || !finiteMvtCoordinate(ring3[i - 1])) {
+          throw (
+            /* alloc */
+            new Error("Invalid MVT ring coordinate")
+          );
+        }
+        area2 += ring3[i - 1][0] * ring3[i][1] - ring3[i][0] * ring3[i - 1][1];
+      }
+      if (!polygon || area2 && Math.sign(area2) === exteriorSign) {
+        polygon = /* alloc */
+        [];
+        polygons.push(polygon);
+        exteriorSign = Math.sign(area2);
+      }
+      polygon.push(ring3);
+    }
+    return polygons;
+  }
+
+  // src/mvt/mvtPathsVertices.js
+  function mvtPathsVertices(paths) {
+    const vertices = (
+      /* alloc */
+      []
+    );
+    let path, point;
+    for (path of paths) {
+      for (point of path) vertices.push(point);
+    }
+    return vertices;
+  }
+
+  // src/mvt/mvtPolygonPaths.js
+  function mvtPolygonPaths(rings) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    let ring3, i, path;
+    for (ring3 of rings) {
+      path = /* alloc */
+      [];
+      for (i = 0; i < ring3.length - 1; i++) {
+        path.push(
+          /* alloc */
+          { x: ring3[i][0], y: ring3[i][1] }
+        );
+      }
+      paths.push(path);
+    }
+    return paths;
+  }
+
+  // src/mvt/triangulateVectorRings.js
+  function triangulateVectorRings(rings) {
+    const polygons = groupMvtPolygons(rings), triangles = (
+      /* alloc */
+      []
+    );
+    let polygon, paths, vertices;
+    for (polygon of polygons) {
+      paths = mvtPolygonPaths(polygon);
+      vertices = mvtPathsVertices(paths);
+      appendMvtPolygonTriangles(polygon, paths, vertices, triangles);
+    }
+    return triangles;
+  }
+
+  // src/vector-tiles/projectVectorTriangles.js
+  function projectVectorTriangles(geometry, coords, extent) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    let triangle, projected, point;
+    for (triangle of triangulateVectorRings(geometry)) {
+      projected = /* alloc */
+      [];
+      for (point of triangle) projected.push(projectVectorPoint(point, coords, extent));
+      paths.push(
+        /* alloc */
+        [projected]
+      );
+    }
+    return paths;
+  }
+
+  // src/vector-tiles/simplifyVectorPath.js
+  function simplifyVectorPath(path, tolerance) {
+    if (path.length < 3) return path;
+    const keep = (
+      /* alloc */
+      new Uint8Array(path.length)
+    );
+    const stack = (
+      /* alloc */
+      [
+        /* alloc */
+        [0, path.length - 1]
+      ]
+    ), output = (
+      /* alloc */
+      []
+    );
+    keep[0] = keep[path.length - 1] = 1;
+    let start, end, a, b, dx, dy, length, index, distance, i, p, t, squared;
+    while (stack.length) {
+      [start, end] = stack.pop();
+      a = path[start];
+      b = path[end];
+      dx = b[0] - a[0];
+      dy = b[1] - a[1];
+      length = dx * dx + dy * dy;
+      index = -1;
+      distance = tolerance * tolerance;
+      for (i = start + 1; i < end; i++) {
+        p = path[i];
+        t = length ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length)) : 0;
+        squared = (p[0] - a[0] - t * dx) ** 2 + (p[1] - a[1] - t * dy) ** 2;
+        if (squared > distance) {
+          distance = squared;
+          index = i;
+        }
+      }
+      if (index >= 0) {
+        keep[index] = 1;
+        stack.push(
+          /* alloc */
+          [start, index],
+          /* alloc */
+          [index, end]
+        );
+      }
+    }
+    for (i = 0; i < path.length; i++) if (keep[i]) output.push(path[i]);
+    return output;
+  }
+
+  // src/vector-tiles/projectVectorPaths.js
+  function projectVectorPaths(geometry, coords, extent, tolerance) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    let path, projected, point;
+    for (path of geometry) {
+      projected = /* alloc */
+      [];
+      for (point of simplifyVectorPath(path, tolerance)) projected.push(projectVectorPoint(point, coords, extent));
+      paths.push(projected);
+    }
+    return paths;
+  }
+
+  // src/vector-tiles/vectorFeaturePaths.js
+  function vectorFeaturePaths(job, layer, entry, feature) {
+    const cache = entry.type === "fill" ? job.triangles : job.projected;
+    let paths = cache.get(feature);
+    if (!paths) {
+      const tolerance = layer.extent / 256 / 2 ** Math.max(0, job.maxZoom - job.coords.z) * 0.35;
+      paths = entry.type === "fill" ? projectVectorTriangles(feature.geometry, job.coords, layer.extent) : projectVectorPaths(feature.geometry, job.coords, layer.extent, tolerance);
+      cache.set(feature, paths);
+    }
+    return paths;
+  }
+
+  // src/vector-tiles/appendVectorBatch.js
+  function appendVectorBatch(job, layer, entry, feature, order, batches, dependencies, paint) {
+    const values = (
+      /* alloc */
+      []
+    );
+    let key, batch, path, count;
+    for (key of dependencies) values.push(feature.properties[key]);
+    key = JSON.stringify(
+      /* alloc */
+      [paint, values]
+    );
+    batch = batches.get(key);
+    if (!batch) {
+      batch = /* alloc */
+      {
+        kind: entry.type,
+        order,
+        paint,
+        properties: feature.properties,
+        entry,
+        paths: (
+          /* alloc */
+          []
+        ),
+        coordinates: 0
+      };
+      batches.set(key, batch);
+    }
+    for (path of vectorFeaturePaths(job, layer, entry, feature)) {
+      count = entry.type === "fill" ? 3 : path.length;
+      if (batch.coordinates + count > 6e3 && batch.paths.length) {
+        job.output.push(
+          /* alloc */
+          { ...batch, paths: batch.paths }
+        );
+        batch.paths = /* alloc */
+        [];
+        batch.coordinates = 0;
+      }
+      batch.paths.push(path);
+      batch.coordinates += count;
+    }
+  }
+
+  // src/vector-tiles/prepareVectorStyleLayer.js
+  function prepareVectorStyleLayer(job, layer, entry, order) {
+    const batches = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    ), dependencies = vectorStyleDependencies(entry);
+    let feature, sampleZoom, paint, batch;
+    for (feature of layer.features) {
+      sampleZoom = vectorFeatureZoom(entry, feature.properties, job.zoom, job.maxZoom);
+      if (sampleZoom < 0) continue;
+      if (entry.type === "symbol") {
+        prepareVectorLabel(job, layer, entry, feature, order);
+        continue;
+      }
+      paint = vectorFeaturePaint(entry, feature, sampleZoom, job.maxZoom);
+      if (paint) appendVectorBatch(job, layer, entry, feature, order, batches, dependencies, paint);
+    }
+    for (batch of batches.values()) if (batch.paths.length) job.output.push(batch);
+  }
+
+  // src/vector-tiles/prepareVectorTile.js
+  function prepareVectorTile(buffer, coords, style, zoom, source, maxZoom = 19) {
+    const layers = decodeVectorTile(buffer), byName = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    const job = (
+      /* alloc */
+      {
+        coords,
+        zoom,
+        maxZoom,
+        output: (
+          /* alloc */
+          []
+        ),
+        labels: (
+          /* alloc */
+          []
+        ),
+        triangles: (
+          /* alloc */
+          /* @__PURE__ */ new WeakMap()
+        ),
+        projected: (
+          /* alloc */
+          /* @__PURE__ */ new WeakMap()
+        )
+      }
+    );
+    let layer, order, entry;
+    for (layer of layers) byName.set(layer.name, layer);
+    for ([order, entry] of style.entries()) {
+      layer = byName.get(entry["source-layer"]);
+      if (!layer || source !== void 0 && entry.source !== source) continue;
+      prepareVectorStyleLayer(job, layer, entry, order);
+    }
+    return (
+      /* alloc */
+      { batches: job.output, labels: job.labels }
+    );
+  }
+
+  // src/workers/vectorTileWorker.js
+  function onVectorTileMessage({ data }) {
+    try {
+      const result = prepareVectorTile(data.buffer, data.coords, data.style, data.zoom, data.source, data.maxZoom);
+      self.postMessage(
+        /* alloc */
+        { id: data.id, ...result }
+      );
+    } catch (error) {
+      self.postMessage(
+        /* alloc */
+        { id: data.id, error: error.message }
+      );
+    }
+  }
+
   // src/workers/geometryWorker.js
   function onGeometryMessage(event) {
+    if (event.data.type === "vector") {
+      onVectorTileMessage(event);
+      return;
+    }
     try {
       const data = assembleAreaGeometry(event.data);
       const transfers = (

@@ -13,10 +13,10 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
         libraryRequests.push(request.url());
       }
     });
-    const worker = await build({ entryPoints: ['src/workers/vectorTileWorker.js'], bundle: true,
+    const worker = await build({ entryPoints: ['src/workers/geometryWorker.js'], bundle: true,
       format: 'esm', write: false });
     // Worker globals must not be rewritten to the window-only test registry.
-    await this.context.route('**/dist/leaflet-city-mapper-vector-worker.js', route => route.fulfill({
+    await this.context.route('**/dist/leaflet-city-mapper-worker.js', route => route.fulfill({
       contentType: 'text/javascript', body: worker.outputFiles[0].text,
     }));
     this.page.on('pageerror', error => errors.push(error.message));

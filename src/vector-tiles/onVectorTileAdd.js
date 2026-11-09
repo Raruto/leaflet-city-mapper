@@ -1,10 +1,12 @@
 import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.js';
-import { vectorTileWorkerUrl } from '../globals/vectorTileWorkerUrl.js';
+import { geometryWorkerUrl } from '../globals/geometryWorkerUrl.js';
 import { vectorTileEvents } from '../globals/vectorTileEvents.js';
 import { evaluateStyle } from '../vector-style/evaluateStyle.js';
 import { refreshVectorTiles } from './refreshVectorTiles.js';
 import { onVectorTileMessage } from './onVectorTileMessage.js';
 import { onVectorTileWorkerError } from './onVectorTileWorkerError.js';
+import { createGeometryWorker } from '../workers/createGeometryWorker.js';
+import { vectorWorkerByLayer } from '../weakmaps/vectorWorkerByLayer.js';
 
 export function onVectorTileAdd(map) {
   const { style, pane } = vectorTileOptionsByLayer.get(this);
@@ -22,7 +24,9 @@ export function onVectorTileAdd(map) {
   this.retiring = /* alloc */ new Set();
   this.inflight = 0; this.sequence = 0;
   this.changedAt = 0; this.paintZoom = null;
-  this.worker = /* alloc */ new Worker(vectorTileWorkerUrl, /* alloc */ { type: 'module' });
+  const workerEntry = createGeometryWorker(this.options.workerUrl || geometryWorkerUrl);
+  vectorWorkerByLayer.set(this, workerEntry);
+  this.worker = workerEntry.worker;
   this.worker.onmessage = onVectorTileMessage.bind(this);
   this.worker.onerror = onVectorTileWorkerError.bind(this);
   this.refresh = refreshVectorTiles.bind(this);

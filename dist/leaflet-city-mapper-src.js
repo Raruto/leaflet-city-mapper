@@ -16332,9 +16332,6 @@
     );
   }
 
-  // src/globals/vectorTileWorkerUrl.js
-  var vectorTileWorkerUrl = void 0 ? new URL("../workers/vectorTileWorker.js", null.url).href : new URL("leaflet-city-mapper-vector-worker.js", document.currentScript?.src || document.baseURI).href;
-
   // src/globals/vectorTileEvents.js
   var vectorTileEvents = "move zoom rotate pitch resize viewreset";
 
@@ -16663,8 +16660,21 @@
     this.timer = setTimeout(this.update.bind(this), 180);
   }
 
+  // src/weakmaps/vectorWorkerByLayer.js
+  var vectorWorkerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/vector-tiles/revokeVectorWorkerUrl.js
+  function revokeVectorWorkerUrl(layer) {
+    const entry = vectorWorkerByLayer.get(layer);
+    if (entry?.blobUrl) {
+      URL.revokeObjectURL(entry.blobUrl);
+      entry.blobUrl = null;
+    }
+  }
+
   // src/vector-tiles/onVectorTileMessage.js
   function onVectorTileMessage({ data }) {
+    revokeVectorWorkerUrl(this);
     const pending = this.waiting.get(data.id);
     if (!pending) return;
     this.waiting.delete(data.id);
@@ -16677,6 +16687,7 @@
 
   // src/vector-tiles/onVectorTileWorkerError.js
   function onVectorTileWorkerError(event) {
+    revokeVectorWorkerUrl(this);
     const error = (
       /* alloc */
       new Error(`Worker MVT: ${event.message}`)
@@ -16718,12 +16729,9 @@
     this.sequence = 0;
     this.changedAt = 0;
     this.paintZoom = null;
-    this.worker = /* alloc */
-    new Worker(
-      vectorTileWorkerUrl,
-      /* alloc */
-      { type: "module" }
-    );
+    const workerEntry = createGeometryWorker(this.options.workerUrl || geometryWorkerUrl);
+    vectorWorkerByLayer.set(this, workerEntry);
+    this.worker = workerEntry.worker;
     this.worker.onmessage = onVectorTileMessage.bind(this);
     this.worker.onerror = onVectorTileWorkerError.bind(this);
     this.refresh = refreshVectorTiles.bind(this);
@@ -16737,6 +16745,8 @@
     clearTimeout(this.timer);
     this.session = null;
     this.worker.terminate();
+    revokeVectorWorkerUrl(this);
+    vectorWorkerByLayer.delete(this);
     let pending, tile, group, marker;
     for (pending of this.waiting.values()) pending.reject(
       /* alloc */
@@ -17232,6 +17242,7 @@
       this.worker.postMessage(
         /* alloc */
         {
+          type: "vector",
           id,
           buffer,
           coords,

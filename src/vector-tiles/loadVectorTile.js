@@ -15,7 +15,7 @@ export async function loadVectorTile(tile) {
     if (controller.signal.aborted) return;
     const id = ++this.sequence, prepared = Promise.withResolvers();
     this.waiting.set(id, prepared);
-    this.worker.postMessage(/* alloc */ { id, buffer, coords, style, source: sourceId, maxZoom,
+    this.worker.postMessage(/* alloc */ { type: 'vector', id, buffer, coords, style, source: sourceId, maxZoom,
       zoom: this._map.getZoom() }, /* alloc */ [buffer]);
     const data = await prepared.promise;
     if (controller.signal.aborted || this.session !== session) return;

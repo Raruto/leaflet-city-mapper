@@ -112,7 +112,6 @@ Then('the build generates readable and minified bundles and standalone compatibi
   }
   for (const path of ['dist/leaflet-city-mapper.js', 'dist/leaflet-city-mapper-src.js',
     'dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js',
-    'dist/leaflet-city-mapper-vector-worker.js',
     'libs/openlayers-bindings.min.js']) {
     const source = await load(path), map = JSON.parse(await load(`${path}.map`));
     assert.ok(source.includes(`sourceMappingURL=${path.split('/').pop()}.map`));
@@ -121,10 +120,10 @@ Then('the build generates readable and minified bundles and standalone compatibi
     assert.ok(map.sources.every(name => path.startsWith('dist/') ? name.startsWith('../src/') : !name.includes('examples/')));
     if (path.startsWith('dist/')) {
       assert.ok(map.sources.every(name => !name.includes('openlayers-bindings')));
-      if (path.includes('-vector-worker')) {
+      if (path.includes('-worker')) {
         assert.ok(map.sourcesContent.some(content => content.includes('prepareVectorTile')));
-        assert.doesNotThrow(() => new Script(source));
-      } else if (path.includes('-worker')) assert.ok(map.sourcesContent.some(content => content.includes('assembleAreaGeometry')));
+        assert.ok(map.sourcesContent.some(content => content.includes('assembleAreaGeometry')));
+      }
       else assert.ok(map.sourcesContent.some(content => content.includes('/* wgsl */')));
     }
   }
