@@ -1702,40 +1702,118 @@
     return object?.[key] === void 0 ? fallback : evaluateStyle(object[key], properties, zoom);
   }
 
+  // src/vector-tiles/vectorStraightRun.js
+  function vectorStraightRun(path, i, point, step) {
+    const base = Math.atan2(path[i][1] - path[i - 1][1], path[i][0] - path[i - 1][0]);
+    let j = step > 0 ? i : i - 1, previous = point, run = 0, next;
+    while (j >= 0 && j < path.length) {
+      run += Math.hypot(path[j][0] - previous[0], path[j][1] - previous[1]);
+      previous = path[j];
+      next = j + step;
+      if (next < 0 || next >= path.length) break;
+      if (Math.cos(Math.atan2(path[next][1] - path[j][1], path[next][0] - path[j][0]) - base + (step < 0 ? Math.PI : 0)) < 0.7) break;
+      j = next;
+    }
+    return run;
+  }
+
+  // src/vector-tiles/vectorLabelAnchors.js
+  function vectorLabelAnchors(path, spacing) {
+    const anchors = (
+      /* alloc */
+      []
+    );
+    let length = 0, i, walked, target, count, k, segment, t, point;
+    for (i = 1; i < path.length; i++) length += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+    count = Math.max(1, Math.floor(length / spacing));
+    i = 1;
+    walked = 0;
+    for (k = 0; k < count; k++) {
+      target = (k + 0.5) * length / count;
+      while (i < path.length - 1 && walked + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]) < target) {
+        walked += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+        i++;
+      }
+      segment = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      t = segment ? Math.min(1, Math.max(0, (target - walked) / segment)) : 0;
+      point = /* alloc */
+      [
+        path[i - 1][0] + (path[i][0] - path[i - 1][0]) * t,
+        path[i - 1][1] + (path[i][1] - path[i - 1][1]) * t
+      ];
+      anchors.push(
+        /* alloc */
+        {
+          point,
+          a: path[i - 1],
+          b: path[i],
+          length: vectorStraightRun(path, i, point, 1) + vectorStraightRun(path, i, point, -1)
+        }
+      );
+    }
+    return anchors;
+  }
+
   // src/vector-tiles/prepareVectorLabel.js
   function prepareVectorLabel(job, layer, entry, feature, order) {
     let text = entry.layout?.["text-field"];
     const { properties } = feature, { zoom } = job;
+    const icon = entry.layout?.["symbol-placement"] === "line" ? null : evaluateStyle(entry.layout?.["icon-image"], properties, zoom);
     if (Array.isArray(text)) text = evaluateStyle(text, properties, zoom);
-    if (typeof text !== "string") return;
+    if (typeof text !== "string") text = "";
     text = text.replace(/\{([^}]+)\}/g, vectorLabelProperty.bind(null, properties));
-    if (!text.trim()) return;
+    if (!text.trim() && typeof icon !== "string") return;
     if (entry.layout?.["text-transform"] === "uppercase") text = text.toUpperCase();
-    const path = feature.geometry[0];
-    if (!path?.length) return;
-    const point = path[Math.floor(path.length / 2)];
-    if (point[0] < 0 || point[0] >= layer.extent || point[1] < 0 || point[1] >= layer.extent) return;
-    job.labels.push(
+    const size = vectorStyleValue(entry.layout, "text-size", 12, properties, zoom), line = feature.type === 2 && text.trim();
+    const spacing = layer.extent / 16, anchors = (
       /* alloc */
-      {
-        text,
-        latlng: projectVectorPoint(point, job.coords, layer.extent),
-        order,
-        entry,
-        properties,
-        size: vectorStyleValue(entry.layout, "text-size", 12, properties, zoom),
-        color: vectorStyleValue(entry.paint, "text-color", "#000", properties, zoom),
-        halo: vectorStyleValue(entry.paint, "text-halo-color", "#fff", properties, zoom),
-        haloWidth: vectorStyleValue(entry.paint, "text-halo-width", 0, properties, zoom),
-        priority: (
-          /* alloc */
-          ["place_labels", "place"].includes(entry["source-layer"]) ? 0 : (
-            /* alloc */
-            ["street_labels", "transportation_name"].includes(entry["source-layer"]) ? 1 : 2
-          )
-        )
-      }
+      []
     );
+    let path, anchor;
+    for (path of line ? feature.geometry : feature.geometry.slice(0, 1)) {
+      if (!path?.length) continue;
+      if (!line) anchors.push(
+        /* alloc */
+        { point: path[Math.floor(path.length / 2)], a: null }
+      );
+      else for (anchor of vectorLabelAnchors(path, spacing)) anchors.push(anchor);
+    }
+    for (anchor of anchors) {
+      if (anchor.point[0] < 0 || anchor.point[0] >= layer.extent || anchor.point[1] < 0 || anchor.point[1] >= layer.extent) continue;
+      job.labels.push(
+        /* alloc */
+        {
+          text,
+          latlng: projectVectorPoint(anchor.point, job.coords, layer.extent),
+          order,
+          entry,
+          properties,
+          size,
+          pixelBase: anchor.length * 256 / layer.extent / 2 ** job.coords.z,
+          along: anchor.a ? (
+            /* alloc */
+            [
+              projectVectorPoint(anchor.a, job.coords, layer.extent),
+              projectVectorPoint(anchor.b, job.coords, layer.extent)
+            ]
+          ) : null,
+          icon: text.trim() ? null : icon,
+          iconOffset: evaluateStyle(entry.layout?.["icon-offset"], properties, zoom) || /* alloc */
+          [0, 0],
+          allowOverlap: entry.layout?.["icon-allow-overlap"] === true,
+          color: vectorStyleValue(entry.paint, "text-color", "#000", properties, zoom),
+          halo: vectorStyleValue(entry.paint, "text-halo-color", "#fff", properties, zoom),
+          haloWidth: vectorStyleValue(entry.paint, "text-halo-width", 0, properties, zoom),
+          priority: (
+            /* alloc */
+            ["place_labels", "place"].includes(entry["source-layer"]) ? 0 : (
+              /* alloc */
+              ["street_labels", "transportation_name"].includes(entry["source-layer"]) ? 1 : 2
+            )
+          )
+        }
+      );
+    }
   }
 
   // src/vector-style/readPaintValue.js
@@ -2141,25 +2219,6 @@
     return triangles;
   }
 
-  // src/vector-tiles/projectVectorTriangles.js
-  function projectVectorTriangles(geometry, coords, extent) {
-    const paths = (
-      /* alloc */
-      []
-    );
-    let triangle, projected, point;
-    for (triangle of triangulateVectorRings(geometry)) {
-      projected = /* alloc */
-      [];
-      for (point of triangle) projected.push(projectVectorPoint(point, coords, extent));
-      paths.push(
-        /* alloc */
-        [projected]
-      );
-    }
-    return paths;
-  }
-
   // src/vector-tiles/simplifyVectorPath.js
   function simplifyVectorPath(path, tolerance) {
     if (path.length < 3) return path;
@@ -2211,20 +2270,53 @@
     return output;
   }
 
+  // src/vector-tiles/projectVectorTriangles.js
+  function projectVectorTriangles(geometry, coords, extent, tolerance) {
+    const paths = (
+      /* alloc */
+      []
+    ), rings = (
+      /* alloc */
+      []
+    );
+    let triangle, projected, point, ring3;
+    for (ring3 of geometry) {
+      ring3 = simplifyVectorPath(ring3, tolerance);
+      if (ring3.length >= 4) rings.push(ring3);
+    }
+    for (triangle of triangulateVectorRings(rings)) {
+      projected = /* alloc */
+      [];
+      for (point of triangle) projected.push(projectVectorPoint(point, coords, extent));
+      paths.push(
+        /* alloc */
+        [projected]
+      );
+    }
+    return paths;
+  }
+
   // src/vector-tiles/projectVectorPaths.js
   function projectVectorPaths(geometry, coords, extent, tolerance) {
     const paths = (
       /* alloc */
       []
     );
-    let path, projected, point;
+    let path, simplified, projected, point;
     for (path of geometry) {
+      simplified = simplifyVectorPath(path, tolerance);
+      if (simplified.length < 3 && Math.hypot(simplified.at(-1)[0] - simplified[0][0], simplified.at(-1)[1] - simplified[0][1]) < tolerance * 2) continue;
       projected = /* alloc */
       [];
-      for (point of simplifyVectorPath(path, tolerance)) projected.push(projectVectorPoint(point, coords, extent));
+      for (point of simplified) projected.push(projectVectorPoint(point, coords, extent));
       paths.push(projected);
     }
     return paths;
+  }
+
+  // src/vector-tiles/vectorTolerance.js
+  function vectorTolerance(job, layer) {
+    return layer.extent / 256 / 2 ** Math.max(-1, job.mapZoom - job.coords.z) * 0.7;
   }
 
   // src/vector-tiles/vectorFeaturePaths.js
@@ -2232,8 +2324,8 @@
     const cache = entry.type === "fill" ? job.triangles : job.projected;
     let paths = cache.get(feature);
     if (!paths) {
-      const tolerance = layer.extent / 256 / 2 ** Math.max(0, job.maxZoom - job.coords.z) * 0.35;
-      paths = entry.type === "fill" ? projectVectorTriangles(feature.geometry, job.coords, layer.extent) : projectVectorPaths(feature.geometry, job.coords, layer.extent, tolerance);
+      const tolerance = vectorTolerance(job, layer);
+      paths = entry.type === "fill" ? projectVectorTriangles(feature.geometry, job.coords, layer.extent, tolerance) : projectVectorPaths(feature.geometry, job.coords, layer.extent, tolerance);
       cache.set(feature, paths);
     }
     return paths;
@@ -2290,6 +2382,18 @@
       /* alloc */
       /* @__PURE__ */ new Map()
     ), dependencies = vectorStyleDependencies(entry);
+    const outlineColor = entry.type === "fill" ? entry.paint?.["fill-outline-color"] : null;
+    const outline = outlineColor ? (
+      /* alloc */
+      {
+        ...entry,
+        type: "line",
+        paint: (
+          /* alloc */
+          { "line-color": outlineColor, "line-width": 1 }
+        )
+      }
+    ) : null;
     let feature, sampleZoom, paint, batch;
     for (feature of layer.features) {
       sampleZoom = vectorFeatureZoom(entry, feature.properties, job.zoom, job.maxZoom);
@@ -2299,13 +2403,26 @@
         continue;
       }
       paint = vectorFeaturePaint(entry, feature, sampleZoom, job.maxZoom);
-      if (paint) appendVectorBatch(job, layer, entry, feature, order, batches, dependencies, paint);
+      if (!paint) continue;
+      appendVectorBatch(job, layer, entry, feature, order, batches, dependencies, paint);
+      if (outline && feature.type === 3) {
+        appendVectorBatch(
+          job,
+          layer,
+          outline,
+          feature,
+          order,
+          batches,
+          dependencies,
+          vectorPaint(outline, feature.properties, sampleZoom)
+        );
+      }
     }
     for (batch of batches.values()) if (batch.paths.length) job.output.push(batch);
   }
 
   // src/vector-tiles/prepareVectorTile.js
-  function prepareVectorTile(buffer, coords, style, zoom, source, maxZoom = 19) {
+  function prepareVectorTile(buffer, coords, style, zoom, source, maxZoom = 19, mapZoom = zoom) {
     const layers = decodeVectorTile(buffer), byName = (
       /* alloc */
       /* @__PURE__ */ new Map()
@@ -2315,6 +2432,7 @@
       {
         coords,
         zoom,
+        mapZoom,
         maxZoom,
         output: (
           /* alloc */
@@ -2350,7 +2468,7 @@
   // src/workers/vectorTileWorker.js
   function onVectorTileMessage({ data }) {
     try {
-      const result = prepareVectorTile(data.buffer, data.coords, data.style, data.zoom, data.source, data.maxZoom);
+      const result = prepareVectorTile(data.buffer, data.coords, data.style, data.zoom, data.source, data.maxZoom, data.mapZoom);
       self.postMessage(
         /* alloc */
         { id: data.id, ...result }

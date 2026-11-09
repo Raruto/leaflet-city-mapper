@@ -4,6 +4,7 @@ import { revokeVectorWorkerUrl } from './revokeVectorWorkerUrl.js';
 
 export function onVectorTileRemove(map) {
   map.off(vectorTileEvents, this.refresh);
+  map.off('move rotate pitch', this.rotateLabels);
   clearTimeout(this.timer);
   this.session = null;
   this.worker.terminate();

@@ -1,10 +1,11 @@
 import { L } from '../globals/L.js';
 import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.js';
+import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { attachVectorTileBatches } from './attachVectorTileBatches.js';
 
 export async function loadVectorTile(tile) {
   const { coords, controller } = tile, session = this.session;
-  const { url, style, sourceId, maxZoom } = vectorTileOptionsByLayer.get(this);
+  const { url, style, sourceId, maxZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);
   const count = 2 ** coords.z, x = ((coords.x % count) + count) % count;
   let group;
   try {
@@ -16,7 +17,7 @@ export async function loadVectorTile(tile) {
     const id = ++this.sequence, prepared = Promise.withResolvers();
     this.waiting.set(id, prepared);
     this.worker.postMessage(/* alloc */ { type: 'vector', id, buffer, coords, style, source: sourceId, maxZoom,
-      zoom: this._map.getZoom() }, /* alloc */ [buffer]);
+      zoom: vectorStyleZoom(this), mapZoom: coords.z >= maxNativeZoom ? maxZoom : this._map.getZoom() }, /* alloc */ [buffer]);
     const data = await prepared.promise;
     if (controller.signal.aborted || this.session !== session) return;
     group = /* alloc */ new L.LayerGroup().addTo(this._map);

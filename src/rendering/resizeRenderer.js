@@ -2,6 +2,7 @@ import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sizeByLayer } from '../weakmaps/sizeByLayer.js';
 
 import { depthTexture as sharedDepthTexture } from '../globals/depthTexture.js';
+import { colorTexture as sharedColorTexture } from '../globals/colorTexture.js';
 
 
 import { destroyTexture } from '../textures/destroyTexture.js';
@@ -15,6 +16,14 @@ export function resizeRenderer(layer, size) {
     rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
     rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
     if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
+    rendererByLayer.get(layer).colorTexture?.destroy();
+    rendererByLayer.get(layer).colorTexture = rendererByLayer.get(layer).device.createTexture((
+      sharedColorTexture.size[0] = rendererByLayer.get(layer).canvas.width,
+      sharedColorTexture.size[1] = rendererByLayer.get(layer).canvas.height,
+      sharedColorTexture.format = rendererByLayer.get(layer).format,
+      sharedColorTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT,
+      sharedColorTexture
+    ));
     rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((
       sharedDepthTexture.size[0] = rendererByLayer.get(layer).canvas.width,
       sharedDepthTexture.size[1] = rendererByLayer.get(layer).canvas.height,

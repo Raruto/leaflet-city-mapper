@@ -2,7 +2,9 @@ import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.j
 import { geometryWorkerUrl } from '../globals/geometryWorkerUrl.js';
 import { vectorTileEvents } from '../globals/vectorTileEvents.js';
 import { evaluateStyle } from '../vector-style/evaluateStyle.js';
+import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { refreshVectorTiles } from './refreshVectorTiles.js';
+import { rotateVectorLabels } from './rotateVectorLabels.js';
 import { onVectorTileMessage } from './onVectorTileMessage.js';
 import { onVectorTileWorkerError } from './onVectorTileWorkerError.js';
 import { createGeometryWorker } from '../workers/createGeometryWorker.js';
@@ -16,7 +18,7 @@ export function onVectorTileAdd(map) {
   }
   for (entry of style) {
     if (entry.type !== 'background') continue;
-    map.getContainer().style.background = evaluateStyle(entry.paint['background-color'], /* alloc */ {}, map.getZoom());
+    map.getContainer().style.background = evaluateStyle(entry.paint['background-color'], /* alloc */ {}, vectorStyleZoom(this));
     break;
   }
   this.session = /* alloc */ {};
@@ -30,6 +32,8 @@ export function onVectorTileAdd(map) {
   this.worker.onmessage = onVectorTileMessage.bind(this);
   this.worker.onerror = onVectorTileWorkerError.bind(this);
   this.refresh = refreshVectorTiles.bind(this);
+  this.rotateLabels = rotateVectorLabels.bind(this);
   map.on(vectorTileEvents, this.refresh);
+  map.on('move rotate pitch', this.rotateLabels);
   this.update();
 }

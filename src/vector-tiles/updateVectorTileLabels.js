@@ -14,9 +14,9 @@ export async function updateVectorTileLabels() {
   for (label of candidates) {
     if (++visited % 128 === 0) await yieldTask();
     if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
-    cells = vectorLabelCells(this._map, label, size);
-    if (!cells || !reserveVectorLabelCells(cells, occupied)) continue;
-    key = `${label.text}:${label.latlng.join(':')}`;
+    cells = vectorLabelCells(this, label, size);
+    if (!cells || !label.allowOverlap && !reserveVectorLabelCells(cells, occupied)) continue;
+    key = `${label.text}${label.icon || ''}:${label.latlng.join(':')}`;
     retained.add(key);
     if (updateVectorLabelMarker(this, label, key)) await yieldTask();
   }

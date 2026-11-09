@@ -1595,6 +1595,15 @@
   var depthTexture = {
     size: [null, null],
     format: "depth24plus",
+    sampleCount: 4,
+    usage: null
+  };
+
+  // src/globals/colorTexture.js
+  var colorTexture = {
+    size: [null, null],
+    format: null,
+    sampleCount: 4,
     usage: null
   };
 
@@ -1627,6 +1636,8 @@
       rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
       rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
       if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
+      rendererByLayer.get(layer).colorTexture?.destroy();
+      rendererByLayer.get(layer).colorTexture = rendererByLayer.get(layer).device.createTexture((colorTexture.size[0] = rendererByLayer.get(layer).canvas.width, colorTexture.size[1] = rendererByLayer.get(layer).canvas.height, colorTexture.format = rendererByLayer.get(layer).format, colorTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, colorTexture));
       rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((depthTexture.size[0] = rendererByLayer.get(layer).canvas.width, depthTexture.size[1] = rendererByLayer.get(layer).canvas.height, depthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, depthTexture));
       sizeByLayer.set(layer, size);
     }
@@ -2997,6 +3008,7 @@
   var scenePass = {
     colorAttachments: [{
       view: null,
+      resolveTarget: null,
       clearValue: {
         r: 0,
         g: 0,
@@ -3039,6 +3051,7 @@
       cullMode: null,
       frontFace: null
     },
+    multisample: { count: 4 },
     depthStencil: {
       format: "depth24plus",
       depthWriteEnabled: null,
@@ -3331,8 +3344,9 @@
   // src/rendering/drawSceneMeshes.js
   function drawSceneMeshes(layer, encoder, meshes) {
     const renderer = rendererByLayer.get(layer);
-    const pass = encoder.beginRenderPass((scenePass.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(), scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(), scenePass));
+    const pass = encoder.beginRenderPass((scenePass.colorAttachments[0].view = renderer.colorTexture.createView(), scenePass.colorAttachments[0].resolveTarget = renderer.context.getCurrentTexture().createView(), scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(), scenePass));
     scenePass.colorAttachments[0].view = null;
+    scenePass.colorAttachments[0].resolveTarget = null;
     scenePass.depthStencilAttachment.view = null;
     pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
     pass.setBindGroup(1, renderer.sunlight.bindGroup);
@@ -7970,6 +7984,599 @@
     _getTiledPixelBounds: gridlayerGetTiledPixelBounds
   });
 
+  // src/sunlight/initSunlight.js
+  init_L();
+
+  // src/weakmaps/timeControlByMap.js
+  var timeControlByMap = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sunlightByControl.js
+  var sunlightByControl = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sunByMap.js
+  var sunByMap = /* @__PURE__ */ new WeakMap();
+
+  // src/sunlight/createSun.js
+  init_L();
+
+  // src/sunlight/updateSky.js
+  init_pitchSkyByMap();
+  init_radians();
+  init_mapGetPitch();
+  init_mapGetBearing();
+
+  // src/projections/projectCelestialBody.js
+  function projectCelestialBody(dir, size, pitch, bearing, target) {
+    const [x, y, z] = dir;
+    const forward = -x * Math.sin(bearing) * Math.sin(pitch) - y * Math.cos(pitch) - z * Math.cos(bearing) * Math.sin(pitch);
+    if (forward > 0) {
+      target ||= /* alloc */
+      {};
+      target.left = size.x / 2 + size.y * 1.5 * (x * Math.cos(bearing) - z * Math.sin(bearing)) / forward;
+      target.top = size.y / 2 - size.y * 1.5 * (-x * Math.sin(bearing) * Math.cos(pitch) + y * Math.sin(pitch) - z * Math.cos(bearing) * Math.cos(pitch)) / forward;
+      return target;
+    }
+    return null;
+  }
+
+  // src/sunlight/updateCelestialDisc.js
+  function updateCelestialDisc(disc, body, sky, size, pitch, bearing, projection) {
+    disc.hidden = true;
+    if (!sky || !body || body.altitude <= 0) return;
+    if (disc.parentNode !== sky) sky.append(disc);
+    const point = projectCelestialBody(body.direction, size, pitch, bearing, projection);
+    if (!point) return;
+    const { left, top } = point;
+    disc.hidden = left < 0 || left > size.x || top < 0 || top > sky.clientHeight || sky.style.display === "none";
+    disc.style.left = `${left}px`;
+    disc.style.top = `${top}px`;
+  }
+
+  // src/sunlight/updateSky.js
+  function updateSky2({ map, originalSky, sunDisc, moonDisc, projection }) {
+    const sun = sunlightByMap.get(map), sky = pitchSkyByMap.get(map);
+    if (sun) map.getContainer().style.setProperty("--leaflet-sky-background", sun.background);
+    else if (originalSky) map.getContainer().style.setProperty("--leaflet-sky-background", originalSky);
+    else map.getContainer().style.removeProperty("--leaflet-sky-background");
+    const size = map.getSize(), pitch = mapGetPitch(map) * radians, bearing = mapGetBearing(map) * radians;
+    updateCelestialDisc(sunDisc, sun, sky, size, pitch, bearing, projection);
+    updateCelestialDisc(moonDisc, sun?.moon, sky, size, pitch, bearing, projection);
+  }
+
+  // src/globals/atmosphereStops.js
+  var atmosphereStops = [
+    [
+      -18,
+      [3, 7, 20],
+      [17, 28, 54],
+      [0.025, 0.04, 0.09]
+    ],
+    [
+      -6,
+      [37, 53, 84],
+      [182, 106, 86],
+      [0.12, 0.1, 0.14]
+    ],
+    [
+      0,
+      [101, 131, 171],
+      [246, 170, 115],
+      [0.38, 0.24, 0.18]
+    ],
+    [
+      10,
+      [74, 147, 208],
+      [197, 221, 237],
+      [0.8, 0.75, 0.68]
+    ],
+    [
+      25,
+      [53, 144, 213],
+      [223, 238, 250],
+      [1, 1, 1]
+    ]
+  ];
+
+  // src/globals/atmosphereColor.js
+  var atmosphereColor = [0, 0, 0];
+
+  // src/colors/mixColor.js
+  function mix(a, b, t, values) {
+    values ||= /* alloc */
+    [];
+    values.length = a.length;
+    let i;
+    for (i = 0; i < a.length; i++) values[i] = a[i] + (b[i] - a[i]) * t;
+    return values;
+  }
+
+  // src/colors/formatRGB.js
+  function rgb(values) {
+    let rounded = "", i;
+    for (i = 0; i < values.length; i++) {
+      if (i) rounded += ", ";
+      rounded += Math.round(values[i]);
+    }
+    return `rgb(${rounded})`;
+  }
+
+  // src/sunlight/atmosphere.js
+  function atmosphere(altitude) {
+    if (!Number.isFinite(altitude)) {
+      throw (
+        /* alloc */
+        new Error("Invalid solar altitude")
+      );
+    }
+    const stops = atmosphereStops;
+    let upper = -1;
+    let i;
+    for (i = 0; i < stops.length; i++) {
+      if (stops[i][0] >= altitude) {
+        upper = i;
+        break;
+      }
+    }
+    const b = stops[upper < 0 ? stops.length - 1 : upper], a = stops[Math.max(0, upper - 1)];
+    const t = a === b || upper < 0 ? 1 : (altitude - a[0]) / (b[0] - a[0]);
+    return (
+      /* alloc */
+      {
+        background: `linear-gradient(${rgb(mix(a[1], b[1], t, atmosphereColor))}, ${rgb(mix(a[2], b[2], t, atmosphereColor))})`,
+        tint: mix(a[3], b[3], t)
+      }
+    );
+  }
+
+  // src/astronomy/solarTime.js
+  function solarTime(date, lat, lng) {
+    const time = date instanceof Date ? Date.prototype.getTime.call(date) : typeof date === "string" ? Date.parse(date) : (
+      /* alloc */
+      new Date(date).getTime()
+    );
+    if (!Number.isFinite(time) || !Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+      throw (
+        /* alloc */
+        new Error("Invalid solar date or location")
+      );
+    }
+    return time;
+  }
+
+  // src/astronomy/horizontalPosition.js
+  init_radians();
+  function horizontalPosition(d, lat, lng, ascension, declination) {
+    const hourAngle = (280.16 + 360.9856235 * d + lng) * radians - ascension;
+    const latitude = lat * radians;
+    const altitude = Math.asin(Math.sin(latitude) * Math.sin(declination) + Math.cos(latitude) * Math.cos(declination) * Math.cos(hourAngle));
+    const southAzimuth = Math.atan2(
+      Math.sin(hourAngle),
+      Math.cos(hourAngle) * Math.sin(latitude) - Math.tan(declination) * Math.cos(latitude)
+    );
+    const azimuth = (southAzimuth / radians + 180 + 360) % 360;
+    return (
+      /* alloc */
+      {
+        altitude: altitude / radians,
+        azimuth,
+        direction: (
+          /* alloc */
+          [
+            Math.sin(azimuth * radians) * Math.cos(altitude),
+            Math.sin(altitude),
+            -Math.cos(azimuth * radians) * Math.cos(altitude)
+          ]
+        )
+      }
+    );
+  }
+
+  // src/astronomy/moonPosition.js
+  init_radians();
+
+  // src/globals/sinObliquity.js
+  init_radians();
+  var sinObliquity = Math.sin(23.4397 * radians);
+
+  // src/globals/cosObliquity.js
+  init_radians();
+  var cosObliquity = Math.cos(23.4397 * radians);
+
+  // src/astronomy/moonPosition.js
+  function moonPosition(date, lat, lng) {
+    const d = solarTime(date, lat, lng) / 864e5 - 10957.5;
+    const anomaly = (134.963 + 13.064993 * d) * radians;
+    const longitude = (218.316 + 13.176396 * d + 6.289 * Math.sin(anomaly)) * radians;
+    const latitude = 5.128 * Math.sin((93.272 + 13.22935 * d) * radians) * radians;
+    const x = Math.cos(latitude) * Math.cos(longitude);
+    const y = Math.cos(latitude) * Math.sin(longitude) * cosObliquity - Math.sin(latitude) * sinObliquity;
+    const z = Math.cos(latitude) * Math.sin(longitude) * sinObliquity + Math.sin(latitude) * cosObliquity;
+    return horizontalPosition(d, lat, lng, Math.atan2(y, x), Math.asin(z));
+  }
+
+  // src/astronomy/solarPosition.js
+  init_radians();
+  function solarPosition(date, lat, lng) {
+    const time = solarTime(date, lat, lng);
+    const d = time / 864e5 - 10957.5;
+    const mean = (357.5291 + 0.98560028 * d) * radians;
+    const longitude = mean + (1.9148 * Math.sin(mean) + 0.02 * Math.sin(2 * mean) + 3e-4 * Math.sin(3 * mean) + 102.9372 + 180) * radians;
+    const declination = Math.asin(Math.sin(longitude) * sinObliquity);
+    const ascension = Math.atan2(Math.sin(longitude) * cosObliquity, Math.cos(longitude));
+    return horizontalPosition(d, lat, lng, ascension, declination);
+  }
+
+  // src/sunlight/requestSunlightRender.js
+  function render2(map) {
+    const renderer = renderers.get(map);
+    if (renderer) update(renderer);
+  }
+
+  // src/sunlight/updateSun.js
+  function updateSun(state) {
+    const { control, map, date, slider, output, status } = state;
+    try {
+      if (control.live) control.time = /* alloc */
+      /* @__PURE__ */ new Date();
+      const time = control.time.toISOString();
+      date.value = time.slice(0, 10);
+      slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
+      output.textContent = `${time.slice(11, 16)} UTC${control.live ? " \xB7 now" : ""}`;
+      const center = map.getCenter();
+      const sun = solarPosition(control.time, center.lat, center.lng);
+      sunlightByMap.set(map, sun);
+      Object.assign(sun, atmosphere(sun.altitude));
+      sun.moon = moonPosition(control.time, center.lat, center.lng);
+      status.textContent = sun.altitude <= 0 ? "Night \xB7 no direct sunlight" : sun.altitude < 3 ? "Low sun \xB7 shadows paused" : `Sun altitude ${sun.altitude.toFixed(1)}\xB0`;
+      map.fire(
+        "simulationtimechange",
+        /* alloc */
+        {
+          time: (
+            /* alloc */
+            new Date(control.time)
+          ),
+          live: control.live
+        }
+      );
+      updateSky2(state);
+      render2(map);
+    } catch (error) {
+      sunlightByMap.delete(map);
+      updateSky2(state);
+      render2(map);
+      status.textContent = `Error: ${error.message}`;
+      console.error("Solar simulation", error);
+    }
+  }
+
+  // src/sunlight/useLiveTime.js
+  function useLiveTime(state) {
+    state.control.live = true;
+    updateSun(state);
+  }
+
+  // src/sunlight/useSelectedTime.js
+  function useSelectedTime(state) {
+    const { control, map, date, slider, status } = state;
+    control.live = false;
+    if (!date.value || !date.validity.valid) {
+      control.time = /* alloc */
+      /* @__PURE__ */ new Date(NaN);
+      map.fire(
+        "simulationtimechange",
+        /* alloc */
+        { time: null, live: false }
+      );
+      sunlightByMap.delete(map);
+      updateSky2(state);
+      render2(map);
+      status.textContent = "Error: choose a valid solar date";
+      return;
+    }
+    control.time = /* alloc */
+    /* @__PURE__ */ new Date(`${date.value}T00:00:00Z`);
+    control.time.setUTCMinutes(Number(slider.value));
+    updateSun(state);
+  }
+
+  // src/sunlight/createSun.js
+  function createSun(map) {
+    const disc = "position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;";
+    const sunDisc = L.DomUtil.create("div", "sunlight-sun");
+    const moonDisc = L.DomUtil.create("div", "sunlight-moon");
+    sunDisc.style.cssText = disc + "background:#fff3bd;box-shadow:0 0 18px 7px #ffd27699;";
+    moonDisc.style.cssText = disc + "background:#dce5f2;box-shadow:0 0 10px 2px #cbdcff55;";
+    sunDisc.setAttribute("role", "img");
+    sunDisc.setAttribute("aria-label", "Sun");
+    moonDisc.setAttribute("role", "img");
+    moonDisc.setAttribute("aria-label", "Moon");
+    const container = L.DomUtil.create("div", "sunlight-control");
+    container.style.cssText = "color:#222;width:min(200px,calc(100vw - 60px));font:12px/1.4 sans-serif;";
+    const date = document.createElement("input");
+    date.type = "date";
+    date.style.cssText = "width:100%;box-sizing:border-box;";
+    date.setAttribute("aria-label", "Solar date (UTC)");
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 4px;cursor:pointer;";
+    slider.min = "0";
+    slider.max = "1439";
+    slider.step = "1";
+    slider.setAttribute("aria-label", "Time of day (UTC)");
+    const output = document.createElement("output");
+    output.style.cssText = "font-weight:bold;font-variant-numeric:tabular-nums;";
+    output.setAttribute("aria-live", "off");
+    const now = document.createElement("button");
+    now.type = "button";
+    now.textContent = "Now";
+    const timeRow = document.createElement("div");
+    timeRow.className = "sunlight-time";
+    timeRow.style.cssText = "display:flex;justify-content:space-between;align-items:center;";
+    timeRow.append(output, now);
+    const status = document.createElement("div");
+    status.className = "sunlight-status";
+    status.style.marginTop = "5px";
+    status.setAttribute("role", "status");
+    const note = document.createElement("small");
+    note.style.color = "#555";
+    container.append(date, slider, timeRow, status, note);
+    const state = (
+      /* alloc */
+      {
+        control: null,
+        map,
+        originalSky: "",
+        container,
+        sunDisc,
+        moonDisc,
+        date,
+        slider,
+        output,
+        status,
+        projection: (
+          /* alloc */
+          { left: 0, top: 0 }
+        )
+      }
+    );
+    state.update = updateSun.bind(null, state);
+    state.updateSky = updateSky2.bind(null, state);
+    now.onclick = useLiveTime.bind(null, state);
+    date.onchange = slider.oninput = useSelectedTime.bind(null, state);
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.disableScrollPropagation(container);
+    return state;
+  }
+
+  // src/sunlight/tickSun.js
+  function tickSun(state) {
+    if (state.control.live) updateSun(state);
+  }
+
+  // src/sunlight/onAddSun.js
+  function onAddSun(control, map) {
+    let state = sunByMap.get(map);
+    if (state?.control && state.control !== control) {
+      control._map = null;
+      if (control.layer._map === map) map.removeLayer(control.layer);
+      throw (
+        /* alloc */
+        new Error("Only one Time control can be active per map")
+      );
+    }
+    if (!state) {
+      state = createSun(map);
+      sunByMap.set(map, state);
+    }
+    state.control = control;
+    state.originalSky = map.getContainer().style.getPropertyValue("--leaflet-sky-background");
+    timeControlByMap.set(map, control);
+    sunlightByControl.set(control, state);
+    state.update();
+    state.timer = setInterval(tickSun, 6e4, state);
+    map.on("moveend", state.update);
+    map.on("move rotate pitch resize", state.updateSky);
+    return state.container;
+  }
+
+  // src/layer-controls/placeEntry.js
+  init_L();
+
+  // src/layer-controls/placeEntryElement.js
+  init_L();
+  function placeEntryElement(input, layer, element) {
+    const label = input.closest("label");
+    if (element.classList.contains("layer-count")) {
+      if (!input.hasAttribute("aria-label")) input.setAttribute("aria-label", label.textContent.trim());
+      element.id = `leaflet-layer-count-${L.Util.stamp(layer)}`;
+      input.setAttribute("aria-describedby", element.id);
+      label.append(element);
+    } else if (element.classList.contains("traffic-status")) {
+      let group = label.nextElementSibling;
+      if (!group?.classList.contains("traffic-status-group")) {
+        group = L.DomUtil.create("div", "traffic-status-group");
+        group.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;max-width:200px;margin:2px 0 6px 20px;";
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", "Traffic counts");
+        label.after(group);
+      }
+      group.append(element);
+    } else label.after(element);
+  }
+
+  // src/layer-controls/placeEntry.js
+  function placeEntry(map, layer, element) {
+    let input, entry;
+    for (input of map.getContainer().querySelectorAll(".leaflet-control-layers-selector")) {
+      entry = map._layers[input.layerId];
+      if (input.layerId === L.Util.stamp(layer) || entry instanceof L.LayerGroup && entry.hasLayer(layer)) {
+        placeEntryElement(input, layer, element);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // src/layer-controls/placeUnderEntry.js
+  function placeUnderEntry(state) {
+    const nested = placeEntry(state.map, state.layer, state.element);
+    const onPlace = state.onPlace;
+    onPlace?.(nested);
+    return nested;
+  }
+
+  // src/globals/pendingPlacements.js
+  var pendingPlacements = [];
+
+  // src/layer-controls/runPlacements.js
+  function runPlacements() {
+    const state = pendingPlacements.shift();
+    if (state?.map.hasLayer(state.layer)) placeUnderEntry(state);
+  }
+
+  // src/layer-controls/replaceEntry.js
+  function replaceEntry() {
+    pendingPlacements.push(this);
+    queueMicrotask(runPlacements);
+  }
+
+  // src/layer-controls/removeEntry.js
+  function removeEntry() {
+    this.map.off("layeradd layerremove", replaceEntry, this);
+    const group = this.element.parentElement;
+    this.element.remove();
+    if (group?.classList.contains("traffic-status-group") && !group.childElementCount) group.remove();
+  }
+
+  // src/layer-controls/underEntry.js
+  function underEntry(layer, element, onPlace) {
+    const state = (
+      /* alloc */
+      { map: layer._map, layer, element, onPlace }
+    );
+    state.map.on("layeradd layerremove", replaceEntry, state);
+    layer.once("remove", removeEntry, state);
+    return placeUnderEntry(state);
+  }
+
+  // src/weakmaps/controlByLayer.js
+  var controlByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/sunlight/initializeTimeControl.js
+  init_L();
+
+  // src/sunlight/addTimeLayer.js
+  function addTimeLayer(map) {
+    return controlByLayer.get(this).addTo(map);
+  }
+
+  // src/sunlight/removeTimeLayer.js
+  init_L();
+  function removeTimeLayer() {
+    return L.Control.prototype.remove.call(controlByLayer.get(this));
+  }
+
+  // src/sunlight/initializeTimeControl.js
+  function initialize(options) {
+    L.Util.setOptions(this, options);
+    this.live = true;
+    this.layer = /* alloc */
+    new L.Layer();
+    controlByLayer.set(this.layer, this);
+    kindByLayer.set(this.layer, "time");
+  }
+
+  // src/sunlight/onAddTimeControl.js
+  function onAdd(map) {
+    return onAddSun(this, map);
+  }
+
+  // src/sunlight/addTimeControlToMap.js
+  init_L();
+
+  // src/sunlight/styleTimeControl.js
+  function styleTimeControl(container, nested) {
+    container.classList.toggle("leaflet-control", !nested);
+    container.classList.toggle("leaflet-bar", !nested);
+    container.style.background = nested ? "" : "#fff";
+    container.style.padding = nested ? "2px 0 6px 20px" : "8px";
+    container.style.margin = nested ? "0" : "";
+  }
+
+  // src/sunlight/addTimeControlToMap.js
+  function addTo(map) {
+    L.Control.prototype.addTo.call(this, map);
+    const container = this.getContainer();
+    if (this.layer._map === map) underEntry(this.layer, container, styleTimeControl.bind(null, container));
+    else styleTimeControl(container, false);
+    return this;
+  }
+
+  // src/sunlight/removeTimeControl.js
+  init_L();
+  function remove() {
+    if (this._map?.hasLayer(this.layer)) {
+      this._map.removeLayer(this.layer);
+      return this;
+    }
+    return L.Control.prototype.remove.call(this);
+  }
+
+  // src/sunlight/removeSun.js
+  function removeSun(state) {
+    const { map, timer, sunDisc, moonDisc } = state;
+    const shared = sunByMap.get(map);
+    clearInterval(timer);
+    timeControlByMap.delete(map);
+    map.fire(
+      "simulationtimechange",
+      /* alloc */
+      { time: null, live: false }
+    );
+    map.off("moveend", state.update);
+    map.off("move rotate pitch resize", state.updateSky);
+    sunlightByMap.delete(map);
+    updateSky2(state);
+    sunDisc.remove();
+    moonDisc.remove();
+    render2(map);
+    if (shared === state) shared.control = null;
+  }
+
+  // src/sunlight/onRemoveSun.js
+  function onRemoveSun() {
+    const sunlight = sunlightByControl.get(this);
+    if (!sunlight) return;
+    removeSun(sunlight);
+    sunlightByControl.delete(this);
+  }
+
+  // src/sunlight/initSunlight.js
+  L.Control.Time = L.Control.extend({
+    options: { position: "bottomright" },
+    initialize,
+    onAdd,
+    onRemove: onRemoveSun,
+    addTo,
+    remove
+  });
+
+  // src/walk/initWalk.js
+  init_L();
+
+  // src/walk/initializeWalkControl.js
+  init_L();
+
+  // src/weakmaps/typeByLayer.js
+  var typeByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/walkerByLayer.js
+  var walkerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/walk/createWalk.js
+  init_L();
+
   // src/weakmaps/addedByLayer.js
   var addedByLayer = /* @__PURE__ */ new WeakMap();
 
@@ -10281,86 +10888,6 @@
     }
   }
 
-  // src/layer-controls/placeEntry.js
-  init_L();
-
-  // src/layer-controls/placeEntryElement.js
-  init_L();
-  function placeEntryElement(input, layer, element) {
-    const label = input.closest("label");
-    if (element.classList.contains("layer-count")) {
-      if (!input.hasAttribute("aria-label")) input.setAttribute("aria-label", label.textContent.trim());
-      element.id = `leaflet-layer-count-${L.Util.stamp(layer)}`;
-      input.setAttribute("aria-describedby", element.id);
-      label.append(element);
-    } else if (element.classList.contains("traffic-status")) {
-      let group = label.nextElementSibling;
-      if (!group?.classList.contains("traffic-status-group")) {
-        group = L.DomUtil.create("div", "traffic-status-group");
-        group.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;max-width:200px;margin:2px 0 6px 20px;";
-        group.setAttribute("role", "group");
-        group.setAttribute("aria-label", "Traffic counts");
-        label.after(group);
-      }
-      group.append(element);
-    } else label.after(element);
-  }
-
-  // src/layer-controls/placeEntry.js
-  function placeEntry(map, layer, element) {
-    let input, entry;
-    for (input of map.getContainer().querySelectorAll(".leaflet-control-layers-selector")) {
-      entry = map._layers[input.layerId];
-      if (input.layerId === L.Util.stamp(layer) || entry instanceof L.LayerGroup && entry.hasLayer(layer)) {
-        placeEntryElement(input, layer, element);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // src/layer-controls/placeUnderEntry.js
-  function placeUnderEntry(state) {
-    const nested = placeEntry(state.map, state.layer, state.element);
-    const onPlace = state.onPlace;
-    onPlace?.(nested);
-    return nested;
-  }
-
-  // src/globals/pendingPlacements.js
-  var pendingPlacements = [];
-
-  // src/layer-controls/runPlacements.js
-  function runPlacements() {
-    const state = pendingPlacements.shift();
-    if (state?.map.hasLayer(state.layer)) placeUnderEntry(state);
-  }
-
-  // src/layer-controls/replaceEntry.js
-  function replaceEntry() {
-    pendingPlacements.push(this);
-    queueMicrotask(runPlacements);
-  }
-
-  // src/layer-controls/removeEntry.js
-  function removeEntry() {
-    this.map.off("layeradd layerremove", replaceEntry, this);
-    const group = this.element.parentElement;
-    this.element.remove();
-    if (group?.classList.contains("traffic-status-group") && !group.childElementCount) group.remove();
-  }
-
-  // src/layer-controls/underEntry.js
-  function underEntry(layer, element, onPlace) {
-    const state = (
-      /* alloc */
-      { map: layer._map, layer, element, onPlace }
-    );
-    state.map.on("layeradd layerremove", replaceEntry, state);
-    layer.once("remove", removeEntry, state);
-    return placeUnderEntry(state);
-  }
-
   // src/layer-controls/layerCountTitle.js
   function layerCountTitle(layer, formatted, pending, error) {
     return error ? `Unable to load: ${typeof error === "string" ? error : error.message}` : `${formatted} loaded ${modelUrlByLayer.get(layer) ? "models" : "elements"} in the current area${pending ? `; ${pending} blocks loading` : ""}`;
@@ -10446,22 +10973,1169 @@
     readyByLayer.get(layer).catch(noOperation);
   }
 
-  // src/raster/initRaster.js
-  init_L();
-
-  // src/globals/wantedTiles.js
-  var wantedTiles = /* @__PURE__ */ new Map();
-
-  // src/globals/coverageTiles.js
-  var coverageTiles = /* @__PURE__ */ new Map();
-
-  // src/raster/comparePendingTiles.js
-  function comparePendingTiles(a, b) {
-    return a.tile.coords.z - b.tile.coords.z || a.distance - b.distance;
+  // src/walk/onWalkBlur.js
+  function onBlur() {
+    this.keys.clear();
   }
 
-  // src/globals/blobParts.js
-  var blobParts = [null];
+  // src/globals/moves.js
+  var moves = {
+    KeyW: [1, 0],
+    ArrowUp: [1, 0],
+    KeyS: [-1, 0],
+    ArrowDown: [-1, 0],
+    KeyD: [0, 1],
+    ArrowRight: [0, 1],
+    KeyA: [0, -1],
+    ArrowLeft: [0, -1]
+  };
+
+  // src/walk/stopWalking.js
+  init_L();
+  init_mapSetPitch();
+
+  // src/walk/onWalkPointer.js
+  init_mapSetPitchAndBearing();
+  init_mapGetPitch();
+  init_mapGetBearing();
+  function onPointer(event) {
+    const map = this.layer._map;
+    if (event.type === "pointerdown") {
+      if (event.button !== 0 || event.target.closest(".leaflet-control")) return;
+      this.dragX = event.clientX;
+      this.dragY = event.clientY;
+      this.dragging = true;
+      map.getContainer().setPointerCapture(event.pointerId);
+    } else if (this.dragging && event.type === "pointermove") {
+      mapSetPitchAndBearing(map, Math.max(20, Math.min(85, mapGetPitch(map) - (event.clientY - this.dragY) * 0.2)), mapGetBearing(map) - (event.clientX - this.dragX) * 0.25);
+      this.dragX = event.clientX;
+      this.dragY = event.clientY;
+    } else this.dragging = false;
+  }
+
+  // src/globals/limbs.js
+  var limbs = [
+    ["body", 0, 0, 0],
+    ["leg", -0.09, 0.9, 1],
+    ["leg", 0.09, 0.9, -1],
+    ["arm", -0.25, 1.42, -1],
+    ["arm", 0.25, 1.42, 1]
+  ];
+
+  // src/projections/walkerLocalPosition.js
+  init_radians();
+  function local(output) {
+    const { layer, state } = this;
+    const map = layer._map, crs = map.options.crs;
+    const location2 = locationByLayer.get(layer), root = rootByLayer.get(layer);
+    const origin = crs.project(location2), metres = Math.cos(location2.lat * radians);
+    const p = crs.project(state.latlng);
+    const ground = mapElevationOf(map, state.latlng) || 0;
+    output[0] = (p.x - origin.x) * metres;
+    output[1] = ground + (state.height ?? 0) - root.position[1];
+    output[2] = -(p.y - origin.y) * metres;
+    return output;
+  }
+
+  // src/walk/placeWalker.js
+  function place() {
+    const [x, y, z] = local.call(this, this.local);
+    const yaw = -this.state.heading, cos = Math.cos(yaw), sin = Math.sin(yaw);
+    let i, px, py, sign, mesh;
+    for (i = 0; i < limbs.length; i++) {
+      [, px, py, sign] = limbs[i];
+      mesh = this.meshes[i];
+      mesh.position[0] = x + px * cos;
+      mesh.position[1] = y + py;
+      mesh.position[2] = z - px * sin;
+      mesh.rotation[0] = sign * this.swing * Math.sin(this.state.phase);
+      mesh.rotation[1] = yaw;
+    }
+    update(this.layer);
+  }
+
+  // src/walk/onWalkTerrain.js
+  function onTerrain() {
+    if (this.meshes) place.call(this);
+  }
+
+  // src/walk/stopWalking.js
+  function stop() {
+    const map = this.layer._map;
+    cancelAnimationFrame(this.frame);
+    this.keys.clear();
+    this.dragging = false;
+    this.state.height = this.verticalSpeed = 0;
+    L.DomEvent.off(document, "keydown keyup", this.onKey);
+    L.DomEvent.off(window, "blur", this.onBlur);
+    let mesh, name;
+    if (this.meshes) for (mesh of this.meshes) disposeMesh(this.layer, mesh);
+    this.meshes = null;
+    this.button.setAttribute("aria-pressed", "false");
+    this.button.style.background = "#fff";
+    this.hint.style.display = "none";
+    if (!map || !this.saved) return;
+    L.DomEvent.off(map.getContainer(), "pointerdown pointermove pointerup pointercancel", this.onPointer);
+    map.off("terrainchange", this.onTerrain);
+    map.options.scrollWheelZoom = this.saved.scrollWheelZoom;
+    for (name of this.saved.handlers) map[name].enable();
+    map.setView(
+      this.state.latlng,
+      this.saved.zoom,
+      /* alloc */
+      { animate: false }
+    );
+    mapSetPitch(map, this.saved.pitch);
+    this.saved = null;
+  }
+
+  // src/walk/onWalkKey.js
+  function onKey(event) {
+    if (event.type === "keyup" && event.code === "Space") this.keys.delete("Space");
+    if (event.target.closest?.("input:not([type=checkbox], [type=radio]), select, textarea, [contenteditable]") || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.type === "keydown" && event.code === "Escape") {
+      this.stop();
+      return;
+    }
+    if (!moves[event.code] && event.code !== "Space") return;
+    event.preventDefault();
+    if (event.type === "keydown") this.keys.add(event.code);
+    else this.keys.delete(event.code);
+  }
+
+  // src/walk/startWalking.js
+  init_radians();
+  init_L();
+
+  // src/globals/sceneWalkHandlers.js
+  var sceneWalkHandlers = ["dragging", "keyboard", "doubleClickZoom", "boxZoom"];
+
+  // src/walk/startWalking.js
+  init_mapGetPitch();
+  init_mapGetBearing();
+  init_mapSetPitch();
+
+  // src/geometry/box.js
+  function box(x0, x1, z0, z1) {
+    return (
+      /* alloc */
+      [
+        /* alloc */
+        [x0, z0],
+        /* alloc */
+        [x1, z0],
+        /* alloc */
+        [x1, z1],
+        /* alloc */
+        [x0, z1]
+      ]
+    );
+  }
+
+  // src/globals/trousers.js
+  var trousers = [0.16, 0.2, 0.32];
+
+  // src/globals/shirt.js
+  var shirt = [0.75, 0.2, 0.15];
+
+  // src/globals/skin.js
+  var skin = [0.85, 0.64, 0.5];
+
+  // src/globals/dark.js
+  var dark = [0.08, 0.07, 0.06];
+
+  // src/globals/parts.js
+  var parts = {
+    body: [
+      [box(-0.17, 0.17, -0.1, 0.1), 0.82, 0.95, trousers],
+      [box(-0.19, 0.19, -0.11, 0.11), 0.95, 1.44, shirt],
+      [box(-0.05, 0.05, -0.05, 0.05), 1.44, 1.5, skin],
+      [box(-0.1, 0.1, -0.11, 0.1), 1.5, 1.72, skin],
+      [box(-0.105, 0.105, -0.06, 0.115), 1.58, 1.77, dark],
+      [box(-0.105, 0.105, -0.115, -0.06), 1.7, 1.77, dark]
+    ],
+    leg: [
+      [box(-0.07, 0.07, -0.07, 0.07), -0.82, 0, trousers],
+      [box(-0.07, 0.07, -0.17, 0.07), -0.9, -0.82, dark]
+    ],
+    arm: [
+      [box(-0.05, 0.05, -0.05, 0.05), -0.55, 0, shirt],
+      [box(-0.045, 0.045, -0.045, 0.045), -0.66, -0.55, skin]
+    ]
+  };
+
+  // src/geometry/triangle.js
+  function triangle2(position, normal, color, a, b, c, tint) {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz);
+    let i, point;
+    for (i = 0; i < 3; i++) {
+      point = i === 0 ? a : i === 1 ? b : c;
+      position.push(...point);
+      normal.push(nx / length, ny / length, nz / length);
+      color.push(...tint);
+    }
+  }
+
+  // src/geometry/buildGeometryParts.js
+  function build(parts2) {
+    const position = (
+      /* alloc */
+      []
+    );
+    const normal = (
+      /* alloc */
+      []
+    );
+    const color = (
+      /* alloc */
+      []
+    );
+    const low = (
+      /* alloc */
+      []
+    );
+    const high = (
+      /* alloc */
+      []
+    );
+    let ring, bottom, top, tint, topRing, x, z, i, j;
+    for ([ring, bottom, top, tint, topRing = ring] of parts2) {
+      low.length = high.length = 0;
+      for ([x, z] of ring) low.push(
+        /* alloc */
+        [x, bottom, z]
+      );
+      for ([x, z] of topRing) high.push(
+        /* alloc */
+        [x, top, z]
+      );
+      for (i = 0; i < ring.length; i++) {
+        j = (i + 1) % ring.length;
+        triangle2(position, normal, color, low[i], low[j], high[j], tint);
+        triangle2(position, normal, color, low[i], high[j], high[i], tint);
+      }
+      for (i = 1; i < ring.length - 1; i++) {
+        triangle2(position, normal, color, high[0], high[i], high[i + 1], tint);
+        triangle2(position, normal, color, low[0], low[i + 1], low[i], tint);
+      }
+    }
+    return (
+      /* alloc */
+      { position, normal, color }
+    );
+  }
+
+  // src/walk/stepWalkerHeight.js
+  function stepWalkerHeight(dt) {
+    if (this.keys.has("Space")) {
+      this.verticalSpeed = 6;
+      this.state.height += this.verticalSpeed * dt;
+      return true;
+    }
+    if (!this.verticalSpeed && !this.state.height) return false;
+    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
+    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
+    return true;
+  }
+
+  // src/walk/resolveWalkerPosition.js
+  init_L();
+
+  // src/globals/CELL.js
+  var CELL = 8;
+
+  // src/weakmaps/colliders.js
+  var colliders = /* @__PURE__ */ new WeakMap();
+
+  // src/collision/indexTriangle.js
+  function indexTriangle(cells, v, t) {
+    let ix, iz, key;
+    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
+      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
+        key = ix + "," + iz;
+        if (!cells.has(key)) cells.set(
+          key,
+          /* alloc */
+          []
+        );
+        cells.get(key).push(t);
+      }
+  }
+
+  // src/collision/collider.js
+  function collider(mesh) {
+    let c = colliders.get(mesh.geometry);
+    if (c) return c;
+    const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+    const vertices = vertexCount(position, index);
+    const count = vertices * (instanceOffset?.count ?? 1);
+    const tri = (
+      /* alloc */
+      []
+    );
+    const nrm = (
+      /* alloc */
+      []
+    );
+    const cells = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    const a = (
+      /* alloc */
+      [0, 0, 0]
+    ), b = (
+      /* alloc */
+      [0, 0, 0]
+    ), d = (
+      /* alloc */
+      [0, 0, 0]
+    );
+    const v = (
+      /* alloc */
+      []
+    );
+    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
+    for (i = 0; i < count; i += 3) {
+      first = index ? index.data[i % vertices] : i % vertices;
+      if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
+        continue;
+      }
+      readTriangle(mesh, i, a, b, d);
+      v[0] = m[0] * a[0] + m[4] * a[1] + m[8] * a[2] + m[12];
+      v[1] = m[1] * a[0] + m[5] * a[1] + m[9] * a[2] + m[13];
+      v[2] = m[2] * a[0] + m[6] * a[1] + m[10] * a[2] + m[14];
+      v[3] = m[0] * b[0] + m[4] * b[1] + m[8] * b[2] + m[12];
+      v[4] = m[1] * b[0] + m[5] * b[1] + m[9] * b[2] + m[13];
+      v[5] = m[2] * b[0] + m[6] * b[1] + m[10] * b[2] + m[14];
+      v[6] = m[0] * d[0] + m[4] * d[1] + m[8] * d[2] + m[12];
+      v[7] = m[1] * d[0] + m[5] * d[1] + m[9] * d[2] + m[13];
+      v[8] = m[2] * d[0] + m[6] * d[1] + m[10] * d[2] + m[14];
+      ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
+      nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
+      ny = ez * fx - ex * fz, length = Math.hypot(nx, ny, nz);
+      if (!length || Math.abs(ny) > 0.9 * length) {
+        continue;
+      }
+      if (normal) {
+        j = first * 3;
+        if ((m[0] * normal.data[j] + m[4] * normal.data[j + 1] + m[8] * normal.data[j + 2]) * nx + (m[2] * normal.data[j] + m[6] * normal.data[j + 1] + m[10] * normal.data[j + 2]) * nz < 0) {
+          nx = -nx;
+          nz = -nz;
+        }
+      }
+      h = Math.hypot(nx, nz), t = nrm.length / 2;
+      tri.push(...v);
+      maxX = Math.max(maxX, v[0], v[3], v[6]);
+      nrm.push(nx / h, nz / h);
+      indexTriangle(cells, v, t);
+    }
+    c = /* alloc */
+    {
+      tri: Float32Array.from(tri),
+      nrm: Float32Array.from(nrm),
+      cells,
+      maxX,
+      origin: (
+        /* alloc */
+        [m[12], m[13], m[14]]
+      )
+    };
+    colliders.set(mesh.geometry, c);
+    return c;
+  }
+
+  // src/collision/horizontalRay.js
+  function horizontalRay(v, t, ox, oy, oz, dx, dz) {
+    const i = t * 9, ex = v[i + 3] - v[i], ey = v[i + 4] - v[i + 1], ez = v[i + 5] - v[i + 2];
+    const fx = v[i + 6] - v[i], fy = v[i + 7] - v[i + 1], fz = v[i + 8] - v[i + 2];
+    const px = -dz * fy, py = dz * fx - dx * fz, pz = dx * fy, det = ex * px + ey * py + ez * pz;
+    if (Math.abs(det) < 1e-9) return -1;
+    const tx = ox - v[i], ty = oy - v[i + 1], tz = oz - v[i + 2], u = (tx * px + ty * py + tz * pz) / det;
+    if (u < 0 || u > 1) return -1;
+    const qx = ty * ez - tz * ey, qy = tz * ex - tx * ez, qz = tx * ey - ty * ex, w = (dx * qx + dz * qz) / det;
+    if (w < 0 || u + w > 1) return -1;
+    return (fx * qx + fy * qy + fz * qz) / det;
+  }
+
+  // src/collision/collectIntersections.js
+  function collectIntersections(shape, x, y, z, seen, hits, end, iz) {
+    let ix, cell, triangle3, distance;
+    for (ix = Math.floor(x / CELL); ix <= end; ix++) {
+      cell = shape.cells.get(`${ix},${iz}`);
+      if (!cell) continue;
+      for (triangle3 of cell) {
+        if (seen.has(triangle3)) continue;
+        seen.add(triangle3);
+        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
+        if (distance > 1e-4) hits.push(distance);
+      }
+    }
+  }
+
+  // src/collision/countCrossings.js
+  function countCrossings(hits) {
+    let ix, j, distance;
+    for (ix = 1; ix < hits.length; ix++) {
+      distance = hits[ix];
+      j = ix - 1;
+      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
+      hits[j + 1] = distance;
+    }
+    let crossings = 0, previous = -Infinity;
+    for (distance of hits) {
+      if (distance - previous > 1e-4) crossings++;
+      previous = distance;
+    }
+    return crossings;
+  }
+
+  // src/collision/insideMesh.js
+  function insideMesh(mesh, x, y, z, seen, intersections) {
+    const geometry = mesh.geometry;
+    if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
+    if (!geometry.bounds) computeBounds(geometry);
+    const bounds = geometry.bounds;
+    const world = mesh.worldMatrix;
+    const center = bounds.center;
+    const cx = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
+    const cy = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
+    const cz = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+    const radius = bounds.radius * Math.max(
+      Math.hypot(world[0], world[1], world[2]),
+      Math.hypot(world[4], world[5], world[6]),
+      Math.hypot(world[8], world[9], world[10])
+    );
+    if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
+    const shape = collider(mesh);
+    const end = Math.floor(shape.maxX / CELL);
+    if (x >= shape.maxX) return false;
+    const iz = Math.floor(z / CELL);
+    const hits = intersections;
+    hits.length = 0;
+    seen.clear();
+    collectIntersections(shape, x, y, z, seen, hits, end, iz);
+    return countCrossings(hits) % 2 === 1;
+  }
+
+  // src/collision/setTrafficNormal.js
+  function setTrafficNormal(data, x, z, distance, dx, dz) {
+    if (distance < 1e-6) {
+      data.normal[0] = -dx;
+      data.normal[1] = -dz;
+    } else {
+      data.normal[0] = x / distance;
+      data.normal[1] = z / distance;
+    }
+  }
+
+  // src/collision/trafficCollision.js
+  function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
+    const state = trafficByLayer.get(layer);
+    if (!state?.mesh || !state.trips.length) return false;
+    let bounds = state.collisionBounds;
+    if (!bounds) {
+      bounds = state.collisionBounds = /* alloc */
+      { radius: 0, minY: Infinity, maxY: -Infinity };
+      let i, px2, py, pz2;
+      for (i = 0; i < state.template.position.length; i += 3) {
+        px2 = state.template.position[i];
+        py = state.template.position[i + 1];
+        pz2 = state.template.position[i + 2];
+        bounds.radius = Math.max(bounds.radius, Math.hypot(px2, pz2));
+        bounds.minY = Math.min(bounds.minY, py);
+        bounds.maxY = Math.max(bounds.maxY, py);
+      }
+    }
+    const root = rootByLayer.get(layer), position = state.position ||= /* alloc */
+    {};
+    const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
+    const radius = bounds.radius * scale + 0.35;
+    let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
+    for (trip of state.trips) {
+      ({ x: px, y: bottom, z: pz } = locateTraffic(state, trip, position));
+      bottom = root.position[1] + (bottom + bounds.minY) * root.scale[1];
+      top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
+      if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) continue;
+      px = root.position[0] + px * root.scale[0];
+      pz = root.position[2] + pz * root.scale[2];
+      projection = (px - x) * dx + (pz - z) * dz;
+      closest = Math.max(0, Math.min(reach, projection));
+      rx = x + closest * dx - px;
+      rz = z + closest * dz - pz;
+      perpendicular = rx * rx + rz * rz;
+      if (perpendicular >= radius * radius) continue;
+      if (reach === 0) {
+        data.found = true;
+        distance = Math.hypot(x - px, z - pz);
+        data.normal[0] = distance ? (x - px) / distance : 0;
+        data.normal[1] = distance ? (z - pz) / distance : 0;
+        continue;
+      }
+      entry = Math.max(0, projection - Math.sqrt(radius * radius - perpendicular));
+      if (entry > reach || entry >= data.best) continue;
+      data.best = entry;
+      data.found = true;
+      distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
+      setTrafficNormal(data, x + entry * dx - px, z + entry * dz - pz, distance, dx, dz);
+    }
+    return data.found;
+  }
+
+  // src/collision/insideWalker.js
+  function insideWalker(context) {
+    const { layer, local: localBuffer, hitData } = context;
+    const shared = sharedByLayer.get(layer);
+    if (!shared || !layersByLayer.get(shared)) return false;
+    updateWorldMatrix(sceneByLayer.get(layer));
+    const root = rootByLayer.get(layer);
+    const feet = local.call(context, localBuffer);
+    const x = root.position[0] + feet[0] * root.scale[0];
+    const y = root.position[1] + feet[1] * root.scale[1];
+    const z = root.position[2] + feet[2] * root.scale[2];
+    const layers = layersByLayer.get(shared);
+    let other, node, child, nodes;
+    for (other of layers) {
+      if (other === layer || kindByLayer.get(other) === "terrain") continue;
+      if (kindByLayer.get(other) === "traffic") {
+        hitData.best = 0;
+        hitData.found = false;
+        if (trafficCollision(other, x, y, z, 0, 0, 0, hitData)) return true;
+        continue;
+      }
+      nodes = hitData.nodes;
+      nodes.length = 0;
+      if (rootByLayer.get(other)) nodes.push(rootByLayer.get(other));
+      while (nodes.length) {
+        node = nodes.pop();
+        if (!node.visible) continue;
+        if (node.geometry && (insideMesh(node, x, y + 0.45 * root.scale[1], z, hitData.seen, hitData.intersections) || insideMesh(node, x, y + 1.35 * root.scale[1], z, hitData.seen, hitData.intersections))) return true;
+        for (child of node.children) nodes.push(child);
+      }
+    }
+    return false;
+  }
+
+  // src/walk/resolveWalkerPosition.js
+  function resolveWalkerPosition() {
+    if (!this.saved || !insideWalker(this)) return false;
+    const map = this.layer._map;
+    const origin = this.state.latlng;
+    const height = this.state.height;
+    let distance, angle, candidate;
+    for (distance = 0.5; distance <= 20; distance += 0.5) {
+      for (angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+        candidate = /* alloc */
+        new L.LatLng(
+          origin.lat + Math.cos(angle) * distance / 111320,
+          origin.lng + Math.sin(angle) * distance / (111320 * Math.cos(origin.lat * Math.PI / 180))
+        );
+        this.state.latlng = candidate;
+        this.state.height = 0;
+        if (!insideWalker(this)) {
+          this.verticalSpeed = 0;
+          map.setView(
+            candidate,
+            map.getZoom(),
+            /* alloc */
+            { animate: false }
+          );
+          return true;
+        }
+      }
+    }
+    this.state.latlng = origin;
+    this.state.height = height;
+    return false;
+  }
+
+  // src/utils/wrap.js
+  function wrap(angle) {
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+  }
+
+  // src/picking/shouldSkipOther.js
+  function shouldSkipOther(other, layer) {
+    return other === layer || typeByLayer.get(other) === "terrain" || typeByLayer.get(other) === "traffic";
+  }
+
+  // src/walk/landWalker.js
+  function land(previousY) {
+    const ray = raycasterByLayer.get(this.layer);
+    const feet = local.call(this, this.local), root = rootByLayer.get(this.layer);
+    const x = root.position[0] + feet[0] * root.scale[0];
+    const y = root.position[1] + feet[1] * root.scale[1];
+    const z = root.position[2] + feet[2] * root.scale[2];
+    if (y > previousY || this.verticalSpeed > 0) return;
+    updateWorldMatrix(sceneByLayer.get(this.layer));
+    ray.origin[0] = x;
+    ray.origin[1] = previousY + 0.01;
+    ray.origin[2] = z;
+    ray.direction[0] = 0;
+    ray.direction[1] = -1;
+    ray.direction[2] = 0;
+    ray.meshes.length = 0;
+    let layer, hit2;
+    for (layer of layersByLayer.get(sharedByLayer.get(this.layer))) {
+      if (shouldSkipOther(layer, this.layer) || kindByLayer.get(layer) === "raster" || layer.options.nightLight) continue;
+      traverse(rootByLayer.get(layer), collectVisibleMesh2, ray.meshes);
+    }
+    for (hit2 of intersectMeshes(ray, ray.meshes)) {
+      if (hit2.point[1] < y - 1e-3) break;
+      this.state.height += (hit2.point[1] - y) / root.scale[1];
+      this.verticalSpeed = 0;
+      break;
+    }
+    ray.meshes.length = 0;
+  }
+
+  // src/walk/moveWalker.js
+  init_L();
+  init_radians();
+
+  // src/picking/hitColliderCell.js
+  function hitColliderCell(cell, c, data, ox, oy, oz) {
+    const { dx, dz, seen } = data;
+    let t, height, d;
+    for (t of cell) {
+      if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
+      seen.add(t);
+      for (height = 0.4; height < 2; height += 1.1) {
+        d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
+        if (d >= 0 && d < data.best) {
+          data.best = d;
+          data.found = true;
+          data.normal[0] = c.nrm[t * 2];
+          data.normal[1] = c.nrm[t * 2 + 1];
+        }
+      }
+    }
+  }
+
+  // src/picking/hitMesh.js
+  function hitMesh(mesh, data) {
+    if (!mesh.visible) return true;
+    if (!mesh.geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return;
+    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
+    const m = mesh.worldMatrix, { center: k, radius } = mesh.geometry.bounds;
+    const { x, y, z, dx, dz, reach } = data;
+    if (Math.hypot(m[0] * k[0] + m[4] * k[1] + m[8] * k[2] + m[12] - x, m[2] * k[0] + m[6] * k[1] + m[10] * k[2] + m[14] - z) > radius * Math.hypot(m[0], m[1], m[2]) + reach) return;
+    const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
+    const seen = data.seen;
+    seen.clear();
+    let ix, iz, cell;
+    for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
+      for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
+        cell = c.cells.get(ix + "," + iz);
+        if (!cell) continue;
+        hitColliderCell(cell, c, data, ox, oy, oz);
+      }
+  }
+
+  // src/picking/hit.js
+  function hit(layer, x, y, z, dx, dz, reach, data) {
+    updateWorldMatrix(sceneByLayer.get(layer));
+    data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
+    data.best = reach, data.found = false;
+    let other;
+    for (other of layersByLayer.get(sharedByLayer.get(layer))) {
+      if (other === layer || kindByLayer.get(other) === "terrain") continue;
+      if (kindByLayer.get(other) === "traffic") {
+        trafficCollision(other, x, y, z, dx, dz, reach, data);
+        continue;
+      }
+      traverse(rootByLayer.get(other), hitMesh, data);
+    }
+    return data.found ? data.normal : null;
+  }
+
+  // src/walk/isWalkBlocked.js
+  function blocked(east, north, feet) {
+    const length = Math.hypot(east, north);
+    return length > 1e-6 && hit(this.layer, feet[0], feet[1], feet[2], east / length, -north / length, length + 0.3, this.hitData);
+  }
+
+  // src/walk/moveWalker.js
+  function moveWalker(forward, dt) {
+    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
+    const { position, scale } = rootByLayer.get(this.layer);
+    let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
+    const feet = local.call(this, this.local);
+    let i;
+    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
+    const wall = blocked.call(this, east, north, feet);
+    if (wall) {
+      const into = east * wall[0] - north * wall[1];
+      east -= into * wall[0];
+      north += into * wall[1];
+      if (blocked.call(this, east, north, feet)) east = north = 0;
+    }
+    this.state.latlng = /* alloc */
+    new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
+    this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
+  }
+
+  // src/walk/updateWalkerView.js
+  init_degrees();
+  init_radians();
+  init_mapGetBearing();
+  init_mapSetPitchAndBearing();
+  init_mapGetPitch();
+  function updateWalkerView(forward, turn, dt) {
+    const map = this.layer._map;
+    if (forward || turn) {
+      const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
+      if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
+      map.setView(
+        this.state.latlng,
+        map.getZoom(),
+        /* alloc */
+        { animate: false }
+      );
+    }
+    const target = forward ? 0.9 : 0;
+    if (Math.abs(this.swing - target) > 1e-3) {
+      this.swing += (target - this.swing) * Math.min(1, dt * 10);
+      return true;
+    }
+    return false;
+  }
+
+  // src/walk/updateWalkerFrame.js
+  function updateWalkerFrame(walker, previousY, forward, turn, dt, changed) {
+    if (turn) {
+      walker.state.heading = wrap(walker.state.heading + turn * 2.5 * dt);
+      changed = true;
+    }
+    if (forward) {
+      moveWalker.call(walker, forward, dt);
+      changed = true;
+    }
+    if (changed) land.call(walker, previousY);
+    if (updateWalkerView.call(walker, forward, turn, dt)) changed = true;
+    if (changed) place.call(walker);
+  }
+
+  // src/walk/animateWalker.js
+  function step(now) {
+    const layer = this.layer;
+    this.frame = requestAnimationFrame(this.step);
+    const dt = Math.min(0.1, (now - (this.last ?? now)) / 1e3);
+    this.last = now;
+    if (!rendererByLayer.get(layer)) return;
+    let changed = false;
+    let part, key;
+    if (now >= this.nextClearanceCheck) {
+      this.nextClearanceCheck = now + 250;
+      if (resolveWalkerPosition.call(this)) changed = true;
+    }
+    if (!this.meshes) {
+      this.meshes = /* alloc */
+      [];
+      for ([part] of limbs) this.meshes.push(createMesh(layer, build(parts[part])));
+      changed = true;
+    }
+    const previousY = rootByLayer.get(layer).position[1] + local.call(this, this.local)[1] * rootByLayer.get(layer).scale[1];
+    if (stepWalkerHeight.call(this, dt)) changed = true;
+    let forward = 0, turn = 0;
+    for (key of this.keys) {
+      forward += moves[key]?.[0] || 0;
+      turn += moves[key]?.[1] || 0;
+    }
+    forward = Math.sign(forward);
+    turn = Math.sign(turn);
+    updateWalkerFrame(this, previousY, forward, turn, dt, changed);
+  }
+
+  // src/walk/startWalking.js
+  function start() {
+    const map = this.layer._map;
+    if (this.saved || !map) return;
+    this.state.latlng = map.getCenter();
+    this.state.height = this.verticalSpeed = 0;
+    const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
+    const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * earthCirc * Math.cos(this.state.latlng.lat * radians) / 256));
+    let name;
+    this.saved = /* alloc */
+    {
+      zoom: map.getZoom(),
+      pitch: mapGetPitch(map),
+      scrollWheelZoom: map.options.scrollWheelZoom,
+      handlers: (
+        /* alloc */
+        []
+      )
+    };
+    for (name of sceneWalkHandlers) {
+      if (map[name]?.enabled()) this.saved.handlers.push(name);
+    }
+    for (name of this.saved.handlers) map[name].disable();
+    map.options.scrollWheelZoom = this.saved.scrollWheelZoom && "center";
+    this.state.heading = -mapGetBearing(map) * radians;
+    map.setView(
+      this.state.latlng,
+      zoom,
+      /* alloc */
+      { animate: false }
+    );
+    mapSetPitch(map, 75);
+    resolveWalkerPosition.call(this);
+    L.DomEvent.on(document, "keydown keyup", this.onKey);
+    L.DomEvent.on(window, "blur", this.onBlur);
+    L.DomEvent.on(map.getContainer(), "pointerdown pointermove pointerup pointercancel", this.onPointer);
+    map.on("terrainchange", this.onTerrain);
+    this.button.setAttribute("aria-pressed", "true");
+    this.button.style.background = "#e4e4e4";
+    this.hint.style.display = "";
+    this.last = void 0;
+    this.nextClearanceCheck = 0;
+    this.frame = requestAnimationFrame(this.step);
+  }
+
+  // src/walk/toggleWalking.js
+  function toggle() {
+    if (this.saved) stop.call(this);
+    else start.call(this);
+  }
+
+  // src/walk/createWalk.js
+  function createWalk(control, {
+    speed: speed2,
+    distance,
+    ...options
+  }) {
+    const layer = (
+      /* alloc */
+      new L.Layer()
+    );
+    typeByLayer.set(layer, "walk");
+    init3D(layer, options);
+    const keys = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    container.style.cssText = "display:flex;align-items:center;background:#fff;";
+    const button = L.DomUtil.create("button", "", container);
+    button.type = "button";
+    button.title = "Walk";
+    button.setAttribute("aria-label", "Walk");
+    button.setAttribute("aria-pressed", "false");
+    button.textContent = "\u{1F6B6}";
+    button.style.cssText = "width:30px;height:30px;padding:0;border:0;border-radius:4px;background:#fff;font-size:18px;line-height:30px;cursor:pointer;";
+    const hint = L.DomUtil.create("small", "", container);
+    hint.style.cssText = "display:none;padding:0 8px;color:#333;white-space:nowrap;";
+    hint.textContent = "W/S: run \xB7 A/D: turn \xB7 hold Space: ascend \xB7 drag: look around \xB7 Esc: exit";
+    L.DomEvent.disableClickPropagation(container);
+    const context = (
+      /* alloc */
+      {
+        layer,
+        speed: speed2,
+        distance,
+        keys,
+        container,
+        button,
+        hint,
+        meshes: null,
+        frame: null,
+        last: void 0,
+        nextClearanceCheck: 0,
+        swing: 0,
+        verticalSpeed: 0,
+        saved: null,
+        hitData: null,
+        local: null,
+        state: control.walker = /* alloc */
+        { latlng: null, heading: 0, phase: 0, height: 0 }
+      }
+    );
+    walkerByLayer.set(layer, context.state);
+    context.step = step.bind(context);
+    context.onKey = onKey.bind(context);
+    context.onBlur = onBlur.bind(context);
+    context.onPointer = onPointer.bind(context);
+    context.onTerrain = onTerrain.bind(context);
+    context.start = start.bind(context);
+    context.stop = stop.bind(context);
+    context.toggle = toggle.bind(context);
+    control._walk = context;
+    L.DomEvent.on(button, "click", context.toggle);
+  }
+
+  // src/walk/initializeWalkControl.js
+  function initialize2(options) {
+    L.Util.setOptions(this, options);
+    createWalk(this, this.options);
+  }
+
+  // src/walk/onAddWalkControl.js
+  function onAdd2(map) {
+    let state = walkByMap.get(map);
+    if (state?.control && state.control !== this) {
+      this._map = null;
+      throw (
+        /* alloc */
+        new Error("Only one Walk control can be active per map")
+      );
+    }
+    if (!state) {
+      state = /* alloc */
+      {
+        control: null,
+        hitData: (
+          /* alloc */
+          {
+            x: 0,
+            y: 0,
+            z: 0,
+            dx: 0,
+            dz: 0,
+            reach: 0,
+            best: 0,
+            found: false,
+            seen: (
+              /* alloc */
+              /* @__PURE__ */ new Set()
+            ),
+            intersections: (
+              /* alloc */
+              []
+            ),
+            nodes: (
+              /* alloc */
+              []
+            ),
+            normal: (
+              /* alloc */
+              [0, 0]
+            )
+          }
+        ),
+        local: (
+          /* alloc */
+          [0, 0, 0]
+        )
+      };
+      walkByMap.set(map, state);
+    }
+    state.control = this;
+    state.local.fill(0);
+    state.hitData.seen.clear();
+    state.hitData.normal.fill(0);
+    this._walk.hitData = state.hitData;
+    this._walk.local = state.local;
+    this._walk.layer.addTo(map);
+    return this._walk.container;
+  }
+
+  // src/walk/onRemoveWalkControl.js
+  function onRemove(map) {
+    const state = walkByMap.get(map);
+    if (state?.control !== this) return;
+    this._walk.stop();
+    this._walk.layer.remove();
+    state.control = null;
+    state.hitData.seen.clear();
+    this._walk.hitData = null;
+    this._walk.local = null;
+  }
+
+  // src/walk/initWalk.js
+  L.Control.Walk = L.Control.extend({
+    options: { position: "bottomright", speed: 70, distance: 20 },
+    initialize: initialize2,
+    onAdd: onAdd2,
+    onRemove
+  });
+
+  // src/weakmaps/eventMapByLayer.js
+  var eventMapByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/eventsByLayer.js
+  var eventsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/scene/addRegisteredLayer.js
+  init_L();
+
+  // src/scene/removeLayerEvents.js
+  function removeLayerEvents() {
+    eventMapByLayer.get(this).off(eventsByLayer.get(this), this);
+    eventMapByLayer.set(this, null);
+    eventsByLayer.set(this, null);
+  }
+
+  // src/weakmaps/pointerEventsByLayer.js
+  var pointerEventsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/scene/onAdd3DLayer.js
+  init_L();
+
+  // src/picking/findFeature.js
+  function findFeature(layer, event) {
+    const model = modelByLayer.get(layer);
+    if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
+      return null;
+    }
+    let hit2, object, ranges, low, high, middle, range;
+    for (hit2 of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
+      if (model) {
+        object = hit2.object;
+        while (object && object !== model) {
+          object = object.parent;
+        }
+        if (object === model) {
+          return (
+            /* alloc */
+            {
+              id: model.id,
+              properties: model.extras,
+              model,
+              mesh: hit2.object,
+              point: hit2.point
+            }
+          );
+        }
+      }
+      ranges = hit2.object.extras?.featureFaces;
+      if (!ranges) {
+        continue;
+      }
+      low = 0, high = ranges.length - 1;
+      while (low <= high) {
+        middle = low + high >> 1;
+        range = ranges[middle];
+        if (hit2.faceIndex < range.faceStart) {
+          high = middle - 1;
+        } else if (hit2.faceIndex >= range.faceEnd) {
+          low = middle + 1;
+        } else {
+          return (
+            /* alloc */
+            {
+              ...range,
+              mesh: hit2.object,
+              point: hit2.point
+            }
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  // src/picking/onPointerLeave.js
+  function onPointerLeave(layer) {
+    hoveredFeatureByLayer.set(layer, null);
+    setHighlight(layer, null);
+    showFeature(layer, null);
+    layer.fire(
+      "featurehover",
+      /* alloc */
+      { feature: null }
+    );
+  }
+
+  // src/picking/onPointerMove.js
+  function onPointerMove(layer, event) {
+    if (event.buttons || layer._map.dragging?.moving() || layer._map._animatingZoom) {
+      if (hoveredFeatureByLayer.get(layer)) onPointerLeave(layer);
+      return;
+    }
+    hoveredFeatureByLayer.set(layer, findFeature(layer, event));
+    setHighlight(layer, hoveredFeatureByLayer.get(layer));
+    showFeature(layer, hoveredFeatureByLayer.get(layer), event);
+    layer.fire(
+      "featurehover",
+      /* alloc */
+      {
+        feature: hoveredFeatureByLayer.get(layer),
+        originalEvent: event
+      }
+    );
+  }
+
+  // src/picking/pointerMove.js
+  function pointerMove(event) {
+    onPointerMove(this, event);
+  }
+
+  // src/picking/onClick.js
+  function onClick(layer, event) {
+    const feature = findFeature(layer, event);
+    hoveredFeatureByLayer.set(layer, feature);
+    setHighlight(layer, feature);
+    showFeature(layer, feature, event);
+    layer.fire(
+      "featureclick",
+      /* alloc */
+      { feature, originalEvent: event }
+    );
+  }
+
+  // src/picking/pointerClick.js
+  function pointerClick(event) {
+    onClick(this, event);
+  }
+
+  // src/picking/pointerLeave.js
+  function pointerLeave() {
+    onPointerLeave(this);
+  }
+
+  // src/scene/attachLayer.js
+  async function attachLayer(layer, map) {
+    try {
+      await attach(layer, map);
+      addedByLayer.get(layer).resolve();
+    } catch (error) {
+      layer.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    }
+  }
+
+  // src/scene/onAdd3DLayer.js
+  function onAdd3DLayer(layer, map) {
+    if (!locationByLayer.get(layer)) {
+      const center = map.getCenter();
+      locationByLayer.set(
+        layer,
+        /* alloc */
+        new L.LatLng(center.lat, center.lng)
+      );
+    }
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
+      containerByLayer.set(layer, map.getContainer());
+      if (!pointerEventsByLayer.get(layer)) {
+        pointerEventsByLayer.set(
+          layer,
+          /* alloc */
+          {
+            mousemove: pointerMove,
+            click: pointerClick,
+            mouseleave: pointerLeave
+          }
+        );
+      }
+      if (layer.options.tooltip) {
+        tooltipByLayer.set(layer, L.DomUtil.create("div", "leaflet-3d-tooltip", containerByLayer.get(layer)));
+        tooltipByLayer.get(layer).hidden = true;
+        tooltipByLayer.get(layer).setAttribute("role", "tooltip");
+        tooltipByLayer.get(layer).setAttribute("aria-live", "polite");
+        tooltipByLayer.get(layer).style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
+      }
+      L.DomEvent.on(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
+    }
+    if (rootByLayer.get(layer)) {
+      attachLayer(layer, map);
+    }
+  }
 
   // src/weakmaps/terrainBoundsByLayer.js
   var terrainBoundsByLayer = /* @__PURE__ */ new WeakMap();
@@ -10804,6 +12478,54 @@
       }
     }
   }
+
+  // src/raster/setRasterTerrain.js
+  function setRasterTerrain(layer, terrain) {
+    if (!rasterTilesByLayer.get(layer) || terrain3DByLayer.get(layer) === terrain) return;
+    let tile;
+    for (tile of rasterTilesByLayer.get(layer).values()) {
+      if (terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
+      if (tile.mesh) {
+        tile.mesh.visible = true;
+        setParent(tile.mesh, rootByLayer.get(layer));
+      }
+    }
+    terrain3DByLayer.set(layer, terrain || null);
+    if (terrain) {
+      for (tile of rasterTilesByLayer.get(layer).values()) {
+        if (tile.done) registerTerrainTile(layer, tile.coords, tile);
+      }
+    }
+  }
+
+  // src/raster/finishRasterAttachment.js
+  async function finishAttachment(layer, map, attached) {
+    try {
+      await attached;
+      addedByLayer.get(layer).resolve();
+      setRasterTerrain(layer, terrain3DByMap.get(map));
+    } catch (error) {
+      layer.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    }
+  }
+
+  // src/globals/wantedTiles.js
+  var wantedTiles = /* @__PURE__ */ new Map();
+
+  // src/globals/coverageTiles.js
+  var coverageTiles = /* @__PURE__ */ new Map();
+
+  // src/raster/comparePendingTiles.js
+  function comparePendingTiles(a, b) {
+    return a.tile.coords.z - b.tile.coords.z || a.distance - b.distance;
+  }
+
+  // src/globals/blobParts.js
+  var blobParts = [null];
 
   // src/weakmaps/rasterGeometryByLayer.js
   var rasterGeometryByLayer = /* @__PURE__ */ new WeakMap();
@@ -11209,72 +12931,6 @@
     pruneRasterTiles(layer);
   }
 
-  // src/raster/getRasterEvents.js
-  function getRasterEvents(layer) {
-    const update2 = updateRasterTiles.bind(null, layer);
-    return (
-      /* alloc */
-      { moveend: update2, zoomend: update2, rotate: update2, pitch: update2, resize: update2 }
-    );
-  }
-
-  // src/raster/readyRaster.js
-  async function readyRaster(layer, archive) {
-    const header = await getHeader(archive);
-    layer.options.archive = archive;
-    headerByLayer.set(layer, header);
-    if (layer.options.maxNativeZoom === void 0) {
-      layer.options.maxNativeZoom = header.maxZoom;
-    }
-    layer.options.maxZoom = Math.max(layer.options.minZoom || 0, layer.options.maxZoom);
-    layer.fire("ready");
-    return layer;
-  }
-
-  // src/raster/reportRasterError.js
-  function reportError2(layer, error) {
-    layer.fire(
-      "error",
-      /* alloc */
-      { error }
-    );
-    throw error;
-  }
-
-  // src/raster/setRasterTerrain.js
-  function setRasterTerrain(layer, terrain) {
-    if (!rasterTilesByLayer.get(layer) || terrain3DByLayer.get(layer) === terrain) return;
-    let tile;
-    for (tile of rasterTilesByLayer.get(layer).values()) {
-      if (terrain3DByLayer.get(layer)) removeRasterTile(terrain3DByLayer.get(layer), tile);
-      if (tile.mesh) {
-        tile.mesh.visible = true;
-        setParent(tile.mesh, rootByLayer.get(layer));
-      }
-    }
-    terrain3DByLayer.set(layer, terrain || null);
-    if (terrain) {
-      for (tile of rasterTilesByLayer.get(layer).values()) {
-        if (tile.done) registerTerrainTile(layer, tile.coords, tile);
-      }
-    }
-  }
-
-  // src/raster/finishRasterAttachment.js
-  async function finishAttachment(layer, map, attached) {
-    try {
-      await attached;
-      addedByLayer.get(layer).resolve();
-      setRasterTerrain(layer, terrain3DByMap.get(map));
-    } catch (error) {
-      layer.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    }
-  }
-
   // src/raster/updateAttachedTiles.js
   async function updateAttachedTiles(layer, map, attached) {
     try {
@@ -11300,40 +12956,8 @@
     updateAttachedTiles(layer, map, attached);
   }
 
-  // src/raster/releaseRasterTiles.js
-  function releaseRasterTiles(layer) {
-    let tile, attribute;
-    for (tile of rasterTilesByLayer.get(layer).values()) releaseRasterTile(layer, tile);
-    rasterProgramByLayer.get(layer)?.pipelineCache.clear();
-    rasterProgramByLayer.set(layer, null);
-    if (rasterGeometryByLayer.get(layer)) {
-      for (attribute of Object.values(rasterGeometryByLayer.get(layer).attributes)) {
-        destroyTexture(layer, attribute.buffer);
-      }
-      rasterGeometryByLayer.set(layer, null);
-    }
-  }
-
-  // src/weakmaps/pointerEventsByLayer.js
-  var pointerEventsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/bridgeMeshByLayer.js
-  var bridgeMeshByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/controlByLayer.js
-  var controlByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/eventMapByLayer.js
-  var eventMapByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/eventsByLayer.js
-  var eventsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/fadeFrameByLayer.js
-  var fadeFrameByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/fadeVersionByLayer.js
-  var fadeVersionByLayer = /* @__PURE__ */ new WeakMap();
+  // src/weakmaps/streamTerrainByLayer.js
+  var streamTerrainByLayer = /* @__PURE__ */ new WeakMap();
 
   // src/weakmaps/terrainArchiveByLayer.js
   var terrainArchiveByLayer = /* @__PURE__ */ new WeakMap();
@@ -11346,298 +12970,6 @@
 
   // src/weakmaps/terrainSourceByLayer.js
   var terrainSourceByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/typeByLayer.js
-  var typeByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/walkerByLayer.js
-  var walkerByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/sceneFields.js
-  var sceneFields = {
-    "_3d": state3dByLayer,
-    "_added": addedByLayer,
-    "_areas": areasByLayer,
-    "_bridgeMesh": bridgeMeshByLayer,
-    "_bridges": bridgesByLayer,
-    "_cameraZIndexOffset": cameraZIndexOffsetByLayer,
-    "_countStatus": countStatusByLayer,
-    "_cursor": cursorByLayer,
-    "_dem": demByLayer,
-    "_directories": directoriesByLayer,
-    "_etag": etagByLayer,
-    "_fadeFrame": fadeFrameByLayer,
-    "_fadeVersion": fadeVersionByLayer,
-    "_frame": frameByLayer,
-    "_geojson": geojsonByLayer,
-    "_header": archiveHeaderByLayer,
-    "_inflight": inflightByLayer,
-    "_layers": layersByLayer,
-    "_loadingTiles": loadingTilesByLayer,
-    "_nativeGPU": nativeGPUByLayer,
-    "_pointerEvents": pointerEventsByLayer,
-    "_pruneAfter": pruneAfterByLayer,
-    "_pruneVersion": pruneVersionByLayer,
-    "_pruneWanted": pruneWantedByLayer,
-    "_queued": queuedByLayer,
-    "_rasterGeometry": rasterGeometryByLayer,
-    "_rasterProgram": rasterProgramByLayer,
-    "_rasterTiles": rasterTilesByLayer,
-    "_rasterVersion": rasterVersionByLayer,
-    "_rendererReady": rendererReadyByLayer,
-    "_roofRaster": roofRasterByLayer,
-    "_roofRasters": roofRastersByLayer,
-    "_sceneOrigin": sceneOriginByLayer,
-    "_shadowMeshes": shadowMeshesByLayer,
-    "_shared": sharedByLayer,
-    "_size": sizeByLayer,
-    "_terrain3D": terrain3DByLayer,
-    "_terrainArchive": terrainArchiveByLayer,
-    "_terrainBaseY": terrainBaseYByLayer,
-    "_terrainBounds": terrainBoundsByLayer,
-    "_terrainController": terrainControllerByLayer,
-    "_terrainGrids": terrainGridsByLayer,
-    "_terrainLoading": terrainLoadingByLayer,
-    "_terrainOriginElevation": terrainOriginElevationByLayer,
-    "_terrainPromise": terrainPromiseByLayer,
-    "_terrainReady": terrainReadyByLayer,
-    "_terrainRequest": terrainRequestByLayer,
-    "_terrainTiles": terrainTilesByLayer,
-    "_terrainZoom": terrainZoomByLayer,
-    "_tileZoom": tileZoomByLayer,
-    "_tooltip": tooltipByLayer,
-    "_type": typeByLayer,
-    "_visibleMeshes": visibleMeshesByLayer,
-    "_wantedRasterTiles": wantedRasterTilesByLayer,
-    "_zoomLevel": zoomLevelByLayer,
-    "_zoomTransitions": zoomTransitionsByLayer,
-    "_zoomView": zoomViewByLayer,
-    "camera": cameraByLayer,
-    "container": containerByLayer,
-    "control": controlByLayer,
-    "eventMap": eventMapByLayer,
-    "events": eventsByLayer,
-    "group": groupByLayer,
-    "header": headerByLayer,
-    "highlightedFeature": highlightedFeatureByLayer,
-    "hoveredFeature": hoveredFeatureByLayer,
-    "kind": kindByLayer,
-    "location": locationByLayer,
-    "model": modelByLayer,
-    "modelUrl": modelUrlByLayer,
-    "raycaster": raycasterByLayer,
-    "ready": readyByLayer,
-    "renderer": rendererByLayer,
-    "root": rootByLayer,
-    "scene": sceneByLayer,
-    "terrainSource": terrainSourceByLayer,
-    "url": urlByLayer,
-    "walker": walkerByLayer
-  };
-
-  // src/scene/onRemove3DLayer.js
-  init_L();
-
-  // src/globals/sceneTransferFields.js
-  var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
-
-  // src/picking/onPointerLeave.js
-  function onPointerLeave(layer) {
-    hoveredFeatureByLayer.set(layer, null);
-    setHighlight(layer, null);
-    showFeature(layer, null);
-    layer.fire(
-      "featurehover",
-      /* alloc */
-      { feature: null }
-    );
-  }
-
-  // src/globals/sceneCleanupFields.js
-  var sceneCleanupFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_cursor"];
-
-  // src/gpu/releaseRenderer.js
-  async function releaseRenderer(renderer, layer) {
-    try {
-      await renderer.device.queue.onSubmittedWorkDone();
-      renderer.depthTexture?.destroy();
-      renderer.roofFallbackTexture?.texture?.destroy();
-      renderer.uniformBuffer?.destroy();
-      renderer.sunlight?.texture?.destroy();
-      renderer.sunlight?.buffer?.destroy();
-      renderer.sunlight?.lights?.destroy();
-    } catch (error) {
-      layer.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    }
-    renderer.device.destroy();
-  }
-
-  // src/scene/releaseSharedScene.js
-  function releaseSharedScene(layer, map) {
-    if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
-    roofRasterByLayer.set(layer, null);
-    if (zoomTransitionsByLayer.get(layer)) {
-      let animation;
-      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.play();
-    }
-    zoomTransitionsByLayer.set(layer, null);
-    zoomViewByLayer.set(layer, null);
-    cameraViewByMap.delete(map);
-    map.getContainer().classList.remove("leaflet-camera-zoom");
-    const renderer = rendererByLayer.get(layer);
-    renderer.canvas.remove();
-    releaseRenderer(renderer, layer);
-    renderers.delete(map);
-    let key;
-    for (key of sceneCleanupFields) sceneFields[key].delete(layer);
-  }
-
-  // src/scene/onRemove3DLayer.js
-  function onRemove3DLayer(layer, map) {
-    addedByLayer.set(layer, Promise.withResolvers());
-    if (containerByLayer.get(layer)) {
-      onPointerLeave(layer);
-      L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
-      containerByLayer.set(layer, null);
-    }
-    let area2, key, sceneLayer, field;
-    for (area2 of areasByLayer.get(layer).values()) releaseArea(layer, area2);
-    areasByLayer.get(layer).clear();
-    tooltipByLayer.get(layer)?.remove();
-    tooltipByLayer.set(layer, null);
-    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
-    const shared = sharedByLayer.get(layer);
-    if (!shared) return;
-    setParent(rootByLayer.get(layer), null);
-    layersByLayer.get(shared).delete(layer);
-    if (shared === layer) {
-      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
-      map.off("zoomstart", startZoom, layer);
-      map.off("zoomanim", onZoomAnim, layer);
-      map.off("zoomend", endZoom, layer);
-      cancelUpdate(layer);
-      if (layersByLayer.get(layer).size) {
-        const next = layersByLayer.get(layer).values().next().value;
-        for (key of sceneTransferFields) {
-          field = sceneFields[key];
-          field.set(next, field.get(layer));
-          field.delete(layer);
-        }
-        for (sceneLayer of layersByLayer.get(next)) sharedByLayer.set(sceneLayer, next);
-        renderers.set(map, next);
-        map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, next);
-        map.on("zoomstart", startZoom, next);
-        map.on("zoomanim", onZoomAnim, next);
-        map.on("zoomend", endZoom, next);
-        update(next);
-      } else {
-        releaseSharedScene(layer, map);
-      }
-    } else update(shared);
-    sharedByLayer.set(layer, null);
-    rendererByLayer.set(layer, null);
-    sceneByLayer.set(layer, null);
-    cameraByLayer.set(layer, null);
-  }
-
-  // src/raster/onPMTileRemove.js
-  function onPMTileRemove(layer, map) {
-    releaseRasterTiles(layer);
-    terrain3DByLayer.set(layer, null);
-    onRemove3DLayer(layer, map);
-  }
-
-  // src/raster/getRasterTileSize.js
-  init_L();
-
-  // src/raster/initRaster.js
-  function initRaster(layer, options) {
-    kindByLayer.set(layer, "raster");
-    options = /* alloc */
-    { ariaLabel: "PMTiles raster", maxZoom: 18, opacity: 1, zIndex: 0, ...options };
-    L.Util.setOptions(layer, options);
-    rootByLayer.set(layer, emptyNode());
-    areasByLayer.set(
-      layer,
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    rasterTilesByLayer.set(
-      layer,
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    loadingTilesByLayer.set(layer, 0);
-    addedByLayer.set(layer, Promise.withResolvers());
-    urlByLayer.set(
-      layer,
-      /* alloc */
-      new URL(options.url, document.baseURI).href
-    );
-    directoriesByLayer.set(
-      layer,
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    readyByLayer.set(layer, Promise.resolve(layer.options.archive || layer).then(readyRaster.bind(null, layer)).catch(reportError2.bind(null, layer)));
-  }
-
-  // src/weakmaps/streamTerrainByLayer.js
-  var streamTerrainByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/globals/renderEmpty.js
-  var renderEmpty = Object.freeze([]);
-
-  // src/terrain/clearLayerTerrain.js
-  function clearLayerTerrain(layer) {
-    if (kindByLayer.get(layer) === "raster") setRasterTerrain(layer, null);
-  }
-
-  // src/terrain/onTerrainRemove.js
-  function onTerrainRemove(layer, map) {
-    const stream = streamTerrainByMap.get(map);
-    if (stream?.layer === layer) {
-      streamTerrainByMap.delete(map);
-      stream.terrainController.abort();
-      stream.terrainCache.clear();
-      map.fire("terrainchange");
-      onRemove3DLayer(layer, map);
-      return;
-    }
-    terrainControllerByLayer.get(layer)?.abort();
-    terrainLoadingByLayer.set(layer, false);
-    terrainReadyByLayer.set(layer, false);
-    map.eachLayer(clearLayerTerrain);
-    let tile, l, grid, attribute;
-    for (tile of rasterTilesByLayer.get(layer).keys()) removeRasterTile(layer, tile);
-    if (terrain3DByMap.get(map) === layer) terrain3DByMap.delete(map);
-    for (l of Object.values(map._layers)) {
-      conformModelToTerrain(l, null);
-      setTerrainHeight(l);
-    }
-    map.fire("terrainchange");
-    terrainTilesByLayer.get(layer).clear();
-    terrainOriginElevationByLayer.set(layer, 0);
-    terrainPromiseByLayer.set(layer, null);
-    if (rasterProgramByLayer.get(layer)) {
-      rasterProgramByLayer.get(layer).pipelineCache.clear();
-    }
-    rasterProgramByLayer.set(layer, null);
-    if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
-    demByLayer.set(layer, null);
-    for (grid of terrainGridsByLayer.get(layer)?.values() || renderEmpty) {
-      for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
-    }
-    terrainGridsByLayer.set(layer, null);
-    bridgesByLayer.set(layer, null);
-    disposeMesh(layer, bridgeMeshByLayer.get(layer));
-    bridgeMeshByLayer.set(layer, null);
-    onRemove3DLayer(layer, map);
-  }
 
   // src/weakmaps/workerMapByLayer.js
   var workerMapByLayer = /* @__PURE__ */ new WeakMap();
@@ -11707,12 +13039,15 @@
     return tiles;
   }
 
+  // src/weakmaps/bridgeMeshByLayer.js
+  var bridgeMeshByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/geometry/addBridges.js
   init_radians();
 
   // src/projections/projectBridgePoint.js
   init_L();
-  function local([lng, lat, z], crs, origin, metres, base) {
+  function local2([lng, lat, z], crs, origin, metres, base) {
     const p = crs.project(
       /* alloc */
       new L.LatLng(lat, lng)
@@ -11867,7 +13202,7 @@
         [p.x, p.y, z]
       );
     }
-    for (ring of rings) for (coordinate of ring) points.push(local(coordinate, crs, origin, metres, base));
+    for (ring of rings) for (coordinate of ring) points.push(local2(coordinate, crs, origin, metres, base));
     try {
       paths = bridgePaths(rings, pixels);
       [contour, ...holes] = paths;
@@ -12007,160 +13342,6 @@
     }
   }
 
-  // src/scene/onAdd3DLayer.js
-  init_L();
-
-  // src/picking/findFeature.js
-  function findFeature(layer, event) {
-    const model = modelByLayer.get(layer);
-    if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {
-      return null;
-    }
-    let hit2, object, ranges, low, high, middle, range;
-    for (hit2 of raycast(layer, event, rootByLayer.get(layer).children, Boolean(model))) {
-      if (model) {
-        object = hit2.object;
-        while (object && object !== model) {
-          object = object.parent;
-        }
-        if (object === model) {
-          return (
-            /* alloc */
-            {
-              id: model.id,
-              properties: model.extras,
-              model,
-              mesh: hit2.object,
-              point: hit2.point
-            }
-          );
-        }
-      }
-      ranges = hit2.object.extras?.featureFaces;
-      if (!ranges) {
-        continue;
-      }
-      low = 0, high = ranges.length - 1;
-      while (low <= high) {
-        middle = low + high >> 1;
-        range = ranges[middle];
-        if (hit2.faceIndex < range.faceStart) {
-          high = middle - 1;
-        } else if (hit2.faceIndex >= range.faceEnd) {
-          low = middle + 1;
-        } else {
-          return (
-            /* alloc */
-            {
-              ...range,
-              mesh: hit2.object,
-              point: hit2.point
-            }
-          );
-        }
-      }
-    }
-    return null;
-  }
-
-  // src/picking/onPointerMove.js
-  function onPointerMove(layer, event) {
-    if (event.buttons || layer._map.dragging?.moving() || layer._map._animatingZoom) {
-      if (hoveredFeatureByLayer.get(layer)) onPointerLeave(layer);
-      return;
-    }
-    hoveredFeatureByLayer.set(layer, findFeature(layer, event));
-    setHighlight(layer, hoveredFeatureByLayer.get(layer));
-    showFeature(layer, hoveredFeatureByLayer.get(layer), event);
-    layer.fire(
-      "featurehover",
-      /* alloc */
-      {
-        feature: hoveredFeatureByLayer.get(layer),
-        originalEvent: event
-      }
-    );
-  }
-
-  // src/picking/pointerMove.js
-  function pointerMove(event) {
-    onPointerMove(this, event);
-  }
-
-  // src/picking/onClick.js
-  function onClick(layer, event) {
-    const feature = findFeature(layer, event);
-    hoveredFeatureByLayer.set(layer, feature);
-    setHighlight(layer, feature);
-    showFeature(layer, feature, event);
-    layer.fire(
-      "featureclick",
-      /* alloc */
-      { feature, originalEvent: event }
-    );
-  }
-
-  // src/picking/pointerClick.js
-  function pointerClick(event) {
-    onClick(this, event);
-  }
-
-  // src/picking/pointerLeave.js
-  function pointerLeave() {
-    onPointerLeave(this);
-  }
-
-  // src/scene/attachLayer.js
-  async function attachLayer(layer, map) {
-    try {
-      await attach(layer, map);
-      addedByLayer.get(layer).resolve();
-    } catch (error) {
-      layer.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    }
-  }
-
-  // src/scene/onAdd3DLayer.js
-  function onAdd3DLayer(layer, map) {
-    if (!locationByLayer.get(layer)) {
-      const center = map.getCenter();
-      locationByLayer.set(
-        layer,
-        /* alloc */
-        new L.LatLng(center.lat, center.lng)
-      );
-    }
-    if (urlByLayer.get(layer) || geojsonByLayer.get(layer) || layer.options.tooltip || modelUrlByLayer.get(layer)) {
-      containerByLayer.set(layer, map.getContainer());
-      if (!pointerEventsByLayer.get(layer)) {
-        pointerEventsByLayer.set(
-          layer,
-          /* alloc */
-          {
-            mousemove: pointerMove,
-            click: pointerClick,
-            mouseleave: pointerLeave
-          }
-        );
-      }
-      if (layer.options.tooltip) {
-        tooltipByLayer.set(layer, L.DomUtil.create("div", "leaflet-3d-tooltip", containerByLayer.get(layer)));
-        tooltipByLayer.get(layer).hidden = true;
-        tooltipByLayer.get(layer).setAttribute("role", "tooltip");
-        tooltipByLayer.get(layer).setAttribute("aria-live", "polite");
-        tooltipByLayer.get(layer).style.cssText = "position:absolute;z-index:600;max-width:220px;padding:10px 12px;border:1px solid #6b5140;border-radius:6px;background:#fffaf0;box-shadow:0 3px 12px #0005;color:#30251d;font:13px/1.45 sans-serif;pointer-events:none";
-      }
-      L.DomEvent.on(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
-    }
-    if (rootByLayer.get(layer)) {
-      attachLayer(layer, map);
-    }
-  }
-
   // src/terrain/loadReadyTerrain.js
   function loadReadyTerrain() {
     loadTerrain(this.backend).then(this.resolve, this.reject);
@@ -12217,6 +13398,1790 @@
     map.fire("terrainchange");
   }
 
+  // src/globals/pendingRasterLoads.js
+  var pendingRasterLoads = [];
+
+  // src/core/fireRasterLoad.js
+  function fireRasterLoad() {
+    pendingRasterLoads.shift()?.fire("load");
+  }
+
+  // src/textures/attachRasterImage.js
+  function addRasterImage() {
+    if (!this._image) this._initImage();
+    if (this._image.complete && this._image.naturalWidth) {
+      pendingRasterLoads.push(this);
+      queueMicrotask(fireRasterLoad);
+    }
+  }
+
+  // src/scene/addSceneLayer.js
+  function addSceneLayer(layer, map) {
+    switch (kindByLayer.get(layer)) {
+      case "3d":
+        return onAdd3DLayer(layer, map);
+      case "raster":
+        return onPMTileAdd(layer, map);
+      case "terrain":
+        return onTerrainAdd(layer, map);
+      case "image":
+        return addRasterImage.call(layer, map);
+      case "time":
+        return addTimeLayer.call(layer, map);
+    }
+  }
+
+  // src/terrain/onTerrainChange.js
+  function onTerrainChange(layer) {
+    if (!layer._map) return;
+    let area2;
+    for (area2 of areasByLayer.get(layer).values()) {
+      releaseArea(layer, area2);
+    }
+    areasByLayer.get(layer).clear();
+    updateArea(layer);
+  }
+
+  // src/scene/get3DEvents.js
+  function get3DEvents(layer) {
+    const events = (
+      /* alloc */
+      {}
+    );
+    if (urlByLayer.get(layer)) {
+      events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
+    }
+    if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
+      events.terrainchange = onTerrainChange.bind(null, layer);
+    }
+    return events;
+  }
+
+  // src/raster/getRasterEvents.js
+  function getRasterEvents(layer) {
+    const update2 = updateRasterTiles.bind(null, layer);
+    return (
+      /* alloc */
+      { moveend: update2, zoomend: update2, rotate: update2, pitch: update2, resize: update2 }
+    );
+  }
+
+  // src/scene/emptyEvents.js
+  function emptyEvents() {
+    return (
+      /* alloc */
+      {}
+    );
+  }
+
+  // src/scene/isNativeLayer.js
+  init_L();
+  function isNativeLayer(layer) {
+    return !state3dByLayer.get(layer) && (layer instanceof L.GridLayer || layer instanceof L.Polyline || layer instanceof L.CircleMarker || layer instanceof L.Marker && !(layer.options.icon instanceof L.DivIcon) || layer instanceof L.ImageOverlay && !(layer instanceof L.VideoOverlay) && !(layer instanceof L.SVGOverlay));
+  }
+
+  // src/scene/addRegisteredLayer.js
+  function layerLayerAdd(event) {
+    const native = isNativeLayer(this);
+    if (native) {
+      if (this instanceof L.GridLayer || this instanceof L.ImageOverlay) {
+        this.options.crossOrigin ||= true;
+      }
+      if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
+    }
+    const map = event.target;
+    if (!map.hasLayer(this)) return;
+    if (kindByLayer.get(this)) {
+      this._map = map;
+      this._zoomAnimated = map._zoomAnimated;
+      if (kindByLayer.get(this) !== "pending" && kindByLayer.get(this) !== "time") {
+        eventsByLayer.set(this, kindByLayer.get(this) === "raster" ? getRasterEvents(this) : state3dByLayer.get(this) ? get3DEvents(this) : emptyEvents());
+        eventMapByLayer.set(this, map);
+        map.on(eventsByLayer.get(this), this);
+        this.once("remove", removeLayerEvents, this);
+      }
+      addSceneLayer(this, map);
+      this.fire("add");
+      map.fire(
+        "layeradd",
+        /* alloc */
+        { layer: this }
+      );
+    } else {
+      layerProto.value._layerAdd.call(this, event);
+    }
+    if (!native || !event.target.hasLayer(this)) return;
+    initNativeGPU(this, event.target);
+  }
+
+  // src/scene/layerInitialize.js
+  init_L();
+
+  // src/globals/pendingInitializations.js
+  var pendingInitializations = [];
+
+  // src/globals/loading.js
+  var loading = { value: Promise.resolve() };
+
+  // src/sources/initializeGeoJSON.js
+  function initializeGeoJSON(layer, options) {
+    geojsonByLayer.set(layer, true);
+    init3D(layer, options);
+  }
+
+  // src/sources/isVectorTileSource.js
+  function isVectorTileSource(options) {
+    return options.data === void 0 && (options.tileJSON !== void 0 || typeof options.url === "string" && /\{[zxy]\}|%7B[zxy]%7D/i.test(options.url));
+  }
+
+  // src/vector-tiles/configureVectorTileLayer.js
+  init_L();
+
+  // src/weakmaps/vectorTileOptionsByLayer.js
+  var vectorTileOptionsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/vector-tiles/readTileJSON.js
+  async function readTileJSON(options) {
+    const url = (
+      /* alloc */
+      new URL(options.tileJSON, document.baseURI).href
+    );
+    const response = await fetch(url);
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`TileJSON: HTTP ${response.status}`)
+    );
+    const metadata = await response.json();
+    if (!metadata || !Array.isArray(metadata.tiles) || !metadata.tiles.length || typeof metadata.tiles[0] !== "string") {
+      throw (
+        /* alloc */
+        new Error("TileJSON requires a tile URL template")
+      );
+    }
+    return (
+      /* alloc */
+      {
+        ...options,
+        url: (
+          /* alloc */
+          new URL(metadata.tiles[0], url).href
+        ),
+        minNativeZoom: options.minNativeZoom ?? metadata.minzoom,
+        maxNativeZoom: options.maxNativeZoom ?? metadata.maxzoom,
+        attribution: options.attribution ?? metadata.attribution
+      }
+    );
+  }
+
+  // src/vector-style/removeTrailingCommas.js
+  function removeTrailingCommas(json) {
+    let cleaned = "", quoted = false, escaped = false, i = 0, char = "";
+    for (i = 0; i < json.length; i++) {
+      char = json[i];
+      if (!quoted && char === "," && /^\s*[\]}]/.test(json.slice(i + 1))) continue;
+      cleaned += char;
+      if (escaped) escaped = false;
+      else if (quoted && char === "\\") escaped = true;
+      else if (char === '"') quoted = !quoted;
+    }
+    return cleaned;
+  }
+
+  // src/vector-style/appendQuotedStyleCharacter.js
+  function appendQuotedStyleCharacter(char, state) {
+    if (state.quoted) {
+      if (state.escaped) {
+        state.escaped = false;
+        return char === "'" ? char : "\\" + char;
+      }
+      if (char === "\\") {
+        state.escaped = true;
+        return "";
+      }
+      if (char === state.quoted) {
+        state.quoted = "";
+        return '"';
+      }
+      return char === '"' ? '\\"' : char;
+    }
+    if (char === '"' || char === "'") {
+      state.quoted = char;
+      return '"';
+    }
+    return void 0;
+  }
+
+  // src/vector-style/skipStyleComment.js
+  function skipStyleComment(text, index, marker) {
+    if (marker === "/") {
+      while (index < text.length && text[index] !== "\n") index++;
+      return index;
+    }
+    const end = text.indexOf("*/", index + 2);
+    if (end < 0) throw (
+      /* alloc */
+      new Error("Unterminated style comment")
+    );
+    return end + 1;
+  }
+
+  // src/vector-style/stripStyleComments.js
+  function stripStyleComments(text) {
+    let json = "", i = 0, char = "", next = "", converted = void 0;
+    const state = (
+      /* alloc */
+      { quoted: "", escaped: false }
+    );
+    for (i = 0; i < text.length; i++) {
+      char = text[i];
+      next = text[i + 1];
+      converted = appendQuotedStyleCharacter(char, state);
+      if (converted !== void 0) {
+        json += converted;
+        continue;
+      }
+      if (char === "/" && (next === "/" || next === "*")) {
+        i = skipStyleComment(text, i, next);
+        json += next === "/" ? "\n" : " ";
+      } else json += char;
+    }
+    return json;
+  }
+
+  // src/vector-style/validateVectorLayers.js
+  function validateVectorLayers(layers) {
+    let i = 0, layer = null;
+    if (!Array.isArray(layers)) throw (
+      /* alloc */
+      new Error("Invalid vector style layers")
+    );
+    for (i = 0; i < layers.length; i++) {
+      layer = layers[i];
+      if (!layer || typeof layer.id !== "string" || typeof layer.type !== "string") {
+        throw (
+          /* alloc */
+          new Error("Invalid vector style layers")
+        );
+      }
+    }
+  }
+
+  // src/vector-style/parseVectorStyle.js
+  function parseVectorStyle(text) {
+    const prefix = /^\s*(?:const|let|var)\s+otm_layers\s*=\s*/.exec(text);
+    if (prefix) text = text.slice(prefix[0].length);
+    const cleaned = removeTrailingCommas(stripStyleComments(text).trim().replace(/;$/, ""));
+    const document2 = JSON.parse(cleaned);
+    const layers = document2.layers ?? document2;
+    validateVectorLayers(layers);
+    return layers;
+  }
+
+  // src/vector-tiles/readVectorStyle.js
+  async function readVectorStyle(style) {
+    if (typeof style === "string") {
+      const response = await fetch(style);
+      if (!response.ok) throw (
+        /* alloc */
+        new Error(`Vector style: HTTP ${response.status}`)
+      );
+      style = parseVectorStyle(await response.text());
+    } else style = style?.layers ?? style;
+    if (!Array.isArray(style)) throw (
+      /* alloc */
+      new Error("Invalid vector style layers")
+    );
+    let entry;
+    for (entry of style) {
+      if (!entry || typeof entry.id !== "string" || typeof entry.type !== "string") {
+        throw (
+          /* alloc */
+          new Error("Invalid vector style layers")
+        );
+      }
+    }
+    return style;
+  }
+
+  // src/vector-tiles/validateVectorTileZooms.js
+  function validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom) {
+    if (!Number.isInteger(minNativeZoom) || !Number.isInteger(maxNativeZoom) || !Number.isInteger(maxZoom) || minNativeZoom < 0 || maxNativeZoom < minNativeZoom || maxZoom < maxNativeZoom || maxZoom > 24) {
+      throw (
+        /* alloc */
+        new Error("Invalid vector tile zoom range")
+      );
+    }
+  }
+
+  // src/vector-tiles/vectorTileSettings.js
+  async function vectorTileSettings(options) {
+    if (!options || typeof options !== "object") throw (
+      /* alloc */
+      new TypeError("Vector tiles require source options")
+    );
+    if (options.tileJSON) options = await readTileJSON(options);
+    let { url, style, minNativeZoom = 0, maxNativeZoom = 14, maxZoom = 19 } = options;
+    let key;
+    if (typeof url === "string") url = url.replaceAll(/%7B([zxy])%7D/gi, "{$1}");
+    for (
+      key of
+      /* alloc */
+      ["{z}", "{x}", "{y}"]
+    ) {
+      if (typeof url !== "string" || !url.includes(key)) throw (
+        /* alloc */
+        new Error("Vector tiles require an XYZ URL template")
+      );
+    }
+    validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom);
+    style = await readVectorStyle(style);
+    return (
+      /* alloc */
+      { ...options, url, style, minNativeZoom, maxNativeZoom, maxZoom }
+    );
+  }
+
+  // src/vector-tiles/loadVectorSprite.js
+  async function loadVectorSprite(url) {
+    const response = await fetch(`${url}.json`);
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`Sprite ${url}.json: HTTP ${response.status}`)
+    );
+    return (
+      /* alloc */
+      { url: `${url}.png`, index: await response.json() }
+    );
+  }
+
+  // src/globals/vectorTileEvents.js
+  var vectorTileEvents = "move zoom rotate pitch resize viewreset";
+
+  // src/vector-style/evaluateBoolean.js
+  function evaluateBoolean(op, args, properties, zoom, legacy) {
+    let i = 0;
+    if (op === "all") {
+      for (i = 0; i < args.length; i++) {
+        if (!evaluateStyle(args[i], properties, zoom, legacy)) return false;
+      }
+      return true;
+    }
+    if (op === "any") {
+      for (i = 0; i < args.length; i++) {
+        if (evaluateStyle(args[i], properties, zoom, legacy)) return true;
+      }
+      return false;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateCoalesceOrCase.js
+  function evaluateCoalesceOrCase(op, args, properties, zoom, legacy) {
+    let i = 0, result = null;
+    if (op === "coalesce") {
+      for (i = 0; i < args.length; i++) {
+        result = evaluateStyle(args[i], properties, zoom);
+        if (result !== null && result !== void 0) return result;
+      }
+      return null;
+    }
+    if (op === "case") {
+      for (i = 0; i < args.length - 1; i += 2) {
+        if (evaluateStyle(args[i], properties, zoom)) {
+          return evaluateStyle(args[i + 1], properties, zoom);
+        }
+      }
+      return evaluateStyle(args[args.length - 1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateInput.js
+  function evaluateInput(value, properties, zoom, legacy) {
+    if (legacy && typeof value === "string") return properties[value];
+    return evaluateStyle(value, properties, zoom);
+  }
+
+  // src/vector-style/evaluateComparison.js
+  function evaluateComparison(op, args, properties, zoom, legacy) {
+    const left = evaluateInput(args[0], properties, zoom, legacy);
+    const right = evaluateStyle(args[1], properties, zoom);
+    switch (op) {
+      case "==":
+        return left === right;
+      case "!=":
+        return left !== right;
+      case "<=":
+        return left <= right;
+      case ">=":
+        return left >= right;
+      case "<":
+        return left < right;
+      case ">":
+        return left > right;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/globals/vectorStyleNamedColors.js
+  var vectorStyleNamedColors = {
+    black: [0, 0, 0, 1],
+    white: [255, 255, 255, 1],
+    gray: [128, 128, 128, 1],
+    blue: [0, 0, 255, 1],
+    red: [255, 0, 0, 1],
+    green: [0, 128, 0, 1]
+  };
+
+  // src/vector-style/parseFunctionalColor.js
+  function parseFunctionalColor(value) {
+    const match = /^rgba?\(([^)]+)\)$/.exec(value);
+    if (match) {
+      const values = match[1].split(",");
+      let i = 0, finite = true;
+      for (i = 0; i < values.length; i++) values[i] = Number(values[i]);
+      if (values.length === 3) values.push(1);
+      for (i = 0; i < values.length; i++) {
+        if (!Number.isFinite(values[i])) finite = false;
+      }
+      if (values.length === 4 && finite) return values;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported interpolated style color: ${value}`)
+    );
+  }
+
+  // src/vector-style/parseHexColor.js
+  function parseHexColor(value) {
+    let i = 0, offset = 0;
+    if (value.length === 4) {
+      value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+    }
+    const color = (
+      /* alloc */
+      []
+    );
+    for (i = 1; i < 6; i += 2) {
+      offset = parseInt(value.slice(i, i + 2), 16);
+      color.push(offset);
+    }
+    color.push(1);
+    return color;
+  }
+
+  // src/vector-style/styleColor.js
+  function styleColor(value) {
+    if (Object.hasOwn(vectorStyleNamedColors, value)) return vectorStyleNamedColors[value];
+    if (/^#[0-9a-f]{3}$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value)) {
+      return parseHexColor(value);
+    }
+    return parseFunctionalColor(value);
+  }
+
+  // src/vector-style/evaluateInterpolate.js
+  function evaluateInterpolate(args, properties, zoom) {
+    const result = evaluateStyle(args[1], properties, zoom);
+    const base = args[0][0] === "exponential" ? args[0][1] : 1;
+    let i = 0, lower = 0, upper = 0, ratio = 0, left = null, right = null, j = 0, color = "";
+    if (result <= args[2]) return evaluateStyle(args[3], properties, zoom);
+    for (i = 4; i < args.length; i += 2) {
+      if (result > args[i]) continue;
+      lower = args[i - 2];
+      upper = args[i];
+      ratio = base === 1 ? (result - lower) / (upper - lower) : (base ** (result - lower) - 1) / (base ** (upper - lower) - 1);
+      left = evaluateStyle(args[i - 1], properties, zoom);
+      right = evaluateStyle(args[i + 1], properties, zoom);
+      if (typeof left === "number" && typeof right === "number") return left + (right - left) * ratio;
+      left = styleColor(left);
+      right = styleColor(right);
+      for (j = 0; j < 3; j++) {
+        if (j) color += ",";
+        color += Math.round(left[j] + (right[j] - left[j]) * ratio);
+      }
+      return `rgba(${color},${left[3] + (right[3] - left[3]) * ratio})`;
+    }
+    return evaluateStyle(args.at(-1), properties, zoom);
+  }
+
+  // src/vector-style/arrayContainsRange.js
+  function arrayContainsRange(values, start2, end, target) {
+    let i = 0, value = null;
+    for (i = start2; i < end; i++) {
+      value = values[i];
+      if (value === target || value !== value && target !== target) return true;
+    }
+    return false;
+  }
+
+  // src/vector-style/evaluateMembership.js
+  function evaluateMembership(op, args, properties, zoom, legacy) {
+    let target = null;
+    if (op === "!in") {
+      target = evaluateInput(args[0], properties, zoom, legacy);
+      return !arrayContainsRange(args, 1, args.length, target);
+    }
+    if (legacy) {
+      target = evaluateInput(args[0], properties, zoom, true);
+      return arrayContainsRange(args, 1, args.length, target);
+    }
+    const values = evaluateStyle(args[1], properties, zoom);
+    target = evaluateInput(args[0], properties, zoom, false);
+    return values.includes(target);
+  }
+
+  // src/vector-style/evaluateIExpression.js
+  function evaluateIExpression(op, args, properties, zoom, legacy) {
+    if (op === "in") return evaluateMembership(op, args, properties, zoom, legacy);
+    if (op === "interpolate") return evaluateInterpolate(args, properties, zoom);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMath.js
+  function evaluateMath(op, args, properties, zoom) {
+    let i = 0, sum = 0;
+    if (op === "+") {
+      for (i = 0; i < args.length; i++) sum += evaluateStyle(args[i], properties, zoom);
+      return sum;
+    }
+    if (op === "-") {
+      if (args.length === 1) return -evaluateStyle(args[0], properties, zoom);
+      return evaluateStyle(args[0], properties, zoom) - evaluateStyle(args[1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMatch.js
+  function evaluateMatch(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let i = 0, matched = false;
+    for (i = 1; i < args.length - 1; i += 2) {
+      if (Array.isArray(args[i])) matched = args[i].includes(result);
+      else matched = args[i] === result;
+      if (matched) return evaluateStyle(args[i + 1], properties, zoom);
+    }
+    return evaluateStyle(args[args.length - 1], properties, zoom);
+  }
+
+  // src/vector-style/evaluateNegation.js
+  function evaluateNegation(op, args, properties, zoom, legacy) {
+    if (op === "!") return !evaluateStyle(args[0], properties, zoom, legacy);
+    if (op === "!=") {
+      return evaluateInput(args[0], properties, zoom, legacy) !== evaluateStyle(args[1], properties, zoom);
+    }
+    if (op === "!in") return evaluateMembership(op, args, properties, zoom, legacy);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluatePrimitive.js
+  function evaluatePrimitive(op, args, properties, zoom) {
+    switch (op) {
+      case "literal":
+        return args[0];
+      case "get":
+        return properties[args[0]];
+      case "has":
+        return Object.hasOwn(properties, args[0]);
+      case "zoom":
+        return zoom;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/vector-style/evaluateStep.js
+  function evaluateStep(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let output = args[1], i = 0;
+    for (i = 2; i < args.length; i += 2) {
+      if (result < args[i]) break;
+      output = args[i + 1];
+    }
+    return evaluateStyle(output, properties, zoom);
+  }
+
+  // src/vector-style/evaluateToExpression.js
+  function evaluateToExpression(op, args, properties, zoom) {
+    if (op === "to-boolean") return Boolean(evaluateStyle(args[0], properties, zoom));
+    if (op === "to-number") {
+      let i = 0, number = 0;
+      for (i = 0; i < args.length; i++) {
+        number = Number(evaluateStyle(args[i], properties, zoom));
+        if (Number.isFinite(number)) return number;
+      }
+      throw (
+        /* alloc */
+        new Error("Invalid numeric style expression")
+      );
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateStyle.js
+  function evaluateStyle(value, properties, zoom, legacy = false) {
+    if (!Array.isArray(value)) return value;
+    const op = value[0];
+    const args = value.slice(1);
+    const operation = String(op);
+    if (/^(?:literal|get|has|zoom)$/.test(operation)) {
+      return evaluatePrimitive(op, args, properties, zoom);
+    }
+    switch (operation[0]) {
+      case "a":
+        return evaluateBoolean(op, args, properties, zoom, legacy);
+      case "!":
+        return evaluateNegation(op, args, properties, zoom, legacy);
+      case "=":
+      case "<":
+      case ">":
+        return evaluateComparison(op, args, properties, zoom, legacy);
+      case "i":
+        return evaluateIExpression(op, args, properties, zoom, legacy);
+      case "t":
+        return evaluateToExpression(op, args, properties, zoom, legacy);
+      case "c":
+        return evaluateCoalesceOrCase(op, args, properties, zoom, legacy);
+      case "m":
+        return evaluateMatch(args, properties, zoom);
+      case "s":
+        return evaluateStep(args, properties, zoom);
+      default:
+        return evaluateMath(op, args, properties, zoom);
+    }
+  }
+
+  // src/vector-tiles/vectorStyleZoom.js
+  function vectorStyleZoom(layer) {
+    return layer._map.getZoom() + (vectorTileOptionsByLayer.get(layer).styleZoomOffset ?? 0);
+  }
+
+  // src/vector-tiles/refreshVectorTiles.js
+  function refreshVectorTiles() {
+    clearTimeout(this.timer);
+    this.changedAt = performance.now();
+    this.timer = setTimeout(this.update.bind(this), 180);
+  }
+
+  // src/vector-tiles/rotateVectorLabel.js
+  init_radians();
+
+  // src/core/markerSetRotation.js
+  function markerSetRotation(marker, rotation) {
+    if (!Number.isFinite(rotation)) throw (
+      /* alloc */
+      new TypeError("Marker rotation must be finite")
+    );
+    marker.options.rotation = rotation;
+    marker.update();
+    refreshNativeLayerContract(marker);
+    return marker;
+  }
+
+  // src/vector-tiles/rotateVectorLabel.js
+  function rotateVectorLabel(map, marker, label) {
+    if (!label.along) return;
+    const a = map.latLngToContainerPoint(label.along[0]), b = map.latLngToContainerPoint(label.along[1]);
+    let angle = Math.atan2(b.y - a.y, b.x - a.x) / radians;
+    if (angle > 90) angle -= 180;
+    else if (angle < -90) angle += 180;
+    if (marker.options.rotation === angle * radians) return;
+    markerSetRotation(marker, angle * radians);
+  }
+
+  // src/vector-tiles/rotateVectorLabels.js
+  function rotateVectorLabels() {
+    let marker;
+    for (marker of this.labels.values()) if (marker._mvtLabel) rotateVectorLabel(this._map, marker, marker._mvtLabel);
+  }
+
+  // src/weakmaps/vectorWorkerByLayer.js
+  var vectorWorkerByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/vector-tiles/revokeVectorWorkerUrl.js
+  function revokeVectorWorkerUrl(layer) {
+    const entry = vectorWorkerByLayer.get(layer);
+    if (entry?.blobUrl) {
+      URL.revokeObjectURL(entry.blobUrl);
+      entry.blobUrl = null;
+    }
+  }
+
+  // src/vector-tiles/onVectorTileMessage.js
+  function onVectorTileMessage({ data }) {
+    revokeVectorWorkerUrl(this);
+    const pending = this.waiting.get(data.id);
+    if (!pending) return;
+    this.waiting.delete(data.id);
+    if (data.error) pending.reject(
+      /* alloc */
+      new Error(data.error)
+    );
+    else pending.resolve(data);
+  }
+
+  // src/vector-tiles/onVectorTileWorkerError.js
+  function onVectorTileWorkerError(event) {
+    revokeVectorWorkerUrl(this);
+    const error = (
+      /* alloc */
+      new Error(`Worker MVT: ${event.message}`)
+    );
+    let pending;
+    for (pending of this.waiting.values()) pending.reject(error);
+    this.waiting.clear();
+    reportError(this, error);
+  }
+
+  // src/vector-tiles/onVectorTileAdd.js
+  function onVectorTileAdd(map) {
+    const { style, pane } = vectorTileOptionsByLayer.get(this);
+    let index, entry;
+    for ([index] of style.entries()) {
+      (map.getPane(`${pane}-${index}`) || map.createPane(`${pane}-${index}`)).style.zIndex = 200 + index;
+    }
+    for (entry of style) {
+      if (entry.type !== "background") continue;
+      map.getContainer().style.background = evaluateStyle(
+        entry.paint["background-color"],
+        /* alloc */
+        {},
+        vectorStyleZoom(this)
+      );
+      break;
+    }
+    this.session = /* alloc */
+    {};
+    this.tiles = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.labels = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.waiting = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.retiring = /* alloc */
+    /* @__PURE__ */ new Set();
+    this.inflight = 0;
+    this.sequence = 0;
+    this.changedAt = 0;
+    this.paintZoom = null;
+    const workerEntry = createGeometryWorker(this.options.workerUrl || geometryWorkerUrl);
+    vectorWorkerByLayer.set(this, workerEntry);
+    this.worker = workerEntry.worker;
+    this.worker.onmessage = onVectorTileMessage.bind(this);
+    this.worker.onerror = onVectorTileWorkerError.bind(this);
+    this.refresh = refreshVectorTiles.bind(this);
+    this.rotateLabels = rotateVectorLabels.bind(this);
+    map.on(vectorTileEvents, this.refresh);
+    map.on("move rotate pitch", this.rotateLabels);
+    this.update();
+  }
+
+  // src/vector-tiles/onVectorTileRemove.js
+  function onVectorTileRemove(map) {
+    map.off(vectorTileEvents, this.refresh);
+    map.off("move rotate pitch", this.rotateLabels);
+    clearTimeout(this.timer);
+    this.session = null;
+    this.worker.terminate();
+    revokeVectorWorkerUrl(this);
+    vectorWorkerByLayer.delete(this);
+    let pending, tile, group, marker;
+    for (pending of this.waiting.values()) pending.reject(
+      /* alloc */
+      new DOMException("Layer removed", "AbortError")
+    );
+    this.waiting.clear();
+    for (tile of this.tiles.values()) {
+      tile.controller.abort();
+      tile.group?.remove();
+    }
+    for (group of this.retiring) group.remove();
+    for (marker of this.labels.values()) marker.remove();
+    this.tiles.clear();
+    this.labels.clear();
+    this.retiring.clear();
+  }
+
+  // src/vector-tiles/updateVectorTiles.js
+  function updateVectorTiles() {
+    if (!this.session) return;
+    const { minNativeZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);
+    const z = Math.max(minNativeZoom, Math.min(maxNativeZoom, Math.floor(vectorStyleZoom(this))));
+    const bounds = this._map.getBounds(), count = 2 ** z;
+    const nw = this._map.project(bounds.getNorthWest(), z).divideBy(256);
+    const se = this._map.project(bounds.getSouthEast(), z).divideBy(256);
+    let tile, x, y, key;
+    for (tile of this.tiles.values()) tile.needed = false;
+    for (x = Math.floor(nw.x); x <= Math.floor(se.x); x++) {
+      for (y = Math.max(0, Math.floor(nw.y)); y <= Math.min(count - 1, Math.floor(se.y)); y++) {
+        key = `${z}/${x}/${y}`;
+        tile = this.tiles.get(key);
+        if (!tile) {
+          tile = /* alloc */
+          { key, coords: (
+            /* alloc */
+            { z, x, y }
+          ), controller: (
+            /* alloc */
+            new AbortController()
+          ) };
+          this.tiles.set(key, tile);
+        }
+        tile.needed = true;
+      }
+    }
+    this.prune();
+    this.pump();
+    this.updatePaint().catch(reportError.bind(null, this));
+    this.updateLabels().catch(reportError.bind(null, this));
+  }
+
+  // src/vector-style/readPaintValue.js
+  function readPaintValue(paint, key, fallback, properties, zoom) {
+    if (paint[key] === void 0) return fallback;
+    return evaluateStyle(paint[key], properties, zoom);
+  }
+
+  // src/vector-style/fillVectorPaint.js
+  function fillVectorPaint(paint, properties, zoom) {
+    const fill = styleColor(readPaintValue(paint, "fill-color", "#000", properties, zoom));
+    const outline = readPaintValue(paint, "fill-outline-color", null, properties, zoom);
+    const rgb2 = outline === null ? null : styleColor(outline);
+    const fillOpacity = readPaintValue(paint, "fill-opacity", 1, properties, zoom) * fill[3];
+    const fillColor = (
+      /* alloc */
+      { r: fill[0] / 255, g: fill[1] / 255, b: fill[2] / 255 }
+    );
+    const color = rgb2 ? (
+      /* alloc */
+      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
+    ) : null;
+    return (
+      /* alloc */
+      {
+        fillColor,
+        fillOpacity,
+        color,
+        weight: 0.5
+      }
+    );
+  }
+
+  // src/vector-style/scaleDashArray.js
+  function scaleDashArray(dash, weight, properties, zoom) {
+    if (!dash) return void 0;
+    let values = dash, i = 0, result = "";
+    if (typeof dash[0] !== "number") values = evaluateStyle(dash, properties, zoom);
+    if (!Array.isArray(values)) throw (
+      /* alloc */
+      new TypeError("Style dash array must be an array")
+    );
+    for (i = 0; i < values.length; i++) {
+      if (i) result += " ";
+      result += values[i] * weight;
+    }
+    return result;
+  }
+
+  // src/vector-style/lineVectorPaint.js
+  function lineVectorPaint(layer, paint, properties, zoom) {
+    const weight = readPaintValue(paint, "line-width", 1, properties, zoom);
+    const rgb2 = styleColor(readPaintValue(paint, "line-color", "#000", properties, zoom));
+    const opacity = readPaintValue(paint, "line-opacity", 1, properties, zoom) * rgb2[3];
+    const dashArray = scaleDashArray(paint["line-dasharray"], weight, properties, zoom);
+    const lineCap = layer.layout?.["line-cap"] || "butt";
+    const lineJoin2 = layer.layout?.["line-join"] || "miter";
+    const color = (
+      /* alloc */
+      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
+    );
+    return (
+      /* alloc */
+      {
+        color,
+        opacity,
+        weight,
+        dashArray,
+        lineCap,
+        lineJoin: lineJoin2
+      }
+    );
+  }
+
+  // src/vector-style/vectorPaint.js
+  function vectorPaint(layer, properties, zoom) {
+    const paint = layer.paint || /* alloc */
+    {};
+    if (layer.type === "fill") return fillVectorPaint(paint, properties, zoom);
+    return lineVectorPaint(layer, paint, properties, zoom);
+  }
+
+  // src/vector-style/visibleStyle.js
+  function visibleStyle(layer, properties, zoom) {
+    return zoom >= (layer.minzoom ?? 0) && zoom < (layer.maxzoom ?? Infinity) && layer.layout?.visibility !== "none" && (!layer.filter || evaluateStyle(layer.filter, properties, zoom, true));
+  }
+
+  // src/vector-tiles/vectorTilePaint.js
+  function vectorTilePaint(batch, zoom) {
+    const paint = vectorPaint(batch.entry, batch.properties, zoom);
+    if (!visibleStyle(batch.entry, batch.properties, zoom)) {
+      paint.opacity = 0;
+      paint.fillOpacity = 0;
+    }
+    return paint;
+  }
+
+  // src/vector-tiles/paintVectorTileBatch.js
+  function paintVectorTileBatch(batch, zoom) {
+    const paint = vectorTilePaint(batch, zoom), { layer } = batch;
+    if (batch.kind === "line") {
+      if (paint.dashArray !== layer.options.dashArray) layer.setStyle(paint);
+      else layer.setStyle(
+        /* alloc */
+        { color: paint.color, opacity: paint.opacity, weight: paint.weight }
+      );
+    } else if (JSON.stringify(paint.fillColor) !== JSON.stringify(layer.options.fillColor) || paint.fillOpacity !== layer.options.fillOpacity) {
+      layer.setStyle(
+        /* alloc */
+        { fillColor: paint.fillColor, fillOpacity: paint.fillOpacity }
+      );
+    }
+  }
+
+  // src/vector-tiles/vectorTilesIdle.js
+  function vectorTilesIdle(layer, session) {
+    return layer.session === session && performance.now() - (layer.changedAt || 0) >= 180;
+  }
+
+  // src/utils/yieldTask.js
+  function yieldTask(delay = 0) {
+    const task = Promise.withResolvers();
+    setTimeout(task.resolve, delay);
+    return task.promise;
+  }
+
+  // src/vector-tiles/updateVectorTilePaint.js
+  async function updateVectorTilePaint() {
+    const zoom = vectorStyleZoom(this), session = this.session;
+    if (this.paintZoom === zoom) return;
+    const revision = this.paintRevision = (this.paintRevision || 0) + 1;
+    let updated = 0, tile, batch;
+    for (tile of this.tiles.values()) {
+      if (!tile.rendered) continue;
+      for (batch of tile.rendered) {
+        if (!vectorTilesIdle(this, session) || this.paintRevision !== revision || vectorStyleZoom(this) !== zoom) return;
+        paintVectorTileBatch(batch, zoom);
+        if (++updated % 32 === 0) await yieldTask();
+      }
+    }
+    this.paintZoom = zoom;
+  }
+
+  // src/vector-tiles/compareVectorLabelPriority.js
+  function compareVectorLabelPriority(a, b) {
+    return a.priority - b.priority;
+  }
+
+  // src/vector-tiles/vectorLabelCandidates.js
+  function vectorLabelCandidates(layer) {
+    const candidates = (
+      /* alloc */
+      []
+    );
+    let tile, label;
+    for (tile of layer.tiles.values()) {
+      if (!tile.needed || !tile.labelCandidates) continue;
+      for (label of tile.labelCandidates) candidates.push(label);
+    }
+    return candidates.sort(compareVectorLabelPriority);
+  }
+
+  // src/vector-tiles/vectorLabelCells.js
+  function vectorLabelCells(layer, label, size) {
+    const map = layer._map, zoom = vectorStyleZoom(layer);
+    if (!visibleStyle(label.entry, label.properties, zoom)) return null;
+    label.size = evaluateStyle(label.entry.layout?.["text-size"] ?? 12, label.properties, zoom);
+    if (!(label.size > 0)) return null;
+    if (label.icon && !vectorTileOptionsByLayer.get(layer).spriteSheet?.index[label.icon]) return null;
+    label.color = evaluateStyle(label.entry.paint?.["text-color"] ?? "#000", label.properties, zoom);
+    label.halo = evaluateStyle(label.entry.paint?.["text-halo-color"] ?? "#fff", label.properties, zoom);
+    label.haloWidth = evaluateStyle(label.entry.paint?.["text-halo-width"] ?? 0, label.properties, zoom);
+    if (label.along && label.pixelBase * 2 ** map.getZoom() < label.text.length * label.size * 0.6) return null;
+    const point = map.latLngToContainerPoint(label.latlng);
+    if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y) return null;
+    const width = label.text.length * label.size * 0.65 + 16, cells = (
+      /* alloc */
+      []
+    );
+    let x, y;
+    for (x = Math.floor((point.x - width / 2) / 32); x <= Math.floor((point.x + width / 2) / 32); x++) {
+      for (y = Math.floor((point.y - label.size) / 24); y <= Math.floor((point.y + label.size) / 24); y++) {
+        cells.push(`${x}:${y}`);
+      }
+    }
+    return cells;
+  }
+
+  // src/vector-tiles/reserveVectorLabelCells.js
+  function reserveVectorLabelCells(cells, occupied) {
+    let cell;
+    for (cell of cells) if (occupied.has(cell)) return false;
+    for (cell of cells) occupied.add(cell);
+    return true;
+  }
+
+  // src/vector-tiles/updateVectorLabelMarker.js
+  init_L();
+
+  // src/vector-tiles/vectorLabelIcon.js
+  init_L();
+
+  // src/vector-tiles/vectorSpriteIcon.js
+  init_L();
+  function vectorSpriteIcon(label, sheet) {
+    const { x, y, width, height } = sheet.index[label.icon], [dx, dy] = label.iconOffset;
+    return (
+      /* alloc */
+      new L.DivIcon(
+        /* alloc */
+        {
+          className: "",
+          html: `<div style="width:${width}px;height:${height}px;background:url(${sheet.url}) -${x}px -${y}px"></div>`,
+          iconSize: (
+            /* alloc */
+            [width, height]
+          ),
+          iconAnchor: (
+            /* alloc */
+            [width / 2 - dx, height / 2 - dy]
+          )
+        }
+      )
+    );
+  }
+
+  // src/vector-tiles/wrapVectorLabel.js
+  function wrapVectorLabel(text) {
+    const limit = Math.floor(10 / 0.52), lines = (
+      /* alloc */
+      []
+    );
+    let line2 = "", word;
+    for (word of text.split(" ")) {
+      if (line2 && Array.from(`${line2} ${word}`).length > limit) {
+        lines.push(line2);
+        line2 = word;
+      } else line2 = line2 ? `${line2} ${word}` : word;
+    }
+    lines.push(line2);
+    return lines;
+  }
+
+  // src/vector-tiles/vectorLabelIcon.js
+  function vectorLabelIcon(label, sheet) {
+    if (label.icon) return vectorSpriteIcon(label, sheet);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const lines = label.along ? [label.text] : wrapVectorLabel(label.text);
+    let longest = 0, line2, key, text, index;
+    for (line2 of lines) longest = Math.max(longest, Array.from(line2).length);
+    const width = Math.max(40, longest * label.size * 0.65 + 12);
+    const lineHeight = label.size * 1.2, height = lines.length * lineHeight + 12;
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    const attributes = (
+      /* alloc */
+      {
+        x: width / 2,
+        "text-anchor": "middle",
+        "font-family": "sans-serif",
+        "font-size": label.size,
+        fill: label.color,
+        stroke: label.halo,
+        "stroke-width": label.haloWidth * 2,
+        "paint-order": "stroke"
+      }
+    );
+    for (index = 0; index < lines.length; index++) {
+      text = document.createElementNS(svg.namespaceURI, "text");
+      for (key of Object.keys(attributes)) text.setAttribute(key, attributes[key]);
+      text.setAttribute("y", height / 2 + (index - (lines.length - 1) / 2) * lineHeight + label.size * 0.35);
+      text.textContent = lines[index];
+      svg.append(text);
+    }
+    return (
+      /* alloc */
+      new L.Icon(
+        /* alloc */
+        {
+          iconUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+            /* alloc */
+            new XMLSerializer().serializeToString(svg)
+          )}`,
+          iconSize: (
+            /* alloc */
+            [width, height]
+          ),
+          iconAnchor: (
+            /* alloc */
+            [width / 2, height / 2]
+          )
+        }
+      )
+    );
+  }
+
+  // src/vector-tiles/forwardVectorTileError.js
+  function forwardVectorTileError({ error }) {
+    reportError(this, error);
+  }
+
+  // src/vector-tiles/updateVectorLabelMarker.js
+  function updateVectorLabelMarker(owner, label, key) {
+    const appearance = JSON.stringify(
+      /* alloc */
+      [label.size, label.color, label.halo, label.haloWidth, label.icon]
+    );
+    const sheet = vectorTileOptionsByLayer.get(owner).spriteSheet;
+    let marker = owner.labels.get(key);
+    if (marker) {
+      marker._mvtLabel = label;
+      if (marker._mvtLabelStyle === appearance) {
+        rotateVectorLabel(owner._map, marker, label);
+        return false;
+      }
+      marker.setIcon(vectorLabelIcon(label, sheet));
+    } else {
+      const { pane } = vectorTileOptionsByLayer.get(owner);
+      marker = /* alloc */
+      new L.Marker(
+        label.latlng,
+        /* alloc */
+        {
+          icon: vectorLabelIcon(label, sheet),
+          pane: `${pane}-${label.order}`,
+          title: label.text,
+          alt: label.text,
+          interactive: false,
+          keyboard: false,
+          rotateWithView: false
+        }
+      ).on("error", forwardVectorTileError, owner).addTo(owner._map);
+      owner.labels.set(key, marker);
+    }
+    marker._mvtLabelStyle = appearance;
+    marker._mvtLabel = label;
+    rotateVectorLabel(owner._map, marker, label);
+    return true;
+  }
+
+  // src/vector-tiles/updateVectorTileLabels.js
+  async function updateVectorTileLabels() {
+    const session = this.session, revision = this.labelRevision = (this.labelRevision || 0) + 1;
+    this.labelsReady = false;
+    const candidates = vectorLabelCandidates(this), size = this._map.getSize();
+    const occupied = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    ), retained = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let visited = 0, label, key, cells, marker;
+    for (label of candidates) {
+      if (++visited % 128 === 0) await yieldTask();
+      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
+      cells = vectorLabelCells(this, label, size);
+      if (!cells || !label.allowOverlap && !reserveVectorLabelCells(cells, occupied)) continue;
+      key = `${label.text}${label.icon || ""}:${label.latlng.join(":")}`;
+      retained.add(key);
+      if (updateVectorLabelMarker(this, label, key)) await yieldTask();
+    }
+    for ([key, marker] of this.labels) {
+      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
+      if (!retained.has(key)) {
+        marker.remove();
+        this.labels.delete(key);
+        await yieldTask();
+      }
+    }
+    this.labelsReady = true;
+  }
+
+  // src/vector-tiles/vectorTileOverlaps.js
+  function vectorTileOverlaps(a, b) {
+    const shift = a.z - b.z;
+    return shift >= 0 ? a.x >> shift === b.x && a.y >> shift === b.y : b.x >> -shift === a.x && b.y >> -shift === a.y;
+  }
+
+  // src/vector-tiles/vectorTileAwaited.js
+  function vectorTileAwaited(layer, stale) {
+    let tile;
+    for (tile of layer.tiles.values()) {
+      if (tile.needed && !tile.group && vectorTileOverlaps(tile.coords, stale.coords)) return true;
+    }
+    return false;
+  }
+
+  // src/vector-tiles/pruneVectorTiles.js
+  function pruneVectorTiles() {
+    let tile, key;
+    for ([key, tile] of this.tiles) {
+      if (tile.needed || tile.group && vectorTileAwaited(this, tile)) continue;
+      tile.controller.abort();
+      this.tiles.delete(key);
+      if (tile.group) this.retire(tile.group).catch(reportError.bind(null, this));
+    }
+  }
+
+  // src/vector-tiles/retireVectorTileGroup.js
+  async function retireVectorTileGroup(group) {
+    const session = this.session;
+    this.retiring.add(group);
+    let removed = 0, layer;
+    for (layer of group.getLayers()) {
+      if (this.session !== session) return;
+      group.removeLayer(layer);
+      if (++removed % 8 === 0) await yieldTask();
+    }
+    group.remove();
+    this.retiring.delete(group);
+  }
+
+  // src/vector-tiles/compareVectorTileDistance.js
+  function compareVectorTileDistance(a, b) {
+    return a.distance - b.distance;
+  }
+
+  // src/vector-tiles/pumpVectorTiles.js
+  function pumpVectorTiles() {
+    if (!this.session) return;
+    const center = this._map.getCenter(), pending = (
+      /* alloc */
+      []
+    );
+    let tile, point;
+    for (tile of this.tiles.values()) {
+      if (!tile.needed || tile.started) continue;
+      point = this._map.project(center, tile.coords.z).divideBy(256);
+      tile.distance = (tile.coords.x - point.x) ** 2 + (tile.coords.y - point.y) ** 2;
+      pending.push(tile);
+    }
+    pending.sort(compareVectorTileDistance);
+    for (tile of pending) {
+      if (this.inflight >= 4) break;
+      tile.started = true;
+      this.inflight++;
+      this.load(tile);
+    }
+  }
+
+  // src/vector-tiles/loadVectorTile.js
+  init_L();
+
+  // src/vector-tiles/attachVectorTileBatch.js
+  init_L();
+  function attachVectorTileBatch(owner, tile, group, batch) {
+    const { pane } = vectorTileOptionsByLayer.get(owner);
+    const paint = vectorTilePaint(batch, vectorStyleZoom(owner));
+    const options = (
+      /* alloc */
+      { ...paint, pane: `${pane}-${batch.order}`, interactive: false, smoothFactor: 0 }
+    );
+    const layer = batch.kind === "fill" ? (
+      /* alloc */
+      new L.Polygon(
+        batch.paths,
+        /* alloc */
+        { ...options, stroke: false, triangulated: true }
+      )
+    ) : (
+      /* alloc */
+      new L.Polyline(batch.paths, options)
+    );
+    layer.on("error", forwardVectorTileError, owner);
+    tile.rendered.push(
+      /* alloc */
+      { layer, kind: batch.kind, entry: batch.entry, properties: batch.properties }
+    );
+    group.addLayer(layer);
+  }
+
+  // src/vector-tiles/attachVectorTileBatches.js
+  async function attachVectorTileBatches(owner, tile, group, batches, session) {
+    let batch, start2 = performance.now();
+    for (batch of batches) {
+      while (!vectorTilesIdle(owner, session) && owner.session === session && !tile.controller.signal.aborted) await yieldTask(50);
+      if (tile.controller.signal.aborted || owner.session !== session) return false;
+      attachVectorTileBatch(owner, tile, group, batch);
+      if (performance.now() - start2 > 8) {
+        await yieldTask();
+        start2 = performance.now();
+      }
+    }
+    return true;
+  }
+
+  // src/vector-tiles/loadVectorTile.js
+  async function loadVectorTile(tile) {
+    const { coords, controller } = tile, session = this.session;
+    const { url, style, sourceId, maxZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);
+    const count = 2 ** coords.z, x = (coords.x % count + count) % count;
+    let group;
+    try {
+      const tileUrl = L.Util.template(
+        url,
+        /* alloc */
+        { z: coords.z, x, y: coords.y }
+      );
+      const response = await fetch(
+        tileUrl,
+        /* alloc */
+        { signal: controller.signal }
+      );
+      if (!response.ok) throw (
+        /* alloc */
+        new Error(`Tile ${tile.key}: HTTP ${response.status}`)
+      );
+      const buffer = await response.arrayBuffer();
+      if (controller.signal.aborted) return;
+      const id = ++this.sequence, prepared = Promise.withResolvers();
+      this.waiting.set(id, prepared);
+      this.worker.postMessage(
+        /* alloc */
+        {
+          type: "vector",
+          id,
+          buffer,
+          coords,
+          style,
+          source: sourceId,
+          maxZoom,
+          zoom: vectorStyleZoom(this),
+          mapZoom: coords.z >= maxNativeZoom ? maxZoom : this._map.getZoom()
+        },
+        /* alloc */
+        [buffer]
+      );
+      const data = await prepared.promise;
+      if (controller.signal.aborted || this.session !== session) return;
+      group = /* alloc */
+      new L.LayerGroup().addTo(this._map);
+      tile.rendered = /* alloc */
+      [];
+      if (!await attachVectorTileBatches(this, tile, group, data.batches, session)) {
+        group.remove();
+        return;
+      }
+      tile.group = group;
+      tile.labelCandidates = data.labels;
+      this.fire(
+        "tileload",
+        /* alloc */
+        { coords, group }
+      );
+      this.prune();
+      this.refresh();
+    } catch (error) {
+      group?.remove();
+      if (!controller.signal.aborted && this.session === session) this.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    } finally {
+      if (this.session === session) {
+        this.inflight--;
+        this.pump();
+      }
+    }
+  }
+
+  // src/vector-tiles/configureVectorTileLayer.js
+  async function configureVectorTileLayer(layer, options) {
+    const settings = await vectorTileSettings(options);
+    if (typeof settings.sprite === "string") settings.spriteSheet = await loadVectorSprite(settings.sprite);
+    const { url, tileJSON, style, sourceId, minNativeZoom, maxNativeZoom, maxZoom, ...core } = settings;
+    L.Util.setOptions(layer, core);
+    settings.pane = `mvt-${L.Util.stamp(layer)}`;
+    vectorTileOptionsByLayer.set(layer, settings);
+    Object.assign(
+      layer,
+      /* alloc */
+      {
+        onAdd: onVectorTileAdd,
+        onRemove: onVectorTileRemove,
+        update: updateVectorTiles,
+        updatePaint: updateVectorTilePaint,
+        updateLabels: updateVectorTileLabels,
+        prune: pruneVectorTiles,
+        retire: retireVectorTileGroup,
+        pump: pumpVectorTiles,
+        load: loadVectorTile
+      }
+    );
+    return layer;
+  }
+
+  // src/sources/readyVectorTiles.js
+  function readyVectorTiles(layer) {
+    const map = layer._map;
+    map?.removeLayer(layer);
+    kindByLayer.delete(layer);
+    map?.addLayer(layer);
+    layer.fire("ready");
+    return layer;
+  }
+
+  // src/raster/reportRasterError.js
+  function reportError2(layer, error) {
+    layer.fire(
+      "error",
+      /* alloc */
+      { error }
+    );
+    throw error;
+  }
+
+  // src/sources/initVectorTiles.js
+  function initVectorTiles(layer, options) {
+    kindByLayer.set(layer, "pending");
+    const ready = configureVectorTileLayer(layer, options).then(readyVectorTiles.bind(null, layer)).catch(reportError2.bind(null, layer));
+    readyByLayer.set(layer, ready);
+    ready.catch(noOperation);
+  }
+
+  // src/raster/initRaster.js
+  init_L();
+
+  // src/raster/readyRaster.js
+  async function readyRaster(layer, archive) {
+    const header = await getHeader(archive);
+    layer.options.archive = archive;
+    headerByLayer.set(layer, header);
+    if (layer.options.maxNativeZoom === void 0) {
+      layer.options.maxNativeZoom = header.maxZoom;
+    }
+    layer.options.maxZoom = Math.max(layer.options.minZoom || 0, layer.options.maxZoom);
+    layer.fire("ready");
+    return layer;
+  }
+
+  // src/raster/releaseRasterTiles.js
+  function releaseRasterTiles(layer) {
+    let tile, attribute;
+    for (tile of rasterTilesByLayer.get(layer).values()) releaseRasterTile(layer, tile);
+    rasterProgramByLayer.get(layer)?.pipelineCache.clear();
+    rasterProgramByLayer.set(layer, null);
+    if (rasterGeometryByLayer.get(layer)) {
+      for (attribute of Object.values(rasterGeometryByLayer.get(layer).attributes)) {
+        destroyTexture(layer, attribute.buffer);
+      }
+      rasterGeometryByLayer.set(layer, null);
+    }
+  }
+
+  // src/weakmaps/fadeFrameByLayer.js
+  var fadeFrameByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/fadeVersionByLayer.js
+  var fadeVersionByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/sceneFields.js
+  var sceneFields = {
+    "_3d": state3dByLayer,
+    "_added": addedByLayer,
+    "_areas": areasByLayer,
+    "_bridgeMesh": bridgeMeshByLayer,
+    "_bridges": bridgesByLayer,
+    "_cameraZIndexOffset": cameraZIndexOffsetByLayer,
+    "_countStatus": countStatusByLayer,
+    "_cursor": cursorByLayer,
+    "_dem": demByLayer,
+    "_directories": directoriesByLayer,
+    "_etag": etagByLayer,
+    "_fadeFrame": fadeFrameByLayer,
+    "_fadeVersion": fadeVersionByLayer,
+    "_frame": frameByLayer,
+    "_geojson": geojsonByLayer,
+    "_header": archiveHeaderByLayer,
+    "_inflight": inflightByLayer,
+    "_layers": layersByLayer,
+    "_loadingTiles": loadingTilesByLayer,
+    "_nativeGPU": nativeGPUByLayer,
+    "_pointerEvents": pointerEventsByLayer,
+    "_pruneAfter": pruneAfterByLayer,
+    "_pruneVersion": pruneVersionByLayer,
+    "_pruneWanted": pruneWantedByLayer,
+    "_queued": queuedByLayer,
+    "_rasterGeometry": rasterGeometryByLayer,
+    "_rasterProgram": rasterProgramByLayer,
+    "_rasterTiles": rasterTilesByLayer,
+    "_rasterVersion": rasterVersionByLayer,
+    "_rendererReady": rendererReadyByLayer,
+    "_roofRaster": roofRasterByLayer,
+    "_roofRasters": roofRastersByLayer,
+    "_sceneOrigin": sceneOriginByLayer,
+    "_shadowMeshes": shadowMeshesByLayer,
+    "_shared": sharedByLayer,
+    "_size": sizeByLayer,
+    "_terrain3D": terrain3DByLayer,
+    "_terrainArchive": terrainArchiveByLayer,
+    "_terrainBaseY": terrainBaseYByLayer,
+    "_terrainBounds": terrainBoundsByLayer,
+    "_terrainController": terrainControllerByLayer,
+    "_terrainGrids": terrainGridsByLayer,
+    "_terrainLoading": terrainLoadingByLayer,
+    "_terrainOriginElevation": terrainOriginElevationByLayer,
+    "_terrainPromise": terrainPromiseByLayer,
+    "_terrainReady": terrainReadyByLayer,
+    "_terrainRequest": terrainRequestByLayer,
+    "_terrainTiles": terrainTilesByLayer,
+    "_terrainZoom": terrainZoomByLayer,
+    "_tileZoom": tileZoomByLayer,
+    "_tooltip": tooltipByLayer,
+    "_type": typeByLayer,
+    "_visibleMeshes": visibleMeshesByLayer,
+    "_wantedRasterTiles": wantedRasterTilesByLayer,
+    "_zoomLevel": zoomLevelByLayer,
+    "_zoomTransitions": zoomTransitionsByLayer,
+    "_zoomView": zoomViewByLayer,
+    "camera": cameraByLayer,
+    "container": containerByLayer,
+    "control": controlByLayer,
+    "eventMap": eventMapByLayer,
+    "events": eventsByLayer,
+    "group": groupByLayer,
+    "header": headerByLayer,
+    "highlightedFeature": highlightedFeatureByLayer,
+    "hoveredFeature": hoveredFeatureByLayer,
+    "kind": kindByLayer,
+    "location": locationByLayer,
+    "model": modelByLayer,
+    "modelUrl": modelUrlByLayer,
+    "raycaster": raycasterByLayer,
+    "ready": readyByLayer,
+    "renderer": rendererByLayer,
+    "root": rootByLayer,
+    "scene": sceneByLayer,
+    "terrainSource": terrainSourceByLayer,
+    "url": urlByLayer,
+    "walker": walkerByLayer
+  };
+
+  // src/scene/onRemove3DLayer.js
+  init_L();
+
+  // src/globals/sceneTransferFields.js
+  var sceneTransferFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_zoomTransitions", "_zoomView", "_cursor", "_roofRaster"];
+
+  // src/globals/sceneCleanupFields.js
+  var sceneCleanupFields = ["_layers", "_sceneOrigin", "_size", "_zoomLevel", "_cursor"];
+
+  // src/gpu/releaseRenderer.js
+  async function releaseRenderer(renderer, layer) {
+    try {
+      await renderer.device.queue.onSubmittedWorkDone();
+      renderer.depthTexture?.destroy();
+      renderer.colorTexture?.destroy();
+      renderer.roofFallbackTexture?.texture?.destroy();
+      renderer.uniformBuffer?.destroy();
+      renderer.sunlight?.texture?.destroy();
+      renderer.sunlight?.buffer?.destroy();
+      renderer.sunlight?.lights?.destroy();
+    } catch (error) {
+      layer.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    }
+    renderer.device.destroy();
+  }
+
+  // src/scene/releaseSharedScene.js
+  function releaseSharedScene(layer, map) {
+    if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
+    roofRasterByLayer.set(layer, null);
+    if (zoomTransitionsByLayer.get(layer)) {
+      let animation;
+      for (animation of zoomTransitionsByLayer.get(layer).keys()) animation.play();
+    }
+    zoomTransitionsByLayer.set(layer, null);
+    zoomViewByLayer.set(layer, null);
+    cameraViewByMap.delete(map);
+    map.getContainer().classList.remove("leaflet-camera-zoom");
+    const renderer = rendererByLayer.get(layer);
+    renderer.canvas.remove();
+    releaseRenderer(renderer, layer);
+    renderers.delete(map);
+    let key;
+    for (key of sceneCleanupFields) sceneFields[key].delete(layer);
+  }
+
+  // src/scene/onRemove3DLayer.js
+  function onRemove3DLayer(layer, map) {
+    addedByLayer.set(layer, Promise.withResolvers());
+    if (containerByLayer.get(layer)) {
+      onPointerLeave(layer);
+      L.DomEvent.off(containerByLayer.get(layer), pointerEventsByLayer.get(layer), layer);
+      containerByLayer.set(layer, null);
+    }
+    let area2, key, sceneLayer, field;
+    for (area2 of areasByLayer.get(layer).values()) releaseArea(layer, area2);
+    areasByLayer.get(layer).clear();
+    tooltipByLayer.get(layer)?.remove();
+    tooltipByLayer.set(layer, null);
+    if (urlByLayer.get(layer) || geojsonByLayer.get(layer)) updateStatus(layer, false);
+    const shared = sharedByLayer.get(layer);
+    if (!shared) return;
+    setParent(rootByLayer.get(layer), null);
+    layersByLayer.get(shared).delete(layer);
+    if (shared === layer) {
+      map.off("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
+      map.off("zoomstart", startZoom, layer);
+      map.off("zoomanim", onZoomAnim, layer);
+      map.off("zoomend", endZoom, layer);
+      cancelUpdate(layer);
+      if (layersByLayer.get(layer).size) {
+        const next = layersByLayer.get(layer).values().next().value;
+        for (key of sceneTransferFields) {
+          field = sceneFields[key];
+          field.set(next, field.get(layer));
+          field.delete(layer);
+        }
+        for (sceneLayer of layersByLayer.get(next)) sharedByLayer.set(sceneLayer, next);
+        renderers.set(map, next);
+        map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, next);
+        map.on("zoomstart", startZoom, next);
+        map.on("zoomanim", onZoomAnim, next);
+        map.on("zoomend", endZoom, next);
+        update(next);
+      } else {
+        releaseSharedScene(layer, map);
+      }
+    } else update(shared);
+    sharedByLayer.set(layer, null);
+    rendererByLayer.set(layer, null);
+    sceneByLayer.set(layer, null);
+    cameraByLayer.set(layer, null);
+  }
+
+  // src/raster/onPMTileRemove.js
+  function onPMTileRemove(layer, map) {
+    releaseRasterTiles(layer);
+    terrain3DByLayer.set(layer, null);
+    onRemove3DLayer(layer, map);
+  }
+
+  // src/raster/getRasterTileSize.js
+  init_L();
+
+  // src/raster/initRaster.js
+  function initRaster(layer, options) {
+    kindByLayer.set(layer, "raster");
+    options = /* alloc */
+    { ariaLabel: "PMTiles raster", maxZoom: 18, opacity: 1, zIndex: 0, ...options };
+    L.Util.setOptions(layer, options);
+    rootByLayer.set(layer, emptyNode());
+    areasByLayer.set(
+      layer,
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    rasterTilesByLayer.set(
+      layer,
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    loadingTilesByLayer.set(layer, 0);
+    addedByLayer.set(layer, Promise.withResolvers());
+    urlByLayer.set(
+      layer,
+      /* alloc */
+      new URL(options.url, document.baseURI).href
+    );
+    directoriesByLayer.set(
+      layer,
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    readyByLayer.set(layer, Promise.resolve(layer.options.archive || layer).then(readyRaster.bind(null, layer)).catch(reportError2.bind(null, layer)));
+  }
+
+  // src/globals/renderEmpty.js
+  var renderEmpty = Object.freeze([]);
+
+  // src/terrain/clearLayerTerrain.js
+  function clearLayerTerrain(layer) {
+    if (kindByLayer.get(layer) === "raster") setRasterTerrain(layer, null);
+  }
+
+  // src/terrain/onTerrainRemove.js
+  function onTerrainRemove(layer, map) {
+    const stream = streamTerrainByMap.get(map);
+    if (stream?.layer === layer) {
+      streamTerrainByMap.delete(map);
+      stream.terrainController.abort();
+      stream.terrainCache.clear();
+      map.fire("terrainchange");
+      onRemove3DLayer(layer, map);
+      return;
+    }
+    terrainControllerByLayer.get(layer)?.abort();
+    terrainLoadingByLayer.set(layer, false);
+    terrainReadyByLayer.set(layer, false);
+    map.eachLayer(clearLayerTerrain);
+    let tile, l, grid, attribute;
+    for (tile of rasterTilesByLayer.get(layer).keys()) removeRasterTile(layer, tile);
+    if (terrain3DByMap.get(map) === layer) terrain3DByMap.delete(map);
+    for (l of Object.values(map._layers)) {
+      conformModelToTerrain(l, null);
+      setTerrainHeight(l);
+    }
+    map.fire("terrainchange");
+    terrainTilesByLayer.get(layer).clear();
+    terrainOriginElevationByLayer.set(layer, 0);
+    terrainPromiseByLayer.set(layer, null);
+    if (rasterProgramByLayer.get(layer)) {
+      rasterProgramByLayer.get(layer).pipelineCache.clear();
+    }
+    rasterProgramByLayer.set(layer, null);
+    if (demByLayer.get(layer)) destroyTexture(layer, demByLayer.get(layer).texture);
+    demByLayer.set(layer, null);
+    for (grid of terrainGridsByLayer.get(layer)?.values() || renderEmpty) {
+      for (attribute of Object.values(grid)) destroyTexture(layer, attribute.buffer);
+    }
+    terrainGridsByLayer.set(layer, null);
+    bridgesByLayer.set(layer, null);
+    disposeMesh(layer, bridgeMeshByLayer.get(layer));
+    bridgeMeshByLayer.set(layer, null);
+    onRemove3DLayer(layer, map);
+  }
+
   // src/terrain/initTerrain.js
   function initTerrain(layer, options) {
     if (options.getTile !== void 0 && typeof options.getTile !== "function") {
@@ -12248,501 +15213,6 @@
     kindByLayer.set(layer, "terrain");
   }
 
-  // src/sunlight/initSunlight.js
-  init_L();
-
-  // src/weakmaps/timeControlByMap.js
-  var timeControlByMap = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/sunlightByControl.js
-  var sunlightByControl = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/sunByMap.js
-  var sunByMap = /* @__PURE__ */ new WeakMap();
-
-  // src/sunlight/createSun.js
-  init_L();
-
-  // src/sunlight/updateSky.js
-  init_pitchSkyByMap();
-  init_radians();
-  init_mapGetPitch();
-  init_mapGetBearing();
-
-  // src/projections/projectCelestialBody.js
-  function projectCelestialBody(dir, size, pitch, bearing, target) {
-    const [x, y, z] = dir;
-    const forward = -x * Math.sin(bearing) * Math.sin(pitch) - y * Math.cos(pitch) - z * Math.cos(bearing) * Math.sin(pitch);
-    if (forward > 0) {
-      target ||= /* alloc */
-      {};
-      target.left = size.x / 2 + size.y * 1.5 * (x * Math.cos(bearing) - z * Math.sin(bearing)) / forward;
-      target.top = size.y / 2 - size.y * 1.5 * (-x * Math.sin(bearing) * Math.cos(pitch) + y * Math.sin(pitch) - z * Math.cos(bearing) * Math.cos(pitch)) / forward;
-      return target;
-    }
-    return null;
-  }
-
-  // src/sunlight/updateCelestialDisc.js
-  function updateCelestialDisc(disc, body, sky, size, pitch, bearing, projection) {
-    disc.hidden = true;
-    if (!sky || !body || body.altitude <= 0) return;
-    if (disc.parentNode !== sky) sky.append(disc);
-    const point = projectCelestialBody(body.direction, size, pitch, bearing, projection);
-    if (!point) return;
-    const { left, top } = point;
-    disc.hidden = left < 0 || left > size.x || top < 0 || top > sky.clientHeight || sky.style.display === "none";
-    disc.style.left = `${left}px`;
-    disc.style.top = `${top}px`;
-  }
-
-  // src/sunlight/updateSky.js
-  function updateSky2({ map, originalSky, sunDisc, moonDisc, projection }) {
-    const sun = sunlightByMap.get(map), sky = pitchSkyByMap.get(map);
-    if (sun) map.getContainer().style.setProperty("--leaflet-sky-background", sun.background);
-    else if (originalSky) map.getContainer().style.setProperty("--leaflet-sky-background", originalSky);
-    else map.getContainer().style.removeProperty("--leaflet-sky-background");
-    const size = map.getSize(), pitch = mapGetPitch(map) * radians, bearing = mapGetBearing(map) * radians;
-    updateCelestialDisc(sunDisc, sun, sky, size, pitch, bearing, projection);
-    updateCelestialDisc(moonDisc, sun?.moon, sky, size, pitch, bearing, projection);
-  }
-
-  // src/globals/atmosphereStops.js
-  var atmosphereStops = [
-    [
-      -18,
-      [3, 7, 20],
-      [17, 28, 54],
-      [0.025, 0.04, 0.09]
-    ],
-    [
-      -6,
-      [37, 53, 84],
-      [182, 106, 86],
-      [0.12, 0.1, 0.14]
-    ],
-    [
-      0,
-      [101, 131, 171],
-      [246, 170, 115],
-      [0.38, 0.24, 0.18]
-    ],
-    [
-      10,
-      [74, 147, 208],
-      [197, 221, 237],
-      [0.8, 0.75, 0.68]
-    ],
-    [
-      25,
-      [53, 144, 213],
-      [223, 238, 250],
-      [1, 1, 1]
-    ]
-  ];
-
-  // src/globals/atmosphereColor.js
-  var atmosphereColor = [0, 0, 0];
-
-  // src/colors/mixColor.js
-  function mix(a, b, t, values) {
-    values ||= /* alloc */
-    [];
-    values.length = a.length;
-    let i;
-    for (i = 0; i < a.length; i++) values[i] = a[i] + (b[i] - a[i]) * t;
-    return values;
-  }
-
-  // src/colors/formatRGB.js
-  function rgb(values) {
-    let rounded = "", i;
-    for (i = 0; i < values.length; i++) {
-      if (i) rounded += ", ";
-      rounded += Math.round(values[i]);
-    }
-    return `rgb(${rounded})`;
-  }
-
-  // src/sunlight/atmosphere.js
-  function atmosphere(altitude) {
-    if (!Number.isFinite(altitude)) {
-      throw (
-        /* alloc */
-        new Error("Invalid solar altitude")
-      );
-    }
-    const stops = atmosphereStops;
-    let upper = -1;
-    let i;
-    for (i = 0; i < stops.length; i++) {
-      if (stops[i][0] >= altitude) {
-        upper = i;
-        break;
-      }
-    }
-    const b = stops[upper < 0 ? stops.length - 1 : upper], a = stops[Math.max(0, upper - 1)];
-    const t = a === b || upper < 0 ? 1 : (altitude - a[0]) / (b[0] - a[0]);
-    return (
-      /* alloc */
-      {
-        background: `linear-gradient(${rgb(mix(a[1], b[1], t, atmosphereColor))}, ${rgb(mix(a[2], b[2], t, atmosphereColor))})`,
-        tint: mix(a[3], b[3], t)
-      }
-    );
-  }
-
-  // src/astronomy/solarTime.js
-  function solarTime(date, lat, lng) {
-    const time = date instanceof Date ? Date.prototype.getTime.call(date) : typeof date === "string" ? Date.parse(date) : (
-      /* alloc */
-      new Date(date).getTime()
-    );
-    if (!Number.isFinite(time) || !Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
-      throw (
-        /* alloc */
-        new Error("Invalid solar date or location")
-      );
-    }
-    return time;
-  }
-
-  // src/astronomy/horizontalPosition.js
-  init_radians();
-  function horizontalPosition(d, lat, lng, ascension, declination) {
-    const hourAngle = (280.16 + 360.9856235 * d + lng) * radians - ascension;
-    const latitude = lat * radians;
-    const altitude = Math.asin(Math.sin(latitude) * Math.sin(declination) + Math.cos(latitude) * Math.cos(declination) * Math.cos(hourAngle));
-    const southAzimuth = Math.atan2(
-      Math.sin(hourAngle),
-      Math.cos(hourAngle) * Math.sin(latitude) - Math.tan(declination) * Math.cos(latitude)
-    );
-    const azimuth = (southAzimuth / radians + 180 + 360) % 360;
-    return (
-      /* alloc */
-      {
-        altitude: altitude / radians,
-        azimuth,
-        direction: (
-          /* alloc */
-          [
-            Math.sin(azimuth * radians) * Math.cos(altitude),
-            Math.sin(altitude),
-            -Math.cos(azimuth * radians) * Math.cos(altitude)
-          ]
-        )
-      }
-    );
-  }
-
-  // src/astronomy/moonPosition.js
-  init_radians();
-
-  // src/globals/sinObliquity.js
-  init_radians();
-  var sinObliquity = Math.sin(23.4397 * radians);
-
-  // src/globals/cosObliquity.js
-  init_radians();
-  var cosObliquity = Math.cos(23.4397 * radians);
-
-  // src/astronomy/moonPosition.js
-  function moonPosition(date, lat, lng) {
-    const d = solarTime(date, lat, lng) / 864e5 - 10957.5;
-    const anomaly = (134.963 + 13.064993 * d) * radians;
-    const longitude = (218.316 + 13.176396 * d + 6.289 * Math.sin(anomaly)) * radians;
-    const latitude = 5.128 * Math.sin((93.272 + 13.22935 * d) * radians) * radians;
-    const x = Math.cos(latitude) * Math.cos(longitude);
-    const y = Math.cos(latitude) * Math.sin(longitude) * cosObliquity - Math.sin(latitude) * sinObliquity;
-    const z = Math.cos(latitude) * Math.sin(longitude) * sinObliquity + Math.sin(latitude) * cosObliquity;
-    return horizontalPosition(d, lat, lng, Math.atan2(y, x), Math.asin(z));
-  }
-
-  // src/astronomy/solarPosition.js
-  init_radians();
-  function solarPosition(date, lat, lng) {
-    const time = solarTime(date, lat, lng);
-    const d = time / 864e5 - 10957.5;
-    const mean = (357.5291 + 0.98560028 * d) * radians;
-    const longitude = mean + (1.9148 * Math.sin(mean) + 0.02 * Math.sin(2 * mean) + 3e-4 * Math.sin(3 * mean) + 102.9372 + 180) * radians;
-    const declination = Math.asin(Math.sin(longitude) * sinObliquity);
-    const ascension = Math.atan2(Math.sin(longitude) * cosObliquity, Math.cos(longitude));
-    return horizontalPosition(d, lat, lng, ascension, declination);
-  }
-
-  // src/sunlight/requestSunlightRender.js
-  function render2(map) {
-    const renderer = renderers.get(map);
-    if (renderer) update(renderer);
-  }
-
-  // src/sunlight/updateSun.js
-  function updateSun(state) {
-    const { control, map, date, slider, output, status } = state;
-    try {
-      if (control.live) control.time = /* alloc */
-      /* @__PURE__ */ new Date();
-      const time = control.time.toISOString();
-      date.value = time.slice(0, 10);
-      slider.value = String(control.time.getUTCHours() * 60 + control.time.getUTCMinutes());
-      output.textContent = `${time.slice(11, 16)} UTC${control.live ? " \xB7 now" : ""}`;
-      const center = map.getCenter();
-      const sun = solarPosition(control.time, center.lat, center.lng);
-      sunlightByMap.set(map, sun);
-      Object.assign(sun, atmosphere(sun.altitude));
-      sun.moon = moonPosition(control.time, center.lat, center.lng);
-      status.textContent = sun.altitude <= 0 ? "Night \xB7 no direct sunlight" : sun.altitude < 3 ? "Low sun \xB7 shadows paused" : `Sun altitude ${sun.altitude.toFixed(1)}\xB0`;
-      map.fire(
-        "simulationtimechange",
-        /* alloc */
-        {
-          time: (
-            /* alloc */
-            new Date(control.time)
-          ),
-          live: control.live
-        }
-      );
-      updateSky2(state);
-      render2(map);
-    } catch (error) {
-      sunlightByMap.delete(map);
-      updateSky2(state);
-      render2(map);
-      status.textContent = `Error: ${error.message}`;
-      console.error("Solar simulation", error);
-    }
-  }
-
-  // src/sunlight/useLiveTime.js
-  function useLiveTime(state) {
-    state.control.live = true;
-    updateSun(state);
-  }
-
-  // src/sunlight/useSelectedTime.js
-  function useSelectedTime(state) {
-    const { control, map, date, slider, status } = state;
-    control.live = false;
-    if (!date.value || !date.validity.valid) {
-      control.time = /* alloc */
-      /* @__PURE__ */ new Date(NaN);
-      map.fire(
-        "simulationtimechange",
-        /* alloc */
-        { time: null, live: false }
-      );
-      sunlightByMap.delete(map);
-      updateSky2(state);
-      render2(map);
-      status.textContent = "Error: choose a valid solar date";
-      return;
-    }
-    control.time = /* alloc */
-    /* @__PURE__ */ new Date(`${date.value}T00:00:00Z`);
-    control.time.setUTCMinutes(Number(slider.value));
-    updateSun(state);
-  }
-
-  // src/sunlight/createSun.js
-  function createSun(map) {
-    const disc = "position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;";
-    const sunDisc = L.DomUtil.create("div", "sunlight-sun");
-    const moonDisc = L.DomUtil.create("div", "sunlight-moon");
-    sunDisc.style.cssText = disc + "background:#fff3bd;box-shadow:0 0 18px 7px #ffd27699;";
-    moonDisc.style.cssText = disc + "background:#dce5f2;box-shadow:0 0 10px 2px #cbdcff55;";
-    sunDisc.setAttribute("role", "img");
-    sunDisc.setAttribute("aria-label", "Sun");
-    moonDisc.setAttribute("role", "img");
-    moonDisc.setAttribute("aria-label", "Moon");
-    const container = L.DomUtil.create("div", "sunlight-control");
-    container.style.cssText = "color:#222;width:min(200px,calc(100vw - 60px));font:12px/1.4 sans-serif;";
-    const date = document.createElement("input");
-    date.type = "date";
-    date.style.cssText = "width:100%;box-sizing:border-box;";
-    date.setAttribute("aria-label", "Solar date (UTC)");
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 4px;cursor:pointer;";
-    slider.min = "0";
-    slider.max = "1439";
-    slider.step = "1";
-    slider.setAttribute("aria-label", "Time of day (UTC)");
-    const output = document.createElement("output");
-    output.style.cssText = "font-weight:bold;font-variant-numeric:tabular-nums;";
-    output.setAttribute("aria-live", "off");
-    const now = document.createElement("button");
-    now.type = "button";
-    now.textContent = "Now";
-    const timeRow = document.createElement("div");
-    timeRow.className = "sunlight-time";
-    timeRow.style.cssText = "display:flex;justify-content:space-between;align-items:center;";
-    timeRow.append(output, now);
-    const status = document.createElement("div");
-    status.className = "sunlight-status";
-    status.style.marginTop = "5px";
-    status.setAttribute("role", "status");
-    const note = document.createElement("small");
-    note.style.color = "#555";
-    container.append(date, slider, timeRow, status, note);
-    const state = (
-      /* alloc */
-      {
-        control: null,
-        map,
-        originalSky: "",
-        container,
-        sunDisc,
-        moonDisc,
-        date,
-        slider,
-        output,
-        status,
-        projection: (
-          /* alloc */
-          { left: 0, top: 0 }
-        )
-      }
-    );
-    state.update = updateSun.bind(null, state);
-    state.updateSky = updateSky2.bind(null, state);
-    now.onclick = useLiveTime.bind(null, state);
-    date.onchange = slider.oninput = useSelectedTime.bind(null, state);
-    L.DomEvent.disableClickPropagation(container);
-    L.DomEvent.disableScrollPropagation(container);
-    return state;
-  }
-
-  // src/sunlight/tickSun.js
-  function tickSun(state) {
-    if (state.control.live) updateSun(state);
-  }
-
-  // src/sunlight/onAddSun.js
-  function onAddSun(control, map) {
-    let state = sunByMap.get(map);
-    if (state?.control && state.control !== control) {
-      control._map = null;
-      if (control.layer._map === map) map.removeLayer(control.layer);
-      throw (
-        /* alloc */
-        new Error("Only one Time control can be active per map")
-      );
-    }
-    if (!state) {
-      state = createSun(map);
-      sunByMap.set(map, state);
-    }
-    state.control = control;
-    state.originalSky = map.getContainer().style.getPropertyValue("--leaflet-sky-background");
-    timeControlByMap.set(map, control);
-    sunlightByControl.set(control, state);
-    state.update();
-    state.timer = setInterval(tickSun, 6e4, state);
-    map.on("moveend", state.update);
-    map.on("move rotate pitch resize", state.updateSky);
-    return state.container;
-  }
-
-  // src/sunlight/initializeTimeControl.js
-  init_L();
-
-  // src/sunlight/addTimeLayer.js
-  function addTimeLayer(map) {
-    return controlByLayer.get(this).addTo(map);
-  }
-
-  // src/sunlight/removeTimeLayer.js
-  init_L();
-  function removeTimeLayer() {
-    return L.Control.prototype.remove.call(controlByLayer.get(this));
-  }
-
-  // src/sunlight/initializeTimeControl.js
-  function initialize(options) {
-    L.Util.setOptions(this, options);
-    this.live = true;
-    this.layer = /* alloc */
-    new L.Layer();
-    controlByLayer.set(this.layer, this);
-    kindByLayer.set(this.layer, "time");
-  }
-
-  // src/sunlight/onAddTimeControl.js
-  function onAdd(map) {
-    return onAddSun(this, map);
-  }
-
-  // src/sunlight/addTimeControlToMap.js
-  init_L();
-
-  // src/sunlight/styleTimeControl.js
-  function styleTimeControl(container, nested) {
-    container.classList.toggle("leaflet-control", !nested);
-    container.classList.toggle("leaflet-bar", !nested);
-    container.style.background = nested ? "" : "#fff";
-    container.style.padding = nested ? "2px 0 6px 20px" : "8px";
-    container.style.margin = nested ? "0" : "";
-  }
-
-  // src/sunlight/addTimeControlToMap.js
-  function addTo(map) {
-    L.Control.prototype.addTo.call(this, map);
-    const container = this.getContainer();
-    if (this.layer._map === map) underEntry(this.layer, container, styleTimeControl.bind(null, container));
-    else styleTimeControl(container, false);
-    return this;
-  }
-
-  // src/sunlight/removeTimeControl.js
-  init_L();
-  function remove() {
-    if (this._map?.hasLayer(this.layer)) {
-      this._map.removeLayer(this.layer);
-      return this;
-    }
-    return L.Control.prototype.remove.call(this);
-  }
-
-  // src/sunlight/removeSun.js
-  function removeSun(state) {
-    const { map, timer, sunDisc, moonDisc } = state;
-    const shared = sunByMap.get(map);
-    clearInterval(timer);
-    timeControlByMap.delete(map);
-    map.fire(
-      "simulationtimechange",
-      /* alloc */
-      { time: null, live: false }
-    );
-    map.off("moveend", state.update);
-    map.off("move rotate pitch resize", state.updateSky);
-    sunlightByMap.delete(map);
-    updateSky2(state);
-    sunDisc.remove();
-    moonDisc.remove();
-    render2(map);
-    if (shared === state) shared.control = null;
-  }
-
-  // src/sunlight/onRemoveSun.js
-  function onRemoveSun() {
-    const sunlight = sunlightByControl.get(this);
-    if (!sunlight) return;
-    removeSun(sunlight);
-    sunlightByControl.delete(this);
-  }
-
-  // src/sunlight/initSunlight.js
-  L.Control.Time = L.Control.extend({
-    options: { position: "bottomright" },
-    initialize,
-    onAdd,
-    onRemove: onRemoveSun,
-    addTo,
-    remove
-  });
-
   // src/traffic/initTraffic.js
   init_L();
 
@@ -12761,32 +15231,6 @@
     [0.12, 0.25, 0.55],
     [0.85, 0.7, 0.15]
   ];
-
-  // src/globals/dark.js
-  var dark = [0.08, 0.07, 0.06];
-
-  // src/globals/skin.js
-  var skin = [0.85, 0.64, 0.5];
-
-  // src/globals/trousers.js
-  var trousers = [0.16, 0.2, 0.32];
-
-  // src/geometry/box.js
-  function box(x0, x1, z0, z1) {
-    return (
-      /* alloc */
-      [
-        /* alloc */
-        [x0, z0],
-        /* alloc */
-        [x1, z0],
-        /* alloc */
-        [x1, z1],
-        /* alloc */
-        [x0, z1]
-      ]
-    );
-  }
 
   // src/vehicles/bicycleModel.js
   function bicycleModel(index) {
@@ -12821,29 +15265,6 @@
       ]
     );
   }
-
-  // src/globals/shirt.js
-  var shirt = [0.75, 0.2, 0.15];
-
-  // src/globals/parts.js
-  var parts = {
-    body: [
-      [box(-0.17, 0.17, -0.1, 0.1), 0.82, 0.95, trousers],
-      [box(-0.19, 0.19, -0.11, 0.11), 0.95, 1.44, shirt],
-      [box(-0.05, 0.05, -0.05, 0.05), 1.44, 1.5, skin],
-      [box(-0.1, 0.1, -0.11, 0.1), 1.5, 1.72, skin],
-      [box(-0.105, 0.105, -0.06, 0.115), 1.58, 1.77, dark],
-      [box(-0.105, 0.105, -0.115, -0.06), 1.7, 1.77, dark]
-    ],
-    leg: [
-      [box(-0.07, 0.07, -0.07, 0.07), -0.82, 0, trousers],
-      [box(-0.07, 0.07, -0.17, 0.07), -0.9, -0.82, dark]
-    ],
-    arm: [
-      [box(-0.05, 0.05, -0.05, 0.05), -0.55, 0, shirt],
-      [box(-0.045, 0.045, -0.045, 0.045), -0.66, -0.55, skin]
-    ]
-  };
 
   // src/vehicles/pedestrianModel.js
   function pedestrianModel(index) {
@@ -13199,70 +15620,6 @@
     }
   }`
   );
-
-  // src/geometry/triangle.js
-  function triangle2(position, normal, color, a, b, c, tint) {
-    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
-    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const length = Math.hypot(nx, ny, nz);
-    let i, point;
-    for (i = 0; i < 3; i++) {
-      point = i === 0 ? a : i === 1 ? b : c;
-      position.push(...point);
-      normal.push(nx / length, ny / length, nz / length);
-      color.push(...tint);
-    }
-  }
-
-  // src/geometry/buildGeometryParts.js
-  function build(parts2) {
-    const position = (
-      /* alloc */
-      []
-    );
-    const normal = (
-      /* alloc */
-      []
-    );
-    const color = (
-      /* alloc */
-      []
-    );
-    const low = (
-      /* alloc */
-      []
-    );
-    const high = (
-      /* alloc */
-      []
-    );
-    let ring, bottom, top, tint, topRing, x, z, i, j;
-    for ([ring, bottom, top, tint, topRing = ring] of parts2) {
-      low.length = high.length = 0;
-      for ([x, z] of ring) low.push(
-        /* alloc */
-        [x, bottom, z]
-      );
-      for ([x, z] of topRing) high.push(
-        /* alloc */
-        [x, top, z]
-      );
-      for (i = 0; i < ring.length; i++) {
-        j = (i + 1) % ring.length;
-        triangle2(position, normal, color, low[i], low[j], high[j], tint);
-        triangle2(position, normal, color, low[i], high[j], high[i], tint);
-      }
-      for (i = 1; i < ring.length - 1; i++) {
-        triangle2(position, normal, color, high[0], high[i], high[i + 1], tint);
-        triangle2(position, normal, color, low[0], low[i + 1], low[i], tint);
-      }
-    }
-    return (
-      /* alloc */
-      { position, normal, color }
-    );
-  }
 
   // src/traffic/trafficTooltip.js
   function tooltip({ properties: p }) {
@@ -14154,2349 +16511,6 @@
     layer.on("remove", removeTraffic.bind(null, state));
   }
 
-  // src/walk/initWalk.js
-  init_L();
-
-  // src/walk/initializeWalkControl.js
-  init_L();
-
-  // src/walk/createWalk.js
-  init_L();
-
-  // src/walk/onWalkBlur.js
-  function onBlur() {
-    this.keys.clear();
-  }
-
-  // src/globals/moves.js
-  var moves = {
-    KeyW: [1, 0],
-    ArrowUp: [1, 0],
-    KeyS: [-1, 0],
-    ArrowDown: [-1, 0],
-    KeyD: [0, 1],
-    ArrowRight: [0, 1],
-    KeyA: [0, -1],
-    ArrowLeft: [0, -1]
-  };
-
-  // src/walk/stopWalking.js
-  init_L();
-  init_mapSetPitch();
-
-  // src/walk/onWalkPointer.js
-  init_mapSetPitchAndBearing();
-  init_mapGetPitch();
-  init_mapGetBearing();
-  function onPointer(event) {
-    const map = this.layer._map;
-    if (event.type === "pointerdown") {
-      if (event.button !== 0 || event.target.closest(".leaflet-control")) return;
-      this.dragX = event.clientX;
-      this.dragY = event.clientY;
-      this.dragging = true;
-      map.getContainer().setPointerCapture(event.pointerId);
-    } else if (this.dragging && event.type === "pointermove") {
-      mapSetPitchAndBearing(map, Math.max(20, Math.min(85, mapGetPitch(map) - (event.clientY - this.dragY) * 0.2)), mapGetBearing(map) - (event.clientX - this.dragX) * 0.25);
-      this.dragX = event.clientX;
-      this.dragY = event.clientY;
-    } else this.dragging = false;
-  }
-
-  // src/globals/limbs.js
-  var limbs = [
-    ["body", 0, 0, 0],
-    ["leg", -0.09, 0.9, 1],
-    ["leg", 0.09, 0.9, -1],
-    ["arm", -0.25, 1.42, -1],
-    ["arm", 0.25, 1.42, 1]
-  ];
-
-  // src/projections/walkerLocalPosition.js
-  init_radians();
-  function local2(output) {
-    const { layer, state } = this;
-    const map = layer._map, crs = map.options.crs;
-    const location2 = locationByLayer.get(layer), root = rootByLayer.get(layer);
-    const origin = crs.project(location2), metres = Math.cos(location2.lat * radians);
-    const p = crs.project(state.latlng);
-    const ground = mapElevationOf(map, state.latlng) || 0;
-    output[0] = (p.x - origin.x) * metres;
-    output[1] = ground + (state.height ?? 0) - root.position[1];
-    output[2] = -(p.y - origin.y) * metres;
-    return output;
-  }
-
-  // src/walk/placeWalker.js
-  function place() {
-    const [x, y, z] = local2.call(this, this.local);
-    const yaw = -this.state.heading, cos = Math.cos(yaw), sin = Math.sin(yaw);
-    let i, px, py, sign, mesh;
-    for (i = 0; i < limbs.length; i++) {
-      [, px, py, sign] = limbs[i];
-      mesh = this.meshes[i];
-      mesh.position[0] = x + px * cos;
-      mesh.position[1] = y + py;
-      mesh.position[2] = z - px * sin;
-      mesh.rotation[0] = sign * this.swing * Math.sin(this.state.phase);
-      mesh.rotation[1] = yaw;
-    }
-    update(this.layer);
-  }
-
-  // src/walk/onWalkTerrain.js
-  function onTerrain() {
-    if (this.meshes) place.call(this);
-  }
-
-  // src/walk/stopWalking.js
-  function stop() {
-    const map = this.layer._map;
-    cancelAnimationFrame(this.frame);
-    this.keys.clear();
-    this.dragging = false;
-    this.state.height = this.verticalSpeed = 0;
-    L.DomEvent.off(document, "keydown keyup", this.onKey);
-    L.DomEvent.off(window, "blur", this.onBlur);
-    let mesh, name;
-    if (this.meshes) for (mesh of this.meshes) disposeMesh(this.layer, mesh);
-    this.meshes = null;
-    this.button.setAttribute("aria-pressed", "false");
-    this.button.style.background = "#fff";
-    this.hint.style.display = "none";
-    if (!map || !this.saved) return;
-    L.DomEvent.off(map.getContainer(), "pointerdown pointermove pointerup pointercancel", this.onPointer);
-    map.off("terrainchange", this.onTerrain);
-    map.options.scrollWheelZoom = this.saved.scrollWheelZoom;
-    for (name of this.saved.handlers) map[name].enable();
-    map.setView(
-      this.state.latlng,
-      this.saved.zoom,
-      /* alloc */
-      { animate: false }
-    );
-    mapSetPitch(map, this.saved.pitch);
-    this.saved = null;
-  }
-
-  // src/walk/onWalkKey.js
-  function onKey(event) {
-    if (event.type === "keyup" && event.code === "Space") this.keys.delete("Space");
-    if (event.target.closest?.("input:not([type=checkbox], [type=radio]), select, textarea, [contenteditable]") || event.ctrlKey || event.altKey || event.metaKey) return;
-    if (event.type === "keydown" && event.code === "Escape") {
-      this.stop();
-      return;
-    }
-    if (!moves[event.code] && event.code !== "Space") return;
-    event.preventDefault();
-    if (event.type === "keydown") this.keys.add(event.code);
-    else this.keys.delete(event.code);
-  }
-
-  // src/walk/startWalking.js
-  init_radians();
-  init_L();
-
-  // src/globals/sceneWalkHandlers.js
-  var sceneWalkHandlers = ["dragging", "keyboard", "doubleClickZoom", "boxZoom"];
-
-  // src/walk/startWalking.js
-  init_mapGetPitch();
-  init_mapGetBearing();
-  init_mapSetPitch();
-
-  // src/walk/stepWalkerHeight.js
-  function stepWalkerHeight(dt) {
-    if (this.keys.has("Space")) {
-      this.verticalSpeed = 6;
-      this.state.height += this.verticalSpeed * dt;
-      return true;
-    }
-    if (!this.verticalSpeed && !this.state.height) return false;
-    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
-    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
-    return true;
-  }
-
-  // src/walk/resolveWalkerPosition.js
-  init_L();
-
-  // src/globals/CELL.js
-  var CELL = 8;
-
-  // src/weakmaps/colliders.js
-  var colliders = /* @__PURE__ */ new WeakMap();
-
-  // src/collision/indexTriangle.js
-  function indexTriangle(cells, v, t) {
-    let ix, iz, key;
-    for (ix = Math.floor(Math.min(v[0], v[3], v[6]) / CELL); ix <= Math.floor(Math.max(v[0], v[3], v[6]) / CELL); ix++)
-      for (iz = Math.floor(Math.min(v[2], v[5], v[8]) / CELL); iz <= Math.floor(Math.max(v[2], v[5], v[8]) / CELL); iz++) {
-        key = ix + "," + iz;
-        if (!cells.has(key)) cells.set(
-          key,
-          /* alloc */
-          []
-        );
-        cells.get(key).push(t);
-      }
-  }
-
-  // src/collision/collider.js
-  function collider(mesh) {
-    let c = colliders.get(mesh.geometry);
-    if (c) return c;
-    const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
-    const vertices = vertexCount(position, index);
-    const count = vertices * (instanceOffset?.count ?? 1);
-    const tri = (
-      /* alloc */
-      []
-    );
-    const nrm = (
-      /* alloc */
-      []
-    );
-    const cells = (
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    const a = (
-      /* alloc */
-      [0, 0, 0]
-    ), b = (
-      /* alloc */
-      [0, 0, 0]
-    ), d = (
-      /* alloc */
-      [0, 0, 0]
-    );
-    const v = (
-      /* alloc */
-      []
-    );
-    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
-    for (i = 0; i < count; i += 3) {
-      first = index ? index.data[i % vertices] : i % vertices;
-      if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
-        continue;
-      }
-      readTriangle(mesh, i, a, b, d);
-      v[0] = m[0] * a[0] + m[4] * a[1] + m[8] * a[2] + m[12];
-      v[1] = m[1] * a[0] + m[5] * a[1] + m[9] * a[2] + m[13];
-      v[2] = m[2] * a[0] + m[6] * a[1] + m[10] * a[2] + m[14];
-      v[3] = m[0] * b[0] + m[4] * b[1] + m[8] * b[2] + m[12];
-      v[4] = m[1] * b[0] + m[5] * b[1] + m[9] * b[2] + m[13];
-      v[5] = m[2] * b[0] + m[6] * b[1] + m[10] * b[2] + m[14];
-      v[6] = m[0] * d[0] + m[4] * d[1] + m[8] * d[2] + m[12];
-      v[7] = m[1] * d[0] + m[5] * d[1] + m[9] * d[2] + m[13];
-      v[8] = m[2] * d[0] + m[6] * d[1] + m[10] * d[2] + m[14];
-      ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
-      nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
-      ny = ez * fx - ex * fz, length = Math.hypot(nx, ny, nz);
-      if (!length || Math.abs(ny) > 0.9 * length) {
-        continue;
-      }
-      if (normal) {
-        j = first * 3;
-        if ((m[0] * normal.data[j] + m[4] * normal.data[j + 1] + m[8] * normal.data[j + 2]) * nx + (m[2] * normal.data[j] + m[6] * normal.data[j + 1] + m[10] * normal.data[j + 2]) * nz < 0) {
-          nx = -nx;
-          nz = -nz;
-        }
-      }
-      h = Math.hypot(nx, nz), t = nrm.length / 2;
-      tri.push(...v);
-      maxX = Math.max(maxX, v[0], v[3], v[6]);
-      nrm.push(nx / h, nz / h);
-      indexTriangle(cells, v, t);
-    }
-    c = /* alloc */
-    {
-      tri: Float32Array.from(tri),
-      nrm: Float32Array.from(nrm),
-      cells,
-      maxX,
-      origin: (
-        /* alloc */
-        [m[12], m[13], m[14]]
-      )
-    };
-    colliders.set(mesh.geometry, c);
-    return c;
-  }
-
-  // src/collision/horizontalRay.js
-  function horizontalRay(v, t, ox, oy, oz, dx, dz) {
-    const i = t * 9, ex = v[i + 3] - v[i], ey = v[i + 4] - v[i + 1], ez = v[i + 5] - v[i + 2];
-    const fx = v[i + 6] - v[i], fy = v[i + 7] - v[i + 1], fz = v[i + 8] - v[i + 2];
-    const px = -dz * fy, py = dz * fx - dx * fz, pz = dx * fy, det = ex * px + ey * py + ez * pz;
-    if (Math.abs(det) < 1e-9) return -1;
-    const tx = ox - v[i], ty = oy - v[i + 1], tz = oz - v[i + 2], u = (tx * px + ty * py + tz * pz) / det;
-    if (u < 0 || u > 1) return -1;
-    const qx = ty * ez - tz * ey, qy = tz * ex - tx * ez, qz = tx * ey - ty * ex, w = (dx * qx + dz * qz) / det;
-    if (w < 0 || u + w > 1) return -1;
-    return (fx * qx + fy * qy + fz * qz) / det;
-  }
-
-  // src/collision/collectIntersections.js
-  function collectIntersections(shape, x, y, z, seen, hits, end, iz) {
-    let ix, cell, triangle3, distance;
-    for (ix = Math.floor(x / CELL); ix <= end; ix++) {
-      cell = shape.cells.get(`${ix},${iz}`);
-      if (!cell) continue;
-      for (triangle3 of cell) {
-        if (seen.has(triangle3)) continue;
-        seen.add(triangle3);
-        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
-        if (distance > 1e-4) hits.push(distance);
-      }
-    }
-  }
-
-  // src/collision/countCrossings.js
-  function countCrossings(hits) {
-    let ix, j, distance;
-    for (ix = 1; ix < hits.length; ix++) {
-      distance = hits[ix];
-      j = ix - 1;
-      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
-      hits[j + 1] = distance;
-    }
-    let crossings = 0, previous = -Infinity;
-    for (distance of hits) {
-      if (distance - previous > 1e-4) crossings++;
-      previous = distance;
-    }
-    return crossings;
-  }
-
-  // src/collision/insideMesh.js
-  function insideMesh(mesh, x, y, z, seen, intersections) {
-    const geometry = mesh.geometry;
-    if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
-    if (!geometry.bounds) computeBounds(geometry);
-    const bounds = geometry.bounds;
-    const world = mesh.worldMatrix;
-    const center = bounds.center;
-    const cx = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-    const cy = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-    const cz = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-    const radius = bounds.radius * Math.max(
-      Math.hypot(world[0], world[1], world[2]),
-      Math.hypot(world[4], world[5], world[6]),
-      Math.hypot(world[8], world[9], world[10])
-    );
-    if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
-    const shape = collider(mesh);
-    const end = Math.floor(shape.maxX / CELL);
-    if (x >= shape.maxX) return false;
-    const iz = Math.floor(z / CELL);
-    const hits = intersections;
-    hits.length = 0;
-    seen.clear();
-    collectIntersections(shape, x, y, z, seen, hits, end, iz);
-    return countCrossings(hits) % 2 === 1;
-  }
-
-  // src/collision/setTrafficNormal.js
-  function setTrafficNormal(data, x, z, distance, dx, dz) {
-    if (distance < 1e-6) {
-      data.normal[0] = -dx;
-      data.normal[1] = -dz;
-    } else {
-      data.normal[0] = x / distance;
-      data.normal[1] = z / distance;
-    }
-  }
-
-  // src/collision/trafficCollision.js
-  function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
-    const state = trafficByLayer.get(layer);
-    if (!state?.mesh || !state.trips.length) return false;
-    let bounds = state.collisionBounds;
-    if (!bounds) {
-      bounds = state.collisionBounds = /* alloc */
-      { radius: 0, minY: Infinity, maxY: -Infinity };
-      let i, px2, py, pz2;
-      for (i = 0; i < state.template.position.length; i += 3) {
-        px2 = state.template.position[i];
-        py = state.template.position[i + 1];
-        pz2 = state.template.position[i + 2];
-        bounds.radius = Math.max(bounds.radius, Math.hypot(px2, pz2));
-        bounds.minY = Math.min(bounds.minY, py);
-        bounds.maxY = Math.max(bounds.maxY, py);
-      }
-    }
-    const root = rootByLayer.get(layer), position = state.position ||= /* alloc */
-    {};
-    const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
-    const radius = bounds.radius * scale + 0.35;
-    let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
-    for (trip of state.trips) {
-      ({ x: px, y: bottom, z: pz } = locateTraffic(state, trip, position));
-      bottom = root.position[1] + (bottom + bounds.minY) * root.scale[1];
-      top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
-      if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) continue;
-      px = root.position[0] + px * root.scale[0];
-      pz = root.position[2] + pz * root.scale[2];
-      projection = (px - x) * dx + (pz - z) * dz;
-      closest = Math.max(0, Math.min(reach, projection));
-      rx = x + closest * dx - px;
-      rz = z + closest * dz - pz;
-      perpendicular = rx * rx + rz * rz;
-      if (perpendicular >= radius * radius) continue;
-      if (reach === 0) {
-        data.found = true;
-        distance = Math.hypot(x - px, z - pz);
-        data.normal[0] = distance ? (x - px) / distance : 0;
-        data.normal[1] = distance ? (z - pz) / distance : 0;
-        continue;
-      }
-      entry = Math.max(0, projection - Math.sqrt(radius * radius - perpendicular));
-      if (entry > reach || entry >= data.best) continue;
-      data.best = entry;
-      data.found = true;
-      distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
-      setTrafficNormal(data, x + entry * dx - px, z + entry * dz - pz, distance, dx, dz);
-    }
-    return data.found;
-  }
-
-  // src/collision/insideWalker.js
-  function insideWalker(context) {
-    const { layer, local: localBuffer, hitData } = context;
-    const shared = sharedByLayer.get(layer);
-    if (!shared || !layersByLayer.get(shared)) return false;
-    updateWorldMatrix(sceneByLayer.get(layer));
-    const root = rootByLayer.get(layer);
-    const feet = local2.call(context, localBuffer);
-    const x = root.position[0] + feet[0] * root.scale[0];
-    const y = root.position[1] + feet[1] * root.scale[1];
-    const z = root.position[2] + feet[2] * root.scale[2];
-    const layers = layersByLayer.get(shared);
-    let other, node, child, nodes;
-    for (other of layers) {
-      if (other === layer || kindByLayer.get(other) === "terrain") continue;
-      if (kindByLayer.get(other) === "traffic") {
-        hitData.best = 0;
-        hitData.found = false;
-        if (trafficCollision(other, x, y, z, 0, 0, 0, hitData)) return true;
-        continue;
-      }
-      nodes = hitData.nodes;
-      nodes.length = 0;
-      if (rootByLayer.get(other)) nodes.push(rootByLayer.get(other));
-      while (nodes.length) {
-        node = nodes.pop();
-        if (!node.visible) continue;
-        if (node.geometry && (insideMesh(node, x, y + 0.45 * root.scale[1], z, hitData.seen, hitData.intersections) || insideMesh(node, x, y + 1.35 * root.scale[1], z, hitData.seen, hitData.intersections))) return true;
-        for (child of node.children) nodes.push(child);
-      }
-    }
-    return false;
-  }
-
-  // src/walk/resolveWalkerPosition.js
-  function resolveWalkerPosition() {
-    if (!this.saved || !insideWalker(this)) return false;
-    const map = this.layer._map;
-    const origin = this.state.latlng;
-    const height = this.state.height;
-    let distance, angle, candidate;
-    for (distance = 0.5; distance <= 20; distance += 0.5) {
-      for (angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-        candidate = /* alloc */
-        new L.LatLng(
-          origin.lat + Math.cos(angle) * distance / 111320,
-          origin.lng + Math.sin(angle) * distance / (111320 * Math.cos(origin.lat * Math.PI / 180))
-        );
-        this.state.latlng = candidate;
-        this.state.height = 0;
-        if (!insideWalker(this)) {
-          this.verticalSpeed = 0;
-          map.setView(
-            candidate,
-            map.getZoom(),
-            /* alloc */
-            { animate: false }
-          );
-          return true;
-        }
-      }
-    }
-    this.state.latlng = origin;
-    this.state.height = height;
-    return false;
-  }
-
-  // src/utils/wrap.js
-  function wrap(angle) {
-    return Math.atan2(Math.sin(angle), Math.cos(angle));
-  }
-
-  // src/picking/shouldSkipOther.js
-  function shouldSkipOther(other, layer) {
-    return other === layer || typeByLayer.get(other) === "terrain" || typeByLayer.get(other) === "traffic";
-  }
-
-  // src/walk/landWalker.js
-  function land(previousY) {
-    const ray = raycasterByLayer.get(this.layer);
-    const feet = local2.call(this, this.local), root = rootByLayer.get(this.layer);
-    const x = root.position[0] + feet[0] * root.scale[0];
-    const y = root.position[1] + feet[1] * root.scale[1];
-    const z = root.position[2] + feet[2] * root.scale[2];
-    if (y > previousY || this.verticalSpeed > 0) return;
-    updateWorldMatrix(sceneByLayer.get(this.layer));
-    ray.origin[0] = x;
-    ray.origin[1] = previousY + 0.01;
-    ray.origin[2] = z;
-    ray.direction[0] = 0;
-    ray.direction[1] = -1;
-    ray.direction[2] = 0;
-    ray.meshes.length = 0;
-    let layer, hit2;
-    for (layer of layersByLayer.get(sharedByLayer.get(this.layer))) {
-      if (shouldSkipOther(layer, this.layer) || kindByLayer.get(layer) === "raster" || layer.options.nightLight) continue;
-      traverse(rootByLayer.get(layer), collectVisibleMesh2, ray.meshes);
-    }
-    for (hit2 of intersectMeshes(ray, ray.meshes)) {
-      if (hit2.point[1] < y - 1e-3) break;
-      this.state.height += (hit2.point[1] - y) / root.scale[1];
-      this.verticalSpeed = 0;
-      break;
-    }
-    ray.meshes.length = 0;
-  }
-
-  // src/walk/moveWalker.js
-  init_L();
-  init_radians();
-
-  // src/picking/hitColliderCell.js
-  function hitColliderCell(cell, c, data, ox, oy, oz) {
-    const { dx, dz, seen } = data;
-    let t, height, d;
-    for (t of cell) {
-      if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
-      seen.add(t);
-      for (height = 0.4; height < 2; height += 1.1) {
-        d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
-        if (d >= 0 && d < data.best) {
-          data.best = d;
-          data.found = true;
-          data.normal[0] = c.nrm[t * 2];
-          data.normal[1] = c.nrm[t * 2 + 1];
-        }
-      }
-    }
-  }
-
-  // src/picking/hitMesh.js
-  function hitMesh(mesh, data) {
-    if (!mesh.visible) return true;
-    if (!mesh.geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return;
-    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
-    const m = mesh.worldMatrix, { center: k, radius } = mesh.geometry.bounds;
-    const { x, y, z, dx, dz, reach } = data;
-    if (Math.hypot(m[0] * k[0] + m[4] * k[1] + m[8] * k[2] + m[12] - x, m[2] * k[0] + m[6] * k[1] + m[10] * k[2] + m[14] - z) > radius * Math.hypot(m[0], m[1], m[2]) + reach) return;
-    const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
-    const seen = data.seen;
-    seen.clear();
-    let ix, iz, cell;
-    for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
-      for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
-        cell = c.cells.get(ix + "," + iz);
-        if (!cell) continue;
-        hitColliderCell(cell, c, data, ox, oy, oz);
-      }
-  }
-
-  // src/picking/hit.js
-  function hit(layer, x, y, z, dx, dz, reach, data) {
-    updateWorldMatrix(sceneByLayer.get(layer));
-    data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
-    data.best = reach, data.found = false;
-    let other;
-    for (other of layersByLayer.get(sharedByLayer.get(layer))) {
-      if (other === layer || kindByLayer.get(other) === "terrain") continue;
-      if (kindByLayer.get(other) === "traffic") {
-        trafficCollision(other, x, y, z, dx, dz, reach, data);
-        continue;
-      }
-      traverse(rootByLayer.get(other), hitMesh, data);
-    }
-    return data.found ? data.normal : null;
-  }
-
-  // src/walk/isWalkBlocked.js
-  function blocked(east, north, feet) {
-    const length = Math.hypot(east, north);
-    return length > 1e-6 && hit(this.layer, feet[0], feet[1], feet[2], east / length, -north / length, length + 0.3, this.hitData);
-  }
-
-  // src/walk/moveWalker.js
-  function moveWalker(forward, dt) {
-    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
-    const { position, scale } = rootByLayer.get(this.layer);
-    let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
-    const feet = local2.call(this, this.local);
-    let i;
-    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
-    const wall = blocked.call(this, east, north, feet);
-    if (wall) {
-      const into = east * wall[0] - north * wall[1];
-      east -= into * wall[0];
-      north += into * wall[1];
-      if (blocked.call(this, east, north, feet)) east = north = 0;
-    }
-    this.state.latlng = /* alloc */
-    new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
-    this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
-  }
-
-  // src/walk/updateWalkerView.js
-  init_degrees();
-  init_radians();
-  init_mapGetBearing();
-  init_mapSetPitchAndBearing();
-  init_mapGetPitch();
-  function updateWalkerView(forward, turn, dt) {
-    const map = this.layer._map;
-    if (forward || turn) {
-      const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
-      if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
-      map.setView(
-        this.state.latlng,
-        map.getZoom(),
-        /* alloc */
-        { animate: false }
-      );
-    }
-    const target = forward ? 0.9 : 0;
-    if (Math.abs(this.swing - target) > 1e-3) {
-      this.swing += (target - this.swing) * Math.min(1, dt * 10);
-      return true;
-    }
-    return false;
-  }
-
-  // src/walk/updateWalkerFrame.js
-  function updateWalkerFrame(walker, previousY, forward, turn, dt, changed) {
-    if (turn) {
-      walker.state.heading = wrap(walker.state.heading + turn * 2.5 * dt);
-      changed = true;
-    }
-    if (forward) {
-      moveWalker.call(walker, forward, dt);
-      changed = true;
-    }
-    if (changed) land.call(walker, previousY);
-    if (updateWalkerView.call(walker, forward, turn, dt)) changed = true;
-    if (changed) place.call(walker);
-  }
-
-  // src/walk/animateWalker.js
-  function step(now) {
-    const layer = this.layer;
-    this.frame = requestAnimationFrame(this.step);
-    const dt = Math.min(0.1, (now - (this.last ?? now)) / 1e3);
-    this.last = now;
-    if (!rendererByLayer.get(layer)) return;
-    let changed = false;
-    let part, key;
-    if (now >= this.nextClearanceCheck) {
-      this.nextClearanceCheck = now + 250;
-      if (resolveWalkerPosition.call(this)) changed = true;
-    }
-    if (!this.meshes) {
-      this.meshes = /* alloc */
-      [];
-      for ([part] of limbs) this.meshes.push(createMesh(layer, build(parts[part])));
-      changed = true;
-    }
-    const previousY = rootByLayer.get(layer).position[1] + local2.call(this, this.local)[1] * rootByLayer.get(layer).scale[1];
-    if (stepWalkerHeight.call(this, dt)) changed = true;
-    let forward = 0, turn = 0;
-    for (key of this.keys) {
-      forward += moves[key]?.[0] || 0;
-      turn += moves[key]?.[1] || 0;
-    }
-    forward = Math.sign(forward);
-    turn = Math.sign(turn);
-    updateWalkerFrame(this, previousY, forward, turn, dt, changed);
-  }
-
-  // src/walk/startWalking.js
-  function start() {
-    const map = this.layer._map;
-    if (this.saved || !map) return;
-    this.state.latlng = map.getCenter();
-    this.state.height = this.verticalSpeed = 0;
-    const pixelsPerMetre = map.getSize().y * 1.5 / this.distance;
-    const zoom = Math.min(map.getMaxZoom(), Math.log2(pixelsPerMetre * earthCirc * Math.cos(this.state.latlng.lat * radians) / 256));
-    let name;
-    this.saved = /* alloc */
-    {
-      zoom: map.getZoom(),
-      pitch: mapGetPitch(map),
-      scrollWheelZoom: map.options.scrollWheelZoom,
-      handlers: (
-        /* alloc */
-        []
-      )
-    };
-    for (name of sceneWalkHandlers) {
-      if (map[name]?.enabled()) this.saved.handlers.push(name);
-    }
-    for (name of this.saved.handlers) map[name].disable();
-    map.options.scrollWheelZoom = this.saved.scrollWheelZoom && "center";
-    this.state.heading = -mapGetBearing(map) * radians;
-    map.setView(
-      this.state.latlng,
-      zoom,
-      /* alloc */
-      { animate: false }
-    );
-    mapSetPitch(map, 75);
-    resolveWalkerPosition.call(this);
-    L.DomEvent.on(document, "keydown keyup", this.onKey);
-    L.DomEvent.on(window, "blur", this.onBlur);
-    L.DomEvent.on(map.getContainer(), "pointerdown pointermove pointerup pointercancel", this.onPointer);
-    map.on("terrainchange", this.onTerrain);
-    this.button.setAttribute("aria-pressed", "true");
-    this.button.style.background = "#e4e4e4";
-    this.hint.style.display = "";
-    this.last = void 0;
-    this.nextClearanceCheck = 0;
-    this.frame = requestAnimationFrame(this.step);
-  }
-
-  // src/walk/toggleWalking.js
-  function toggle() {
-    if (this.saved) stop.call(this);
-    else start.call(this);
-  }
-
-  // src/walk/createWalk.js
-  function createWalk(control, {
-    speed: speed2,
-    distance,
-    ...options
-  }) {
-    const layer = (
-      /* alloc */
-      new L.Layer()
-    );
-    typeByLayer.set(layer, "walk");
-    init3D(layer, options);
-    const keys = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    );
-    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
-    container.style.cssText = "display:flex;align-items:center;background:#fff;";
-    const button = L.DomUtil.create("button", "", container);
-    button.type = "button";
-    button.title = "Walk";
-    button.setAttribute("aria-label", "Walk");
-    button.setAttribute("aria-pressed", "false");
-    button.textContent = "\u{1F6B6}";
-    button.style.cssText = "width:30px;height:30px;padding:0;border:0;border-radius:4px;background:#fff;font-size:18px;line-height:30px;cursor:pointer;";
-    const hint = L.DomUtil.create("small", "", container);
-    hint.style.cssText = "display:none;padding:0 8px;color:#333;white-space:nowrap;";
-    hint.textContent = "W/S: run \xB7 A/D: turn \xB7 hold Space: ascend \xB7 drag: look around \xB7 Esc: exit";
-    L.DomEvent.disableClickPropagation(container);
-    const context = (
-      /* alloc */
-      {
-        layer,
-        speed: speed2,
-        distance,
-        keys,
-        container,
-        button,
-        hint,
-        meshes: null,
-        frame: null,
-        last: void 0,
-        nextClearanceCheck: 0,
-        swing: 0,
-        verticalSpeed: 0,
-        saved: null,
-        hitData: null,
-        local: null,
-        state: control.walker = /* alloc */
-        { latlng: null, heading: 0, phase: 0, height: 0 }
-      }
-    );
-    walkerByLayer.set(layer, context.state);
-    context.step = step.bind(context);
-    context.onKey = onKey.bind(context);
-    context.onBlur = onBlur.bind(context);
-    context.onPointer = onPointer.bind(context);
-    context.onTerrain = onTerrain.bind(context);
-    context.start = start.bind(context);
-    context.stop = stop.bind(context);
-    context.toggle = toggle.bind(context);
-    control._walk = context;
-    L.DomEvent.on(button, "click", context.toggle);
-  }
-
-  // src/walk/initializeWalkControl.js
-  function initialize2(options) {
-    L.Util.setOptions(this, options);
-    createWalk(this, this.options);
-  }
-
-  // src/walk/onAddWalkControl.js
-  function onAdd2(map) {
-    let state = walkByMap.get(map);
-    if (state?.control && state.control !== this) {
-      this._map = null;
-      throw (
-        /* alloc */
-        new Error("Only one Walk control can be active per map")
-      );
-    }
-    if (!state) {
-      state = /* alloc */
-      {
-        control: null,
-        hitData: (
-          /* alloc */
-          {
-            x: 0,
-            y: 0,
-            z: 0,
-            dx: 0,
-            dz: 0,
-            reach: 0,
-            best: 0,
-            found: false,
-            seen: (
-              /* alloc */
-              /* @__PURE__ */ new Set()
-            ),
-            intersections: (
-              /* alloc */
-              []
-            ),
-            nodes: (
-              /* alloc */
-              []
-            ),
-            normal: (
-              /* alloc */
-              [0, 0]
-            )
-          }
-        ),
-        local: (
-          /* alloc */
-          [0, 0, 0]
-        )
-      };
-      walkByMap.set(map, state);
-    }
-    state.control = this;
-    state.local.fill(0);
-    state.hitData.seen.clear();
-    state.hitData.normal.fill(0);
-    this._walk.hitData = state.hitData;
-    this._walk.local = state.local;
-    this._walk.layer.addTo(map);
-    return this._walk.container;
-  }
-
-  // src/walk/onRemoveWalkControl.js
-  function onRemove(map) {
-    const state = walkByMap.get(map);
-    if (state?.control !== this) return;
-    this._walk.stop();
-    this._walk.layer.remove();
-    state.control = null;
-    state.hitData.seen.clear();
-    this._walk.hitData = null;
-    this._walk.local = null;
-  }
-
-  // src/walk/initWalk.js
-  L.Control.Walk = L.Control.extend({
-    options: { position: "bottomright", speed: 70, distance: 20 },
-    initialize: initialize2,
-    onAdd: onAdd2,
-    onRemove
-  });
-
-  // src/core/initializeNativeLayer.js
-  init_L();
-
-  // src/weakmaps/closestMethods.js
-  var closestMethods = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/boundsMethods.js
-  var boundsMethods = /* @__PURE__ */ new WeakMap();
-
-  // src/weakmaps/gridInitializers.js
-  var gridInitializers = /* @__PURE__ */ new WeakMap();
-
-  // src/scene/emptyEvents.js
-  function emptyEvents() {
-    return (
-      /* alloc */
-      {}
-    );
-  }
-
-  // src/core/closestCameraLayerPoint.js
-  function closestCameraLayerPoint(point) {
-    this._project();
-    this._parts = this._rings;
-    return closestMethods.get(this).call(this, point);
-  }
-
-  // src/core/cameraCircleBounds.js
-  function cameraCircleBounds() {
-    this._project();
-    return boundsMethods.get(this).call(this);
-  }
-
-  // src/core/initializeGridContainer.js
-  function initializeGridContainer() {
-    gridInitializers.get(this).call(this);
-    this._container.remove();
-  }
-
-  // src/globals/pendingGridFades.js
-  var pendingGridFades = /* @__PURE__ */ new Map();
-
-  // src/globals/gridFadeFrame.js
-  var gridFadeFrame = { value: null };
-
-  // src/animations/cancelGridFade.js
-  function cancelGridFade(layer) {
-    pendingGridFades.delete(layer);
-    fadeFrameByLayer.set(layer, null);
-    if (!pendingGridFades.size && gridFadeFrame.value !== null) {
-      cancelAnimationFrame(gridFadeFrame.value);
-      gridFadeFrame.value = null;
-    }
-  }
-
-  // src/animations/runGridFades.js
-  function runGridFades() {
-    gridFadeFrame.value = null;
-    const layers = (
-      /* alloc */
-      [...pendingGridFades]
-    );
-    let layer, version;
-    for ([layer, version] of layers) {
-      if (pendingGridFades.get(layer) !== version) continue;
-      pendingGridFades.delete(layer);
-      fadeFrameByLayer.set(layer, null);
-      updateGridOpacity.call(layer);
-    }
-  }
-
-  // src/animations/scheduleGridFade.js
-  function scheduleGridFade(layer) {
-    fadeVersionByLayer.set(layer, (fadeVersionByLayer.get(layer) || 0) + 1);
-    pendingGridFades.set(layer, fadeVersionByLayer.get(layer));
-    if (gridFadeFrame.value === null) gridFadeFrame.value = requestAnimationFrame(runGridFades);
-    fadeFrameByLayer.set(layer, gridFadeFrame.value);
-  }
-
-  // src/core/updateGridOpacity.js
-  function updateGridOpacity() {
-    if (!this._map) return;
-    const layer = this, now = Date.now();
-    let fading = false, prune = false;
-    let key, tile;
-    for (key in this._tiles) {
-      if (!Object.hasOwn(this._tiles, key)) continue;
-      tile = this._tiles[key];
-      if (!tile.current || !tile.loaded) continue;
-      tile._gpuOpacity = this._map._fadeAnimated ? Math.min(1, (now - tile.loaded) / 200) : 1;
-      if (tile._gpuOpacity < 1) fading = true;
-      else if (!tile.active) {
-        this._onOpaqueTile(tile);
-        tile.active = true;
-        prune = true;
-      }
-    }
-    if (prune && !this._noPrune) this._pruneTiles();
-    refreshNativeLayerContract(this);
-    cancelGridFade(layer);
-    if (fading) scheduleGridFade(layer);
-  }
-
-  // src/globals/pendingRasterLoads.js
-  var pendingRasterLoads = [];
-
-  // src/core/fireRasterLoad.js
-  function fireRasterLoad() {
-    pendingRasterLoads.shift()?.fire("load");
-  }
-
-  // src/textures/attachRasterImage.js
-  function addRasterImage() {
-    if (!this._image) this._initImage();
-    if (this._image.complete && this._image.naturalWidth) {
-      pendingRasterLoads.push(this);
-      queueMicrotask(fireRasterLoad);
-    }
-  }
-
-  // src/core/redrawPath.js
-  function redrawPath() {
-    refreshNativeLayerContract(this);
-    return this;
-  }
-
-  // src/core/initializeNativeLayer.js
-  function initializeNativeLayer() {
-    if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
-      this.beforeAdd = this._updateBounds = noOperation;
-      this.redraw = redrawPath;
-      kindByLayer.set(this, "path");
-      if (this instanceof L.Polyline) {
-        closestMethods.set(this, this.closestLayerPoint);
-        this.closestLayerPoint = closestCameraLayerPoint;
-      }
-      if (this instanceof L.Circle) {
-        boundsMethods.set(this, this.getBounds);
-        this.getBounds = cameraCircleBounds;
-      }
-    } else if (this instanceof L.GridLayer) {
-      gridInitializers.set(this, this._initContainer);
-      this._initContainer = initializeGridContainer;
-      this._updateOpacity = updateGridOpacity;
-    } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
-      kindByLayer.set(this, "image");
-      this._reset = refreshNativeLayerContract;
-    }
-  }
-
-  // src/scene/addRegisteredLayer.js
-  init_L();
-
-  // src/scene/removeLayerEvents.js
-  function removeLayerEvents() {
-    eventMapByLayer.get(this).off(eventsByLayer.get(this), this);
-    eventMapByLayer.set(this, null);
-    eventsByLayer.set(this, null);
-  }
-
-  // src/scene/addSceneLayer.js
-  function addSceneLayer(layer, map) {
-    switch (kindByLayer.get(layer)) {
-      case "3d":
-        return onAdd3DLayer(layer, map);
-      case "raster":
-        return onPMTileAdd(layer, map);
-      case "terrain":
-        return onTerrainAdd(layer, map);
-      case "image":
-        return addRasterImage.call(layer, map);
-      case "time":
-        return addTimeLayer.call(layer, map);
-    }
-  }
-
-  // src/terrain/onTerrainChange.js
-  function onTerrainChange(layer) {
-    if (!layer._map) return;
-    let area2;
-    for (area2 of areasByLayer.get(layer).values()) {
-      releaseArea(layer, area2);
-    }
-    areasByLayer.get(layer).clear();
-    updateArea(layer);
-  }
-
-  // src/scene/get3DEvents.js
-  function get3DEvents(layer) {
-    const events = (
-      /* alloc */
-      {}
-    );
-    if (urlByLayer.get(layer)) {
-      events.moveend = events.zoomend = events.rotate = events.pitch = events.resize = updateArea.bind(null, layer);
-    }
-    if (geojsonByLayer.get(layer) || urlByLayer.get(layer)) {
-      events.terrainchange = onTerrainChange.bind(null, layer);
-    }
-    return events;
-  }
-
-  // src/scene/isNativeLayer.js
-  init_L();
-  function isNativeLayer(layer) {
-    return !state3dByLayer.get(layer) && (layer instanceof L.GridLayer || layer instanceof L.Polyline || layer instanceof L.CircleMarker || layer instanceof L.Marker && !(layer.options.icon instanceof L.DivIcon) || layer instanceof L.ImageOverlay && !(layer instanceof L.VideoOverlay) && !(layer instanceof L.SVGOverlay));
-  }
-
-  // src/scene/addRegisteredLayer.js
-  function layerLayerAdd(event) {
-    const native = isNativeLayer(this);
-    if (native) {
-      if (this instanceof L.GridLayer || this instanceof L.ImageOverlay) {
-        this.options.crossOrigin ||= true;
-      }
-      if (this instanceof L.Marker) this.options.icon.options.crossOrigin ||= true;
-    }
-    const map = event.target;
-    if (!map.hasLayer(this)) return;
-    if (kindByLayer.get(this)) {
-      this._map = map;
-      this._zoomAnimated = map._zoomAnimated;
-      if (kindByLayer.get(this) !== "pending" && kindByLayer.get(this) !== "time") {
-        eventsByLayer.set(this, kindByLayer.get(this) === "raster" ? getRasterEvents(this) : state3dByLayer.get(this) ? get3DEvents(this) : emptyEvents());
-        eventMapByLayer.set(this, map);
-        map.on(eventsByLayer.get(this), this);
-        this.once("remove", removeLayerEvents, this);
-      }
-      addSceneLayer(this, map);
-      this.fire("add");
-      map.fire(
-        "layeradd",
-        /* alloc */
-        { layer: this }
-      );
-    } else {
-      layerProto.value._layerAdd.call(this, event);
-    }
-    if (!native || !event.target.hasLayer(this)) return;
-    initNativeGPU(this, event.target);
-  }
-
-  // src/scene/layerInitialize.js
-  init_L();
-
-  // src/globals/pendingInitializations.js
-  var pendingInitializations = [];
-
-  // src/globals/loading.js
-  var loading = { value: Promise.resolve() };
-
-  // src/sources/initializeGeoJSON.js
-  function initializeGeoJSON(layer, options) {
-    geojsonByLayer.set(layer, true);
-    init3D(layer, options);
-  }
-
-  // src/sources/isVectorTileSource.js
-  function isVectorTileSource(options) {
-    return options.data === void 0 && (options.tileJSON !== void 0 || typeof options.url === "string" && /\{[zxy]\}|%7B[zxy]%7D/i.test(options.url));
-  }
-
-  // src/vector-tiles/configureVectorTileLayer.js
-  init_L();
-
-  // src/weakmaps/vectorTileOptionsByLayer.js
-  var vectorTileOptionsByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/vector-tiles/readTileJSON.js
-  async function readTileJSON(options) {
-    const url = (
-      /* alloc */
-      new URL(options.tileJSON, document.baseURI).href
-    );
-    const response = await fetch(url);
-    if (!response.ok) throw (
-      /* alloc */
-      new Error(`TileJSON: HTTP ${response.status}`)
-    );
-    const metadata = await response.json();
-    if (!metadata || !Array.isArray(metadata.tiles) || !metadata.tiles.length || typeof metadata.tiles[0] !== "string") {
-      throw (
-        /* alloc */
-        new Error("TileJSON requires a tile URL template")
-      );
-    }
-    return (
-      /* alloc */
-      {
-        ...options,
-        url: (
-          /* alloc */
-          new URL(metadata.tiles[0], url).href
-        ),
-        minNativeZoom: options.minNativeZoom ?? metadata.minzoom,
-        maxNativeZoom: options.maxNativeZoom ?? metadata.maxzoom,
-        attribution: options.attribution ?? metadata.attribution
-      }
-    );
-  }
-
-  // src/vector-style/removeTrailingCommas.js
-  function removeTrailingCommas(json) {
-    let cleaned = "", quoted = false, escaped = false, i = 0, char = "";
-    for (i = 0; i < json.length; i++) {
-      char = json[i];
-      if (!quoted && char === "," && /^\s*[\]}]/.test(json.slice(i + 1))) continue;
-      cleaned += char;
-      if (escaped) escaped = false;
-      else if (quoted && char === "\\") escaped = true;
-      else if (char === '"') quoted = !quoted;
-    }
-    return cleaned;
-  }
-
-  // src/vector-style/appendQuotedStyleCharacter.js
-  function appendQuotedStyleCharacter(char, state) {
-    if (state.quoted) {
-      if (state.escaped) {
-        state.escaped = false;
-        return char === "'" ? char : "\\" + char;
-      }
-      if (char === "\\") {
-        state.escaped = true;
-        return "";
-      }
-      if (char === state.quoted) {
-        state.quoted = "";
-        return '"';
-      }
-      return char === '"' ? '\\"' : char;
-    }
-    if (char === '"' || char === "'") {
-      state.quoted = char;
-      return '"';
-    }
-    return void 0;
-  }
-
-  // src/vector-style/skipStyleComment.js
-  function skipStyleComment(text, index, marker) {
-    if (marker === "/") {
-      while (index < text.length && text[index] !== "\n") index++;
-      return index;
-    }
-    const end = text.indexOf("*/", index + 2);
-    if (end < 0) throw (
-      /* alloc */
-      new Error("Unterminated style comment")
-    );
-    return end + 1;
-  }
-
-  // src/vector-style/stripStyleComments.js
-  function stripStyleComments(text) {
-    let json = "", i = 0, char = "", next = "", converted = void 0;
-    const state = (
-      /* alloc */
-      { quoted: "", escaped: false }
-    );
-    for (i = 0; i < text.length; i++) {
-      char = text[i];
-      next = text[i + 1];
-      converted = appendQuotedStyleCharacter(char, state);
-      if (converted !== void 0) {
-        json += converted;
-        continue;
-      }
-      if (char === "/" && (next === "/" || next === "*")) {
-        i = skipStyleComment(text, i, next);
-        json += next === "/" ? "\n" : " ";
-      } else json += char;
-    }
-    return json;
-  }
-
-  // src/vector-style/validateVectorLayers.js
-  function validateVectorLayers(layers) {
-    let i = 0, layer = null;
-    if (!Array.isArray(layers)) throw (
-      /* alloc */
-      new Error("Invalid vector style layers")
-    );
-    for (i = 0; i < layers.length; i++) {
-      layer = layers[i];
-      if (!layer || typeof layer.id !== "string" || typeof layer.type !== "string") {
-        throw (
-          /* alloc */
-          new Error("Invalid vector style layers")
-        );
-      }
-    }
-  }
-
-  // src/vector-style/parseVectorStyle.js
-  function parseVectorStyle(text) {
-    const prefix = /^\s*(?:const|let|var)\s+otm_layers\s*=\s*/.exec(text);
-    if (prefix) text = text.slice(prefix[0].length);
-    const cleaned = removeTrailingCommas(stripStyleComments(text).trim().replace(/;$/, ""));
-    const document2 = JSON.parse(cleaned);
-    const layers = document2.layers ?? document2;
-    validateVectorLayers(layers);
-    return layers;
-  }
-
-  // src/vector-tiles/readVectorStyle.js
-  async function readVectorStyle(style) {
-    if (typeof style === "string") {
-      const response = await fetch(style);
-      if (!response.ok) throw (
-        /* alloc */
-        new Error(`Vector style: HTTP ${response.status}`)
-      );
-      style = parseVectorStyle(await response.text());
-    } else style = style?.layers ?? style;
-    if (!Array.isArray(style)) throw (
-      /* alloc */
-      new Error("Invalid vector style layers")
-    );
-    let entry;
-    for (entry of style) {
-      if (!entry || typeof entry.id !== "string" || typeof entry.type !== "string") {
-        throw (
-          /* alloc */
-          new Error("Invalid vector style layers")
-        );
-      }
-    }
-    return style;
-  }
-
-  // src/vector-tiles/validateVectorTileZooms.js
-  function validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom) {
-    if (!Number.isInteger(minNativeZoom) || !Number.isInteger(maxNativeZoom) || !Number.isInteger(maxZoom) || minNativeZoom < 0 || maxNativeZoom < minNativeZoom || maxZoom < maxNativeZoom || maxZoom > 24) {
-      throw (
-        /* alloc */
-        new Error("Invalid vector tile zoom range")
-      );
-    }
-  }
-
-  // src/vector-tiles/vectorTileSettings.js
-  async function vectorTileSettings(options) {
-    if (!options || typeof options !== "object") throw (
-      /* alloc */
-      new TypeError("Vector tiles require source options")
-    );
-    if (options.tileJSON) options = await readTileJSON(options);
-    let { url, style, minNativeZoom = 0, maxNativeZoom = 14, maxZoom = 19 } = options;
-    let key;
-    if (typeof url === "string") url = url.replaceAll(/%7B([zxy])%7D/gi, "{$1}");
-    for (
-      key of
-      /* alloc */
-      ["{z}", "{x}", "{y}"]
-    ) {
-      if (typeof url !== "string" || !url.includes(key)) throw (
-        /* alloc */
-        new Error("Vector tiles require an XYZ URL template")
-      );
-    }
-    validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom);
-    style = await readVectorStyle(style);
-    return (
-      /* alloc */
-      { ...options, url, style, minNativeZoom, maxNativeZoom, maxZoom }
-    );
-  }
-
-  // src/globals/vectorTileEvents.js
-  var vectorTileEvents = "move zoom rotate pitch resize viewreset";
-
-  // src/vector-style/evaluateBoolean.js
-  function evaluateBoolean(op, args, properties, zoom, legacy) {
-    let i = 0;
-    if (op === "all") {
-      for (i = 0; i < args.length; i++) {
-        if (!evaluateStyle(args[i], properties, zoom, legacy)) return false;
-      }
-      return true;
-    }
-    if (op === "any") {
-      for (i = 0; i < args.length; i++) {
-        if (evaluateStyle(args[i], properties, zoom, legacy)) return true;
-      }
-      return false;
-    }
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluateCoalesceOrCase.js
-  function evaluateCoalesceOrCase(op, args, properties, zoom, legacy) {
-    let i = 0, result = null;
-    if (op === "coalesce") {
-      for (i = 0; i < args.length; i++) {
-        result = evaluateStyle(args[i], properties, zoom);
-        if (result !== null && result !== void 0) return result;
-      }
-      return null;
-    }
-    if (op === "case") {
-      for (i = 0; i < args.length - 1; i += 2) {
-        if (evaluateStyle(args[i], properties, zoom)) {
-          return evaluateStyle(args[i + 1], properties, zoom);
-        }
-      }
-      return evaluateStyle(args[args.length - 1], properties, zoom);
-    }
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluateInput.js
-  function evaluateInput(value, properties, zoom, legacy) {
-    if (legacy && typeof value === "string") return properties[value];
-    return evaluateStyle(value, properties, zoom);
-  }
-
-  // src/vector-style/evaluateComparison.js
-  function evaluateComparison(op, args, properties, zoom, legacy) {
-    const left = evaluateInput(args[0], properties, zoom, legacy);
-    const right = evaluateStyle(args[1], properties, zoom);
-    switch (op) {
-      case "==":
-        return left === right;
-      case "!=":
-        return left !== right;
-      case "<=":
-        return left <= right;
-      case ">=":
-        return left >= right;
-      case "<":
-        return left < right;
-      case ">":
-        return left > right;
-      default:
-        throw (
-          /* alloc */
-          new Error(`Unsupported vector style expression: ${op}`)
-        );
-    }
-  }
-
-  // src/globals/vectorStyleNamedColors.js
-  var vectorStyleNamedColors = {
-    black: [0, 0, 0, 1],
-    white: [255, 255, 255, 1],
-    gray: [128, 128, 128, 1],
-    blue: [0, 0, 255, 1],
-    red: [255, 0, 0, 1],
-    green: [0, 128, 0, 1]
-  };
-
-  // src/vector-style/parseFunctionalColor.js
-  function parseFunctionalColor(value) {
-    const match = /^rgba?\(([^)]+)\)$/.exec(value);
-    if (match) {
-      const values = match[1].split(",");
-      let i = 0, finite = true;
-      for (i = 0; i < values.length; i++) values[i] = Number(values[i]);
-      if (values.length === 3) values.push(1);
-      for (i = 0; i < values.length; i++) {
-        if (!Number.isFinite(values[i])) finite = false;
-      }
-      if (values.length === 4 && finite) return values;
-    }
-    throw (
-      /* alloc */
-      new Error(`Unsupported interpolated style color: ${value}`)
-    );
-  }
-
-  // src/vector-style/parseHexColor.js
-  function parseHexColor(value) {
-    let i = 0, offset = 0;
-    if (value.length === 4) {
-      value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
-    }
-    const color = (
-      /* alloc */
-      []
-    );
-    for (i = 1; i < 6; i += 2) {
-      offset = parseInt(value.slice(i, i + 2), 16);
-      color.push(offset);
-    }
-    color.push(1);
-    return color;
-  }
-
-  // src/vector-style/styleColor.js
-  function styleColor(value) {
-    if (Object.hasOwn(vectorStyleNamedColors, value)) return vectorStyleNamedColors[value];
-    if (/^#[0-9a-f]{3}$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value)) {
-      return parseHexColor(value);
-    }
-    return parseFunctionalColor(value);
-  }
-
-  // src/vector-style/evaluateInterpolate.js
-  function evaluateInterpolate(args, properties, zoom) {
-    const result = evaluateStyle(args[1], properties, zoom);
-    const base = args[0][0] === "exponential" ? args[0][1] : 1;
-    let i = 0, lower = 0, upper = 0, ratio = 0, left = null, right = null, j = 0, color = "";
-    if (result <= args[2]) return evaluateStyle(args[3], properties, zoom);
-    for (i = 4; i < args.length; i += 2) {
-      if (result > args[i]) continue;
-      lower = args[i - 2];
-      upper = args[i];
-      ratio = base === 1 ? (result - lower) / (upper - lower) : (base ** (result - lower) - 1) / (base ** (upper - lower) - 1);
-      left = evaluateStyle(args[i - 1], properties, zoom);
-      right = evaluateStyle(args[i + 1], properties, zoom);
-      if (typeof left === "number" && typeof right === "number") return left + (right - left) * ratio;
-      left = styleColor(left);
-      right = styleColor(right);
-      for (j = 0; j < 3; j++) {
-        if (j) color += ",";
-        color += Math.round(left[j] + (right[j] - left[j]) * ratio);
-      }
-      return `rgba(${color},${left[3] + (right[3] - left[3]) * ratio})`;
-    }
-    return evaluateStyle(args.at(-1), properties, zoom);
-  }
-
-  // src/vector-style/arrayContainsRange.js
-  function arrayContainsRange(values, start2, end, target) {
-    let i = 0, value = null;
-    for (i = start2; i < end; i++) {
-      value = values[i];
-      if (value === target || value !== value && target !== target) return true;
-    }
-    return false;
-  }
-
-  // src/vector-style/evaluateMembership.js
-  function evaluateMembership(op, args, properties, zoom, legacy) {
-    let target = null;
-    if (op === "!in") {
-      target = evaluateInput(args[0], properties, zoom, legacy);
-      return !arrayContainsRange(args, 1, args.length, target);
-    }
-    if (legacy) {
-      target = evaluateInput(args[0], properties, zoom, true);
-      return arrayContainsRange(args, 1, args.length, target);
-    }
-    const values = evaluateStyle(args[1], properties, zoom);
-    target = evaluateInput(args[0], properties, zoom, false);
-    return values.includes(target);
-  }
-
-  // src/vector-style/evaluateIExpression.js
-  function evaluateIExpression(op, args, properties, zoom, legacy) {
-    if (op === "in") return evaluateMembership(op, args, properties, zoom, legacy);
-    if (op === "interpolate") return evaluateInterpolate(args, properties, zoom);
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluateMath.js
-  function evaluateMath(op, args, properties, zoom) {
-    let i = 0, sum = 0;
-    if (op === "+") {
-      for (i = 0; i < args.length; i++) sum += evaluateStyle(args[i], properties, zoom);
-      return sum;
-    }
-    if (op === "-") {
-      if (args.length === 1) return -evaluateStyle(args[0], properties, zoom);
-      return evaluateStyle(args[0], properties, zoom) - evaluateStyle(args[1], properties, zoom);
-    }
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluateMatch.js
-  function evaluateMatch(args, properties, zoom) {
-    const result = evaluateStyle(args[0], properties, zoom);
-    let i = 0, matched = false;
-    for (i = 1; i < args.length - 1; i += 2) {
-      if (Array.isArray(args[i])) matched = args[i].includes(result);
-      else matched = args[i] === result;
-      if (matched) return evaluateStyle(args[i + 1], properties, zoom);
-    }
-    return evaluateStyle(args[args.length - 1], properties, zoom);
-  }
-
-  // src/vector-style/evaluateNegation.js
-  function evaluateNegation(op, args, properties, zoom, legacy) {
-    if (op === "!") return !evaluateStyle(args[0], properties, zoom, legacy);
-    if (op === "!=") {
-      return evaluateInput(args[0], properties, zoom, legacy) !== evaluateStyle(args[1], properties, zoom);
-    }
-    if (op === "!in") return evaluateMembership(op, args, properties, zoom, legacy);
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluatePrimitive.js
-  function evaluatePrimitive(op, args, properties, zoom) {
-    switch (op) {
-      case "literal":
-        return args[0];
-      case "get":
-        return properties[args[0]];
-      case "has":
-        return Object.hasOwn(properties, args[0]);
-      case "zoom":
-        return zoom;
-      default:
-        throw (
-          /* alloc */
-          new Error(`Unsupported vector style expression: ${op}`)
-        );
-    }
-  }
-
-  // src/vector-style/evaluateStep.js
-  function evaluateStep(args, properties, zoom) {
-    const result = evaluateStyle(args[0], properties, zoom);
-    let output = args[1], i = 0;
-    for (i = 2; i < args.length; i += 2) {
-      if (result < args[i]) break;
-      output = args[i + 1];
-    }
-    return evaluateStyle(output, properties, zoom);
-  }
-
-  // src/vector-style/evaluateToExpression.js
-  function evaluateToExpression(op, args, properties, zoom) {
-    if (op === "to-boolean") return Boolean(evaluateStyle(args[0], properties, zoom));
-    if (op === "to-number") {
-      let i = 0, number = 0;
-      for (i = 0; i < args.length; i++) {
-        number = Number(evaluateStyle(args[i], properties, zoom));
-        if (Number.isFinite(number)) return number;
-      }
-      throw (
-        /* alloc */
-        new Error("Invalid numeric style expression")
-      );
-    }
-    throw (
-      /* alloc */
-      new Error(`Unsupported vector style expression: ${op}`)
-    );
-  }
-
-  // src/vector-style/evaluateStyle.js
-  function evaluateStyle(value, properties, zoom, legacy = false) {
-    if (!Array.isArray(value)) return value;
-    const op = value[0];
-    const args = value.slice(1);
-    const operation = String(op);
-    if (/^(?:literal|get|has|zoom)$/.test(operation)) {
-      return evaluatePrimitive(op, args, properties, zoom);
-    }
-    switch (operation[0]) {
-      case "a":
-        return evaluateBoolean(op, args, properties, zoom, legacy);
-      case "!":
-        return evaluateNegation(op, args, properties, zoom, legacy);
-      case "=":
-      case "<":
-      case ">":
-        return evaluateComparison(op, args, properties, zoom, legacy);
-      case "i":
-        return evaluateIExpression(op, args, properties, zoom, legacy);
-      case "t":
-        return evaluateToExpression(op, args, properties, zoom, legacy);
-      case "c":
-        return evaluateCoalesceOrCase(op, args, properties, zoom, legacy);
-      case "m":
-        return evaluateMatch(args, properties, zoom);
-      case "s":
-        return evaluateStep(args, properties, zoom);
-      default:
-        return evaluateMath(op, args, properties, zoom);
-    }
-  }
-
-  // src/vector-tiles/refreshVectorTiles.js
-  function refreshVectorTiles() {
-    clearTimeout(this.timer);
-    this.changedAt = performance.now();
-    this.timer = setTimeout(this.update.bind(this), 180);
-  }
-
-  // src/weakmaps/vectorWorkerByLayer.js
-  var vectorWorkerByLayer = /* @__PURE__ */ new WeakMap();
-
-  // src/vector-tiles/revokeVectorWorkerUrl.js
-  function revokeVectorWorkerUrl(layer) {
-    const entry = vectorWorkerByLayer.get(layer);
-    if (entry?.blobUrl) {
-      URL.revokeObjectURL(entry.blobUrl);
-      entry.blobUrl = null;
-    }
-  }
-
-  // src/vector-tiles/onVectorTileMessage.js
-  function onVectorTileMessage({ data }) {
-    revokeVectorWorkerUrl(this);
-    const pending = this.waiting.get(data.id);
-    if (!pending) return;
-    this.waiting.delete(data.id);
-    if (data.error) pending.reject(
-      /* alloc */
-      new Error(data.error)
-    );
-    else pending.resolve(data);
-  }
-
-  // src/vector-tiles/onVectorTileWorkerError.js
-  function onVectorTileWorkerError(event) {
-    revokeVectorWorkerUrl(this);
-    const error = (
-      /* alloc */
-      new Error(`Worker MVT: ${event.message}`)
-    );
-    let pending;
-    for (pending of this.waiting.values()) pending.reject(error);
-    this.waiting.clear();
-    reportError(this, error);
-  }
-
-  // src/vector-tiles/onVectorTileAdd.js
-  function onVectorTileAdd(map) {
-    const { style, pane } = vectorTileOptionsByLayer.get(this);
-    let index, entry;
-    for ([index] of style.entries()) {
-      (map.getPane(`${pane}-${index}`) || map.createPane(`${pane}-${index}`)).style.zIndex = 200 + index;
-    }
-    for (entry of style) {
-      if (entry.type !== "background") continue;
-      map.getContainer().style.background = evaluateStyle(
-        entry.paint["background-color"],
-        /* alloc */
-        {},
-        map.getZoom()
-      );
-      break;
-    }
-    this.session = /* alloc */
-    {};
-    this.tiles = /* alloc */
-    /* @__PURE__ */ new Map();
-    this.labels = /* alloc */
-    /* @__PURE__ */ new Map();
-    this.waiting = /* alloc */
-    /* @__PURE__ */ new Map();
-    this.retiring = /* alloc */
-    /* @__PURE__ */ new Set();
-    this.inflight = 0;
-    this.sequence = 0;
-    this.changedAt = 0;
-    this.paintZoom = null;
-    const workerEntry = createGeometryWorker(this.options.workerUrl || geometryWorkerUrl);
-    vectorWorkerByLayer.set(this, workerEntry);
-    this.worker = workerEntry.worker;
-    this.worker.onmessage = onVectorTileMessage.bind(this);
-    this.worker.onerror = onVectorTileWorkerError.bind(this);
-    this.refresh = refreshVectorTiles.bind(this);
-    map.on(vectorTileEvents, this.refresh);
-    this.update();
-  }
-
-  // src/vector-tiles/onVectorTileRemove.js
-  function onVectorTileRemove(map) {
-    map.off(vectorTileEvents, this.refresh);
-    clearTimeout(this.timer);
-    this.session = null;
-    this.worker.terminate();
-    revokeVectorWorkerUrl(this);
-    vectorWorkerByLayer.delete(this);
-    let pending, tile, group, marker;
-    for (pending of this.waiting.values()) pending.reject(
-      /* alloc */
-      new DOMException("Layer removed", "AbortError")
-    );
-    this.waiting.clear();
-    for (tile of this.tiles.values()) {
-      tile.controller.abort();
-      tile.group?.remove();
-    }
-    for (group of this.retiring) group.remove();
-    for (marker of this.labels.values()) marker.remove();
-    this.tiles.clear();
-    this.labels.clear();
-    this.retiring.clear();
-  }
-
-  // src/vector-tiles/updateVectorTiles.js
-  function updateVectorTiles() {
-    if (!this.session) return;
-    const { minNativeZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);
-    const z = Math.max(minNativeZoom, Math.min(maxNativeZoom, Math.floor(this._map.getZoom())));
-    const bounds = this._map.getBounds(), count = 2 ** z;
-    const nw = this._map.project(bounds.getNorthWest(), z).divideBy(256);
-    const se = this._map.project(bounds.getSouthEast(), z).divideBy(256);
-    let tile, x, y, key;
-    for (tile of this.tiles.values()) tile.needed = false;
-    for (x = Math.floor(nw.x); x <= Math.floor(se.x); x++) {
-      for (y = Math.max(0, Math.floor(nw.y)); y <= Math.min(count - 1, Math.floor(se.y)); y++) {
-        key = `${z}/${x}/${y}`;
-        tile = this.tiles.get(key);
-        if (!tile) {
-          tile = /* alloc */
-          { key, coords: (
-            /* alloc */
-            { z, x, y }
-          ), controller: (
-            /* alloc */
-            new AbortController()
-          ) };
-          this.tiles.set(key, tile);
-        }
-        tile.needed = true;
-      }
-    }
-    this.prune();
-    this.pump();
-    this.updatePaint().catch(reportError.bind(null, this));
-    this.updateLabels().catch(reportError.bind(null, this));
-  }
-
-  // src/vector-style/readPaintValue.js
-  function readPaintValue(paint, key, fallback, properties, zoom) {
-    if (paint[key] === void 0) return fallback;
-    return evaluateStyle(paint[key], properties, zoom);
-  }
-
-  // src/vector-style/fillVectorPaint.js
-  function fillVectorPaint(paint, properties, zoom) {
-    const fill = styleColor(readPaintValue(paint, "fill-color", "#000", properties, zoom));
-    const outline = readPaintValue(paint, "fill-outline-color", null, properties, zoom);
-    const rgb2 = outline === null ? null : styleColor(outline);
-    const fillOpacity = readPaintValue(paint, "fill-opacity", 1, properties, zoom) * fill[3];
-    const fillColor = (
-      /* alloc */
-      { r: fill[0] / 255, g: fill[1] / 255, b: fill[2] / 255 }
-    );
-    const color = rgb2 ? (
-      /* alloc */
-      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
-    ) : null;
-    return (
-      /* alloc */
-      {
-        fillColor,
-        fillOpacity,
-        color,
-        weight: 0.5
-      }
-    );
-  }
-
-  // src/vector-style/scaleDashArray.js
-  function scaleDashArray(dash, weight, properties, zoom) {
-    if (!dash) return void 0;
-    let values = dash, i = 0, result = "";
-    if (typeof dash[0] !== "number") values = evaluateStyle(dash, properties, zoom);
-    if (!Array.isArray(values)) throw (
-      /* alloc */
-      new TypeError("Style dash array must be an array")
-    );
-    for (i = 0; i < values.length; i++) {
-      if (i) result += " ";
-      result += values[i] * weight;
-    }
-    return result;
-  }
-
-  // src/vector-style/lineVectorPaint.js
-  function lineVectorPaint(layer, paint, properties, zoom) {
-    const weight = readPaintValue(paint, "line-width", 1, properties, zoom);
-    const rgb2 = styleColor(readPaintValue(paint, "line-color", "#000", properties, zoom));
-    const opacity = readPaintValue(paint, "line-opacity", 1, properties, zoom) * rgb2[3];
-    const dashArray = scaleDashArray(paint["line-dasharray"], weight, properties, zoom);
-    const lineCap = layer.layout?.["line-cap"] || "butt";
-    const lineJoin2 = layer.layout?.["line-join"] || "miter";
-    const color = (
-      /* alloc */
-      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
-    );
-    return (
-      /* alloc */
-      {
-        color,
-        opacity,
-        weight,
-        dashArray,
-        lineCap,
-        lineJoin: lineJoin2
-      }
-    );
-  }
-
-  // src/vector-style/vectorPaint.js
-  function vectorPaint(layer, properties, zoom) {
-    const paint = layer.paint || /* alloc */
-    {};
-    if (layer.type === "fill") return fillVectorPaint(paint, properties, zoom);
-    return lineVectorPaint(layer, paint, properties, zoom);
-  }
-
-  // src/vector-style/visibleStyle.js
-  function visibleStyle(layer, properties, zoom) {
-    return zoom >= (layer.minzoom ?? 0) && zoom < (layer.maxzoom ?? Infinity) && layer.layout?.visibility !== "none" && (!layer.filter || evaluateStyle(layer.filter, properties, zoom, true));
-  }
-
-  // src/vector-tiles/vectorTilePaint.js
-  function vectorTilePaint(batch, zoom) {
-    const paint = vectorPaint(batch.entry, batch.properties, zoom);
-    if (!visibleStyle(batch.entry, batch.properties, zoom)) {
-      paint.opacity = 0;
-      paint.fillOpacity = 0;
-    }
-    return paint;
-  }
-
-  // src/vector-tiles/paintVectorTileBatch.js
-  function paintVectorTileBatch(batch, zoom) {
-    const paint = vectorTilePaint(batch, zoom), { layer } = batch;
-    if (batch.kind === "line") {
-      if (paint.dashArray !== layer.options.dashArray) layer.setStyle(paint);
-      else layer.setStyle(
-        /* alloc */
-        { color: paint.color, opacity: paint.opacity, weight: paint.weight }
-      );
-    } else if (JSON.stringify(paint.fillColor) !== JSON.stringify(layer.options.fillColor) || paint.fillOpacity !== layer.options.fillOpacity) {
-      layer.setStyle(
-        /* alloc */
-        { fillColor: paint.fillColor, fillOpacity: paint.fillOpacity }
-      );
-    }
-  }
-
-  // src/vector-tiles/vectorTilesIdle.js
-  function vectorTilesIdle(layer, session) {
-    return layer.session === session && performance.now() - (layer.changedAt || 0) >= 180;
-  }
-
-  // src/utils/yieldTask.js
-  function yieldTask(delay = 0) {
-    const task = Promise.withResolvers();
-    setTimeout(task.resolve, delay);
-    return task.promise;
-  }
-
-  // src/vector-tiles/updateVectorTilePaint.js
-  async function updateVectorTilePaint() {
-    const zoom = this._map.getZoom(), session = this.session;
-    if (this.paintZoom === zoom) return;
-    const revision = this.paintRevision = (this.paintRevision || 0) + 1;
-    let updated = 0, tile, batch;
-    for (tile of this.tiles.values()) {
-      if (!tile.rendered) continue;
-      for (batch of tile.rendered) {
-        if (!vectorTilesIdle(this, session) || this.paintRevision !== revision || this._map.getZoom() !== zoom) return;
-        paintVectorTileBatch(batch, zoom);
-        if (++updated % 32 === 0) await yieldTask();
-      }
-    }
-    this.paintZoom = zoom;
-  }
-
-  // src/vector-tiles/compareVectorLabelPriority.js
-  function compareVectorLabelPriority(a, b) {
-    return a.priority - b.priority;
-  }
-
-  // src/vector-tiles/vectorLabelCandidates.js
-  function vectorLabelCandidates(layer) {
-    const candidates = (
-      /* alloc */
-      []
-    );
-    let tile, label;
-    for (tile of layer.tiles.values()) {
-      if (!tile.needed || !tile.labelCandidates) continue;
-      for (label of tile.labelCandidates) candidates.push(label);
-    }
-    return candidates.sort(compareVectorLabelPriority);
-  }
-
-  // src/vector-tiles/vectorLabelCells.js
-  function vectorLabelCells(map, label, size) {
-    const zoom = map.getZoom();
-    if (!visibleStyle(label.entry, label.properties, zoom)) return null;
-    label.size = evaluateStyle(label.entry.layout?.["text-size"] ?? 12, label.properties, zoom);
-    if (!(label.size > 0)) return null;
-    label.color = evaluateStyle(label.entry.paint?.["text-color"] ?? "#000", label.properties, zoom);
-    label.halo = evaluateStyle(label.entry.paint?.["text-halo-color"] ?? "#fff", label.properties, zoom);
-    label.haloWidth = evaluateStyle(label.entry.paint?.["text-halo-width"] ?? 0, label.properties, zoom);
-    const point = map.latLngToContainerPoint(label.latlng);
-    if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y) return null;
-    const width = label.text.length * label.size * 0.65 + 16, cells = (
-      /* alloc */
-      []
-    );
-    let x, y;
-    for (x = Math.floor((point.x - width / 2) / 32); x <= Math.floor((point.x + width / 2) / 32); x++) {
-      for (y = Math.floor((point.y - label.size) / 24); y <= Math.floor((point.y + label.size) / 24); y++) {
-        cells.push(`${x}:${y}`);
-      }
-    }
-    return cells;
-  }
-
-  // src/vector-tiles/reserveVectorLabelCells.js
-  function reserveVectorLabelCells(cells, occupied) {
-    let cell;
-    for (cell of cells) if (occupied.has(cell)) return false;
-    for (cell of cells) occupied.add(cell);
-    return true;
-  }
-
-  // src/vector-tiles/updateVectorLabelMarker.js
-  init_L();
-
-  // src/vector-tiles/vectorLabelIcon.js
-  init_L();
-  function vectorLabelIcon(label) {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    const width = Math.max(40, Array.from(label.text).length * label.size * 0.65 + 12);
-    const height = label.size + 12;
-    svg.setAttribute("width", width);
-    svg.setAttribute("height", height);
-    const text = document.createElementNS(svg.namespaceURI, "text");
-    const attributes = (
-      /* alloc */
-      {
-        x: width / 2,
-        y: label.size + 2,
-        "text-anchor": "middle",
-        "font-family": "sans-serif",
-        "font-size": label.size,
-        fill: label.color,
-        stroke: label.halo,
-        "stroke-width": label.haloWidth * 2,
-        "paint-order": "stroke"
-      }
-    );
-    let key;
-    for (key of Object.keys(attributes)) text.setAttribute(key, attributes[key]);
-    text.textContent = label.text;
-    svg.append(text);
-    return (
-      /* alloc */
-      new L.Icon(
-        /* alloc */
-        {
-          iconUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-            /* alloc */
-            new XMLSerializer().serializeToString(svg)
-          )}`,
-          iconSize: (
-            /* alloc */
-            [width, height]
-          ),
-          iconAnchor: (
-            /* alloc */
-            [width / 2, height / 2]
-          )
-        }
-      )
-    );
-  }
-
-  // src/vector-tiles/forwardVectorTileError.js
-  function forwardVectorTileError({ error }) {
-    reportError(this, error);
-  }
-
-  // src/vector-tiles/updateVectorLabelMarker.js
-  function updateVectorLabelMarker(owner, label, key) {
-    const appearance = JSON.stringify(
-      /* alloc */
-      [label.size, label.color, label.halo, label.haloWidth]
-    );
-    let marker = owner.labels.get(key);
-    if (marker) {
-      if (marker._mvtLabelStyle === appearance) return false;
-      marker.setIcon(vectorLabelIcon(label));
-    } else {
-      const { pane } = vectorTileOptionsByLayer.get(owner);
-      marker = /* alloc */
-      new L.Marker(
-        label.latlng,
-        /* alloc */
-        {
-          icon: vectorLabelIcon(label),
-          pane: `${pane}-${label.order}`,
-          title: label.text,
-          alt: label.text,
-          interactive: false,
-          keyboard: false,
-          rotateWithView: false
-        }
-      ).on("error", forwardVectorTileError, owner).addTo(owner._map);
-      owner.labels.set(key, marker);
-    }
-    marker._mvtLabelStyle = appearance;
-    return true;
-  }
-
-  // src/vector-tiles/updateVectorTileLabels.js
-  async function updateVectorTileLabels() {
-    const session = this.session, revision = this.labelRevision = (this.labelRevision || 0) + 1;
-    this.labelsReady = false;
-    const candidates = vectorLabelCandidates(this), size = this._map.getSize();
-    const occupied = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    ), retained = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    );
-    let visited = 0, label, key, cells, marker;
-    for (label of candidates) {
-      if (++visited % 128 === 0) await yieldTask();
-      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
-      cells = vectorLabelCells(this._map, label, size);
-      if (!cells || !reserveVectorLabelCells(cells, occupied)) continue;
-      key = `${label.text}:${label.latlng.join(":")}`;
-      retained.add(key);
-      if (updateVectorLabelMarker(this, label, key)) await yieldTask();
-    }
-    for ([key, marker] of this.labels) {
-      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
-      if (!retained.has(key)) {
-        marker.remove();
-        this.labels.delete(key);
-        await yieldTask();
-      }
-    }
-    this.labelsReady = true;
-  }
-
-  // src/vector-tiles/pruneVectorTiles.js
-  function pruneVectorTiles() {
-    let tile, key, complete = true;
-    for (tile of this.tiles.values()) {
-      if (tile.needed && !tile.group) {
-        complete = false;
-        break;
-      }
-    }
-    for ([key, tile] of this.tiles) {
-      if (tile.needed || tile.group && !complete) continue;
-      tile.controller.abort();
-      this.tiles.delete(key);
-      if (tile.group) this.retire(tile.group).catch(reportError.bind(null, this));
-    }
-  }
-
-  // src/vector-tiles/retireVectorTileGroup.js
-  async function retireVectorTileGroup(group) {
-    const session = this.session;
-    this.retiring.add(group);
-    let removed = 0, layer;
-    for (layer of group.getLayers()) {
-      if (this.session !== session) return;
-      group.removeLayer(layer);
-      if (++removed % 8 === 0) await yieldTask();
-    }
-    group.remove();
-    this.retiring.delete(group);
-  }
-
-  // src/vector-tiles/compareVectorTileDistance.js
-  function compareVectorTileDistance(a, b) {
-    return a.distance - b.distance;
-  }
-
-  // src/vector-tiles/pumpVectorTiles.js
-  function pumpVectorTiles() {
-    if (!this.session) return;
-    const center = this._map.getCenter(), pending = (
-      /* alloc */
-      []
-    );
-    let tile, point;
-    for (tile of this.tiles.values()) {
-      if (!tile.needed || tile.started) continue;
-      point = this._map.project(center, tile.coords.z).divideBy(256);
-      tile.distance = (tile.coords.x - point.x) ** 2 + (tile.coords.y - point.y) ** 2;
-      pending.push(tile);
-    }
-    pending.sort(compareVectorTileDistance);
-    for (tile of pending) {
-      if (this.inflight >= 4) break;
-      tile.started = true;
-      this.inflight++;
-      this.load(tile);
-    }
-  }
-
-  // src/vector-tiles/loadVectorTile.js
-  init_L();
-
-  // src/vector-tiles/attachVectorTileBatch.js
-  init_L();
-  function attachVectorTileBatch(owner, tile, group, batch) {
-    const { pane } = vectorTileOptionsByLayer.get(owner);
-    const paint = vectorTilePaint(batch, owner._map.getZoom());
-    const options = (
-      /* alloc */
-      { ...paint, pane: `${pane}-${batch.order}`, interactive: false, smoothFactor: 0 }
-    );
-    const layer = batch.kind === "fill" ? (
-      /* alloc */
-      new L.Polygon(
-        batch.paths,
-        /* alloc */
-        { ...options, stroke: false, triangulated: true }
-      )
-    ) : (
-      /* alloc */
-      new L.Polyline(batch.paths, options)
-    );
-    layer.on("error", forwardVectorTileError, owner);
-    tile.rendered.push(
-      /* alloc */
-      { layer, kind: batch.kind, entry: batch.entry, properties: batch.properties }
-    );
-    group.addLayer(layer);
-  }
-
-  // src/vector-tiles/attachVectorTileBatches.js
-  async function attachVectorTileBatches(owner, tile, group, batches, session) {
-    let batch;
-    for (batch of batches) {
-      while (!vectorTilesIdle(owner, session) && owner.session === session && !tile.controller.signal.aborted) await yieldTask(50);
-      if (tile.controller.signal.aborted || owner.session !== session) return false;
-      attachVectorTileBatch(owner, tile, group, batch);
-      await yieldTask();
-    }
-    return true;
-  }
-
-  // src/vector-tiles/loadVectorTile.js
-  async function loadVectorTile(tile) {
-    const { coords, controller } = tile, session = this.session;
-    const { url, style, sourceId, maxZoom } = vectorTileOptionsByLayer.get(this);
-    const count = 2 ** coords.z, x = (coords.x % count + count) % count;
-    let group;
-    try {
-      const tileUrl = L.Util.template(
-        url,
-        /* alloc */
-        { z: coords.z, x, y: coords.y }
-      );
-      const response = await fetch(
-        tileUrl,
-        /* alloc */
-        { signal: controller.signal }
-      );
-      if (!response.ok) throw (
-        /* alloc */
-        new Error(`Tile ${tile.key}: HTTP ${response.status}`)
-      );
-      const buffer = await response.arrayBuffer();
-      if (controller.signal.aborted) return;
-      const id = ++this.sequence, prepared = Promise.withResolvers();
-      this.waiting.set(id, prepared);
-      this.worker.postMessage(
-        /* alloc */
-        {
-          type: "vector",
-          id,
-          buffer,
-          coords,
-          style,
-          source: sourceId,
-          maxZoom,
-          zoom: this._map.getZoom()
-        },
-        /* alloc */
-        [buffer]
-      );
-      const data = await prepared.promise;
-      if (controller.signal.aborted || this.session !== session) return;
-      group = /* alloc */
-      new L.LayerGroup().addTo(this._map);
-      tile.rendered = /* alloc */
-      [];
-      if (!await attachVectorTileBatches(this, tile, group, data.batches, session)) {
-        group.remove();
-        return;
-      }
-      tile.group = group;
-      tile.labelCandidates = data.labels;
-      this.fire(
-        "tileload",
-        /* alloc */
-        { coords, group }
-      );
-      this.prune();
-      this.refresh();
-    } catch (error) {
-      group?.remove();
-      if (!controller.signal.aborted && this.session === session) this.fire(
-        "error",
-        /* alloc */
-        { error }
-      );
-    } finally {
-      if (this.session === session) {
-        this.inflight--;
-        this.pump();
-      }
-    }
-  }
-
-  // src/vector-tiles/configureVectorTileLayer.js
-  async function configureVectorTileLayer(layer, options) {
-    const settings = await vectorTileSettings(options);
-    const { url, tileJSON, style, sourceId, minNativeZoom, maxNativeZoom, maxZoom, ...core } = settings;
-    L.Util.setOptions(layer, core);
-    settings.pane = `mvt-${L.Util.stamp(layer)}`;
-    vectorTileOptionsByLayer.set(layer, settings);
-    Object.assign(
-      layer,
-      /* alloc */
-      {
-        onAdd: onVectorTileAdd,
-        onRemove: onVectorTileRemove,
-        update: updateVectorTiles,
-        updatePaint: updateVectorTilePaint,
-        updateLabels: updateVectorTileLabels,
-        prune: pruneVectorTiles,
-        retire: retireVectorTileGroup,
-        pump: pumpVectorTiles,
-        load: loadVectorTile
-      }
-    );
-    return layer;
-  }
-
-  // src/sources/readyVectorTiles.js
-  function readyVectorTiles(layer) {
-    const map = layer._map;
-    map?.removeLayer(layer);
-    kindByLayer.delete(layer);
-    map?.addLayer(layer);
-    layer.fire("ready");
-    return layer;
-  }
-
-  // src/sources/initVectorTiles.js
-  function initVectorTiles(layer, options) {
-    kindByLayer.set(layer, "pending");
-    const ready = configureVectorTileLayer(layer, options).then(readyVectorTiles.bind(null, layer)).catch(reportError2.bind(null, layer));
-    readyByLayer.set(layer, ready);
-    ready.catch(noOperation);
-  }
-
   // src/cog/getCogHeader.js
   function getCogHeader(source) {
     return source.header;
@@ -16691,21 +16705,146 @@
     return mapGetBearing(this);
   }
 
-  // src/core/markerSetRotation.js
-  function markerSetRotation(marker, rotation) {
-    if (!Number.isFinite(rotation)) throw (
-      /* alloc */
-      new TypeError("Marker rotation must be finite")
-    );
-    marker.options.rotation = rotation;
-    marker.update();
-    refreshNativeLayerContract(marker);
-    return marker;
+  // src/camera/setPitch.js
+  init_mapSetPitch();
+  function setPitch(pitch, options) {
+    return mapSetPitch(this, pitch, options);
+  }
+
+  // src/camera/setBearing.js
+  init_mapSetBearing();
+  function setBearing(bearing, options) {
+    return mapSetBearing(this, bearing, options);
   }
 
   // src/core/setRotation.js
   function setRotation(rotation) {
     return markerSetRotation(this, rotation);
+  }
+
+  // src/core/initializeNativeLayer.js
+  init_L();
+
+  // src/weakmaps/closestMethods.js
+  var closestMethods = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/boundsMethods.js
+  var boundsMethods = /* @__PURE__ */ new WeakMap();
+
+  // src/weakmaps/gridInitializers.js
+  var gridInitializers = /* @__PURE__ */ new WeakMap();
+
+  // src/core/closestCameraLayerPoint.js
+  function closestCameraLayerPoint(point) {
+    this._project();
+    this._parts = this._rings;
+    return closestMethods.get(this).call(this, point);
+  }
+
+  // src/core/cameraCircleBounds.js
+  function cameraCircleBounds() {
+    this._project();
+    return boundsMethods.get(this).call(this);
+  }
+
+  // src/core/initializeGridContainer.js
+  function initializeGridContainer() {
+    gridInitializers.get(this).call(this);
+    this._container.remove();
+  }
+
+  // src/globals/pendingGridFades.js
+  var pendingGridFades = /* @__PURE__ */ new Map();
+
+  // src/globals/gridFadeFrame.js
+  var gridFadeFrame = { value: null };
+
+  // src/animations/cancelGridFade.js
+  function cancelGridFade(layer) {
+    pendingGridFades.delete(layer);
+    fadeFrameByLayer.set(layer, null);
+    if (!pendingGridFades.size && gridFadeFrame.value !== null) {
+      cancelAnimationFrame(gridFadeFrame.value);
+      gridFadeFrame.value = null;
+    }
+  }
+
+  // src/animations/runGridFades.js
+  function runGridFades() {
+    gridFadeFrame.value = null;
+    const layers = (
+      /* alloc */
+      [...pendingGridFades]
+    );
+    let layer, version;
+    for ([layer, version] of layers) {
+      if (pendingGridFades.get(layer) !== version) continue;
+      pendingGridFades.delete(layer);
+      fadeFrameByLayer.set(layer, null);
+      updateGridOpacity.call(layer);
+    }
+  }
+
+  // src/animations/scheduleGridFade.js
+  function scheduleGridFade(layer) {
+    fadeVersionByLayer.set(layer, (fadeVersionByLayer.get(layer) || 0) + 1);
+    pendingGridFades.set(layer, fadeVersionByLayer.get(layer));
+    if (gridFadeFrame.value === null) gridFadeFrame.value = requestAnimationFrame(runGridFades);
+    fadeFrameByLayer.set(layer, gridFadeFrame.value);
+  }
+
+  // src/core/updateGridOpacity.js
+  function updateGridOpacity() {
+    if (!this._map) return;
+    const layer = this, now = Date.now();
+    let fading = false, prune = false;
+    let key, tile;
+    for (key in this._tiles) {
+      if (!Object.hasOwn(this._tiles, key)) continue;
+      tile = this._tiles[key];
+      if (!tile.current || !tile.loaded) continue;
+      tile._gpuOpacity = this._map._fadeAnimated ? Math.min(1, (now - tile.loaded) / 200) : 1;
+      if (tile._gpuOpacity < 1) fading = true;
+      else if (!tile.active) {
+        this._onOpaqueTile(tile);
+        tile.active = true;
+        prune = true;
+      }
+    }
+    if (prune && !this._noPrune) this._pruneTiles();
+    refreshNativeLayerContract(this);
+    cancelGridFade(layer);
+    if (fading) scheduleGridFade(layer);
+  }
+
+  // src/core/redrawPath.js
+  function redrawPath() {
+    refreshNativeLayerContract(this);
+    return this;
+  }
+
+  // src/core/initializeNativeLayer.js
+  function initializeNativeLayer() {
+    if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
+      this.beforeAdd = this._updateBounds = noOperation;
+      this.redraw = redrawPath;
+      kindByLayer.set(this, "path");
+      if (this instanceof L.Polyline) {
+        closestMethods.set(this, this.closestLayerPoint);
+        this.closestLayerPoint = closestCameraLayerPoint;
+      }
+      if (this instanceof L.Circle) {
+        boundsMethods.set(this, this.getBounds);
+        this.getBounds = cameraCircleBounds;
+      }
+    } else if (this instanceof L.GridLayer) {
+      gridInitializers.set(this, this._initContainer);
+      this._initContainer = initializeGridContainer;
+      this._updateOpacity = updateGridOpacity;
+    } else if (this instanceof L.ImageOverlay && !(this instanceof L.VideoOverlay) && !(this instanceof L.SVGOverlay)) {
+      kindByLayer.set(this, "image");
+      this._reset = refreshNativeLayerContract;
+    }
   }
 
   // src/core/layerCallInitHooks.js
@@ -16718,403 +16857,6 @@
     if (!initialized) initializeNativeLayer.call(this);
   }
 
-  // src/mvt/createMvtReader.js
-  function createMvtReader(bytes) {
-    return (
-      /* alloc */
-      {
-        bytes,
-        view: (
-          /* alloc */
-          new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-        ),
-        pos: 0
-      }
-    );
-  }
-
-  // src/mvt/takeMvtBytes.js
-  function takeMvtBytes(reader, size) {
-    if (!Number.isSafeInteger(size) || size < 0 || size > reader.bytes.length - reader.pos) {
-      throw (
-        /* alloc */
-        new Error("Truncated MVT field")
-      );
-    }
-    const start2 = reader.pos;
-    reader.pos += size;
-    return start2;
-  }
-
-  // src/mvt/readMvtInteger.js
-  function readMvtInteger(reader) {
-    let value = 0n, i = 0, byte;
-    for (; i < 10; i++) {
-      byte = reader.bytes[takeMvtBytes(reader, 1)];
-      if (i === 9 && byte > 1) throw (
-        /* alloc */
-        new Error("Invalid MVT varint")
-      );
-      value |= BigInt(byte & 127) << BigInt(i * 7);
-      if (byte < 128) return value;
-    }
-    throw (
-      /* alloc */
-      new Error("Invalid MVT varint")
-    );
-  }
-
-  // src/mvt/readMvtNumber.js
-  function readMvtNumber(reader) {
-    const value = readMvtInteger(reader);
-    if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
-      throw (
-        /* alloc */
-        new Error("MVT integer exceeds safe range")
-      );
-    }
-    return Number(value);
-  }
-
-  // src/mvt/readMvtField.js
-  function readMvtField(reader) {
-    const tag = readMvtNumber(reader);
-    const field = Math.floor(tag / 8), wire = tag % 8;
-    if (!field || field > 536870911) throw (
-      /* alloc */
-      new Error("Invalid MVT field number")
-    );
-    return (
-      /* alloc */
-      [field, wire]
-    );
-  }
-
-  // src/mvt/expectMvtWire.js
-  function expectMvtWire(wire, expected) {
-    if (wire !== expected) throw (
-      /* alloc */
-      new Error("Invalid MVT wire type")
-    );
-  }
-
-  // src/mvt/numericMvtValue.js
-  function numericMvtValue(value) {
-    return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
-  }
-
-  // src/mvt/finishMvtPath.js
-  function finishMvtPath(path, type, closed) {
-    if (path && (type === 2 && path.length < 2 || type === 3 && !closed)) {
-      throw (
-        /* alloc */
-        new Error("Incomplete MVT geometry")
-      );
-    }
-  }
-
-  // src/mvt/appendMvtCoordinates.js
-  function appendMvtCoordinates(commands, state, count) {
-    let i = 0, dx, dy;
-    for (; i < count; i++) {
-      dx = commands[state.index++];
-      dy = commands[state.index++];
-      if (dx > 4294967295 || dy > 4294967295) throw (
-        /* alloc */
-        new Error("Invalid MVT coordinate")
-      );
-      state.x += dx % 2 ? -(dx + 1) / 2 : dx / 2;
-      state.y += dy % 2 ? -(dy + 1) / 2 : dy / 2;
-      state.path.push(
-        /* alloc */
-        [state.x, state.y]
-      );
-    }
-  }
-
-  // src/mvt/beginMvtPath.js
-  function beginMvtPath(state, paths, type, count) {
-    finishMvtPath(state.path, type, state.closed);
-    if (type !== 1 && count !== 1) throw (
-      /* alloc */
-      new Error("Invalid MVT MoveTo")
-    );
-    state.path = /* alloc */
-    [];
-    paths.push(state.path);
-    state.closed = false;
-  }
-
-  // src/mvt/closeMvtPath.js
-  function closeMvtPath(state, type, count) {
-    if (type !== 3 || count !== 1 || !state.path || state.closed || state.path.length < 3) {
-      throw (
-        /* alloc */
-        new Error("Invalid MVT ClosePath")
-      );
-    }
-    state.path.push(
-      /* alloc */
-      [...state.path[0]]
-    );
-    state.closed = true;
-  }
-
-  // src/mvt/readMvtGeometry.js
-  function readMvtGeometry(commands, type) {
-    const paths = (
-      /* alloc */
-      []
-    );
-    const state = (
-      /* alloc */
-      { x: 0, y: 0, path: null, closed: false, index: 0 }
-    );
-    let command, id, count;
-    while (state.index < commands.length) {
-      command = commands[state.index++];
-      id = command % 8;
-      count = Math.floor(command / 8);
-      if (!count || command > 4294967295) throw (
-        /* alloc */
-        new Error("Invalid MVT geometry command")
-      );
-      if (id === 7) {
-        closeMvtPath(state, type, count);
-        continue;
-      }
-      if (id !== 1 && id !== 2 || count > Math.floor((commands.length - state.index) / 2)) {
-        throw (
-          /* alloc */
-          new Error("Invalid MVT geometry parameters")
-        );
-      }
-      if (id === 1) beginMvtPath(state, paths, type, count);
-      else if (type === 1 || !state.path || state.closed) throw (
-        /* alloc */
-        new Error("Invalid MVT LineTo")
-      );
-      appendMvtCoordinates(commands, state, count);
-    }
-    finishMvtPath(state.path, type, state.closed);
-    if (!paths.length) throw (
-      /* alloc */
-      new Error("Empty MVT geometry")
-    );
-    return paths;
-  }
-
-  // src/mvt/readMvtMessage.js
-  function readMvtMessage(reader, wire) {
-    expectMvtWire(wire, 2);
-    const size = readMvtNumber(reader), start2 = takeMvtBytes(reader, size);
-    return createMvtReader(reader.bytes.subarray(start2, start2 + size));
-  }
-
-  // src/mvt/readMvtNumbers.js
-  function readMvtNumbers(reader, wire, target) {
-    let packed;
-    if (wire === 0) target.push(readMvtNumber(reader));
-    else {
-      packed = readMvtMessage(reader, wire);
-      while (packed.pos < packed.bytes.length) target.push(readMvtNumber(packed));
-    }
-  }
-
-  // src/mvt/skipMvtField.js
-  function skipMvtField(reader, wire) {
-    switch (wire) {
-      case 0:
-        readMvtInteger(reader);
-        break;
-      case 1:
-        takeMvtBytes(reader, 8);
-        break;
-      case 2:
-        takeMvtBytes(reader, readMvtNumber(reader));
-        break;
-      case 5:
-        takeMvtBytes(reader, 4);
-        break;
-      default:
-        throw (
-          /* alloc */
-          new Error("Unsupported MVT wire type")
-        );
-    }
-  }
-
-  // src/mvt/readMvtFeature.js
-  function readMvtFeature(reader, keys, values) {
-    let id, type = 0, field, wire, i = 0;
-    const tags = (
-      /* alloc */
-      []
-    ), commands = (
-      /* alloc */
-      []
-    );
-    while (reader.pos < reader.bytes.length) {
-      [field, wire] = readMvtField(reader);
-      if (field === 1) {
-        expectMvtWire(wire, 0);
-        id = numericMvtValue(readMvtInteger(reader));
-      } else if (field === 2) readMvtNumbers(reader, wire, tags);
-      else if (field === 3) {
-        expectMvtWire(wire, 0);
-        type = readMvtNumber(reader);
-      } else if (field === 4) readMvtNumbers(reader, wire, commands);
-      else skipMvtField(reader, wire);
-    }
-    if (tags.length % 2 || type > 3) throw (
-      /* alloc */
-      new Error("Invalid MVT feature")
-    );
-    const properties = /* @__PURE__ */ Object.create(null);
-    for (; i < tags.length; i += 2) {
-      if (tags[i] >= keys.length || tags[i + 1] >= values.length) {
-        throw (
-          /* alloc */
-          new Error("Invalid MVT property index")
-        );
-      }
-      properties[keys[tags[i]]] = values[tags[i + 1]];
-    }
-    return (
-      /* alloc */
-      { id, type, properties, geometry: type ? readMvtGeometry(commands, type) : (
-        /* alloc */
-        []
-      ) }
-    );
-  }
-
-  // src/globals/mvtTextDecoder.js
-  var mvtTextDecoder = new TextDecoder("utf-8", { fatal: true });
-
-  // src/mvt/readMvtString.js
-  function readMvtString(reader, wire) {
-    return mvtTextDecoder.decode(readMvtMessage(reader, wire).bytes);
-  }
-
-  // src/mvt/readMvtKnownValue.js
-  function readMvtKnownValue(reader, field, wire) {
-    let offset, integer;
-    if (field === 1) return readMvtString(reader, wire);
-    if (field === 2 || field === 3) {
-      expectMvtWire(wire, field === 2 ? 5 : 1);
-      offset = takeMvtBytes(reader, field === 2 ? 4 : 8);
-      return field === 2 ? reader.view.getFloat32(offset, true) : reader.view.getFloat64(offset, true);
-    }
-    expectMvtWire(wire, 0);
-    integer = readMvtInteger(reader);
-    if (field === 4) return numericMvtValue(BigInt.asIntN(64, integer));
-    if (field === 5) return numericMvtValue(integer);
-    if (field === 6) return numericMvtValue(integer >> 1n ^ -(integer & 1n));
-    return integer !== 0n;
-  }
-
-  // src/mvt/readMvtValue.js
-  function readMvtValue(reader) {
-    let value, found = false, field, wire;
-    while (reader.pos < reader.bytes.length) {
-      [field, wire] = readMvtField(reader);
-      if (field < 1 || field > 7) {
-        skipMvtField(reader, wire);
-        continue;
-      }
-      if (found) throw (
-        /* alloc */
-        new Error("Multiple MVT value types")
-      );
-      found = true;
-      value = readMvtKnownValue(reader, field, wire);
-    }
-    if (!found) throw (
-      /* alloc */
-      new Error("Empty MVT value")
-    );
-    return value;
-  }
-
-  // src/mvt/readMvtLayer.js
-  function readMvtLayer(reader) {
-    let name, version, extent = 4096, field, wire, value, i = 0;
-    const keys = (
-      /* alloc */
-      []
-    ), values = (
-      /* alloc */
-      []
-    ), features = (
-      /* alloc */
-      []
-    );
-    while (reader.pos < reader.bytes.length) {
-      [field, wire] = readMvtField(reader);
-      if (field === 1) name = readMvtString(reader, wire);
-      else if (field === 2) features.push(readMvtMessage(reader, wire));
-      else if (field === 3) keys.push(readMvtString(reader, wire));
-      else if (field === 4) values.push(readMvtValue(readMvtMessage(reader, wire)));
-      else if (field === 5 || field === 15) {
-        expectMvtWire(wire, 0);
-        value = readMvtNumber(reader);
-        if (field === 5) extent = value;
-        else version = value;
-      } else skipMvtField(reader, wire);
-    }
-    if (!name || !/* alloc */
-    [1, 2].includes(version) || !extent || extent > 4294967295) {
-      throw (
-        /* alloc */
-        new Error("Invalid MVT layer metadata")
-      );
-    }
-    for (; i < features.length; i++) features[i] = readMvtFeature(features[i], keys, values);
-    return (
-      /* alloc */
-      { name, extent, features }
-    );
-  }
-
-  // src/mvt/decodeVectorTile.js
-  function decodeVectorTile(buffer) {
-    if (!(buffer instanceof ArrayBuffer) && !(buffer instanceof Uint8Array)) {
-      throw (
-        /* alloc */
-        new TypeError("MVT input must be an ArrayBuffer or Uint8Array")
-      );
-    }
-    const bytes = buffer instanceof Uint8Array ? buffer : (
-      /* alloc */
-      new Uint8Array(buffer)
-    );
-    const reader = createMvtReader(bytes);
-    const layers = (
-      /* alloc */
-      []
-    ), names = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    );
-    let field, wire, layer;
-    while (reader.pos < reader.bytes.length) {
-      [field, wire] = readMvtField(reader);
-      if (field !== 3) {
-        skipMvtField(reader, wire);
-        continue;
-      }
-      layer = readMvtLayer(readMvtMessage(reader, wire));
-      if (names.has(layer.name)) throw (
-        /* alloc */
-        new Error("Duplicate MVT layer name")
-      );
-      names.add(layer.name);
-      layers.push(layer);
-    }
-    return layers;
-  }
-
   // src/index.js
   layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
   layerCallInitHooks.value = L.Layer.prototype.callInitHooks;
@@ -17124,8 +16866,7 @@
     callInitHooks: layerCallInitHooks2
   });
   removeLayer.value = L.Map.prototype.removeLayer;
-  L.Map.include({ removeLayer: removeLayer2, getPitch, getBearing });
+  L.Map.include({ removeLayer: removeLayer2, getPitch, getBearing, setPitch, setBearing });
   L.Marker.include({ setRotation });
-  L.Util.decodeVectorTile = decodeVectorTile;
 })();
 //# sourceMappingURL=leaflet-city-mapper-src.js.map

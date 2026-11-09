@@ -9,11 +9,13 @@ import { drawGeometry } from './drawGeometry.js';
 export function drawSceneMeshes(layer, encoder, meshes) {
   const renderer = rendererByLayer.get(layer);
   const pass = encoder.beginRenderPass((
-    scenePass.colorAttachments[0].view = renderer.context.getCurrentTexture().createView(),
+    scenePass.colorAttachments[0].view = renderer.colorTexture.createView(),
+    scenePass.colorAttachments[0].resolveTarget = renderer.context.getCurrentTexture().createView(),
     scenePass.depthStencilAttachment.view = renderer.depthTexture.createView(),
     scenePass
   ));
   scenePass.colorAttachments[0].view = null;
+  scenePass.colorAttachments[0].resolveTarget = null;
   scenePass.depthStencilAttachment.view = null;
   pass.setViewport(0, 0, renderer.canvas.width, renderer.canvas.height, 0, 1);
   pass.setBindGroup(1, renderer.sunlight.bindGroup);

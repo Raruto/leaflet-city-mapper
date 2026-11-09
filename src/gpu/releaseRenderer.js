@@ -2,6 +2,7 @@ export async function releaseRenderer(renderer, layer) {
   try {
     await renderer.device.queue.onSubmittedWorkDone();
     renderer.depthTexture?.destroy();
+    renderer.colorTexture?.destroy();
     renderer.roofFallbackTexture?.texture?.destroy();
     renderer.uniformBuffer?.destroy();
     renderer.sunlight?.texture?.destroy();

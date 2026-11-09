@@ -1,6 +1,7 @@
 export const scenePass = {
   colorAttachments: [{
     view: null,
+    resolveTarget: null,
     clearValue: {
       r: 0,
       g: 0,

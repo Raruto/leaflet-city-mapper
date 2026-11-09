@@ -1,11 +1,12 @@
 import { L } from '../globals/L.js';
 import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.js';
+import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { vectorTilePaint } from './vectorTilePaint.js';
 import { forwardVectorTileError } from './forwardVectorTileError.js';
 
 export function attachVectorTileBatch(owner, tile, group, batch) {
   const { pane } = vectorTileOptionsByLayer.get(owner);
-  const paint = vectorTilePaint(batch, owner._map.getZoom());
+  const paint = vectorTilePaint(batch, vectorStyleZoom(owner));
   const options = /* alloc */ { ...paint, pane: `${pane}-${batch.order}`, interactive: false, smoothFactor: 0 };
   const layer = batch.kind === 'fill'
     ? /* alloc */ new L.Polygon(batch.paths, /* alloc */ { ...options, stroke: false, triangulated: true })

@@ -4,24 +4,18 @@ import { layerCallInitHooks as sharedLayerCallInitHooks } from './globals/layerC
 import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';
 
 import './camera/mapCamera.js';
-import { init3D } from './scene/init3D.js';
-import { initNativeGPU } from './native/initNativeGPU.js';
-import { initRaster } from './raster/initRaster.js';
-import { setGeoJSONData } from './sources/setGeoJSONData.js';
-import { initTerrain } from './terrain/initTerrain.js';
 import './sunlight/initSunlight.js';
-import { initTraffic } from './traffic/initTraffic.js';
 import './walk/initWalk.js';
 
-import { initializeNativeLayer } from './core/initializeNativeLayer.js';
 import { layerLayerAdd } from './scene/addRegisteredLayer.js';
 import { layerInitialize } from './scene/layerInitialize.js';
 import { removeLayer } from './core/removeLayer.js';
 import { getPitch } from './camera/getPitch.js';
 import { getBearing } from './camera/getBearing.js';
+import { setPitch } from './camera/setPitch.js';
+import { setBearing } from './camera/setBearing.js';
 import { setRotation } from './core/setRotation.js';
 import { layerCallInitHooks } from './core/layerCallInitHooks.js';
-import { decodeVectorTile } from './mvt/decodeVectorTile.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -108,6 +102,5 @@ L.Layer.include({
 });
 
 sharedRemoveLayer.value = L.Map.prototype.removeLayer;
-L.Map.include({ removeLayer, getPitch, getBearing });
+L.Map.include({ removeLayer, getPitch, getBearing, setPitch, setBearing });
 L.Marker.include({ setRotation });
-L.Util.decodeVectorTile = decodeVectorTile;

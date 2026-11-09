@@ -5,20 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>leaflet-city-mapper.js</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/libs/leaflet.js"></script>
-  <script src="../dist/leaflet-city-mapper.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/dist/leaflet-city-mapper.js"></script>
   <style>
-    html, body, #map { height: 100%; margin: 0; background: #eee; }
+    html, body { height: 100%; margin: 0; }
+    #compare { display: flex; height: 100%; gap: 2px; background: #333; }
+    #compare > div { position: relative; flex: 1; min-width: 0; background: #eee; }
+    #compare > div > .map { position: absolute; inset: 0; }
+    .label { position: absolute; z-index: 1000; top: 8px; left: 50px; padding: 2px 8px; font: 600 13px system-ui; background: #fffd; border-radius: 4px; pointer-events: none; }
+    @media (max-width: 700px) { #compare { flex-direction: column; } }
   </style>
 </head>
 <body>
-  <div id="map" aria-label="Mappe vettoriali con rotazione e inclinazione"></div>
+  <div id="compare">
+    <div><div id="map" class="map" aria-label="leaflet-city-mapper"></div><span class="label">leaflet-city-mapper</span></div>
+    <div><div id="ml" class="map" aria-label="MapLibre GL JS"></div><span class="label">MapLibre GL JS</span></div>
+  </div>
   <script>
     const map = new L.Map('map', {
       center: [48.8583, 2.2945],
       zoom: 15,
-      minZoom: 2,
-      maxZoom: 19,
       rotate: true,
       bearing: 20,
       pitch: 45,
@@ -33,13 +41,73 @@
         url: 'https://opentopomap.org/otm/{z}/{x}/{y}.pbf',
         style: 'https://opentopomap.org/vector/otm_layers.json',
         sourceId: 'opentopomap-vector',
+        sprite: 'https://opentopomap.org/vector/otm_sprite',
         maxNativeZoom: 14,
+        styleZoomOffset: -1,
         attribution: 'Style: <a href="https://opentopomap.org/vector/">&copy; OpenTopoMap</a> ' +
           '(<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</a>). Data: ' +
-          '<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>',
+          '<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>'
       },
     }).addTo(map);
+
+    // The OpenTopoMap file is a bare `const otm_layers = [...]`: wrap it in a full MapLibre style.
+    fetch('https://opentopomap.org/vector/otm_layers.json').then((r) => r.text()).then((text) => {
+      const sources = {
+        'opentopomap-vector': {
+          type: 'vector',
+          tiles: ['https://opentopomap.org/otm/{z}/{x}/{y}.pbf'],
+          maxzoom: 14
+        },
+      };
+      const ml = new maplibregl.Map({
+        container: 'ml',
+        center: [2.2945, 48.8583],
+        zoom: 15 - 1, // 512px MapLibre tiles: one zoom level below Leaflet's 256px; bearing is mirrored (Leaflet turns the map clockwise)
+        bearing: -20,
+        pitch: 45,
+        maxPitch: 85,
+        attributionControl: {
+          customAttribution: 'Style: <a href="https://opentopomap.org/vector/">&copy; OpenTopoMap</a> ' +
+            '(<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</a>). Data: ' +
+            '<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>'
+        },
+        style: {
+          version: 8,
+          glyphs: 'https://fonts.undpgeohub.org/fonts/{fontstack}/{range}.pbf',
+          sprite: 'https://opentopomap.org/vector/otm_sprite',
+          sources,
+          // No DEM, contours or raster fallback: skip every layer whose source isn't loaded.
+          layers: (new Function(text + ';return otm_layers;'))().filter((l) => !l.source || sources[l.source]),
+        },
+      });
+      ml.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
+
+      // Whichever map the user touched last drives the other one.
+      let leader = map;
+      map.getContainer().addEventListener('pointerdown', () => { leader = map; }, true);
+      map.getContainer().addEventListener('wheel', () => { leader = map; }, true);
+      ml.getContainer().addEventListener('pointerdown', () => { leader = ml; }, true);
+      ml.getContainer().addEventListener('wheel', () => { leader = ml; }, true);
+
+      map.on('move rotate pitch', () => {
+        if (leader !== map) return;
+        const c = map.getCenter();
+        ml.jumpTo({
+          center: [c.lng, c.lat],
+          zoom: map.getZoom() - 1,
+          bearing: -map.getBearing(),
+          pitch: map.getPitch()
+        });
+      });
+      ml.on('move', () => {
+        if (leader !== ml) return;
+        const c = ml.getCenter();
+        map.setView([c.lat, c.lng], ml.getZoom() + 1, { animate: false });
+        map.setBearing(-ml.getBearing());
+        map.setPitch(ml.getPitch());
+      });
+    });
   </script>
-  <a href="https://github.com/Raruto/leaflet-city-mapper" class="view-on-github"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
+  <a href="https://github.com/Raruto/leaflet-city-mapper" style="position: fixed;bottom: 20px;left: calc(50% - 85px);z-index: 9999;"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
 </body>
 </html>
