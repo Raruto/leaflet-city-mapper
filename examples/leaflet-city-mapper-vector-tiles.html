@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>leaflet-city-mapper.js</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/libs/leaflet.js"></script>
+  <script src="../dist/leaflet-city-mapper.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; background: #eee; }
+  </style>
+</head>
+<body>
+  <div id="map" aria-label="Mappe vettoriali con rotazione e inclinazione"></div>
+  <script>
+    const map = new L.Map('map', {
+      center: [48.8583, 2.2945],
+      zoom: 15,
+      minZoom: 2,
+      maxZoom: 19,
+      rotate: true,
+      bearing: 20,
+      pitch: 45,
+      rotateControl: true,
+      touchRotate: true,
+      touchPitch: true,
+    });
+
+    new L.Layer({
+      source: {
+        type: 'vector',
+        url: 'https://opentopomap.org/otm/{z}/{x}/{y}.pbf',
+        style: 'https://opentopomap.org/vector/otm_layers.json',
+        sourceId: 'opentopomap-vector',
+        maxNativeZoom: 14,
+        attribution: 'Style: <a href="https://opentopomap.org/vector/">&copy; OpenTopoMap</a> ' +
+          '(<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</a>). Data: ' +
+          '<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>',
+      },
+    }).addTo(map);
+  </script>
+  <a href="https://github.com/Raruto/leaflet-city-mapper" class="view-on-github"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
+</body>
+</html>

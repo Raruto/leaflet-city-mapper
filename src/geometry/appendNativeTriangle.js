@@ -1,3 +1,3 @@
-export function triangle(point, target, a, b, c) {
-  return target.push(...point(a), ...point(b), ...point(c));
+export function triangle(point, target, a, b, c, anchorA, anchorB, anchorC) {
+  return target.push(...point(a, anchorA), ...point(b, anchorB), ...point(c, anchorC));
 }

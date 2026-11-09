@@ -30,6 +30,7 @@ export function materialShaders(material = defaultMaterial, sparkle = false, ele
       terrain: vec4<f32>,
       highlight: vec4<f32>,
       cutout: vec4<f32>,
+      nativeStroke: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,

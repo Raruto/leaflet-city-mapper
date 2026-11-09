@@ -13,5 +13,6 @@ export function createProgramUniforms(material) {
   if (material.emissiveTexture) uniforms.emissiveTexture = /* alloc */ { value: material.emissiveTexture };
   if (material.occlusionTexture) uniforms.occlusionTexture = /* alloc */ { value: material.occlusionTexture };
   if (material.roofTexture || material.wallTexture) uniforms.roofTexture = /* alloc */ { value: null };
+  if (material.nativeStroke) uniforms.strokeScale = /* alloc */ { value: 1 };
   return uniforms;
 }

@@ -1,23 +1,17 @@
-import { triangle } from './appendNativeTriangle.js';
 import { line } from './line.js';
-import { triangulate } from '../triangulation/triangulate.js';
+import { fillNativePolygon } from './fillNativePolygon.js';
 
 export function polygon(context, rings, closed) {
-  const { options, fill, point, map } = context;
+  const { options, map } = context;
   const projected = /* alloc */ [];
-  let ring, path, latlng, indices;
+  let ring, path, latlng;
   for (ring of rings) {
     path = /* alloc */ [];
     for (latlng of ring) path.push(map.project(latlng));
     projected.push(path);
   }
   if (closed && options.fill && projected[0]?.length >= 3) {
-    const valid = /* alloc */ [];
-    for (ring of projected) if (ring.length >= 3) valid.push(ring);
-    const vertices = valid.flat();
-    for (indices of triangulate(valid[0], valid.slice(1))) {
-      triangle(point, fill, vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]);
-    }
+    fillNativePolygon(context, projected);
   }
   for (ring of projected) line(context, ring, closed);
 }

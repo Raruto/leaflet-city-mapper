@@ -13,6 +13,8 @@ import { loading } from '../globals/loading.js';
 
 import { init3D } from './init3D.js';
 import { initializeGeoJSON } from '../sources/initializeGeoJSON.js';
+import { isVectorTileSource } from '../sources/isVectorTileSource.js';
+import { initVectorTiles } from '../sources/initVectorTiles.js';
 import { noOperation } from '../utils/noOperation.js';
 import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
@@ -32,7 +34,9 @@ export function layerInitialize(options = sceneEmptyOptions) {
   L.Util.setOptions(this, core);
   typeByLayer.set(this, type);
   if (type === 'vector') {
-    if (settings.data !== undefined ||
+    if (isVectorTileSource(settings)) {
+      initVectorTiles(this, settings);
+    } else if (settings.data !== undefined ||
         settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
       initializeGeoJSON(this, settings);
     } else {

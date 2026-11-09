@@ -1,0 +1,1 @@
+export const mvtTextDecoder = new TextDecoder('utf-8', { fatal: true });

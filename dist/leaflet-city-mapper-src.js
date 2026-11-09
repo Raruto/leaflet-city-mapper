@@ -1431,9 +1431,6 @@
   // src/native/nativeLayer.js
   init_L();
 
-  // src/native/nativeLayerMethod.js
-  init_L();
-
   // src/weakmaps/sharedByLayer.js
   var sharedByLayer = /* @__PURE__ */ new WeakMap();
 
@@ -2021,6 +2018,12 @@
     { min, max, center, radius };
   }
 
+  // src/rendering/nativeStrokeExpansion.js
+  function nativeStrokeExpansion(mesh) {
+    const strokeScale = mesh.program?.uniforms?.strokeScale?.value ?? 1;
+    return Math.max(0, strokeScale - 1) * (mesh.geometry.nativeStrokeRadius || 0);
+  }
+
   // src/rendering/collectVisibleMesh.js
   function collectVisibleMesh(mesh, projection, frustum, frustumLengths, candidates) {
     if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
@@ -2034,16 +2037,18 @@
       sphere.x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
       sphere.y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
       sphere.z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-      sphere.radius = bounds.radius * Math.max(
+      sphere.scale = Math.max(
         Math.hypot(world[0], world[1], world[2]),
         Math.hypot(world[4], world[5], world[6]),
         Math.hypot(world[8], world[9], world[10])
       );
+      sphere.radius = bounds.radius * sphere.scale;
       sphere.bounds = bounds;
       sphere.matrix = world;
       sphere.version = mesh._worldMatrixVersion;
     }
-    const { x, y, z, radius } = sphere;
+    const { x, y, z } = sphere;
+    const radius = sphere.radius + nativeStrokeExpansion(mesh) * sphere.scale;
     const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
     const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
     mesh._sortDepth = clipZ / clipW;
@@ -3111,6 +3116,8 @@
     data[base + 34] = mesh.program.nightSparkle ? data[55] : 0;
     data[base + 35] = mesh.ground ? 1 : mesh._appearance ?? 1;
     prepareMeshCutout(renderer, mesh, base);
+    data[base + 40] = uniforms.strokeScale?.value ?? 1;
+    data[base + 41] = data[base + 42] = data[base + 43] = 0;
     return offset;
   }
 
@@ -3155,7 +3162,7 @@
     binding: 0,
     resource: {
       buffer: null,
-      size: 160
+      size: 176
     }
   };
 
@@ -4079,6 +4086,9 @@
   // src/native/putNativeMesh.js
   init_L();
 
+  // src/native/createNativeMesh.js
+  init_L();
+
   // src/globals/defaultMaterial.js
   var defaultMaterial = Object.freeze({});
 
@@ -4392,6 +4402,8 @@
     { value: material.occlusionTexture };
     if (material.roofTexture || material.wallTexture) uniforms.roofTexture = /* alloc */
     { value: null };
+    if (material.nativeStroke) uniforms.strokeScale = /* alloc */
+    { value: 1 };
     return uniforms;
   }
 
@@ -4442,9 +4454,21 @@
     );
   }
 
+  // src/shaders/nativeStrokeShader.js
+  function nativeStrokeShader(material) {
+    return (
+      /* alloc */
+      {
+        position: material.nativeStroke ? "position = input.normal + (input.position - input.normal) * u.nativeStroke.x;" : "",
+        normal: material.nativeStroke ? "let sourceNormal = vec3<f32>(0.0, 1.0, 0.0);" : "let sourceNormal = input.normal;"
+      }
+    );
+  }
+
   // src/shaders/materialVertexShader.js
   function materialVertexShader(material, sparkle, elevationWGSL2, hasTerrain, textured, hasRoof) {
     const instanceOffset = material.instanced ? " + input.instanceOffset.xyz" : "";
+    const stroke = nativeStrokeShader(material);
     return (
       /* wgsl */
       `
@@ -4456,6 +4480,7 @@
       terrain: vec4<f32>,
       highlight: vec4<f32>,
       cutout: vec4<f32>,
+      nativeStroke: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,
@@ -4494,14 +4519,16 @@
     @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
       var output: VertexOutput;
       var position = input.position${instanceOffset};
+      ${stroke.position}
       ${hasTerrain ? "position.y = elevation(u.terrain.xy + input.uv * u.terrain.z, u.terrain.w) - u.terrain.w;" : ""}
       let featureVertex = f32(vertexIndex)${material.instanced ? " + input.instanceOffset.w" : ""};
       let highlighted = featureVertex >= u.highlight.x && featureVertex < u.highlight.y;
       output.color = ${material.vertexColors ? "select(input.color, vec3<f32>(72.0 / 255.0, 217.0 / 255.0, 1.0), highlighted)" : "u.baseColor.rgb"};
       // Inverse-transpose from cofactors; the camera view matrix is orthonormal.
       let m = mat3x3<f32>(u.worldMatrix[0].xyz, u.worldMatrix[1].xyz, u.worldMatrix[2].xyz);
-      let normal = (cross(m[1], m[2]) * input.normal.x + cross(m[2], m[0]) * input.normal.y +
-        cross(m[0], m[1]) * input.normal.z) / determinant(m);
+      ${stroke.normal}
+      let normal = (cross(m[1], m[2]) * sourceNormal.x + cross(m[2], m[0]) * sourceNormal.y +
+        cross(m[0], m[1]) * sourceNormal.z) / determinant(m);
       output.normal = (frame.viewMatrix * vec4<f32>(normal, 0.0)).xyz;
       let world = u.worldMatrix * vec4<f32>(position, 1.0);
       output.shadowPosition = solar.matrix * world;
@@ -4625,6 +4652,7 @@
       terrain: vec4<f32>,
       highlight: vec4<f32>,
       cutout: vec4<f32>,
+      nativeStroke: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,
@@ -4868,49 +4896,108 @@
     return mesh;
   }
 
+  // src/weakmaps/nativeProgramsByRenderer.js
+  var nativeProgramsByRenderer = /* @__PURE__ */ new WeakMap();
+
+  // src/native/nativeProgram.js
+  function nativeProgram(layer, material) {
+    const renderer = rendererByLayer.get(layer);
+    let programs = nativeProgramsByRenderer.get(renderer);
+    if (!programs) {
+      programs = /* alloc */
+      /* @__PURE__ */ new Map();
+      nativeProgramsByRenderer.set(renderer, programs);
+    }
+    const key = `${Boolean(material.baseTexture)}:${Boolean(material.nativeStroke)}:${Boolean(material.depthWrite)}`;
+    let template = programs.get(key);
+    if (!template) {
+      template = createProgram(
+        layer,
+        /* alloc */
+        { doubleSided: true, ...material }
+      );
+      programs.set(key, template);
+    }
+    return (
+      /* alloc */
+      { ...template, uniforms: createProgramUniforms(material), _layerMaterial: material }
+    );
+  }
+
+  // src/native/createNativeMesh.js
+  function createNativeMesh(state, key, position, color, opacity, texture, uv, terrain, nativeStroke) {
+    const { backend: layer, source, meshes } = state;
+    const normal = nativeStroke ? state.strokeAnchors : (
+      /* alloc */
+      []
+    );
+    let index, mesh = meshes.get(key);
+    if (!nativeStroke) {
+      for (index = 0; index < position.length; index++) normal.push(index % 3 === 1 ? 1 : 0);
+    }
+    const data = (
+      /* alloc */
+      { position, normal }
+    );
+    if (uv) data.uv = uv;
+    const material = (
+      /* alloc */
+      {
+        vertexColors: false,
+        color,
+        opacity,
+        unlit: true,
+        alphaMode: "BLEND",
+        depthWrite: terrain,
+        nativeStroke
+      }
+    );
+    if (texture) material.baseTexture = texture;
+    if (mesh) disposeMesh(layer, mesh);
+    mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? (terrain ? state.terrainRasterProgram : state.rasterProgram) || nativeProgram(layer, material) : nativeProgram(layer, material));
+    if (source instanceof L.GridLayer) {
+      if (terrain) state.terrainRasterProgram ||= mesh.program;
+      else state.rasterProgram ||= mesh.program;
+      mesh.texture = texture;
+    }
+    meshes.set(key, mesh);
+    return mesh;
+  }
+
+  // src/native/updateNativeStrokeRadius.js
+  function updateNativeStrokeRadius(mesh) {
+    const attributes = mesh.geometry.attributes, positions = attributes.position.data, anchors = attributes.normal.data;
+    let i, radius = 0;
+    for (i = 0; i < positions.length; i += 3) {
+      radius = Math.max(radius, Math.hypot(
+        positions[i] - anchors[i],
+        positions[i + 1] - anchors[i + 1],
+        positions[i + 2] - anchors[i + 2]
+      ));
+    }
+    mesh.geometry.nativeStrokeRadius = radius;
+  }
+
   // src/native/putNativeMesh.js
   function putNativeMesh(state, key, position, color, opacity, texture, uv, terrain = false) {
-    const { backend: layer, source, meshes } = state;
+    const { source, meshes } = state;
     if (!position.length) return;
+    const nativeStroke = key === "stroke" && Boolean(state.strokeCoordinates) && source.options.interactive === false;
     let mesh = meshes.get(key);
-    if (!mesh || mesh.geometry.attributes.position.data.length !== position.length || source instanceof L.GridLayer && mesh.program.depthWrite !== terrain || mesh.program.uniforms.baseTexture?.value !== texture) {
-      const normal = (
-        /* alloc */
-        []
-      );
-      let index;
-      for (index = 0; index < position.length; index++) normal.push(index % 3 === 1 ? 1 : 0);
-      const data = (
-        /* alloc */
-        { position, normal }
-      );
-      if (uv) data.uv = uv;
-      const material = (
-        /* alloc */
-        {
-          vertexColors: false,
-          color,
-          opacity,
-          unlit: true,
-          alphaMode: "BLEND",
-          depthWrite: terrain
-        }
-      );
-      if (texture) material.baseTexture = texture;
-      if (mesh) disposeMesh(layer, mesh);
-      mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? terrain ? state.terrainRasterProgram : state.rasterProgram : void 0);
-      if (source instanceof L.GridLayer) {
-        if (terrain) state.terrainRasterProgram ||= mesh.program;
-        else state.rasterProgram ||= mesh.program;
-        mesh.texture = texture;
-      }
-      meshes.set(key, mesh);
+    if (!mesh || mesh.geometry.attributes.position.data.length !== position.length || source instanceof L.GridLayer && mesh.program.depthWrite !== terrain || mesh.program.uniforms.baseTexture?.value !== texture || Boolean(mesh.program._layerMaterial.nativeStroke) !== nativeStroke) {
+      mesh = createNativeMesh(state, key, position, color, opacity, texture, uv, terrain, nativeStroke);
     } else {
       const attribute = mesh.geometry.attributes.position;
       attribute.data.set(position);
       attribute.needsUpdate = true;
       mesh.geometry.bounds = null;
+      if (nativeStroke) {
+        mesh.geometry.attributes.normal.data.set(state.strokeAnchors);
+        mesh.geometry.attributes.normal.needsUpdate = true;
+      }
     }
+    if (nativeStroke) updateNativeStrokeRadius(mesh);
+    if (mesh.program.uniforms.strokeScale) mesh.program.uniforms.strokeScale.value = 1;
     styleNativeMesh(state, mesh, color, opacity);
     return mesh;
   }
@@ -5322,6 +5409,102 @@
     }
   }
 
+  // src/colors/toSRGB.js
+  function toSRGB(value) {
+    return value <= 31308e-7 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+  }
+
+  // src/colors/hslChannel.js
+  function channel(n, h, l, a) {
+    const k = (n + h * 12) % 12;
+    return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  }
+
+  // src/colors/parseColor.js
+  function parseColor(value) {
+    if (value && typeof value === "object" && "h" in value) {
+      const a = value.s * Math.min(value.l, 1 - value.l);
+      return (
+        /* alloc */
+        {
+          r: toSRGB(channel(0, value.h, value.l, a)),
+          g: toSRGB(channel(8, value.h, value.l, a)),
+          b: toSRGB(channel(4, value.h, value.l, a))
+        }
+      );
+    }
+    if (value && typeof value === "object" && "r" in value) {
+      return value;
+    }
+    if (typeof value === "number") {
+      return (
+        /* alloc */
+        {
+          r: (value >> 16 & 255) / 255,
+          g: (value >> 8 & 255) / 255,
+          b: (value & 255) / 255
+        }
+      );
+    }
+    if (typeof value !== "string" || !CSS.supports("color", value)) {
+      throw (
+        /* alloc */
+        new Error("Invalid 3D color")
+      );
+    }
+    const context = document.createElement("canvas").getContext("2d");
+    context.fillStyle = value;
+    context.fillRect(0, 0, 1, 1);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    return (
+      /* alloc */
+      {
+        r: r / 255,
+        g: g / 255,
+        b: b / 255
+      }
+    );
+  }
+
+  // src/native/syncNativeStrokeZoom.js
+  function syncNativeStrokeZoom(state) {
+    const { source, meshes, strokeCoordinates, strokeAnchors } = state;
+    const mesh = meshes.get("stroke");
+    let i, r, g, b, fill;
+    if (mesh) {
+      const factor = 2 ** (state.strokeZoom - state.map.getZoom()) * Number(source.options.weight) / state.strokeWeight;
+      const attribute = mesh.geometry.attributes.position;
+      if (mesh.program.uniforms.strokeScale) {
+        mesh.program.uniforms.strokeScale.value = factor;
+      } else {
+        for (i = 0; i < strokeCoordinates.length; i++) {
+          attribute.data[i] = strokeAnchors[i] + (strokeCoordinates[i] - strokeAnchors[i]) * factor;
+        }
+        attribute.needsUpdate = true;
+        mesh.geometry.bounds = null;
+      }
+      ({ r, g, b } = parseColor(source.options.color));
+      styleNativeMesh(
+        state,
+        mesh,
+        /* alloc */
+        [r, g, b],
+        source.options.opacity ?? 1
+      );
+    }
+    fill = meshes.get("fill");
+    if (fill) {
+      ({ r, g, b } = parseColor(source.options.fillColor || source.options.color));
+      styleNativeMesh(
+        state,
+        fill,
+        /* alloc */
+        [r, g, b],
+        source.options.fillOpacity ?? 1
+      );
+    }
+  }
+
   // src/globals/geometryPixelStates.js
   var geometryPixelStates = [];
 
@@ -5331,13 +5514,13 @@
   // src/geometry/visitNativeCoordinates.js
   init_L();
 
-  // src/geometry/appendNativeTriangle.js
-  function triangle(point, target, a, b, c) {
-    return target.push(...point(a), ...point(b), ...point(c));
-  }
-
   // src/geometry/segment.js
   init_L();
+
+  // src/geometry/appendNativeTriangle.js
+  function triangle(point, target, a, b, c, anchorA, anchorB, anchorC) {
+    return target.push(...point(a, anchorA), ...point(b, anchorB), ...point(c, anchorC));
+  }
 
   // src/globals/tau.js
   var tau = 2 * Math.PI;
@@ -5360,7 +5543,7 @@
     const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(radius))));
     let i;
     for (i = 0; i < count; i++) {
-      triangle(point, target, center, diskAt(center, radius, radiusY, count, i), diskAt(center, radius, radiusY, count, i + 1));
+      triangle(point, target, center, diskAt(center, radius, radiusY, count, i), diskAt(center, radius, radiusY, count, i + 1), center, center, center);
     }
   }
 
@@ -5368,6 +5551,7 @@
   function segment(context, a, b, startCap, endCap) {
     const { options, width, stroke, point } = context;
     const radius = width / 2;
+    const anchorA = a, anchorB = b;
     const length = a.distanceTo(b);
     if (!length) return;
     const direction = b.subtract(a).divideBy(length);
@@ -5379,8 +5563,8 @@
       if (startCap) a = a.subtract(direction.multiplyBy(radius));
       if (endCap) b = b.add(direction.multiplyBy(radius));
     }
-    triangle(point, stroke, a.add(normal), a.subtract(normal), b.add(normal));
-    triangle(point, stroke, b.add(normal), a.subtract(normal), b.subtract(normal));
+    triangle(point, stroke, a.add(normal), a.subtract(normal), b.add(normal), anchorA, anchorA, anchorB);
+    triangle(point, stroke, b.add(normal), a.subtract(normal), b.subtract(normal), anchorB, anchorA, anchorB);
     if (options.lineCap === "round") {
       if (startCap) disk(point, a, radius, stroke);
       if (endCap) disk(point, b, radius, stroke);
@@ -5412,25 +5596,33 @@
     const from = a.add(n1.multiplyBy(radius)), to = a.add(n2.multiplyBy(radius));
     const denominator = 1 + n1.x * n2.x + n1.y * n2.y;
     const miter = denominator > 0 ? n1.add(n2).multiplyBy(radius / denominator) : null;
-    triangle(point, stroke, from, a, to);
+    triangle(point, stroke, from, a, to, a, a, a);
     if (options.lineJoin === "miter" && miter && Math.hypot(miter.x, miter.y) <= radius * 4) {
-      triangle(point, stroke, from, a.add(miter), to);
+      triangle(point, stroke, from, a.add(miter), to, a, a, a);
     }
   }
 
   // src/geometry/dashedSegment.js
   function dashedSegment(context, a, b, length, distance, period) {
     const dash = context.dash;
-    let offset = 0, phase, index, end, delta;
+    let offset = 0, phase = (distance % period + period) % period, index = 0, end, delta, skipped = 0;
+    while (index < dash.length - 1 && phase >= dash[index]) phase -= dash[index++];
+    let remaining = Math.max(0, dash[index] - phase);
     while (offset < length) {
-      phase = ((distance + offset) % period + period) % period, index = 0;
-      while (phase >= dash[index]) phase -= dash[index++];
-      end = Math.min(length, offset + dash[index] - phase);
-      if (index % 2 === 0) {
+      end = Math.min(length, offset + remaining);
+      if (end > offset && index % 2 === 0) {
         delta = b.subtract(a).divideBy(length);
         segment(context, a.add(delta.multiplyBy(offset)), a.add(delta.multiplyBy(end)), true, true);
       }
+      if (end <= offset) {
+        if (++skipped >= dash.length) throw (
+          /* alloc */
+          new Error("Leaflet dashArray is too small for these coordinates")
+        );
+      } else skipped = 0;
       offset = end;
+      index = (index + 1) % dash.length;
+      remaining = dash[index];
     }
   }
 
@@ -5748,14 +5940,39 @@
     return result;
   }
 
+  // src/geometry/fillNativePolygon.js
+  function fillNativePolygon(context, projected) {
+    const { options, fill, point } = context;
+    if (options.triangulated) {
+      if (projected.length !== 1 || projected[0].length !== 3) {
+        throw (
+          /* alloc */
+          new Error("triangulated polygons require three vertices per polygon and no holes")
+        );
+      }
+      triangle(point, fill, projected[0][0], projected[0][1], projected[0][2]);
+      return;
+    }
+    const valid = (
+      /* alloc */
+      []
+    );
+    let ring3, indices;
+    for (ring3 of projected) if (ring3.length >= 3) valid.push(ring3);
+    const vertices = valid.flat();
+    for (indices of triangulate(valid[0], valid.slice(1))) {
+      triangle(point, fill, vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]);
+    }
+  }
+
   // src/geometry/polygon.js
   function polygon(context, rings, closed) {
-    const { options, fill, point, map } = context;
+    const { options, map } = context;
     const projected = (
       /* alloc */
       []
     );
-    let ring3, path, latlng, indices;
+    let ring3, path, latlng;
     for (ring3 of rings) {
       path = /* alloc */
       [];
@@ -5763,15 +5980,7 @@
       projected.push(path);
     }
     if (closed && options.fill && projected[0]?.length >= 3) {
-      const valid = (
-        /* alloc */
-        []
-      );
-      for (ring3 of projected) if (ring3.length >= 3) valid.push(ring3);
-      const vertices = valid.flat();
-      for (indices of triangulate(valid[0], valid.slice(1))) {
-        triangle(point, fill, vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]);
-      }
+      fillNativePolygon(context, projected);
     }
     for (ring3 of projected) line(context, ring3, closed);
   }
@@ -5900,83 +6109,77 @@
 
   // src/projections/localPixel.js
   function localPixel(state, point) {
+    if (state.pixelProjection) {
+      const { transformation, scale, origin, metres } = state.pixelProjection;
+      const projected = transformation.untransform(point, scale);
+      return (
+        /* alloc */
+        [(projected.x - origin.x) * metres, 0, -(projected.y - origin.y) * metres]
+      );
+    }
     return localPosition(state, state.map.unproject(point));
   }
 
   // src/projections/localPixelForGeometry.js
-  function localPixelForGeometry(point) {
-    return localPixel(geometryPixelStates[geometryPixelStates.length - 1], point);
+  function localPixelForGeometry(point, anchor) {
+    const state = geometryPixelStates[geometryPixelStates.length - 1];
+    if (anchor && state.strokeAnchors) state.strokeAnchors.push(...localPixel(state, anchor));
+    return localPixel(state, point);
   }
 
-  // src/colors/toSRGB.js
-  function toSRGB(value) {
-    return value <= 31308e-7 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
-  }
-
-  // src/colors/hslChannel.js
-  function channel(n, h, l, a) {
-    const k = (n + h * 12) % 12;
-    return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-  }
-
-  // src/colors/parseColor.js
-  function parseColor(value) {
-    if (value && typeof value === "object" && "h" in value) {
-      const a = value.s * Math.min(value.l, 1 - value.l);
-      return (
-        /* alloc */
-        {
-          r: toSRGB(channel(0, value.h, value.l, a)),
-          g: toSRGB(channel(8, value.h, value.l, a)),
-          b: toSRGB(channel(4, value.h, value.l, a))
-        }
-      );
-    }
-    if (value && typeof value === "object" && "r" in value) {
-      return value;
-    }
-    if (typeof value === "number") {
-      return (
-        /* alloc */
-        {
-          r: (value >> 16 & 255) / 255,
-          g: (value >> 8 & 255) / 255,
-          b: (value & 255) / 255
-        }
-      );
-    }
-    if (typeof value !== "string" || !CSS.supports("color", value)) {
-      throw (
-        /* alloc */
-        new Error("Invalid 3D color")
-      );
-    }
-    const context = document.createElement("canvas").getContext("2d");
-    context.fillStyle = value;
-    context.fillRect(0, 0, 1, 1);
-    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
-    return (
+  // src/native/nativeVectorGeometry.js
+  init_radians();
+  init_L();
+  function nativeVectorGeometry(state) {
+    const { source } = state;
+    state.strokeCoordinates = null;
+    state.strokeAnchors = source instanceof L.Polyline && !source.options.dashArray ? (
       /* alloc */
-      {
-        r: r / 255,
-        g: g / 255,
-        b: b / 255
+      []
+    ) : null;
+    const crs = state.map.options.crs, origin = locationByLayer.get(state.backend);
+    state.pixelProjection = /* alloc */
+    {
+      transformation: crs.transformation,
+      scale: crs.scale(state.map.getZoom()),
+      origin: crs.project(origin),
+      metres: Math.cos(origin.lat * radians)
+    };
+    geometryPixelStates.push(state);
+    try {
+      return nativeGeometry(source, state.map, localPixelForGeometry);
+    } finally {
+      geometryPixelStates.pop();
+    }
+  }
+
+  // src/native/syncNativeStrokeAnchors.js
+  function syncNativeStrokeAnchors(state, stroke) {
+    const { source } = state;
+    if (state.strokeAnchors?.length === stroke.length && stroke.length) {
+      if (source.options.interactive === false) state.strokeCoordinates = stroke;
+      else {
+        state.strokeCoordinates = /* alloc */
+        new Float64Array(stroke);
+        state.strokeAnchors = /* alloc */
+        new Float64Array(state.strokeAnchors);
       }
-    );
+      state.strokeZoom = state.map.getZoom();
+      state.strokeWeight = Number(source.options.weight);
+    } else state.strokeAnchors = null;
   }
 
   // src/native/syncVectorLayer.js
   function syncVectorLayer(state) {
     const { source } = state;
-    geometryPixelStates.push(state);
-    let geometry;
-    try {
-      geometry = nativeGeometry(source, state.map, localPixelForGeometry);
-    } finally {
-      geometryPixelStates.pop();
+    if (state.zoomOnly) {
+      syncNativeStrokeZoom(state);
+      state.zoomOnly = false;
+      return;
     }
-    const { fill, stroke } = geometry;
-    let i, key, positions, color, opacity, r, g, b;
+    const { fill, stroke } = nativeVectorGeometry(state);
+    syncNativeStrokeAnchors(state, stroke);
+    let i, key, positions, color, opacity, r, g, b, attributes;
     for (i = 0; i < 2; i++) {
       key = i ? "stroke" : "fill";
       positions = i ? stroke : fill;
@@ -5992,6 +6195,11 @@
         [r, g, b],
         opacity ?? 1
       );
+      if (key === "stroke" && source.options.interactive === false && state.strokeCoordinates) {
+        attributes = state.meshes.get(key).geometry.attributes;
+        state.strokeCoordinates = attributes.position.data;
+        state.strokeAnchors = attributes.normal.data;
+      }
     }
   }
 
@@ -6035,6 +6243,11 @@
   function beforeNativeRender(state) {
     try {
       synchronizeNativeLayer(state);
+      const uniform = state.meshes.get("stroke")?.program.uniforms.strokeScale;
+      if (uniform) {
+        const zoom = cameraViewByMap.get(state.map)?.zoom ?? state.map.getZoom();
+        uniform.value = 2 ** (state.strokeZoom - zoom) * Number(state.source.options.weight) / state.strokeWeight;
+      }
     } catch (error) {
       state.failed = true;
       state.source.fire(
@@ -6145,6 +6358,7 @@
 
   // src/native/refreshNativeLayer.js
   function refreshNativeLayer(state = this) {
+    state.zoomOnly = false;
     state.dirty = true;
     state.viewDirty = true;
     state.failed = false;
@@ -6169,21 +6383,49 @@
     if (sharedByLayer.get(state.backend)) update(state.backend);
   }
 
+  // src/native/canScaleNativeStyle.js
+  init_L();
+
+  // src/globals/nativeScalableStyleKeys.js
+  var nativeScalableStyleKeys = /* @__PURE__ */ new Set(["color", "opacity", "weight", "fillColor", "fillOpacity"]);
+
+  // src/native/canScaleNativeStyle.js
+  function canScaleNativeStyle(name, state, args) {
+    const { source } = state;
+    if (name !== "setStyle" || source.options.interactive !== false || state.dirty && !state.zoomOnly) return false;
+    const stroke = state.strokeCoordinates && state.meshes.get("stroke")?.program.uniforms.strokeScale;
+    const fill = source instanceof L.Polygon && !source.options.stroke && state.meshes.has("fill");
+    if (!stroke && !fill) return false;
+    let key;
+    if (args[0]) {
+      for (key of Object.keys(args[0])) {
+        if (!nativeScalableStyleKeys.has(key)) return false;
+      }
+    }
+    return true;
+  }
+
+  // src/native/orderNativeGridLayer.js
+  init_L();
+  function orderNativeGridLayer(state, name) {
+    const { source } = state;
+    if (!(source instanceof L.GridLayer) || name !== "bringToFront" && name !== "bringToBack") return;
+    let extreme = name === "bringToFront" ? -Infinity : Infinity, layer, zIndex;
+    for (layer of Object.values(state.map._layers)) {
+      if (layer === source || !(layer instanceof L.GridLayer) || layer.getPane() !== source.getPane()) continue;
+      zIndex = layer.options.zIndex || 0;
+      extreme = name === "bringToFront" ? Math.max(extreme, zIndex) : Math.min(extreme, zIndex);
+    }
+    const edge = name === "bringToFront" ? extreme + 1 : extreme - 1;
+    if (Number.isFinite(edge)) source.setZIndex(edge);
+  }
+
   // src/native/nativeLayerMethod.js
   function nativeLayerMethod(name, source, args) {
     const state = nativeGPUByLayer.get(source), original = state.methods.get(name).original;
+    const scalable = canScaleNativeStyle(name, state, args);
     const result = original.apply(source, args);
-    let layer, zIndex;
-    if ((name === "bringToFront" || name === "bringToBack") && source instanceof L.GridLayer) {
-      let extreme = name === "bringToFront" ? -Infinity : Infinity;
-      for (layer of Object.values(state.map._layers)) {
-        if (layer === source || !(layer instanceof L.GridLayer) || layer.getPane() !== source.getPane()) continue;
-        zIndex = layer.options.zIndex || 0;
-        extreme = name === "bringToFront" ? Math.max(extreme, zIndex) : Math.min(extreme, zIndex);
-      }
-      const edge = name === "bringToFront" ? extreme + 1 : extreme - 1;
-      if (Number.isFinite(edge)) source.setZIndex(edge);
-    }
+    orderNativeGridLayer(state, name);
     if (name === "bringToFront") {
       state.order = nativeGPUOrderByMap.get(state.map) + 1;
       nativeGPUOrderByMap.set(state.map, state.order);
@@ -6193,6 +6435,7 @@
       nativeGPUBackByMap.set(state.map, state.order);
     }
     refreshNativeLayer(state);
+    if (scalable && (!source.options.stroke || Number(source.options.weight) > 0)) state.zoomOnly = true;
     return result;
   }
 
@@ -6797,7 +7040,15 @@
   }
 
   // src/native/refreshNativeEvent.js
+  init_L();
   function refreshNativeEvent(event) {
+    if (event?.type === "zoomend" && this.source instanceof L.Polyline && (!this.source.options.stroke || !(Number(this.source.options.weight) > 0))) return;
+    if (event?.type === "zoomend" && this.strokeCoordinates && (!this.dirty || this.zoomOnly)) {
+      this.zoomOnly = true;
+      this.dirty = true;
+      update(this.backend);
+      return;
+    }
     if (event?.type === "terrainchange" && this.marker) this.source.update();
     refreshNativeLayer(this);
   }
@@ -15869,6 +16120,1206 @@
     init3D(layer, options);
   }
 
+  // src/sources/isVectorTileSource.js
+  function isVectorTileSource(options) {
+    return options.data === void 0 && (options.tileJSON !== void 0 || typeof options.url === "string" && /\{[zxy]\}|%7B[zxy]%7D/i.test(options.url));
+  }
+
+  // src/vector-tiles/configureVectorTileLayer.js
+  init_L();
+
+  // src/weakmaps/vectorTileOptionsByLayer.js
+  var vectorTileOptionsByLayer = /* @__PURE__ */ new WeakMap();
+
+  // src/vector-tiles/readTileJSON.js
+  async function readTileJSON(options) {
+    const url = (
+      /* alloc */
+      new URL(options.tileJSON, document.baseURI).href
+    );
+    const response = await fetch(url);
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`TileJSON: HTTP ${response.status}`)
+    );
+    const metadata = await response.json();
+    if (!metadata || !Array.isArray(metadata.tiles) || !metadata.tiles.length || typeof metadata.tiles[0] !== "string") {
+      throw (
+        /* alloc */
+        new Error("TileJSON requires a tile URL template")
+      );
+    }
+    return (
+      /* alloc */
+      {
+        ...options,
+        url: (
+          /* alloc */
+          new URL(metadata.tiles[0], url).href
+        ),
+        minNativeZoom: options.minNativeZoom ?? metadata.minzoom,
+        maxNativeZoom: options.maxNativeZoom ?? metadata.maxzoom,
+        attribution: options.attribution ?? metadata.attribution
+      }
+    );
+  }
+
+  // src/vector-style/removeTrailingCommas.js
+  function removeTrailingCommas(json) {
+    let cleaned = "", quoted = false, escaped = false, i = 0, char = "";
+    for (i = 0; i < json.length; i++) {
+      char = json[i];
+      if (!quoted && char === "," && /^\s*[\]}]/.test(json.slice(i + 1))) continue;
+      cleaned += char;
+      if (escaped) escaped = false;
+      else if (quoted && char === "\\") escaped = true;
+      else if (char === '"') quoted = !quoted;
+    }
+    return cleaned;
+  }
+
+  // src/vector-style/appendQuotedStyleCharacter.js
+  function appendQuotedStyleCharacter(char, state) {
+    if (state.quoted) {
+      if (state.escaped) {
+        state.escaped = false;
+        return char === "'" ? char : "\\" + char;
+      }
+      if (char === "\\") {
+        state.escaped = true;
+        return "";
+      }
+      if (char === state.quoted) {
+        state.quoted = "";
+        return '"';
+      }
+      return char === '"' ? '\\"' : char;
+    }
+    if (char === '"' || char === "'") {
+      state.quoted = char;
+      return '"';
+    }
+    return void 0;
+  }
+
+  // src/vector-style/skipStyleComment.js
+  function skipStyleComment(text, index, marker) {
+    if (marker === "/") {
+      while (index < text.length && text[index] !== "\n") index++;
+      return index;
+    }
+    const end = text.indexOf("*/", index + 2);
+    if (end < 0) throw (
+      /* alloc */
+      new Error("Unterminated style comment")
+    );
+    return end + 1;
+  }
+
+  // src/vector-style/stripStyleComments.js
+  function stripStyleComments(text) {
+    let json = "", i = 0, char = "", next = "", converted = void 0;
+    const state = (
+      /* alloc */
+      { quoted: "", escaped: false }
+    );
+    for (i = 0; i < text.length; i++) {
+      char = text[i];
+      next = text[i + 1];
+      converted = appendQuotedStyleCharacter(char, state);
+      if (converted !== void 0) {
+        json += converted;
+        continue;
+      }
+      if (char === "/" && (next === "/" || next === "*")) {
+        i = skipStyleComment(text, i, next);
+        json += next === "/" ? "\n" : " ";
+      } else json += char;
+    }
+    return json;
+  }
+
+  // src/vector-style/validateVectorLayers.js
+  function validateVectorLayers(layers) {
+    let i = 0, layer = null;
+    if (!Array.isArray(layers)) throw (
+      /* alloc */
+      new Error("Invalid vector style layers")
+    );
+    for (i = 0; i < layers.length; i++) {
+      layer = layers[i];
+      if (!layer || typeof layer.id !== "string" || typeof layer.type !== "string") {
+        throw (
+          /* alloc */
+          new Error("Invalid vector style layers")
+        );
+      }
+    }
+  }
+
+  // src/vector-style/parseVectorStyle.js
+  function parseVectorStyle(text) {
+    const prefix = /^\s*(?:const|let|var)\s+otm_layers\s*=\s*/.exec(text);
+    if (prefix) text = text.slice(prefix[0].length);
+    const cleaned = removeTrailingCommas(stripStyleComments(text).trim().replace(/;$/, ""));
+    const document2 = JSON.parse(cleaned);
+    const layers = document2.layers ?? document2;
+    validateVectorLayers(layers);
+    return layers;
+  }
+
+  // src/vector-tiles/readVectorStyle.js
+  async function readVectorStyle(style) {
+    if (typeof style === "string") {
+      const response = await fetch(style);
+      if (!response.ok) throw (
+        /* alloc */
+        new Error(`Vector style: HTTP ${response.status}`)
+      );
+      style = parseVectorStyle(await response.text());
+    } else style = style?.layers ?? style;
+    if (!Array.isArray(style)) throw (
+      /* alloc */
+      new Error("Invalid vector style layers")
+    );
+    let entry;
+    for (entry of style) {
+      if (!entry || typeof entry.id !== "string" || typeof entry.type !== "string") {
+        throw (
+          /* alloc */
+          new Error("Invalid vector style layers")
+        );
+      }
+    }
+    return style;
+  }
+
+  // src/vector-tiles/validateVectorTileZooms.js
+  function validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom) {
+    if (!Number.isInteger(minNativeZoom) || !Number.isInteger(maxNativeZoom) || !Number.isInteger(maxZoom) || minNativeZoom < 0 || maxNativeZoom < minNativeZoom || maxZoom < maxNativeZoom || maxZoom > 24) {
+      throw (
+        /* alloc */
+        new Error("Invalid vector tile zoom range")
+      );
+    }
+  }
+
+  // src/vector-tiles/vectorTileSettings.js
+  async function vectorTileSettings(options) {
+    if (!options || typeof options !== "object") throw (
+      /* alloc */
+      new TypeError("Vector tiles require source options")
+    );
+    if (options.tileJSON) options = await readTileJSON(options);
+    let { url, style, minNativeZoom = 0, maxNativeZoom = 14, maxZoom = 19 } = options;
+    let key;
+    if (typeof url === "string") url = url.replaceAll(/%7B([zxy])%7D/gi, "{$1}");
+    for (
+      key of
+      /* alloc */
+      ["{z}", "{x}", "{y}"]
+    ) {
+      if (typeof url !== "string" || !url.includes(key)) throw (
+        /* alloc */
+        new Error("Vector tiles require an XYZ URL template")
+      );
+    }
+    validateVectorTileZooms(minNativeZoom, maxNativeZoom, maxZoom);
+    style = await readVectorStyle(style);
+    return (
+      /* alloc */
+      { ...options, url, style, minNativeZoom, maxNativeZoom, maxZoom }
+    );
+  }
+
+  // src/globals/vectorTileWorkerUrl.js
+  var vectorTileWorkerUrl = void 0 ? new URL("../workers/vectorTileWorker.js", null.url).href : new URL("leaflet-city-mapper-vector-worker.js", document.currentScript?.src || document.baseURI).href;
+
+  // src/globals/vectorTileEvents.js
+  var vectorTileEvents = "move zoom rotate pitch resize viewreset";
+
+  // src/vector-style/evaluateBoolean.js
+  function evaluateBoolean(op, args, properties, zoom, legacy) {
+    let i = 0;
+    if (op === "all") {
+      for (i = 0; i < args.length; i++) {
+        if (!evaluateStyle(args[i], properties, zoom, legacy)) return false;
+      }
+      return true;
+    }
+    if (op === "any") {
+      for (i = 0; i < args.length; i++) {
+        if (evaluateStyle(args[i], properties, zoom, legacy)) return true;
+      }
+      return false;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateCoalesceOrCase.js
+  function evaluateCoalesceOrCase(op, args, properties, zoom, legacy) {
+    let i = 0, result = null;
+    if (op === "coalesce") {
+      for (i = 0; i < args.length; i++) {
+        result = evaluateStyle(args[i], properties, zoom);
+        if (result !== null && result !== void 0) return result;
+      }
+      return null;
+    }
+    if (op === "case") {
+      for (i = 0; i < args.length - 1; i += 2) {
+        if (evaluateStyle(args[i], properties, zoom)) {
+          return evaluateStyle(args[i + 1], properties, zoom);
+        }
+      }
+      return evaluateStyle(args[args.length - 1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateInput.js
+  function evaluateInput(value, properties, zoom, legacy) {
+    if (legacy && typeof value === "string") return properties[value];
+    return evaluateStyle(value, properties, zoom);
+  }
+
+  // src/vector-style/evaluateComparison.js
+  function evaluateComparison(op, args, properties, zoom, legacy) {
+    const left = evaluateInput(args[0], properties, zoom, legacy);
+    const right = evaluateStyle(args[1], properties, zoom);
+    switch (op) {
+      case "==":
+        return left === right;
+      case "!=":
+        return left !== right;
+      case "<=":
+        return left <= right;
+      case ">=":
+        return left >= right;
+      case "<":
+        return left < right;
+      case ">":
+        return left > right;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/globals/vectorStyleNamedColors.js
+  var vectorStyleNamedColors = {
+    black: [0, 0, 0, 1],
+    white: [255, 255, 255, 1],
+    gray: [128, 128, 128, 1],
+    blue: [0, 0, 255, 1],
+    red: [255, 0, 0, 1],
+    green: [0, 128, 0, 1]
+  };
+
+  // src/vector-style/parseFunctionalColor.js
+  function parseFunctionalColor(value) {
+    const match = /^rgba?\(([^)]+)\)$/.exec(value);
+    if (match) {
+      const values = match[1].split(",");
+      let i = 0, finite = true;
+      for (i = 0; i < values.length; i++) values[i] = Number(values[i]);
+      if (values.length === 3) values.push(1);
+      for (i = 0; i < values.length; i++) {
+        if (!Number.isFinite(values[i])) finite = false;
+      }
+      if (values.length === 4 && finite) return values;
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported interpolated style color: ${value}`)
+    );
+  }
+
+  // src/vector-style/parseHexColor.js
+  function parseHexColor(value) {
+    let i = 0, offset = 0;
+    if (value.length === 4) {
+      value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+    }
+    const color = (
+      /* alloc */
+      []
+    );
+    for (i = 1; i < 6; i += 2) {
+      offset = parseInt(value.slice(i, i + 2), 16);
+      color.push(offset);
+    }
+    color.push(1);
+    return color;
+  }
+
+  // src/vector-style/styleColor.js
+  function styleColor(value) {
+    if (Object.hasOwn(vectorStyleNamedColors, value)) return vectorStyleNamedColors[value];
+    if (/^#[0-9a-f]{3}$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value)) {
+      return parseHexColor(value);
+    }
+    return parseFunctionalColor(value);
+  }
+
+  // src/vector-style/evaluateInterpolate.js
+  function evaluateInterpolate(args, properties, zoom) {
+    const result = evaluateStyle(args[1], properties, zoom);
+    const base = args[0][0] === "exponential" ? args[0][1] : 1;
+    let i = 0, lower = 0, upper = 0, ratio = 0, left = null, right = null, j = 0, color = "";
+    if (result <= args[2]) return evaluateStyle(args[3], properties, zoom);
+    for (i = 4; i < args.length; i += 2) {
+      if (result > args[i]) continue;
+      lower = args[i - 2];
+      upper = args[i];
+      ratio = base === 1 ? (result - lower) / (upper - lower) : (base ** (result - lower) - 1) / (base ** (upper - lower) - 1);
+      left = evaluateStyle(args[i - 1], properties, zoom);
+      right = evaluateStyle(args[i + 1], properties, zoom);
+      if (typeof left === "number" && typeof right === "number") return left + (right - left) * ratio;
+      left = styleColor(left);
+      right = styleColor(right);
+      for (j = 0; j < 3; j++) {
+        if (j) color += ",";
+        color += Math.round(left[j] + (right[j] - left[j]) * ratio);
+      }
+      return `rgba(${color},${left[3] + (right[3] - left[3]) * ratio})`;
+    }
+    return evaluateStyle(args.at(-1), properties, zoom);
+  }
+
+  // src/vector-style/arrayContainsRange.js
+  function arrayContainsRange(values, start2, end, target) {
+    let i = 0, value = null;
+    for (i = start2; i < end; i++) {
+      value = values[i];
+      if (value === target || value !== value && target !== target) return true;
+    }
+    return false;
+  }
+
+  // src/vector-style/evaluateMembership.js
+  function evaluateMembership(op, args, properties, zoom, legacy) {
+    let target = null;
+    if (op === "!in") {
+      target = evaluateInput(args[0], properties, zoom, legacy);
+      return !arrayContainsRange(args, 1, args.length, target);
+    }
+    if (legacy) {
+      target = evaluateInput(args[0], properties, zoom, true);
+      return arrayContainsRange(args, 1, args.length, target);
+    }
+    const values = evaluateStyle(args[1], properties, zoom);
+    target = evaluateInput(args[0], properties, zoom, false);
+    return values.includes(target);
+  }
+
+  // src/vector-style/evaluateIExpression.js
+  function evaluateIExpression(op, args, properties, zoom, legacy) {
+    if (op === "in") return evaluateMembership(op, args, properties, zoom, legacy);
+    if (op === "interpolate") return evaluateInterpolate(args, properties, zoom);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMath.js
+  function evaluateMath(op, args, properties, zoom) {
+    let i = 0, sum = 0;
+    if (op === "+") {
+      for (i = 0; i < args.length; i++) sum += evaluateStyle(args[i], properties, zoom);
+      return sum;
+    }
+    if (op === "-") {
+      if (args.length === 1) return -evaluateStyle(args[0], properties, zoom);
+      return evaluateStyle(args[0], properties, zoom) - evaluateStyle(args[1], properties, zoom);
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateMatch.js
+  function evaluateMatch(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let i = 0, matched = false;
+    for (i = 1; i < args.length - 1; i += 2) {
+      if (Array.isArray(args[i])) matched = args[i].includes(result);
+      else matched = args[i] === result;
+      if (matched) return evaluateStyle(args[i + 1], properties, zoom);
+    }
+    return evaluateStyle(args[args.length - 1], properties, zoom);
+  }
+
+  // src/vector-style/evaluateNegation.js
+  function evaluateNegation(op, args, properties, zoom, legacy) {
+    if (op === "!") return !evaluateStyle(args[0], properties, zoom, legacy);
+    if (op === "!=") {
+      return evaluateInput(args[0], properties, zoom, legacy) !== evaluateStyle(args[1], properties, zoom);
+    }
+    if (op === "!in") return evaluateMembership(op, args, properties, zoom, legacy);
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluatePrimitive.js
+  function evaluatePrimitive(op, args, properties, zoom) {
+    switch (op) {
+      case "literal":
+        return args[0];
+      case "get":
+        return properties[args[0]];
+      case "has":
+        return Object.hasOwn(properties, args[0]);
+      case "zoom":
+        return zoom;
+      default:
+        throw (
+          /* alloc */
+          new Error(`Unsupported vector style expression: ${op}`)
+        );
+    }
+  }
+
+  // src/vector-style/evaluateStep.js
+  function evaluateStep(args, properties, zoom) {
+    const result = evaluateStyle(args[0], properties, zoom);
+    let output = args[1], i = 0;
+    for (i = 2; i < args.length; i += 2) {
+      if (result < args[i]) break;
+      output = args[i + 1];
+    }
+    return evaluateStyle(output, properties, zoom);
+  }
+
+  // src/vector-style/evaluateToExpression.js
+  function evaluateToExpression(op, args, properties, zoom) {
+    if (op === "to-boolean") return Boolean(evaluateStyle(args[0], properties, zoom));
+    if (op === "to-number") {
+      let i = 0, number = 0;
+      for (i = 0; i < args.length; i++) {
+        number = Number(evaluateStyle(args[i], properties, zoom));
+        if (Number.isFinite(number)) return number;
+      }
+      throw (
+        /* alloc */
+        new Error("Invalid numeric style expression")
+      );
+    }
+    throw (
+      /* alloc */
+      new Error(`Unsupported vector style expression: ${op}`)
+    );
+  }
+
+  // src/vector-style/evaluateStyle.js
+  function evaluateStyle(value, properties, zoom, legacy = false) {
+    if (!Array.isArray(value)) return value;
+    const op = value[0];
+    const args = value.slice(1);
+    const operation = String(op);
+    if (/^(?:literal|get|has|zoom)$/.test(operation)) {
+      return evaluatePrimitive(op, args, properties, zoom);
+    }
+    switch (operation[0]) {
+      case "a":
+        return evaluateBoolean(op, args, properties, zoom, legacy);
+      case "!":
+        return evaluateNegation(op, args, properties, zoom, legacy);
+      case "=":
+      case "<":
+      case ">":
+        return evaluateComparison(op, args, properties, zoom, legacy);
+      case "i":
+        return evaluateIExpression(op, args, properties, zoom, legacy);
+      case "t":
+        return evaluateToExpression(op, args, properties, zoom, legacy);
+      case "c":
+        return evaluateCoalesceOrCase(op, args, properties, zoom, legacy);
+      case "m":
+        return evaluateMatch(args, properties, zoom);
+      case "s":
+        return evaluateStep(args, properties, zoom);
+      default:
+        return evaluateMath(op, args, properties, zoom);
+    }
+  }
+
+  // src/vector-tiles/refreshVectorTiles.js
+  function refreshVectorTiles() {
+    clearTimeout(this.timer);
+    this.changedAt = performance.now();
+    this.timer = setTimeout(this.update.bind(this), 180);
+  }
+
+  // src/vector-tiles/onVectorTileMessage.js
+  function onVectorTileMessage({ data }) {
+    const pending = this.waiting.get(data.id);
+    if (!pending) return;
+    this.waiting.delete(data.id);
+    if (data.error) pending.reject(
+      /* alloc */
+      new Error(data.error)
+    );
+    else pending.resolve(data);
+  }
+
+  // src/vector-tiles/onVectorTileWorkerError.js
+  function onVectorTileWorkerError(event) {
+    const error = (
+      /* alloc */
+      new Error(`Worker MVT: ${event.message}`)
+    );
+    let pending;
+    for (pending of this.waiting.values()) pending.reject(error);
+    this.waiting.clear();
+    reportError(this, error);
+  }
+
+  // src/vector-tiles/onVectorTileAdd.js
+  function onVectorTileAdd(map) {
+    const { style, pane } = vectorTileOptionsByLayer.get(this);
+    let index, entry;
+    for ([index] of style.entries()) {
+      (map.getPane(`${pane}-${index}`) || map.createPane(`${pane}-${index}`)).style.zIndex = 200 + index;
+    }
+    for (entry of style) {
+      if (entry.type !== "background") continue;
+      map.getContainer().style.background = evaluateStyle(
+        entry.paint["background-color"],
+        /* alloc */
+        {},
+        map.getZoom()
+      );
+      break;
+    }
+    this.session = /* alloc */
+    {};
+    this.tiles = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.labels = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.waiting = /* alloc */
+    /* @__PURE__ */ new Map();
+    this.retiring = /* alloc */
+    /* @__PURE__ */ new Set();
+    this.inflight = 0;
+    this.sequence = 0;
+    this.changedAt = 0;
+    this.paintZoom = null;
+    this.worker = /* alloc */
+    new Worker(
+      vectorTileWorkerUrl,
+      /* alloc */
+      { type: "module" }
+    );
+    this.worker.onmessage = onVectorTileMessage.bind(this);
+    this.worker.onerror = onVectorTileWorkerError.bind(this);
+    this.refresh = refreshVectorTiles.bind(this);
+    map.on(vectorTileEvents, this.refresh);
+    this.update();
+  }
+
+  // src/vector-tiles/onVectorTileRemove.js
+  function onVectorTileRemove(map) {
+    map.off(vectorTileEvents, this.refresh);
+    clearTimeout(this.timer);
+    this.session = null;
+    this.worker.terminate();
+    let pending, tile, group, marker;
+    for (pending of this.waiting.values()) pending.reject(
+      /* alloc */
+      new DOMException("Layer removed", "AbortError")
+    );
+    this.waiting.clear();
+    for (tile of this.tiles.values()) {
+      tile.controller.abort();
+      tile.group?.remove();
+    }
+    for (group of this.retiring) group.remove();
+    for (marker of this.labels.values()) marker.remove();
+    this.tiles.clear();
+    this.labels.clear();
+    this.retiring.clear();
+  }
+
+  // src/vector-tiles/updateVectorTiles.js
+  function updateVectorTiles() {
+    if (!this.session) return;
+    const { minNativeZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);
+    const z = Math.max(minNativeZoom, Math.min(maxNativeZoom, Math.floor(this._map.getZoom())));
+    const bounds = this._map.getBounds(), count = 2 ** z;
+    const nw = this._map.project(bounds.getNorthWest(), z).divideBy(256);
+    const se = this._map.project(bounds.getSouthEast(), z).divideBy(256);
+    let tile, x, y, key;
+    for (tile of this.tiles.values()) tile.needed = false;
+    for (x = Math.floor(nw.x); x <= Math.floor(se.x); x++) {
+      for (y = Math.max(0, Math.floor(nw.y)); y <= Math.min(count - 1, Math.floor(se.y)); y++) {
+        key = `${z}/${x}/${y}`;
+        tile = this.tiles.get(key);
+        if (!tile) {
+          tile = /* alloc */
+          { key, coords: (
+            /* alloc */
+            { z, x, y }
+          ), controller: (
+            /* alloc */
+            new AbortController()
+          ) };
+          this.tiles.set(key, tile);
+        }
+        tile.needed = true;
+      }
+    }
+    this.prune();
+    this.pump();
+    this.updatePaint().catch(reportError.bind(null, this));
+    this.updateLabels().catch(reportError.bind(null, this));
+  }
+
+  // src/vector-style/readPaintValue.js
+  function readPaintValue(paint, key, fallback, properties, zoom) {
+    if (paint[key] === void 0) return fallback;
+    return evaluateStyle(paint[key], properties, zoom);
+  }
+
+  // src/vector-style/fillVectorPaint.js
+  function fillVectorPaint(paint, properties, zoom) {
+    const fill = styleColor(readPaintValue(paint, "fill-color", "#000", properties, zoom));
+    const outline = readPaintValue(paint, "fill-outline-color", null, properties, zoom);
+    const rgb2 = outline === null ? null : styleColor(outline);
+    const fillOpacity = readPaintValue(paint, "fill-opacity", 1, properties, zoom) * fill[3];
+    const fillColor = (
+      /* alloc */
+      { r: fill[0] / 255, g: fill[1] / 255, b: fill[2] / 255 }
+    );
+    const color = rgb2 ? (
+      /* alloc */
+      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
+    ) : null;
+    return (
+      /* alloc */
+      {
+        fillColor,
+        fillOpacity,
+        color,
+        weight: 0.5
+      }
+    );
+  }
+
+  // src/vector-style/scaleDashArray.js
+  function scaleDashArray(dash, weight, properties, zoom) {
+    if (!dash) return void 0;
+    let values = dash, i = 0, result = "";
+    if (typeof dash[0] !== "number") values = evaluateStyle(dash, properties, zoom);
+    if (!Array.isArray(values)) throw (
+      /* alloc */
+      new TypeError("Style dash array must be an array")
+    );
+    for (i = 0; i < values.length; i++) {
+      if (i) result += " ";
+      result += values[i] * weight;
+    }
+    return result;
+  }
+
+  // src/vector-style/lineVectorPaint.js
+  function lineVectorPaint(layer, paint, properties, zoom) {
+    const weight = readPaintValue(paint, "line-width", 1, properties, zoom);
+    const rgb2 = styleColor(readPaintValue(paint, "line-color", "#000", properties, zoom));
+    const opacity = readPaintValue(paint, "line-opacity", 1, properties, zoom) * rgb2[3];
+    const dashArray = scaleDashArray(paint["line-dasharray"], weight, properties, zoom);
+    const lineCap = layer.layout?.["line-cap"] || "butt";
+    const lineJoin2 = layer.layout?.["line-join"] || "miter";
+    const color = (
+      /* alloc */
+      { r: rgb2[0] / 255, g: rgb2[1] / 255, b: rgb2[2] / 255 }
+    );
+    return (
+      /* alloc */
+      {
+        color,
+        opacity,
+        weight,
+        dashArray,
+        lineCap,
+        lineJoin: lineJoin2
+      }
+    );
+  }
+
+  // src/vector-style/vectorPaint.js
+  function vectorPaint(layer, properties, zoom) {
+    const paint = layer.paint || /* alloc */
+    {};
+    if (layer.type === "fill") return fillVectorPaint(paint, properties, zoom);
+    return lineVectorPaint(layer, paint, properties, zoom);
+  }
+
+  // src/vector-style/visibleStyle.js
+  function visibleStyle(layer, properties, zoom) {
+    return zoom >= (layer.minzoom ?? 0) && zoom < (layer.maxzoom ?? Infinity) && layer.layout?.visibility !== "none" && (!layer.filter || evaluateStyle(layer.filter, properties, zoom, true));
+  }
+
+  // src/vector-tiles/vectorTilePaint.js
+  function vectorTilePaint(batch, zoom) {
+    const paint = vectorPaint(batch.entry, batch.properties, zoom);
+    if (!visibleStyle(batch.entry, batch.properties, zoom)) {
+      paint.opacity = 0;
+      paint.fillOpacity = 0;
+    }
+    return paint;
+  }
+
+  // src/vector-tiles/paintVectorTileBatch.js
+  function paintVectorTileBatch(batch, zoom) {
+    const paint = vectorTilePaint(batch, zoom), { layer } = batch;
+    if (batch.kind === "line") {
+      if (paint.dashArray !== layer.options.dashArray) layer.setStyle(paint);
+      else layer.setStyle(
+        /* alloc */
+        { color: paint.color, opacity: paint.opacity, weight: paint.weight }
+      );
+    } else if (JSON.stringify(paint.fillColor) !== JSON.stringify(layer.options.fillColor) || paint.fillOpacity !== layer.options.fillOpacity) {
+      layer.setStyle(
+        /* alloc */
+        { fillColor: paint.fillColor, fillOpacity: paint.fillOpacity }
+      );
+    }
+  }
+
+  // src/vector-tiles/vectorTilesIdle.js
+  function vectorTilesIdle(layer, session) {
+    return layer.session === session && performance.now() - (layer.changedAt || 0) >= 180;
+  }
+
+  // src/utils/yieldTask.js
+  function yieldTask(delay = 0) {
+    const task = Promise.withResolvers();
+    setTimeout(task.resolve, delay);
+    return task.promise;
+  }
+
+  // src/vector-tiles/updateVectorTilePaint.js
+  async function updateVectorTilePaint() {
+    const zoom = this._map.getZoom(), session = this.session;
+    if (this.paintZoom === zoom) return;
+    const revision = this.paintRevision = (this.paintRevision || 0) + 1;
+    let updated = 0, tile, batch;
+    for (tile of this.tiles.values()) {
+      if (!tile.rendered) continue;
+      for (batch of tile.rendered) {
+        if (!vectorTilesIdle(this, session) || this.paintRevision !== revision || this._map.getZoom() !== zoom) return;
+        paintVectorTileBatch(batch, zoom);
+        if (++updated % 32 === 0) await yieldTask();
+      }
+    }
+    this.paintZoom = zoom;
+  }
+
+  // src/vector-tiles/compareVectorLabelPriority.js
+  function compareVectorLabelPriority(a, b) {
+    return a.priority - b.priority;
+  }
+
+  // src/vector-tiles/vectorLabelCandidates.js
+  function vectorLabelCandidates(layer) {
+    const candidates = (
+      /* alloc */
+      []
+    );
+    let tile, label;
+    for (tile of layer.tiles.values()) {
+      if (!tile.needed || !tile.labelCandidates) continue;
+      for (label of tile.labelCandidates) candidates.push(label);
+    }
+    return candidates.sort(compareVectorLabelPriority);
+  }
+
+  // src/vector-tiles/vectorLabelCells.js
+  function vectorLabelCells(map, label, size) {
+    const zoom = map.getZoom();
+    if (!visibleStyle(label.entry, label.properties, zoom)) return null;
+    label.size = evaluateStyle(label.entry.layout?.["text-size"] ?? 12, label.properties, zoom);
+    if (!(label.size > 0)) return null;
+    label.color = evaluateStyle(label.entry.paint?.["text-color"] ?? "#000", label.properties, zoom);
+    label.halo = evaluateStyle(label.entry.paint?.["text-halo-color"] ?? "#fff", label.properties, zoom);
+    label.haloWidth = evaluateStyle(label.entry.paint?.["text-halo-width"] ?? 0, label.properties, zoom);
+    const point = map.latLngToContainerPoint(label.latlng);
+    if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y) return null;
+    const width = label.text.length * label.size * 0.65 + 16, cells = (
+      /* alloc */
+      []
+    );
+    let x, y;
+    for (x = Math.floor((point.x - width / 2) / 32); x <= Math.floor((point.x + width / 2) / 32); x++) {
+      for (y = Math.floor((point.y - label.size) / 24); y <= Math.floor((point.y + label.size) / 24); y++) {
+        cells.push(`${x}:${y}`);
+      }
+    }
+    return cells;
+  }
+
+  // src/vector-tiles/reserveVectorLabelCells.js
+  function reserveVectorLabelCells(cells, occupied) {
+    let cell;
+    for (cell of cells) if (occupied.has(cell)) return false;
+    for (cell of cells) occupied.add(cell);
+    return true;
+  }
+
+  // src/vector-tiles/updateVectorLabelMarker.js
+  init_L();
+
+  // src/vector-tiles/vectorLabelIcon.js
+  init_L();
+  function vectorLabelIcon(label) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const width = Math.max(40, Array.from(label.text).length * label.size * 0.65 + 12);
+    const height = label.size + 12;
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    const text = document.createElementNS(svg.namespaceURI, "text");
+    const attributes = (
+      /* alloc */
+      {
+        x: width / 2,
+        y: label.size + 2,
+        "text-anchor": "middle",
+        "font-family": "sans-serif",
+        "font-size": label.size,
+        fill: label.color,
+        stroke: label.halo,
+        "stroke-width": label.haloWidth * 2,
+        "paint-order": "stroke"
+      }
+    );
+    let key;
+    for (key of Object.keys(attributes)) text.setAttribute(key, attributes[key]);
+    text.textContent = label.text;
+    svg.append(text);
+    return (
+      /* alloc */
+      new L.Icon(
+        /* alloc */
+        {
+          iconUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+            /* alloc */
+            new XMLSerializer().serializeToString(svg)
+          )}`,
+          iconSize: (
+            /* alloc */
+            [width, height]
+          ),
+          iconAnchor: (
+            /* alloc */
+            [width / 2, height / 2]
+          )
+        }
+      )
+    );
+  }
+
+  // src/vector-tiles/forwardVectorTileError.js
+  function forwardVectorTileError({ error }) {
+    reportError(this, error);
+  }
+
+  // src/vector-tiles/updateVectorLabelMarker.js
+  function updateVectorLabelMarker(owner, label, key) {
+    const appearance = JSON.stringify(
+      /* alloc */
+      [label.size, label.color, label.halo, label.haloWidth]
+    );
+    let marker = owner.labels.get(key);
+    if (marker) {
+      if (marker._mvtLabelStyle === appearance) return false;
+      marker.setIcon(vectorLabelIcon(label));
+    } else {
+      const { pane } = vectorTileOptionsByLayer.get(owner);
+      marker = /* alloc */
+      new L.Marker(
+        label.latlng,
+        /* alloc */
+        {
+          icon: vectorLabelIcon(label),
+          pane: `${pane}-${label.order}`,
+          title: label.text,
+          alt: label.text,
+          interactive: false,
+          keyboard: false,
+          rotateWithView: false
+        }
+      ).on("error", forwardVectorTileError, owner).addTo(owner._map);
+      owner.labels.set(key, marker);
+    }
+    marker._mvtLabelStyle = appearance;
+    return true;
+  }
+
+  // src/vector-tiles/updateVectorTileLabels.js
+  async function updateVectorTileLabels() {
+    const session = this.session, revision = this.labelRevision = (this.labelRevision || 0) + 1;
+    this.labelsReady = false;
+    const candidates = vectorLabelCandidates(this), size = this._map.getSize();
+    const occupied = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    ), retained = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let visited = 0, label, key, cells, marker;
+    for (label of candidates) {
+      if (++visited % 128 === 0) await yieldTask();
+      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
+      cells = vectorLabelCells(this._map, label, size);
+      if (!cells || !reserveVectorLabelCells(cells, occupied)) continue;
+      key = `${label.text}:${label.latlng.join(":")}`;
+      retained.add(key);
+      if (updateVectorLabelMarker(this, label, key)) await yieldTask();
+    }
+    for ([key, marker] of this.labels) {
+      if (!vectorTilesIdle(this, session) || this.labelRevision !== revision) return;
+      if (!retained.has(key)) {
+        marker.remove();
+        this.labels.delete(key);
+        await yieldTask();
+      }
+    }
+    this.labelsReady = true;
+  }
+
+  // src/vector-tiles/pruneVectorTiles.js
+  function pruneVectorTiles() {
+    let tile, key, complete = true;
+    for (tile of this.tiles.values()) {
+      if (tile.needed && !tile.group) {
+        complete = false;
+        break;
+      }
+    }
+    for ([key, tile] of this.tiles) {
+      if (tile.needed || tile.group && !complete) continue;
+      tile.controller.abort();
+      this.tiles.delete(key);
+      if (tile.group) this.retire(tile.group).catch(reportError.bind(null, this));
+    }
+  }
+
+  // src/vector-tiles/retireVectorTileGroup.js
+  async function retireVectorTileGroup(group) {
+    const session = this.session;
+    this.retiring.add(group);
+    let removed = 0, layer;
+    for (layer of group.getLayers()) {
+      if (this.session !== session) return;
+      group.removeLayer(layer);
+      if (++removed % 8 === 0) await yieldTask();
+    }
+    group.remove();
+    this.retiring.delete(group);
+  }
+
+  // src/vector-tiles/compareVectorTileDistance.js
+  function compareVectorTileDistance(a, b) {
+    return a.distance - b.distance;
+  }
+
+  // src/vector-tiles/pumpVectorTiles.js
+  function pumpVectorTiles() {
+    if (!this.session) return;
+    const center = this._map.getCenter(), pending = (
+      /* alloc */
+      []
+    );
+    let tile, point;
+    for (tile of this.tiles.values()) {
+      if (!tile.needed || tile.started) continue;
+      point = this._map.project(center, tile.coords.z).divideBy(256);
+      tile.distance = (tile.coords.x - point.x) ** 2 + (tile.coords.y - point.y) ** 2;
+      pending.push(tile);
+    }
+    pending.sort(compareVectorTileDistance);
+    for (tile of pending) {
+      if (this.inflight >= 4) break;
+      tile.started = true;
+      this.inflight++;
+      this.load(tile);
+    }
+  }
+
+  // src/vector-tiles/loadVectorTile.js
+  init_L();
+
+  // src/vector-tiles/attachVectorTileBatch.js
+  init_L();
+  function attachVectorTileBatch(owner, tile, group, batch) {
+    const { pane } = vectorTileOptionsByLayer.get(owner);
+    const paint = vectorTilePaint(batch, owner._map.getZoom());
+    const options = (
+      /* alloc */
+      { ...paint, pane: `${pane}-${batch.order}`, interactive: false, smoothFactor: 0 }
+    );
+    const layer = batch.kind === "fill" ? (
+      /* alloc */
+      new L.Polygon(
+        batch.paths,
+        /* alloc */
+        { ...options, stroke: false, triangulated: true }
+      )
+    ) : (
+      /* alloc */
+      new L.Polyline(batch.paths, options)
+    );
+    layer.on("error", forwardVectorTileError, owner);
+    tile.rendered.push(
+      /* alloc */
+      { layer, kind: batch.kind, entry: batch.entry, properties: batch.properties }
+    );
+    group.addLayer(layer);
+  }
+
+  // src/vector-tiles/attachVectorTileBatches.js
+  async function attachVectorTileBatches(owner, tile, group, batches, session) {
+    let batch;
+    for (batch of batches) {
+      while (!vectorTilesIdle(owner, session) && owner.session === session && !tile.controller.signal.aborted) await yieldTask(50);
+      if (tile.controller.signal.aborted || owner.session !== session) return false;
+      attachVectorTileBatch(owner, tile, group, batch);
+      await yieldTask();
+    }
+    return true;
+  }
+
+  // src/vector-tiles/loadVectorTile.js
+  async function loadVectorTile(tile) {
+    const { coords, controller } = tile, session = this.session;
+    const { url, style, sourceId, maxZoom } = vectorTileOptionsByLayer.get(this);
+    const count = 2 ** coords.z, x = (coords.x % count + count) % count;
+    let group;
+    try {
+      const tileUrl = L.Util.template(
+        url,
+        /* alloc */
+        { z: coords.z, x, y: coords.y }
+      );
+      const response = await fetch(
+        tileUrl,
+        /* alloc */
+        { signal: controller.signal }
+      );
+      if (!response.ok) throw (
+        /* alloc */
+        new Error(`Tile ${tile.key}: HTTP ${response.status}`)
+      );
+      const buffer = await response.arrayBuffer();
+      if (controller.signal.aborted) return;
+      const id = ++this.sequence, prepared = Promise.withResolvers();
+      this.waiting.set(id, prepared);
+      this.worker.postMessage(
+        /* alloc */
+        {
+          id,
+          buffer,
+          coords,
+          style,
+          source: sourceId,
+          maxZoom,
+          zoom: this._map.getZoom()
+        },
+        /* alloc */
+        [buffer]
+      );
+      const data = await prepared.promise;
+      if (controller.signal.aborted || this.session !== session) return;
+      group = /* alloc */
+      new L.LayerGroup().addTo(this._map);
+      tile.rendered = /* alloc */
+      [];
+      if (!await attachVectorTileBatches(this, tile, group, data.batches, session)) {
+        group.remove();
+        return;
+      }
+      tile.group = group;
+      tile.labelCandidates = data.labels;
+      this.fire(
+        "tileload",
+        /* alloc */
+        { coords, group }
+      );
+      this.prune();
+      this.refresh();
+    } catch (error) {
+      group?.remove();
+      if (!controller.signal.aborted && this.session === session) this.fire(
+        "error",
+        /* alloc */
+        { error }
+      );
+    } finally {
+      if (this.session === session) {
+        this.inflight--;
+        this.pump();
+      }
+    }
+  }
+
+  // src/vector-tiles/configureVectorTileLayer.js
+  async function configureVectorTileLayer(layer, options) {
+    const settings = await vectorTileSettings(options);
+    const { url, tileJSON, style, sourceId, minNativeZoom, maxNativeZoom, maxZoom, ...core } = settings;
+    L.Util.setOptions(layer, core);
+    settings.pane = `mvt-${L.Util.stamp(layer)}`;
+    vectorTileOptionsByLayer.set(layer, settings);
+    Object.assign(
+      layer,
+      /* alloc */
+      {
+        onAdd: onVectorTileAdd,
+        onRemove: onVectorTileRemove,
+        update: updateVectorTiles,
+        updatePaint: updateVectorTilePaint,
+        updateLabels: updateVectorTileLabels,
+        prune: pruneVectorTiles,
+        retire: retireVectorTileGroup,
+        pump: pumpVectorTiles,
+        load: loadVectorTile
+      }
+    );
+    return layer;
+  }
+
+  // src/sources/readyVectorTiles.js
+  function readyVectorTiles(layer) {
+    const map = layer._map;
+    map?.removeLayer(layer);
+    kindByLayer.delete(layer);
+    map?.addLayer(layer);
+    layer.fire("ready");
+    return layer;
+  }
+
+  // src/sources/initVectorTiles.js
+  function initVectorTiles(layer, options) {
+    kindByLayer.set(layer, "pending");
+    const ready = configureVectorTileLayer(layer, options).then(readyVectorTiles.bind(null, layer)).catch(reportError2.bind(null, layer));
+    readyByLayer.set(layer, ready);
+    ready.catch(noOperation);
+  }
+
   // src/cog/validateCogRange.js
   function validateCogRange(source, offset, length) {
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || length > 32e6 || !Number.isSafeInteger(offset + length) || source.size !== void 0 && offset + length > source.size) {
@@ -16563,7 +18014,9 @@
     L.Util.setOptions(this, core);
     typeByLayer.set(this, type);
     if (type === "vector") {
-      if (settings.data !== void 0 || settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
+      if (isVectorTileSource(settings)) {
+        initVectorTiles(this, settings);
+      } else if (settings.data !== void 0 || settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
         initializeGeoJSON(this, settings);
       } else {
         init3D(this, settings);
@@ -16658,6 +18111,403 @@
     if (!initialized) initializeNativeLayer.call(this);
   }
 
+  // src/mvt/createMvtReader.js
+  function createMvtReader(bytes) {
+    return (
+      /* alloc */
+      {
+        bytes,
+        view: (
+          /* alloc */
+          new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        ),
+        pos: 0
+      }
+    );
+  }
+
+  // src/mvt/takeMvtBytes.js
+  function takeMvtBytes(reader, size) {
+    if (!Number.isSafeInteger(size) || size < 0 || size > reader.bytes.length - reader.pos) {
+      throw (
+        /* alloc */
+        new Error("Truncated MVT field")
+      );
+    }
+    const start2 = reader.pos;
+    reader.pos += size;
+    return start2;
+  }
+
+  // src/mvt/readMvtInteger.js
+  function readMvtInteger(reader) {
+    let value = 0n, i = 0, byte;
+    for (; i < 10; i++) {
+      byte = reader.bytes[takeMvtBytes(reader, 1)];
+      if (i === 9 && byte > 1) throw (
+        /* alloc */
+        new Error("Invalid MVT varint")
+      );
+      value |= BigInt(byte & 127) << BigInt(i * 7);
+      if (byte < 128) return value;
+    }
+    throw (
+      /* alloc */
+      new Error("Invalid MVT varint")
+    );
+  }
+
+  // src/mvt/readMvtNumber.js
+  function readMvtNumber(reader) {
+    const value = readMvtInteger(reader);
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw (
+        /* alloc */
+        new Error("MVT integer exceeds safe range")
+      );
+    }
+    return Number(value);
+  }
+
+  // src/mvt/readMvtField.js
+  function readMvtField(reader) {
+    const tag = readMvtNumber(reader);
+    const field = Math.floor(tag / 8), wire = tag % 8;
+    if (!field || field > 536870911) throw (
+      /* alloc */
+      new Error("Invalid MVT field number")
+    );
+    return (
+      /* alloc */
+      [field, wire]
+    );
+  }
+
+  // src/mvt/expectMvtWire.js
+  function expectMvtWire(wire, expected) {
+    if (wire !== expected) throw (
+      /* alloc */
+      new Error("Invalid MVT wire type")
+    );
+  }
+
+  // src/mvt/numericMvtValue.js
+  function numericMvtValue(value) {
+    return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
+  }
+
+  // src/mvt/finishMvtPath.js
+  function finishMvtPath(path, type, closed) {
+    if (path && (type === 2 && path.length < 2 || type === 3 && !closed)) {
+      throw (
+        /* alloc */
+        new Error("Incomplete MVT geometry")
+      );
+    }
+  }
+
+  // src/mvt/appendMvtCoordinates.js
+  function appendMvtCoordinates(commands, state, count) {
+    let i = 0, dx, dy;
+    for (; i < count; i++) {
+      dx = commands[state.index++];
+      dy = commands[state.index++];
+      if (dx > 4294967295 || dy > 4294967295) throw (
+        /* alloc */
+        new Error("Invalid MVT coordinate")
+      );
+      state.x += dx % 2 ? -(dx + 1) / 2 : dx / 2;
+      state.y += dy % 2 ? -(dy + 1) / 2 : dy / 2;
+      state.path.push(
+        /* alloc */
+        [state.x, state.y]
+      );
+    }
+  }
+
+  // src/mvt/beginMvtPath.js
+  function beginMvtPath(state, paths, type, count) {
+    finishMvtPath(state.path, type, state.closed);
+    if (type !== 1 && count !== 1) throw (
+      /* alloc */
+      new Error("Invalid MVT MoveTo")
+    );
+    state.path = /* alloc */
+    [];
+    paths.push(state.path);
+    state.closed = false;
+  }
+
+  // src/mvt/closeMvtPath.js
+  function closeMvtPath(state, type, count) {
+    if (type !== 3 || count !== 1 || !state.path || state.closed || state.path.length < 3) {
+      throw (
+        /* alloc */
+        new Error("Invalid MVT ClosePath")
+      );
+    }
+    state.path.push(
+      /* alloc */
+      [...state.path[0]]
+    );
+    state.closed = true;
+  }
+
+  // src/mvt/readMvtGeometry.js
+  function readMvtGeometry(commands, type) {
+    const paths = (
+      /* alloc */
+      []
+    );
+    const state = (
+      /* alloc */
+      { x: 0, y: 0, path: null, closed: false, index: 0 }
+    );
+    let command, id, count;
+    while (state.index < commands.length) {
+      command = commands[state.index++];
+      id = command % 8;
+      count = Math.floor(command / 8);
+      if (!count || command > 4294967295) throw (
+        /* alloc */
+        new Error("Invalid MVT geometry command")
+      );
+      if (id === 7) {
+        closeMvtPath(state, type, count);
+        continue;
+      }
+      if (id !== 1 && id !== 2 || count > Math.floor((commands.length - state.index) / 2)) {
+        throw (
+          /* alloc */
+          new Error("Invalid MVT geometry parameters")
+        );
+      }
+      if (id === 1) beginMvtPath(state, paths, type, count);
+      else if (type === 1 || !state.path || state.closed) throw (
+        /* alloc */
+        new Error("Invalid MVT LineTo")
+      );
+      appendMvtCoordinates(commands, state, count);
+    }
+    finishMvtPath(state.path, type, state.closed);
+    if (!paths.length) throw (
+      /* alloc */
+      new Error("Empty MVT geometry")
+    );
+    return paths;
+  }
+
+  // src/mvt/readMvtMessage.js
+  function readMvtMessage(reader, wire) {
+    expectMvtWire(wire, 2);
+    const size = readMvtNumber(reader), start2 = takeMvtBytes(reader, size);
+    return createMvtReader(reader.bytes.subarray(start2, start2 + size));
+  }
+
+  // src/mvt/readMvtNumbers.js
+  function readMvtNumbers(reader, wire, target) {
+    let packed;
+    if (wire === 0) target.push(readMvtNumber(reader));
+    else {
+      packed = readMvtMessage(reader, wire);
+      while (packed.pos < packed.bytes.length) target.push(readMvtNumber(packed));
+    }
+  }
+
+  // src/mvt/skipMvtField.js
+  function skipMvtField(reader, wire) {
+    switch (wire) {
+      case 0:
+        readMvtInteger(reader);
+        break;
+      case 1:
+        takeMvtBytes(reader, 8);
+        break;
+      case 2:
+        takeMvtBytes(reader, readMvtNumber(reader));
+        break;
+      case 5:
+        takeMvtBytes(reader, 4);
+        break;
+      default:
+        throw (
+          /* alloc */
+          new Error("Unsupported MVT wire type")
+        );
+    }
+  }
+
+  // src/mvt/readMvtFeature.js
+  function readMvtFeature(reader, keys, values) {
+    let id, type = 0, field, wire, i = 0;
+    const tags = (
+      /* alloc */
+      []
+    ), commands = (
+      /* alloc */
+      []
+    );
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field === 1) {
+        expectMvtWire(wire, 0);
+        id = numericMvtValue(readMvtInteger(reader));
+      } else if (field === 2) readMvtNumbers(reader, wire, tags);
+      else if (field === 3) {
+        expectMvtWire(wire, 0);
+        type = readMvtNumber(reader);
+      } else if (field === 4) readMvtNumbers(reader, wire, commands);
+      else skipMvtField(reader, wire);
+    }
+    if (tags.length % 2 || type > 3) throw (
+      /* alloc */
+      new Error("Invalid MVT feature")
+    );
+    const properties = /* @__PURE__ */ Object.create(null);
+    for (; i < tags.length; i += 2) {
+      if (tags[i] >= keys.length || tags[i + 1] >= values.length) {
+        throw (
+          /* alloc */
+          new Error("Invalid MVT property index")
+        );
+      }
+      properties[keys[tags[i]]] = values[tags[i + 1]];
+    }
+    return (
+      /* alloc */
+      { id, type, properties, geometry: type ? readMvtGeometry(commands, type) : (
+        /* alloc */
+        []
+      ) }
+    );
+  }
+
+  // src/globals/mvtTextDecoder.js
+  var mvtTextDecoder = new TextDecoder("utf-8", { fatal: true });
+
+  // src/mvt/readMvtString.js
+  function readMvtString(reader, wire) {
+    return mvtTextDecoder.decode(readMvtMessage(reader, wire).bytes);
+  }
+
+  // src/mvt/readMvtKnownValue.js
+  function readMvtKnownValue(reader, field, wire) {
+    let offset, integer;
+    if (field === 1) return readMvtString(reader, wire);
+    if (field === 2 || field === 3) {
+      expectMvtWire(wire, field === 2 ? 5 : 1);
+      offset = takeMvtBytes(reader, field === 2 ? 4 : 8);
+      return field === 2 ? reader.view.getFloat32(offset, true) : reader.view.getFloat64(offset, true);
+    }
+    expectMvtWire(wire, 0);
+    integer = readMvtInteger(reader);
+    if (field === 4) return numericMvtValue(BigInt.asIntN(64, integer));
+    if (field === 5) return numericMvtValue(integer);
+    if (field === 6) return numericMvtValue(integer >> 1n ^ -(integer & 1n));
+    return integer !== 0n;
+  }
+
+  // src/mvt/readMvtValue.js
+  function readMvtValue(reader) {
+    let value, found = false, field, wire;
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field < 1 || field > 7) {
+        skipMvtField(reader, wire);
+        continue;
+      }
+      if (found) throw (
+        /* alloc */
+        new Error("Multiple MVT value types")
+      );
+      found = true;
+      value = readMvtKnownValue(reader, field, wire);
+    }
+    if (!found) throw (
+      /* alloc */
+      new Error("Empty MVT value")
+    );
+    return value;
+  }
+
+  // src/mvt/readMvtLayer.js
+  function readMvtLayer(reader) {
+    let name, version, extent = 4096, field, wire, value, i = 0;
+    const keys = (
+      /* alloc */
+      []
+    ), values = (
+      /* alloc */
+      []
+    ), features = (
+      /* alloc */
+      []
+    );
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field === 1) name = readMvtString(reader, wire);
+      else if (field === 2) features.push(readMvtMessage(reader, wire));
+      else if (field === 3) keys.push(readMvtString(reader, wire));
+      else if (field === 4) values.push(readMvtValue(readMvtMessage(reader, wire)));
+      else if (field === 5 || field === 15) {
+        expectMvtWire(wire, 0);
+        value = readMvtNumber(reader);
+        if (field === 5) extent = value;
+        else version = value;
+      } else skipMvtField(reader, wire);
+    }
+    if (!name || !/* alloc */
+    [1, 2].includes(version) || !extent || extent > 4294967295) {
+      throw (
+        /* alloc */
+        new Error("Invalid MVT layer metadata")
+      );
+    }
+    for (; i < features.length; i++) features[i] = readMvtFeature(features[i], keys, values);
+    return (
+      /* alloc */
+      { name, extent, features }
+    );
+  }
+
+  // src/mvt/decodeVectorTile.js
+  function decodeVectorTile(buffer) {
+    if (!(buffer instanceof ArrayBuffer) && !(buffer instanceof Uint8Array)) {
+      throw (
+        /* alloc */
+        new TypeError("MVT input must be an ArrayBuffer or Uint8Array")
+      );
+    }
+    const bytes = buffer instanceof Uint8Array ? buffer : (
+      /* alloc */
+      new Uint8Array(buffer)
+    );
+    const reader = createMvtReader(bytes);
+    const layers = (
+      /* alloc */
+      []
+    ), names = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let field, wire, layer;
+    while (reader.pos < reader.bytes.length) {
+      [field, wire] = readMvtField(reader);
+      if (field !== 3) {
+        skipMvtField(reader, wire);
+        continue;
+      }
+      layer = readMvtLayer(readMvtMessage(reader, wire));
+      if (names.has(layer.name)) throw (
+        /* alloc */
+        new Error("Duplicate MVT layer name")
+      );
+      names.add(layer.name);
+      layers.push(layer);
+    }
+    return layers;
+  }
+
   // src/index.js
   layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
   layerCallInitHooks.value = L.Layer.prototype.callInitHooks;
@@ -16669,5 +18519,6 @@
   removeLayer.value = L.Map.prototype.removeLayer;
   L.Map.include({ removeLayer: removeLayer2, getPitch, getBearing });
   L.Marker.include({ setRotation });
+  L.Util.decodeVectorTile = decodeVectorTile;
 })();
 //# sourceMappingURL=leaflet-city-mapper-src.js.map

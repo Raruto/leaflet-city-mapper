@@ -10,6 +10,7 @@ import { update } from '../scene/scheduleSceneUpdate.js';
 import { hideTargets } from './hideTargets.js';
 
 export function refreshNativeLayer(state = this) {
+  state.zoomOnly = false;
   state.dirty = true;
   state.viewDirty = true;
   state.failed = false;

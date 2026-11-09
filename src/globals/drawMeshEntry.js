@@ -2,6 +2,6 @@ export const drawMeshEntry = {
   binding: 0,
   resource: {
     buffer: null,
-    size: 160
+    size: 176
   }
 };

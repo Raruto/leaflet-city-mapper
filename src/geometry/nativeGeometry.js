@@ -3,7 +3,7 @@ import { visit } from './visitNativeCoordinates.js';
 import { dashValues } from './dashValues.js';
 import { circleGeometry } from './circleGeometry.js';
 
-/** Leaflet paths become flat triangles; pixel-sized strokes are rebuilt on zoom. */
+/** Leaflet paths become flat triangles; solid strokes retain stationary zoom anchors. */
 export function nativeGeometry(source, map, point) {
   const fill = /* alloc */ [];
   const stroke = /* alloc */ [];

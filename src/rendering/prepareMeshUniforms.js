@@ -20,6 +20,8 @@ export function prepareMeshUniforms(renderer, mesh) {
   data[base + 34] = mesh.program.nightSparkle ? data[55] : 0;
   data[base + 35] = mesh.ground ? 1 : mesh._appearance ?? 1;
   prepareMeshCutout(renderer, mesh, base);
+  data[base + 40] = uniforms.strokeScale?.value ?? 1;
+  data[base + 41] = data[base + 42] = data[base + 43] = 0;
   return offset;
 }
 import { prepareMeshCutout } from '../materials/prepareMeshCutout.js';

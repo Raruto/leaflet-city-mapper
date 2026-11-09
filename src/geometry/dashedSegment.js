@@ -2,15 +2,20 @@ import { segment } from './segment.js';
 
 export function dashedSegment(context, a, b, length, distance, period) {
   const dash = context.dash;
-  let offset = 0, phase, index, end, delta;
+  let offset = 0, phase = ((distance % period) + period) % period, index = 0, end, delta, skipped = 0;
+  while (index < dash.length - 1 && phase >= dash[index]) phase -= dash[index++];
+  let remaining = Math.max(0, dash[index] - phase);
   while (offset < length) {
-    phase = ((distance + offset) % period + period) % period, index = 0;
-    while (phase >= dash[index]) phase -= dash[index++];
-    end = Math.min(length, offset + dash[index] - phase);
-    if (index % 2 === 0) {
+    end = Math.min(length, offset + remaining);
+    if (end > offset && index % 2 === 0) {
       delta = b.subtract(a).divideBy(length);
       segment(context, a.add(delta.multiplyBy(offset)), a.add(delta.multiplyBy(end)), true, true);
     }
+    if (end <= offset) {
+      if (++skipped >= dash.length) throw /* alloc */ new Error('Leaflet dashArray is too small for these coordinates');
+    } else skipped = 0;
     offset = end;
+    index = (index + 1) % dash.length;
+    remaining = dash[index];
   }
 }

@@ -215,6 +215,16 @@ Then('local allocation checks accept source file {string}', async function (file
   assert.deepEqual(localAllocationErrors(await readFile(file, 'utf8'), file), []);
 });
 
+Then('local allocation checks accept source directory {string}', async function (directory) {
+  const errors = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${directory}/${entry.name}`;
+    errors.push(...localAllocationErrors(await readFile(file, 'utf8'), file));
+  }
+  assert.deepEqual(errors, []);
+});
+
 Then('the PMTiles directory decoder uses a sized array and complete records', async function () {
   const ast = parse(await readFile('src/archives/decodeDirectory.js', 'utf8'),
     { ecmaVersion: 'latest', sourceType: 'module' });

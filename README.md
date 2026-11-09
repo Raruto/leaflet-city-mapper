@@ -3,7 +3,7 @@
 [![NPM version](https://img.shields.io/npm/v/leaflet-city-mapper.svg?color=red)](https://www.npmjs.com/package/leaflet-city-mapper)
 [![License](https://img.shields.io/badge/license-GPL%203-blue.svg?style=flat)](LICENSE)
 
-**Your data, on a rotated and pitched Leaflet map:** a small 3D rendering engine (WebGPU) packaged onto standard `L.Layer`. Available sources: extruded GeoJSON, glTF models, raster PMTiles, COG and terrain layers.
+**Your data, on a rotated and pitched Leaflet map:** a small 3D rendering engine (WebGPU) packaged onto standard `L.Layer`. Available sources: extruded GeoJSON, glTF models, raster PMTiles, COG, MVT/PBF and terrain layers.
 
 <p align="center">
     <a href="https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html"><img src="https://raruto.github.io/img/leaflet-city-mapper.png" alt="Leaflet 3D City Mapper" /></a>
@@ -15,9 +15,7 @@ _For a working example see one of the following demos:_
 - [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-rome.html)
 - [Matterhorn in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-matterhorn.html)
 - [Native Leaflet layers on WebGPU](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-native.html)
-
-The Matterhorn example uses the repository's `dist` bundle. Run `npm run build`
-after changing the source to update it.
+- [Vector tiles](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-vector-tiles.html)
 
 ## How to use
 
@@ -97,6 +95,9 @@ src/
   index.js           Public entry point and source registration
   globals/           One shared constant or mutable cell per module
   weakmaps/          One private WeakMap per map/layer state field
+  mvt/               PBF vector tile decoding and tessellation
+  vector-style/      Safe vector style parsing and expressions
+  vector-tiles/      Native vector tile lifecycle and worker preparation
   camera/            Leaflet camera API and scene camera state
   controls/          Compass, dragging, touch and resizing
   core/              Leaflet hooks, camera-aware overlays and readiness

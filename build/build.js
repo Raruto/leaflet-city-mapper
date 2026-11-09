@@ -80,6 +80,14 @@ const options = {
 const builds = [
   options,
   {
+    entryPoints: ['src/workers/vectorTileWorker.js'],
+    outfile: 'dist/leaflet-city-mapper-vector-worker.js',
+    bundle: true,
+    format: 'iife',
+    minify: true,
+    sourcemap: true,
+  },
+  {
     entryPoints: ['src/workers/geometryWorker.js'],
     outfile: 'dist/leaflet-city-mapper-worker.js',
     bundle: true,

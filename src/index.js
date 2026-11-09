@@ -21,6 +21,7 @@ import { getPitch } from './camera/getPitch.js';
 import { getBearing } from './camera/getBearing.js';
 import { setRotation } from './core/setRotation.js';
 import { layerCallInitHooks } from './core/layerCallInitHooks.js';
+import { decodeVectorTile } from './mvt/decodeVectorTile.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -109,3 +110,4 @@ L.Layer.include({
 sharedRemoveLayer.value = L.Map.prototype.removeLayer;
 L.Map.include({ removeLayer, getPitch, getBearing });
 L.Marker.include({ setRotation });
+L.Util.decodeVectorTile = decodeVectorTile;

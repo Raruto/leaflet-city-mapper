@@ -19,8 +19,8 @@ export function lineJoin(context, points, i, b, length) {
   const from = a.add(n1.multiplyBy(radius)), to = a.add(n2.multiplyBy(radius));
   const denominator = 1 + n1.x * n2.x + n1.y * n2.y;
   const miter = denominator > 0 ? n1.add(n2).multiplyBy(radius / denominator) : null;
-  triangle(point, stroke, from, a, to);
+  triangle(point, stroke, from, a, to, a, a, a);
   if (options.lineJoin === 'miter' && miter && Math.hypot(miter.x, miter.y) <= radius * 4) {
-    triangle(point, stroke, from, a.add(miter), to);
+    triangle(point, stroke, from, a.add(miter), to, a, a, a);
   }
 }

@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>leaflet-city-mapper.js</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/libs/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/dist/leaflet-city-mapper.js"></script>
   <style>
@@ -78,7 +77,7 @@
           }
         }
       },
-      attribution: 'Elevazione: <a href="https://mapterhorn.com/attribution">&copy; Mapterhorn</a>',
+      attribution: 'Elevation: <a href="https://mapterhorn.com/attribution">&copy; Mapterhorn</a>',
     }).addTo(map);
 
     new L.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -95,5 +94,6 @@
 
     new L.Control.Time().layer.addTo(map);
   </script>
+  <a href="https://github.com/Raruto/leaflet-city-mapper" class="view-on-github"> <img alt="View on Github" src="https://raruto.github.io/img/view-on-github.png" title="View on Github" width="163"> </a>
 </body>
 </html>

@@ -1,7 +1,9 @@
 import { roofVertexShader } from './roofVertexShader.js';
+import { nativeStrokeShader } from './nativeStrokeShader.js';
 
 export function materialVertexShader(material, sparkle, elevationWGSL, hasTerrain, textured, hasRoof) {
   const instanceOffset = material.instanced ? ' + input.instanceOffset.xyz' : '';
+  const stroke = nativeStrokeShader(material);
   return /* wgsl */ `
     struct Mesh {
       worldMatrix: mat4x4<f32>,
@@ -11,6 +13,7 @@ export function materialVertexShader(material, sparkle, elevationWGSL, hasTerrai
       terrain: vec4<f32>,
       highlight: vec4<f32>,
       cutout: vec4<f32>,
+      nativeStroke: vec4<f32>,
     };
     struct Frame {
       viewMatrix: mat4x4<f32>,
@@ -46,6 +49,7 @@ export function materialVertexShader(material, sparkle, elevationWGSL, hasTerrai
     @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
       var output: VertexOutput;
       var position = input.position${instanceOffset};
+      ${stroke.position}
       ${hasTerrain ? 'position.y = elevation(u.terrain.xy + input.uv * u.terrain.z, u.terrain.w) - u.terrain.w;' : ''}
       let featureVertex = f32(vertexIndex)${material.instanced ? ' + input.instanceOffset.w' : ''};
       let highlighted = featureVertex >= u.highlight.x && featureVertex < u.highlight.y;
@@ -54,8 +58,9 @@ export function materialVertexShader(material, sparkle, elevationWGSL, hasTerrai
       : 'u.baseColor.rgb'};
       // Inverse-transpose from cofactors; the camera view matrix is orthonormal.
       let m = mat3x3<f32>(u.worldMatrix[0].xyz, u.worldMatrix[1].xyz, u.worldMatrix[2].xyz);
-      let normal = (cross(m[1], m[2]) * input.normal.x + cross(m[2], m[0]) * input.normal.y +
-        cross(m[0], m[1]) * input.normal.z) / determinant(m);
+      ${stroke.normal}
+      let normal = (cross(m[1], m[2]) * sourceNormal.x + cross(m[2], m[0]) * sourceNormal.y +
+        cross(m[0], m[1]) * sourceNormal.z) / determinant(m);
       output.normal = (frame.viewMatrix * vec4<f32>(normal, 0.0)).xyz;
       let world = u.worldMatrix * vec4<f32>(position, 1.0);
       output.shadowPosition = solar.matrix * world;
