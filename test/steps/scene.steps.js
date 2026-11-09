@@ -3,6 +3,7 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
 Then('layer-owned objects preserve values and visibility without engine classes', async function () {
   const result = await this.page.evaluate(async () => {
@@ -263,6 +264,7 @@ When('I select the {string} background in the 3D example', async function (backg
       center: map.getCenter(), zoom: map.getZoom(), bearing: testOperations.getBearing(map), pitch: testOperations.getPitch(map),
     };
   });
+  await expandLayerControl(this.page);
   await this.page.getByRole('radio', { name: background, exact: true }).check();
 });
 
@@ -300,6 +302,7 @@ When('I disable and restore the 3D overlays through the layer control', { timeou
   const trafficControl = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
   const background = await this.page.evaluate(() => layers._layers.find(entry =>
     !entry.overlay && map.hasLayer(entry.layer)).name);
+  await expandLayerControl(this.page);
   await this.page.getByRole('radio', { name: 'Empty', exact: true }).check();
   await trafficControl.uncheck();
   const trafficDisabled = await this.page.evaluate(() =>

@@ -6,7 +6,7 @@ const files = new Map();
 for (const version of ['1.9.4', '2.0.0-alpha.1']) {
   for (const file of [version === '1.9.4' ? 'leaflet-src.js' : 'leaflet-global-src.js', 'leaflet.css',
     'images/marker-icon.png', 'images/marker-icon-2x.png', 'images/marker-shadow.png',
-    ...(version === '1.9.4' ? ['images/layers.png', 'images/layers-2x.png'] : [])]) {
+    ...(version === '1.9.4' ? ['images/layers.png', 'images/layers-2x.png'] : ['images/layers.svg'])]) {
     files.set(`https://unpkg.com/leaflet@${version}/dist/${file}`, new URL(`leaflet-${version}/${file}`, cache));
   }
 }

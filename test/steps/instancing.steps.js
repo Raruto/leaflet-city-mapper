@@ -122,7 +122,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
           depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT }) },
       };
       globals.sceneByLayer.set(backend, backend);
-      backend._shared = backend;
+      globals.sceneByLayer.get(backend)._shared = backend;
       bindSunlight(backend);
       return backend;
     };

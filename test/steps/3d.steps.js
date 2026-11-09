@@ -268,7 +268,7 @@ Given('a leaflet map', { timeout: 30000 }, async function () {
 });
 
 const openEiffelExample = async function () {
-  await this.page.setViewportSize({ width: 800, height: 600 });
+  await this.page.setViewportSize({ width: 1024, height: 600 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.map && typeof testOperations.getPitch === 'function');

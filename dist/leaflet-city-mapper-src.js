@@ -214,11 +214,35 @@
     }
   });
 
+  // src/weakmaps/cameraHandlersByMap.js
+  var cameraHandlersByMap;
+  var init_cameraHandlersByMap = __esm({
+    "src/weakmaps/cameraHandlersByMap.js"() {
+      cameraHandlersByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // src/weakmaps/rotateControlByMap.js
   var rotateControlByMap;
   var init_rotateControlByMap = __esm({
     "src/weakmaps/rotateControlByMap.js"() {
       rotateControlByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
+  // src/weakmaps/touchPitchByMap.js
+  var touchPitchByMap;
+  var init_touchPitchByMap = __esm({
+    "src/weakmaps/touchPitchByMap.js"() {
+      touchPitchByMap = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
+  // src/weakmaps/touchRotateByMap.js
+  var touchRotateByMap;
+  var init_touchRotateByMap = __esm({
+    "src/weakmaps/touchRotateByMap.js"() {
+      touchRotateByMap = /* @__PURE__ */ new WeakMap();
     }
   });
 
@@ -1032,22 +1056,6 @@
     }
   });
 
-  // src/weakmaps/touchPitchByMap.js
-  var touchPitchByMap;
-  var init_touchPitchByMap = __esm({
-    "src/weakmaps/touchPitchByMap.js"() {
-      touchPitchByMap = /* @__PURE__ */ new WeakMap();
-    }
-  });
-
-  // src/weakmaps/touchRotateByMap.js
-  var touchRotateByMap;
-  var init_touchRotateByMap = __esm({
-    "src/weakmaps/touchRotateByMap.js"() {
-      touchRotateByMap = /* @__PURE__ */ new WeakMap();
-    }
-  });
-
   // src/controls/startCameraTouch.js
   function startCameraTouch(event) {
     const state = touchByContainer.get(this), { map, container } = state;
@@ -1242,14 +1250,6 @@
     }
   });
 
-  // src/weakmaps/cameraHandlersByMap.js
-  var cameraHandlersByMap;
-  var init_cameraHandlersByMap = __esm({
-    "src/weakmaps/cameraHandlersByMap.js"() {
-      cameraHandlersByMap = /* @__PURE__ */ new WeakMap();
-    }
-  });
-
   // src/controls/addCameraHandler.js
   function addCameraHandler(map, name, Type) {
     let handlers = cameraHandlersByMap.get(map);
@@ -1282,6 +1282,8 @@
     addCameraHandler(map, "compassBearing", Compass.value);
     addCameraHandler(map, "touchRotate", TouchMode.value);
     addCameraHandler(map, "touchPitch", TouchMode.value);
+    touchRotateByMap.set(map, cameraHandlersByMap.get(map).get("touchRotate"));
+    touchPitchByMap.set(map, cameraHandlersByMap.get(map).get("touchPitch"));
     const container = map.getContainer();
     const state = (
       /* alloc */
@@ -1296,6 +1298,7 @@
     container.addEventListener("touchcancel", endCameraTouchEvent, true);
     window.addEventListener("blur", endAllCameraTouches);
     map.on("cameratouchchange", changeCameraTouch, map);
+    changeCameraTouch.call(map);
     if (map.options.rotateControl) {
       rotateControlByMap.set(
         map,
@@ -1309,7 +1312,10 @@
   var init_cameraControls = __esm({
     "src/controls/cameraControls.js"() {
       init_cameraTouchStateByMap();
+      init_cameraHandlersByMap();
       init_rotateControlByMap();
+      init_touchPitchByMap();
+      init_touchRotateByMap();
       init_L();
       init_Compass();
       init_ContainerResize();
@@ -6154,18 +6160,24 @@
     return !(far < near);
   }
 
+  // src/collision/vertexCount.js
+  function vertexCount(position, index) {
+    return index?.count ?? index?.data.length ?? position.count ?? position.data.length / (position.size ?? 3);
+  }
+
   // src/collision/readTriangle.js
   function readTriangle(mesh, i, a, b, c) {
     const { position, index, instanceOffset } = mesh.geometry.attributes;
-    const vertices = index?.count || position.count;
+    const size = position.size ?? 3;
+    const vertices = vertexCount(position, index);
     const vertex = instanceOffset ? i % vertices : i;
     const offset = instanceOffset ? Math.floor(i / vertices) * instanceOffset.size : 0;
     const x = instanceOffset?.data[offset] ?? 0;
     const y = instanceOffset?.data[offset + 1] ?? 0;
     const z = instanceOffset?.data[offset + 2] ?? 0;
-    const ai = (index ? index.data[vertex] : vertex) * position.size;
-    const bi = (index ? index.data[vertex + 1] : vertex + 1) * position.size;
-    const ci = (index ? index.data[vertex + 2] : vertex + 2) * position.size;
+    const ai = (index ? index.data[vertex] : vertex) * size;
+    const bi = (index ? index.data[vertex + 1] : vertex + 1) * size;
+    const ci = (index ? index.data[vertex + 2] : vertex + 2) * size;
     a[0] = position.data[ai];
     a[1] = position.data[ai + 1];
     a[2] = position.data[ai + 2];
@@ -7621,614 +7633,6 @@
     layer.fire("progress", progress);
   }
 
-  // src/sources/buildAreaFeature.js
-  init_L();
-
-  // src/projections/projectTreePoint.js
-  init_L();
-  function projectedTree(context, lon, lat) {
-    const { backend: layer, crs, origin, metres, map } = context;
-    const location2 = (
-      /* alloc */
-      new L.LatLng(lat, lon)
-    );
-    const point = crs.project(location2);
-    const elevation = mapElevationOf(map, location2), root = rootByLayer.get(layer);
-    return (
-      /* alloc */
-      {
-        x: (point.x - origin.x) * metres,
-        y: (point.y - origin.y) * metres,
-        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
-      }
-    );
-  }
-
-  // src/globals/triangleContexts.js
-  var triangleContexts = [];
-
-  // src/sources/groundOffset.js
-  function groundOffset(point) {
-    return point.ground || 0;
-  }
-
-  // src/geometry/appendAreaTriangle.js
-  function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
-    const { backend: layer, positions, normals, colors, uvs } = context;
-    const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
-    const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
-    if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
-      const point = b, height = bh;
-      b = c;
-      bh = ch;
-      c = point;
-      ch = height;
-    }
-    positions.push(
-      a.x,
-      ah + groundOffset(a),
-      -a.y,
-      b.x,
-      bh + groundOffset(b),
-      -b.y,
-      c.x,
-      ch + groundOffset(c),
-      -c.y
-    );
-    normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
-    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
-  }
-
-  // src/geometry/addGeneratedTriangle.js
-  function addGeneratedTriangle(...args) {
-    addTriangle(triangleContexts[triangleContexts.length - 1], ...args);
-  }
-
-  // src/geometry/generateTreeGeometry.js
-  function generateTreeGeometry(context, generator, point, style) {
-    triangleContexts.push(context);
-    try {
-      generator(point, style, addGeneratedTriangle);
-    } finally {
-      triangleContexts.pop();
-    }
-  }
-
-  // src/globals/lampDirections.js
-  var lampDirections = [
-    { x: Math.cos(0 * Math.PI / 3), y: Math.sin(0 * Math.PI / 3), nx: Math.cos(0.5 * Math.PI / 3), nz: -Math.sin(0.5 * Math.PI / 3) },
-    { x: Math.cos(1 * Math.PI / 3), y: Math.sin(1 * Math.PI / 3), nx: Math.cos(1.5 * Math.PI / 3), nz: -Math.sin(1.5 * Math.PI / 3) },
-    { x: Math.cos(2 * Math.PI / 3), y: Math.sin(2 * Math.PI / 3), nx: Math.cos(2.5 * Math.PI / 3), nz: -Math.sin(2.5 * Math.PI / 3) },
-    { x: Math.cos(3 * Math.PI / 3), y: Math.sin(3 * Math.PI / 3), nx: Math.cos(3.5 * Math.PI / 3), nz: -Math.sin(3.5 * Math.PI / 3) },
-    { x: Math.cos(4 * Math.PI / 3), y: Math.sin(4 * Math.PI / 3), nx: Math.cos(4.5 * Math.PI / 3), nz: -Math.sin(4.5 * Math.PI / 3) },
-    { x: Math.cos(5 * Math.PI / 3), y: Math.sin(5 * Math.PI / 3), nx: Math.cos(5.5 * Math.PI / 3), nz: -Math.sin(5.5 * Math.PI / 3) }
-  ];
-
-  // src/geometry/createLampRing.js
-  function ring(point, radius) {
-    const points = (
-      /* alloc */
-      new Array(lampDirections.length)
-    );
-    let i;
-    for (i = 0; i < points.length; i++) {
-      points[i] = /* alloc */
-      {
-        x: point.x + lampDirections[i].x * radius,
-        y: point.y + lampDirections[i].y * radius,
-        ground: point.ground,
-        uv: (
-          /* alloc */
-          [3, 3]
-        )
-      };
-    }
-    return points;
-  }
-
-  // src/geometry/lampPostGeometry.js
-  function lampPostGeometry(point, style, addTriangle2) {
-    const color = parseColor(5264986), radius = style.poleRadius;
-    if (!Number.isFinite(radius) || radius <= 0) {
-      throw (
-        /* alloc */
-        new Error("Invalid lamp pole radius")
-      );
-    }
-    const center = (
-      /* alloc */
-      {
-        ...point,
-        uv: (
-          /* alloc */
-          [3, 3]
-        )
-      }
-    );
-    let r, low, high, points, i, a, b, nx, nz, section;
-    for (section = 0; section < 2; section++) {
-      r = section ? radius * 2.5 : radius;
-      low = section ? style.top - 0.25 : 0;
-      high = section ? style.top + 0.15 : style.top;
-      points = ring(point, r);
-      for (i = 0; i < 6; i++) {
-        a = points[i], b = points[(i + 1) % 6];
-        nx = lampDirections[i].nx, nz = lampDirections[i].nz;
-        addTriangle2(a, low, b, low, b, high, nx, 0, nz, color);
-        addTriangle2(a, low, b, high, a, high, nx, 0, nz, color);
-        addTriangle2(center, high, a, high, b, high, 0, 1, 0, color);
-        addTriangle2(center, low, b, low, a, low, 0, -1, 0, color);
-      }
-    }
-  }
-
-  // src/geometry/quad.js
-  function quad(addTriangle2, color, a, b, c, d, height, nx, ny, nz) {
-    if (typeof nx !== "number") {
-      addTriangle2(a, height, b, height, c, height, ...nx, color);
-      addTriangle2(a, height, c, height, d, height, ...nx, color);
-    } else {
-      addTriangle2(a, height, b, height, c, height, nx, ny, nz, color);
-      addTriangle2(a, height, c, height, d, height, nx, ny, nz, color);
-    }
-  }
-
-  // src/geometry/emitter.js
-  function emitter(point, u, v, axis) {
-    const r = 0.65;
-    return (
-      /* alloc */
-      {
-        x: point.x + (axis === 2 ? 0 : u * r),
-        y: point.y + (axis === 1 ? 0 : axis === 2 ? u * r : v * r),
-        ground: point.ground + (axis === 0 ? 0 : v * r),
-        uv: (
-          /* alloc */
-          [u, v]
-        )
-      }
-    );
-  }
-
-  // src/geometry/lightGeometry.js
-  function lightGeometry(point, style, addTriangle2) {
-    if (!Number.isFinite(style.lightRadius) || style.lightRadius <= 0) throw (
-      /* alloc */
-      new Error("Invalid light radius")
-    );
-    const color = parseColor(style.color);
-    let axis;
-    for (axis = 0; axis < 3; axis++) {
-      quad(
-        addTriangle2,
-        color,
-        emitter(point, -1, -1, axis),
-        emitter(point, 1, -1, axis),
-        emitter(point, 1, 1, axis),
-        emitter(point, -1, 1, axis),
-        style.top,
-        axis === 2 ? 1 : 0,
-        axis === 0 ? 1 : 0,
-        axis === 1 ? 1 : 0
-      );
-    }
-  }
-
-  // src/globals/roundProfile.js
-  var roundProfile = [
-    [0, 0],
-    [0.35, 0.8],
-    [0.6, 1],
-    [0.85, 0.7],
-    [1, 0]
-  ];
-
-  // src/globals/ringDirections.js
-  var ringDirections = [
-    {
-      x: Math.cos(0 * Math.PI / 4),
-      y: Math.sin(0 * Math.PI / 4),
-      nx: Math.cos((0 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((0 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(1 * Math.PI / 4),
-      y: Math.sin(1 * Math.PI / 4),
-      nx: Math.cos((1 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((1 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(2 * Math.PI / 4),
-      y: Math.sin(2 * Math.PI / 4),
-      nx: Math.cos((2 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((2 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(3 * Math.PI / 4),
-      y: Math.sin(3 * Math.PI / 4),
-      nx: Math.cos((3 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((3 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(4 * Math.PI / 4),
-      y: Math.sin(4 * Math.PI / 4),
-      nx: Math.cos((4 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((4 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(5 * Math.PI / 4),
-      y: Math.sin(5 * Math.PI / 4),
-      nx: Math.cos((5 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((5 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(6 * Math.PI / 4),
-      y: Math.sin(6 * Math.PI / 4),
-      nx: Math.cos((6 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((6 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(7 * Math.PI / 4),
-      y: Math.sin(7 * Math.PI / 4),
-      nx: Math.cos((7 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((7 + 0.5) * Math.PI / 4)
-    }
-  ];
-
-  // src/geometry/createTreeRing.js
-  function ring2(point, radius) {
-    const result = (
-      /* alloc */
-      new Array(ringDirections.length)
-    );
-    let i;
-    for (i = 0; i < result.length; i++) {
-      result[i] = /* alloc */
-      {
-        x: point.x + ringDirections[i].x * radius,
-        y: point.y + ringDirections[i].y * radius,
-        ground: point.ground
-      };
-    }
-    return result;
-  }
-
-  // src/geometry/surface.js
-  function surface(point, addTriangle2, lowRadius, low, highRadius, high, color) {
-    const lower = ring2(point, lowRadius), upper = ring2(point, highRadius);
-    let i, next, slope, length, nx, nz, ny, normalX, normalZ;
-    for (i = 0; i < 8; i++) {
-      next = (i + 1) % 8;
-      slope = (lowRadius - highRadius) / (high - low);
-      length = Math.hypot(1, slope);
-      ({ nx, nz } = ringDirections[i]);
-      ny = slope / length;
-      normalX = nx / length, normalZ = nz / length;
-      if (lowRadius) addTriangle2(lower[i], low, lower[next], low, upper[next], high, normalX, ny, normalZ, color);
-      if (highRadius) addTriangle2(lower[i], low, upper[next], high, upper[i], high, normalX, ny, normalZ, color);
-    }
-  }
-
-  // src/geometry/validateTree.js
-  function validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape) {
-    if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) || trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top || crownShape !== "round" && crownShape !== "cone") {
-      throw (
-        /* alloc */
-        new Error("Invalid tree dimensions or crown shape")
-      );
-    }
-  }
-
-  // src/geometry/treeGeometry.js
-  function treeGeometry(point, style, addTriangle2) {
-    const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = "round" } = style;
-    validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);
-    const trunk = parseColor(style.trunkColor ?? 7491898);
-    const crown = parseColor(style.color ?? 5210683);
-    surface(point, addTriangle2, trunkRadius, bottom, trunkRadius, crownBottom + (top - crownBottom) * 0.25, trunk);
-    let i, low, lr, high, hr;
-    if (crownShape === "cone") {
-      const base = ring2(point, crownRadius);
-      for (i = 0; i < 8; i++) addTriangle2(
-        point,
-        crownBottom,
-        base[i],
-        crownBottom,
-        base[(i + 1) % 8],
-        crownBottom,
-        0,
-        -1,
-        0,
-        crown
-      );
-      surface(point, addTriangle2, crownRadius, crownBottom, 0, top, crown);
-    } else {
-      for (i = 1; i < roundProfile.length; i++) {
-        [low, lr] = roundProfile[i - 1], [high, hr] = roundProfile[i];
-        surface(
-          point,
-          addTriangle2,
-          lr * crownRadius,
-          crownBottom + low * (top - crownBottom),
-          hr * crownRadius,
-          crownBottom + high * (top - crownBottom),
-          crown
-        );
-      }
-    }
-  }
-
-  // src/geometry/buildProjectedPoint.js
-  function buildProjectedPoint(context, projected, style, baseColor, support) {
-    const { top } = style;
-    if (context.backend.options.nightLight) {
-      if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw (
-        /* alloc */
-        new Error("Invalid light flux")
-      );
-      if (style.poleRadius > 0 && !context.supports.has(support)) {
-        generateTreeGeometry(context, lampPostGeometry, projected, style);
-        context.supports.add(support);
-      }
-      generateTreeGeometry(context, lightGeometry, projected, style);
-      context.lights.push(
-        /* alloc */
-        {
-          position: (
-            /* alloc */
-            [projected.x, projected.ground + top, -projected.y]
-          ),
-          radius: Math.hypot(top, style.lightRadius),
-          color: (
-            /* alloc */
-            [baseColor.r, baseColor.g, baseColor.b]
-          ),
-          flux: style.lightFlux
-        }
-      );
-    } else generateTreeGeometry(context, treeGeometry, projected, style);
-  }
-
-  // src/sources/buildAreaPoint.js
-  function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-    const projected = projectedTree(context, lon, lat);
-    buildProjectedPoint(context, projected, style, baseColor, feature.properties?.cod_ouvrag || `${lon},${lat}`);
-  }
-
-  // src/projections/projectRing.js
-  init_L();
-  function projectRing(context, ring3) {
-    const { backend: layer, crs, origin, metres, map } = context;
-    if (ring3.length < 4) throw (
-      /* alloc */
-      new Error("Invalid GeoJSON polygon ring")
-    );
-    const path = (
-      /* alloc */
-      []
-    );
-    const root = rootByLayer.get(layer);
-    let i, lng, lat, location2, point, elevation;
-    for (i = 0; i < ring3.length - 1; i++) {
-      lng = ring3[i][0], lat = ring3[i][1];
-      if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw (
-        /* alloc */
-        new Error("Invalid GeoJSON coordinates")
-      );
-      location2 = /* alloc */
-      new L.LatLng(lat, lng);
-      point = crs.project(location2);
-      elevation = mapElevationOf(map, location2);
-      path.push(
-        /* alloc */
-        {
-          x: (point.x - origin.x) * metres,
-          y: (point.y - origin.y) * metres,
-          ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
-        }
-      );
-    }
-    return path;
-  }
-
-  // src/geometry/buildProjectedPolygon.js
-  function buildProjectedPolygon(context, paths, top, bottom, baseColor) {
-    const points = (
-      /* alloc */
-      []
-    );
-    let path, point, a, b, c, index, sign, i, length, nx, nz;
-    for (path of paths) for (point of path) points.push(point);
-    for ([a, b, c] of triangulate(paths[0], paths.slice(1))) {
-      addTriangle(context, points[a], top, points[b], top, points[c], top, 0, 1, 0, baseColor);
-      if (bottom > 0) addTriangle(context, points[a], bottom, points[b], bottom, points[c], bottom, 0, -1, 0, baseColor);
-    }
-    for (index = 0; index < paths.length; index++) {
-      path = paths[index];
-      sign = isClockWise(path) === (index === 0) ? -1 : 1;
-      for (i = 0; i < path.length; i++) {
-        a = path[i], b = path[(i + 1) % path.length];
-        length = Math.hypot(b.x - a.x, b.y - a.y);
-        if (!length) continue;
-        nx = sign * (b.y - a.y) / length, nz = sign * (b.x - a.x) / length;
-        addTriangle(context, a, bottom, b, bottom, b, top, nx, 0, nz, baseColor);
-        addTriangle(context, a, bottom, b, top, a, top, nx, 0, nz, baseColor);
-      }
-    }
-  }
-
-  // src/geometry/buildExtrudedPolygon.js
-  function buildAreaPolygon(context, rings, top, bottom, baseColor) {
-    if (!rings.length) throw (
-      /* alloc */
-      new Error("Empty GeoJSON polygon")
-    );
-    const paths = (
-      /* alloc */
-      []
-    );
-    let ring3;
-    for (ring3 of rings) paths.push(projectRing(context, ring3));
-    buildProjectedPolygon(context, paths, top, bottom, baseColor);
-  }
-
-  // src/sources/featureAnchor.js
-  function featureAnchor(feature, nightLight) {
-    const geometry = feature?.geometry, point = geometry?.type === "Point";
-    if (nightLight && !point) throw (
-      /* alloc */
-      new Error("Night lights require Point geometry")
-    );
-    if (geometry?.type !== "Polygon" && geometry?.type !== "MultiPolygon" && !point) throw (
-      /* alloc */
-      new Error("Unsupported GeoJSON geometry")
-    );
-    const coordinates = point ? geometry.coordinates : geometry.type === "Polygon" ? geometry.coordinates[0]?.[0] : geometry.coordinates[0]?.[0]?.[0];
-    if (!Number.isFinite(coordinates?.[0]) || !Number.isFinite(coordinates?.[1])) throw (
-      /* alloc */
-      new Error("Invalid GeoJSON coordinates")
-    );
-    return coordinates;
-  }
-
-  // src/sources/extrusionStyle.js
-  function extrusionStyle(layer, feature) {
-    const style = layer.options.style(feature);
-    if (style === null) return null;
-    if (!style || typeof style !== "object") throw (
-      /* alloc */
-      new Error("style must return an extrusion style or null")
-    );
-    const { top, bottom = 0 } = style;
-    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
-      throw (
-        /* alloc */
-        new Error("Invalid extrusion heights: expected top > bottom >= 0")
-      );
-    }
-    return style;
-  }
-
-  // src/sources/prepareAreaGeometryJob.js
-  function prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor) {
-    const geometry = feature.geometry;
-    const polygons = (
-      /* alloc */
-      []
-    );
-    const rings = geometry.type === "Polygon" ? (
-      /* alloc */
-      [geometry.coordinates]
-    ) : geometry.type === "MultiPolygon" ? geometry.coordinates : (
-      /* alloc */
-      []
-    );
-    let polygon2, ring3, paths;
-    for (polygon2 of rings) {
-      if (!polygon2.length) throw (
-        /* alloc */
-        new Error("Empty GeoJSON polygon")
-      );
-      paths = /* alloc */
-      [];
-      for (ring3 of polygon2) paths.push(projectRing(context, ring3));
-      polygons.push(paths);
-    }
-    const point = geometry.type === "Point" ? projectedTree(context, lon, lat) : null;
-    const nightLight = context.backend.options.nightLight;
-    const crownColor = point ? parseColor(style.color ?? (nightLight ? void 0 : 5210683)) : baseColor;
-    const trunkColor = point && !nightLight ? parseColor(style.trunkColor ?? 7491898) : null;
-    context.jobs.push(
-      /* alloc */
-      {
-        point,
-        polygons,
-        baseColor: (
-          /* alloc */
-          { r: baseColor.r, g: baseColor.g, b: baseColor.b }
-        ),
-        support: feature.properties?.cod_ouvrag || `${lon},${lat}`,
-        style: (
-          /* alloc */
-          {
-            top: style.top,
-            bottom: style.bottom ?? 0,
-            color: (
-              /* alloc */
-              { r: crownColor.r, g: crownColor.g, b: crownColor.b }
-            ),
-            trunkColor: trunkColor ? (
-              /* alloc */
-              { r: trunkColor.r, g: trunkColor.g, b: trunkColor.b }
-            ) : void 0,
-            trunkRadius: style.trunkRadius,
-            crownRadius: style.crownRadius,
-            crownBottom: style.crownBottom,
-            crownShape: style.crownShape,
-            poleRadius: style.poleRadius,
-            lightRadius: style.lightRadius,
-            lightFlux: style.lightFlux
-          }
-        )
-      }
-    );
-  }
-
-  // src/sources/buildAreaFeature.js
-  function buildAreaFeature(context, feature) {
-    const { backend: layer, area: area2, map } = context;
-    const coords = area2.coords;
-    const coordinates = featureAnchor(feature, layer.options.nightLight);
-    const geometry = feature.geometry, isTree = geometry.type === "Point";
-    const lon = coordinates[0], lat = coordinates[1];
-    if (coords) {
-      const anchor = map.project(
-        /* alloc */
-        new L.LatLng(lat, lon),
-        coords.z
-      );
-      if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
-    }
-    const style = extrusionStyle(layer, feature);
-    if (style === null) {
-      context.skipped++;
-      return;
-    }
-    const { top, bottom = 0, color = 14267276 } = style;
-    const baseColor = parseColor(color);
-    if (context.jobs) {
-      prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
-      context.featureFaces.push(
-        /* alloc */
-        {
-          id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
-          properties: feature.properties,
-          baseColor
-        }
-      );
-      return;
-    }
-    const vertexStart = context.positions.length / 3;
-    if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
-    let polygon2;
-    if (geometry.type === "Polygon") buildAreaPolygon(context, geometry.coordinates, top, bottom, baseColor);
-    else if (geometry.type === "MultiPolygon") for (polygon2 of geometry.coordinates) buildAreaPolygon(context, polygon2, top, bottom, baseColor);
-    const vertexEnd = context.positions.length / 3;
-    context.featureFaces.push(
-      /* alloc */
-      {
-        id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
-        properties: feature.properties,
-        baseColor,
-        faceStart: vertexStart / 3,
-        faceEnd: vertexEnd / 3,
-        vertexStart,
-        vertexEnd
-      }
-    );
-  }
-
   // src/geometry/instanceAreaGeometry.js
   function instanceAreaGeometry(context) {
     const { positions, normals, colors, featureFaces } = context;
@@ -8793,6 +8197,45 @@
     pool.idle.length = 0;
   }
 
+  // src/workers/createGeometryWorker.js
+  function createGeometryWorker(url, pool) {
+    let workerUrl = url, blobUrl, worker;
+    if (globalThis.location) {
+      const resolved = (
+        /* alloc */
+        new URL(url, location.href)
+      );
+      if ((resolved.protocol === "https:" || resolved.protocol === "http:") && resolved.origin !== location.origin) {
+        blobUrl = URL.createObjectURL(
+          /* alloc */
+          new Blob(
+            /* alloc */
+            [`import ${JSON.stringify(resolved.href)};`],
+            /* alloc */
+            { type: "text/javascript" }
+          )
+        );
+        workerUrl = blobUrl;
+      }
+    }
+    try {
+      worker = /* alloc */
+      new Worker(
+        workerUrl,
+        /* alloc */
+        { type: "module" }
+      );
+    } finally {
+      if (!worker && blobUrl) URL.revokeObjectURL(blobUrl);
+    }
+    const entry = (
+      /* alloc */
+      { url, pool, worker, blobUrl }
+    );
+    if (pool) pool.entries.add(entry);
+    return entry;
+  }
+
   // src/workers/acquireGeometryWorker.js
   function acquireGeometryWorker(map, url) {
     let pool = map && geometryWorkersByMap.get(map);
@@ -8827,39 +8270,7 @@
         pool.entries.delete(entry);
       }
     }
-    let workerUrl = url, blobUrl, worker;
-    if (globalThis.location) {
-      const resolved = (
-        /* alloc */
-        new URL(url, location.href)
-      );
-      if ((resolved.protocol === "https:" || resolved.protocol === "http:") && resolved.origin !== location.origin) {
-        blobUrl = URL.createObjectURL(
-          /* alloc */
-          new Blob(
-            /* alloc */
-            [`import ${JSON.stringify(resolved.href)};`],
-            /* alloc */
-            { type: "text/javascript" }
-          )
-        );
-        workerUrl = blobUrl;
-      }
-    }
-    try {
-      worker = /* alloc */
-      new Worker(
-        workerUrl,
-        /* alloc */
-        { type: "module" }
-      );
-    } finally {
-      if (!worker && blobUrl) URL.revokeObjectURL(blobUrl);
-    }
-    entry = /* alloc */
-    { url, pool, worker, blobUrl };
-    if (pool) pool.entries.add(entry);
-    return entry;
+    return createGeometryWorker(url, pool);
   }
 
   // src/workers/buildAreaInWorker.js
@@ -8908,9 +8319,639 @@
     }
   }
 
+  // src/projections/projectTreePoint.js
+  init_L();
+  function projectedTree(context, lon, lat) {
+    const { backend: layer, crs, origin, metres, map } = context;
+    const location2 = (
+      /* alloc */
+      new L.LatLng(lat, lon)
+    );
+    const point = crs.project(location2);
+    const elevation = mapElevationOf(map, location2), root = rootByLayer.get(layer);
+    return (
+      /* alloc */
+      {
+        x: (point.x - origin.x) * metres,
+        y: (point.y - origin.y) * metres,
+        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
+      }
+    );
+  }
+
+  // src/globals/triangleContexts.js
+  var triangleContexts = [];
+
+  // src/sources/groundOffset.js
+  function groundOffset(point) {
+    return point.ground || 0;
+  }
+
+  // src/geometry/appendAreaTriangle.js
+  function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
+    const { backend: layer, positions, normals, colors, uvs } = context;
+    const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
+    const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
+    if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
+      const point = b, height = bh;
+      b = c;
+      bh = ch;
+      c = point;
+      ch = height;
+    }
+    positions.push(
+      a.x,
+      ah + groundOffset(a),
+      -a.y,
+      b.x,
+      bh + groundOffset(b),
+      -b.y,
+      c.x,
+      ch + groundOffset(c),
+      -c.y
+    );
+    normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+    colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
+    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
+  }
+
+  // src/geometry/addGeneratedTriangle.js
+  function addGeneratedTriangle(...args) {
+    addTriangle(triangleContexts[triangleContexts.length - 1], ...args);
+  }
+
+  // src/geometry/generateTreeGeometry.js
+  function generateTreeGeometry(context, generator, point, style) {
+    triangleContexts.push(context);
+    try {
+      generator(point, style, addGeneratedTriangle);
+    } finally {
+      triangleContexts.pop();
+    }
+  }
+
+  // src/globals/lampDirections.js
+  var lampDirections = [
+    { x: Math.cos(0 * Math.PI / 3), y: Math.sin(0 * Math.PI / 3), nx: Math.cos(0.5 * Math.PI / 3), nz: -Math.sin(0.5 * Math.PI / 3) },
+    { x: Math.cos(1 * Math.PI / 3), y: Math.sin(1 * Math.PI / 3), nx: Math.cos(1.5 * Math.PI / 3), nz: -Math.sin(1.5 * Math.PI / 3) },
+    { x: Math.cos(2 * Math.PI / 3), y: Math.sin(2 * Math.PI / 3), nx: Math.cos(2.5 * Math.PI / 3), nz: -Math.sin(2.5 * Math.PI / 3) },
+    { x: Math.cos(3 * Math.PI / 3), y: Math.sin(3 * Math.PI / 3), nx: Math.cos(3.5 * Math.PI / 3), nz: -Math.sin(3.5 * Math.PI / 3) },
+    { x: Math.cos(4 * Math.PI / 3), y: Math.sin(4 * Math.PI / 3), nx: Math.cos(4.5 * Math.PI / 3), nz: -Math.sin(4.5 * Math.PI / 3) },
+    { x: Math.cos(5 * Math.PI / 3), y: Math.sin(5 * Math.PI / 3), nx: Math.cos(5.5 * Math.PI / 3), nz: -Math.sin(5.5 * Math.PI / 3) }
+  ];
+
+  // src/geometry/createLampRing.js
+  function ring(point, radius) {
+    const points = (
+      /* alloc */
+      new Array(lampDirections.length)
+    );
+    let i;
+    for (i = 0; i < points.length; i++) {
+      points[i] = /* alloc */
+      {
+        x: point.x + lampDirections[i].x * radius,
+        y: point.y + lampDirections[i].y * radius,
+        ground: point.ground,
+        uv: (
+          /* alloc */
+          [3, 3]
+        )
+      };
+    }
+    return points;
+  }
+
+  // src/geometry/lampPostGeometry.js
+  function lampPostGeometry(point, style, addTriangle2) {
+    const color = parseColor(5264986), radius = style.poleRadius;
+    if (!Number.isFinite(radius) || radius <= 0) {
+      throw (
+        /* alloc */
+        new Error("Invalid lamp pole radius")
+      );
+    }
+    const center = (
+      /* alloc */
+      {
+        ...point,
+        uv: (
+          /* alloc */
+          [3, 3]
+        )
+      }
+    );
+    let r, low, high, points, i, a, b, nx, nz, section;
+    for (section = 0; section < 2; section++) {
+      r = section ? radius * 2.5 : radius;
+      low = section ? style.top - 0.25 : 0;
+      high = section ? style.top + 0.15 : style.top;
+      points = ring(point, r);
+      for (i = 0; i < 6; i++) {
+        a = points[i], b = points[(i + 1) % 6];
+        nx = lampDirections[i].nx, nz = lampDirections[i].nz;
+        addTriangle2(a, low, b, low, b, high, nx, 0, nz, color);
+        addTriangle2(a, low, b, high, a, high, nx, 0, nz, color);
+        addTriangle2(center, high, a, high, b, high, 0, 1, 0, color);
+        addTriangle2(center, low, b, low, a, low, 0, -1, 0, color);
+      }
+    }
+  }
+
+  // src/geometry/quad.js
+  function quad(addTriangle2, color, a, b, c, d, height, nx, ny, nz) {
+    if (typeof nx !== "number") {
+      addTriangle2(a, height, b, height, c, height, ...nx, color);
+      addTriangle2(a, height, c, height, d, height, ...nx, color);
+    } else {
+      addTriangle2(a, height, b, height, c, height, nx, ny, nz, color);
+      addTriangle2(a, height, c, height, d, height, nx, ny, nz, color);
+    }
+  }
+
+  // src/geometry/emitter.js
+  function emitter(point, u, v, axis) {
+    const r = 0.65;
+    return (
+      /* alloc */
+      {
+        x: point.x + (axis === 2 ? 0 : u * r),
+        y: point.y + (axis === 1 ? 0 : axis === 2 ? u * r : v * r),
+        ground: point.ground + (axis === 0 ? 0 : v * r),
+        uv: (
+          /* alloc */
+          [u, v]
+        )
+      }
+    );
+  }
+
+  // src/geometry/lightGeometry.js
+  function lightGeometry(point, style, addTriangle2) {
+    if (!Number.isFinite(style.lightRadius) || style.lightRadius <= 0) throw (
+      /* alloc */
+      new Error("Invalid light radius")
+    );
+    const color = parseColor(style.color);
+    let axis;
+    for (axis = 0; axis < 3; axis++) {
+      quad(
+        addTriangle2,
+        color,
+        emitter(point, -1, -1, axis),
+        emitter(point, 1, -1, axis),
+        emitter(point, 1, 1, axis),
+        emitter(point, -1, 1, axis),
+        style.top,
+        axis === 2 ? 1 : 0,
+        axis === 0 ? 1 : 0,
+        axis === 1 ? 1 : 0
+      );
+    }
+  }
+
+  // src/globals/roundProfile.js
+  var roundProfile = [
+    [0, 0],
+    [0.35, 0.8],
+    [0.6, 1],
+    [0.85, 0.7],
+    [1, 0]
+  ];
+
+  // src/globals/ringDirections.js
+  var ringDirections = [
+    {
+      x: Math.cos(0 * Math.PI / 4),
+      y: Math.sin(0 * Math.PI / 4),
+      nx: Math.cos((0 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((0 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(1 * Math.PI / 4),
+      y: Math.sin(1 * Math.PI / 4),
+      nx: Math.cos((1 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((1 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(2 * Math.PI / 4),
+      y: Math.sin(2 * Math.PI / 4),
+      nx: Math.cos((2 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((2 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(3 * Math.PI / 4),
+      y: Math.sin(3 * Math.PI / 4),
+      nx: Math.cos((3 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((3 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(4 * Math.PI / 4),
+      y: Math.sin(4 * Math.PI / 4),
+      nx: Math.cos((4 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((4 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(5 * Math.PI / 4),
+      y: Math.sin(5 * Math.PI / 4),
+      nx: Math.cos((5 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((5 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(6 * Math.PI / 4),
+      y: Math.sin(6 * Math.PI / 4),
+      nx: Math.cos((6 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((6 + 0.5) * Math.PI / 4)
+    },
+    {
+      x: Math.cos(7 * Math.PI / 4),
+      y: Math.sin(7 * Math.PI / 4),
+      nx: Math.cos((7 + 0.5) * Math.PI / 4),
+      nz: -Math.sin((7 + 0.5) * Math.PI / 4)
+    }
+  ];
+
+  // src/geometry/createTreeRing.js
+  function ring2(point, radius) {
+    const result = (
+      /* alloc */
+      new Array(ringDirections.length)
+    );
+    let i;
+    for (i = 0; i < result.length; i++) {
+      result[i] = /* alloc */
+      {
+        x: point.x + ringDirections[i].x * radius,
+        y: point.y + ringDirections[i].y * radius,
+        ground: point.ground
+      };
+    }
+    return result;
+  }
+
+  // src/geometry/surface.js
+  function surface(point, addTriangle2, lowRadius, low, highRadius, high, color) {
+    const lower = ring2(point, lowRadius), upper = ring2(point, highRadius);
+    let i, next, slope, length, nx, nz, ny, normalX, normalZ;
+    for (i = 0; i < 8; i++) {
+      next = (i + 1) % 8;
+      slope = (lowRadius - highRadius) / (high - low);
+      length = Math.hypot(1, slope);
+      ({ nx, nz } = ringDirections[i]);
+      ny = slope / length;
+      normalX = nx / length, normalZ = nz / length;
+      if (lowRadius) addTriangle2(lower[i], low, lower[next], low, upper[next], high, normalX, ny, normalZ, color);
+      if (highRadius) addTriangle2(lower[i], low, upper[next], high, upper[i], high, normalX, ny, normalZ, color);
+    }
+  }
+
+  // src/geometry/validateTree.js
+  function validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape) {
+    if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) || trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top || crownShape !== "round" && crownShape !== "cone") {
+      throw (
+        /* alloc */
+        new Error("Invalid tree dimensions or crown shape")
+      );
+    }
+  }
+
+  // src/geometry/treeGeometry.js
+  function treeGeometry(point, style, addTriangle2) {
+    const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = "round" } = style;
+    validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);
+    const trunk = parseColor(style.trunkColor ?? 7491898);
+    const crown = parseColor(style.color ?? 5210683);
+    surface(point, addTriangle2, trunkRadius, bottom, trunkRadius, crownBottom + (top - crownBottom) * 0.25, trunk);
+    let i, low, lr, high, hr;
+    if (crownShape === "cone") {
+      const base = ring2(point, crownRadius);
+      for (i = 0; i < 8; i++) addTriangle2(
+        point,
+        crownBottom,
+        base[i],
+        crownBottom,
+        base[(i + 1) % 8],
+        crownBottom,
+        0,
+        -1,
+        0,
+        crown
+      );
+      surface(point, addTriangle2, crownRadius, crownBottom, 0, top, crown);
+    } else {
+      for (i = 1; i < roundProfile.length; i++) {
+        [low, lr] = roundProfile[i - 1], [high, hr] = roundProfile[i];
+        surface(
+          point,
+          addTriangle2,
+          lr * crownRadius,
+          crownBottom + low * (top - crownBottom),
+          hr * crownRadius,
+          crownBottom + high * (top - crownBottom),
+          crown
+        );
+      }
+    }
+  }
+
+  // src/geometry/buildProjectedPoint.js
+  function buildProjectedPoint(context, projected, style, baseColor, support) {
+    const { top } = style;
+    if (context.backend.options.nightLight) {
+      if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw (
+        /* alloc */
+        new Error("Invalid light flux")
+      );
+      if (style.poleRadius > 0 && !context.supports.has(support)) {
+        generateTreeGeometry(context, lampPostGeometry, projected, style);
+        context.supports.add(support);
+      }
+      generateTreeGeometry(context, lightGeometry, projected, style);
+      context.lights.push(
+        /* alloc */
+        {
+          position: (
+            /* alloc */
+            [projected.x, projected.ground + top, -projected.y]
+          ),
+          radius: Math.hypot(top, style.lightRadius),
+          color: (
+            /* alloc */
+            [baseColor.r, baseColor.g, baseColor.b]
+          ),
+          flux: style.lightFlux
+        }
+      );
+    } else generateTreeGeometry(context, treeGeometry, projected, style);
+  }
+
+  // src/sources/buildAreaPoint.js
+  function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
+    const projected = projectedTree(context, lon, lat);
+    buildProjectedPoint(context, projected, style, baseColor, feature.properties?.cod_ouvrag || `${lon},${lat}`);
+  }
+
+  // src/projections/projectRing.js
+  init_L();
+  function projectRing(context, ring3) {
+    const { backend: layer, crs, origin, metres, map } = context;
+    if (ring3.length < 4) throw (
+      /* alloc */
+      new Error("Invalid GeoJSON polygon ring")
+    );
+    const path = (
+      /* alloc */
+      []
+    );
+    const root = rootByLayer.get(layer);
+    let i, lng, lat, location2, point, elevation;
+    for (i = 0; i < ring3.length - 1; i++) {
+      lng = ring3[i][0], lat = ring3[i][1];
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw (
+        /* alloc */
+        new Error("Invalid GeoJSON coordinates")
+      );
+      location2 = /* alloc */
+      new L.LatLng(lat, lng);
+      point = crs.project(location2);
+      elevation = mapElevationOf(map, location2);
+      path.push(
+        /* alloc */
+        {
+          x: (point.x - origin.x) * metres,
+          y: (point.y - origin.y) * metres,
+          ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
+        }
+      );
+    }
+    return path;
+  }
+
+  // src/geometry/buildProjectedPolygon.js
+  function buildProjectedPolygon(context, paths, top, bottom, baseColor) {
+    const points = (
+      /* alloc */
+      []
+    );
+    let path, point, a, b, c, index, sign, i, length, nx, nz;
+    for (path of paths) for (point of path) points.push(point);
+    for ([a, b, c] of triangulate(paths[0], paths.slice(1))) {
+      addTriangle(context, points[a], top, points[b], top, points[c], top, 0, 1, 0, baseColor);
+      if (bottom > 0) addTriangle(context, points[a], bottom, points[b], bottom, points[c], bottom, 0, -1, 0, baseColor);
+    }
+    for (index = 0; index < paths.length; index++) {
+      path = paths[index];
+      sign = isClockWise(path) === (index === 0) ? -1 : 1;
+      for (i = 0; i < path.length; i++) {
+        a = path[i], b = path[(i + 1) % path.length];
+        length = Math.hypot(b.x - a.x, b.y - a.y);
+        if (!length) continue;
+        nx = sign * (b.y - a.y) / length, nz = sign * (b.x - a.x) / length;
+        addTriangle(context, a, bottom, b, bottom, b, top, nx, 0, nz, baseColor);
+        addTriangle(context, a, bottom, b, top, a, top, nx, 0, nz, baseColor);
+      }
+    }
+  }
+
+  // src/geometry/buildExtrudedPolygon.js
+  function buildAreaPolygon(context, rings, top, bottom, baseColor) {
+    if (!rings.length) throw (
+      /* alloc */
+      new Error("Empty GeoJSON polygon")
+    );
+    const paths = (
+      /* alloc */
+      []
+    );
+    let ring3;
+    for (ring3 of rings) paths.push(projectRing(context, ring3));
+    buildProjectedPolygon(context, paths, top, bottom, baseColor);
+  }
+
+  // src/sources/featureAnchor.js
+  function featureAnchor(feature, nightLight) {
+    const geometry = feature?.geometry, point = geometry?.type === "Point";
+    if (nightLight && !point) throw (
+      /* alloc */
+      new Error("Night lights require Point geometry")
+    );
+    if (geometry?.type !== "Polygon" && geometry?.type !== "MultiPolygon" && !point) throw (
+      /* alloc */
+      new Error("Unsupported GeoJSON geometry")
+    );
+    const coordinates = point ? geometry.coordinates : geometry.type === "Polygon" ? geometry.coordinates[0]?.[0] : geometry.coordinates[0]?.[0]?.[0];
+    if (!Number.isFinite(coordinates?.[0]) || !Number.isFinite(coordinates?.[1])) throw (
+      /* alloc */
+      new Error("Invalid GeoJSON coordinates")
+    );
+    return coordinates;
+  }
+
+  // src/sources/extrusionStyle.js
+  function extrusionStyle(layer, feature) {
+    const style = layer.options.style(feature);
+    if (style === null) return null;
+    if (!style || typeof style !== "object") throw (
+      /* alloc */
+      new Error("style must return an extrusion style or null")
+    );
+    const { top, bottom = 0 } = style;
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom < 0 || top <= bottom) {
+      throw (
+        /* alloc */
+        new Error("Invalid extrusion heights: expected top > bottom >= 0")
+      );
+    }
+    return style;
+  }
+
+  // src/sources/projectAreaPolygons.js
+  function projectAreaPolygons(context, geometry) {
+    const rings = geometry.type === "Polygon" ? (
+      /* alloc */
+      [geometry.coordinates]
+    ) : geometry.type === "MultiPolygon" ? geometry.coordinates : (
+      /* alloc */
+      []
+    );
+    const polygons = (
+      /* alloc */
+      []
+    );
+    let polygon2, ring3, paths;
+    for (polygon2 of rings) {
+      if (!polygon2.length) throw (
+        /* alloc */
+        new Error("Empty GeoJSON polygon")
+      );
+      paths = /* alloc */
+      [];
+      for (ring3 of polygon2) paths.push(projectRing(context, ring3));
+      polygons.push(paths);
+    }
+    return polygons;
+  }
+
+  // src/sources/prepareAreaGeometryJob.js
+  function prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor) {
+    const geometry = feature.geometry;
+    const polygons = projectAreaPolygons(context, geometry);
+    const point = geometry.type === "Point" ? projectedTree(context, lon, lat) : null;
+    const nightLight = context.backend.options.nightLight;
+    const crownColor = point ? parseColor(style.color ?? (nightLight ? void 0 : 5210683)) : baseColor;
+    const trunkColor = point && !nightLight ? parseColor(style.trunkColor ?? 7491898) : null;
+    context.jobs.push(
+      /* alloc */
+      {
+        point,
+        polygons,
+        baseColor: (
+          /* alloc */
+          { r: baseColor.r, g: baseColor.g, b: baseColor.b }
+        ),
+        support: feature.properties?.cod_ouvrag || `${lon},${lat}`,
+        style: (
+          /* alloc */
+          {
+            top: style.top,
+            bottom: style.bottom ?? 0,
+            color: (
+              /* alloc */
+              { r: crownColor.r, g: crownColor.g, b: crownColor.b }
+            ),
+            trunkColor: trunkColor ? (
+              /* alloc */
+              { r: trunkColor.r, g: trunkColor.g, b: trunkColor.b }
+            ) : void 0,
+            trunkRadius: style.trunkRadius,
+            crownRadius: style.crownRadius,
+            crownBottom: style.crownBottom,
+            crownShape: style.crownShape,
+            poleRadius: style.poleRadius,
+            lightRadius: style.lightRadius,
+            lightFlux: style.lightFlux
+          }
+        )
+      }
+    );
+  }
+
+  // src/sources/matchesAreaTile.js
+  init_L();
+  function matchesAreaTile(map, coords, lon, lat) {
+    if (!coords) return true;
+    const anchor = map.project(
+      /* alloc */
+      new L.LatLng(lat, lon),
+      coords.z
+    );
+    return Math.floor(anchor.x / 256) === coords.x && Math.floor(anchor.y / 256) === coords.y;
+  }
+
+  // src/sources/buildAreaFeature.js
+  function buildAreaFeature(context, feature) {
+    const { backend: layer, area: area2, map } = context;
+    const coords = area2.coords;
+    const coordinates = featureAnchor(feature, layer.options.nightLight);
+    const geometry = feature.geometry, isTree = geometry.type === "Point";
+    const lon = coordinates[0], lat = coordinates[1];
+    if (!matchesAreaTile(map, coords, lon, lat)) return;
+    const style = extrusionStyle(layer, feature);
+    if (style === null) {
+      context.skipped++;
+      return;
+    }
+    const { top, bottom = 0, color = 14267276 } = style;
+    const baseColor = parseColor(color);
+    if (context.jobs) {
+      prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
+      context.featureFaces.push(
+        /* alloc */
+        {
+          id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
+          properties: feature.properties,
+          baseColor
+        }
+      );
+      return;
+    }
+    const vertexStart = context.positions.length / 3;
+    if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
+    let polygon2;
+    if (geometry.type === "Polygon") buildAreaPolygon(context, geometry.coordinates, top, bottom, baseColor);
+    else if (geometry.type === "MultiPolygon") for (polygon2 of geometry.coordinates) buildAreaPolygon(context, polygon2, top, bottom, baseColor);
+    const vertexEnd = context.positions.length / 3;
+    context.featureFaces.push(
+      /* alloc */
+      {
+        id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
+        properties: feature.properties,
+        baseColor,
+        faceStart: vertexStart / 3,
+        faceEnd: vertexEnd / 3,
+        vertexStart,
+        vertexEnd
+      }
+    );
+  }
+
+  // src/sources/buildAreaFeatures.js
+  async function buildAreaFeatures(context, area2, features) {
+    let deadline = performance.now() + 4, feature;
+    for (feature of features) {
+      if (area2.request.signal.aborted) return;
+      if (performance.now() >= deadline) {
+        await /* alloc */
+        new Promise(requestAnimationFrame);
+        if (area2.request.signal.aborted) return;
+        deadline = performance.now() + 4;
+      }
+      buildAreaFeature(context, feature);
+    }
+  }
+
   // src/sources/buildArea.js
   async function buildArea(layer, area2, map) {
-    let feature;
     try {
       await /* alloc */
       new Promise(requestAnimationFrame);
@@ -8935,17 +8976,8 @@
         context.jobs = /* alloc */
         [];
       }
-      let deadline = performance.now() + 4;
-      for (feature of data.features) {
-        if (area2.request.signal.aborted) return;
-        if (performance.now() >= deadline) {
-          await /* alloc */
-          new Promise(requestAnimationFrame);
-          if (area2.request.signal.aborted) return;
-          deadline = performance.now() + 4;
-        }
-        buildAreaFeature(context, feature);
-      }
+      await buildAreaFeatures(context, area2, data.features);
+      if (area2.request.signal.aborted) return;
       if (context.jobs) await buildAreaInWorker(context, area2.request.signal);
       if (area2.request.signal.aborted) return;
       attachAreaMesh(context);
@@ -10283,26 +10315,26 @@
       /* alloc */
       new Error("glTF mesh has no positions")
     );
-    const vertexCount = attributes.position.data.length / 3;
-    if (attributes.position.size !== 3 || vertexCount < 3) throw (
+    const vertexCount2 = attributes.position.data.length / 3;
+    if (attributes.position.size !== 3 || vertexCount2 < 3) throw (
       /* alloc */
       new Error("Invalid glTF vertex attributes")
     );
     let attribute;
     for (attribute of Object.values(attributes)) {
-      if (attribute.data.length / attribute.size !== vertexCount) throw (
+      if (attribute.data.length / attribute.size !== vertexCount2) throw (
         /* alloc */
         new Error("Invalid glTF vertex attributes")
       );
     }
     return (
       /* alloc */
-      { attributes, vertexCount }
+      { attributes, vertexCount: vertexCount2 }
     );
   }
 
   // src/models/readModelIndices.js
-  function readModelIndices(description, primitive, attributes, vertexCount) {
+  function readModelIndices(description, primitive, attributes, vertexCount2) {
     if (primitive.indices !== void 0) {
       const index = readAccessor(description, primitive.indices);
       attributes.index = /* alloc */
@@ -10314,11 +10346,11 @@
         );
       }
       let value;
-      for (value of index.indices) if (value >= vertexCount) throw (
+      for (value of index.indices) if (value >= vertexCount2) throw (
         /* alloc */
         new Error("Invalid glTF triangle indices")
       );
-    } else if (vertexCount % 3) {
+    } else if (vertexCount2 % 3) {
       throw (
         /* alloc */
         new Error("Incomplete glTF triangle")
@@ -10405,13 +10437,13 @@
       }
     );
     group.matrix = nodeMatrix(spec);
-    let primitive, attributeData, attributes, vertexCount, built, mesh, child;
+    let primitive, attributeData, attributes, vertexCount2, built, mesh, child;
     if (spec.mesh !== void 0) {
       for (primitive of description.meshes[spec.mesh].primitives) {
         attributeData = readModelAttributes(description, primitive);
         attributes = attributeData.attributes;
-        vertexCount = attributeData.vertexCount;
-        readModelIndices(description, primitive, attributes, vertexCount);
+        vertexCount2 = attributeData.vertexCount;
+        readModelIndices(description, primitive, attributes, vertexCount2);
         built = createModelGeometry(context, primitive, attributes);
         mesh = /* alloc */
         {
@@ -14556,49 +14588,21 @@
   init_mapGetBearing();
   init_mapSetPitch();
 
-  // src/utils/wrap.js
-  function wrap(angle) {
-    return Math.atan2(Math.sin(angle), Math.cos(angle));
-  }
-
-  // src/picking/shouldSkipOther.js
-  function shouldSkipOther(other, layer) {
-    return other === layer || typeByLayer.get(other) === "terrain" || typeByLayer.get(other) === "traffic";
-  }
-
-  // src/walk/landWalker.js
-  function land(previousY) {
-    const ray = raycasterByLayer.get(this.layer);
-    const feet = local2.call(this, this.local), root = rootByLayer.get(this.layer);
-    const x = root.position[0] + feet[0] * root.scale[0];
-    const y = root.position[1] + feet[1] * root.scale[1];
-    const z = root.position[2] + feet[2] * root.scale[2];
-    if (y > previousY || this.verticalSpeed > 0) return;
-    updateWorldMatrix(sceneByLayer.get(this.layer));
-    ray.origin[0] = x;
-    ray.origin[1] = previousY + 0.01;
-    ray.origin[2] = z;
-    ray.direction[0] = 0;
-    ray.direction[1] = -1;
-    ray.direction[2] = 0;
-    ray.meshes.length = 0;
-    let layer, hit2;
-    for (layer of layersByLayer.get(sharedByLayer.get(this.layer))) {
-      if (shouldSkipOther(layer, this.layer) || kindByLayer.get(layer) === "raster" || layer.options.nightLight) continue;
-      traverse(rootByLayer.get(layer), collectVisibleMesh2, ray.meshes);
+  // src/walk/stepWalkerHeight.js
+  function stepWalkerHeight(dt) {
+    if (this.keys.has("Space")) {
+      this.verticalSpeed = 6;
+      this.state.height += this.verticalSpeed * dt;
+      return true;
     }
-    for (hit2 of intersectMeshes(ray, ray.meshes)) {
-      if (hit2.point[1] < y - 1e-3) break;
-      this.state.height += (hit2.point[1] - y) / root.scale[1];
-      this.verticalSpeed = 0;
-      break;
-    }
-    ray.meshes.length = 0;
+    if (!this.verticalSpeed && !this.state.height) return false;
+    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
+    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
+    return true;
   }
 
-  // src/walk/moveWalker.js
+  // src/walk/resolveWalkerPosition.js
   init_L();
-  init_radians();
 
   // src/globals/CELL.js
   var CELL = 8;
@@ -14625,8 +14629,8 @@
   function collider(mesh) {
     let c = colliders.get(mesh.geometry);
     if (c) return c;
-    const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
-    const vertices = index ? index.count : p.length / 3;
+    const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+    const vertices = vertexCount(position, index);
     const count = vertices * (instanceOffset?.count ?? 1);
     const tri = (
       /* alloc */
@@ -14717,43 +14721,75 @@
     return (fx * qx + fy * qy + fz * qz) / det;
   }
 
-  // src/picking/hitColliderCell.js
-  function hitColliderCell(cell, c, data, ox, oy, oz) {
-    const { dx, dz, seen } = data;
-    let t, height, d;
-    for (t of cell) {
-      if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
-      seen.add(t);
-      for (height = 0.4; height < 2; height += 1.1) {
-        d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
-        if (d >= 0 && d < data.best) {
-          data.best = d;
-          data.found = true;
-          data.normal[0] = c.nrm[t * 2];
-          data.normal[1] = c.nrm[t * 2 + 1];
-        }
+  // src/collision/collectIntersections.js
+  function collectIntersections(shape, x, y, z, seen, hits, end, iz) {
+    let ix, cell, triangle3, distance;
+    for (ix = Math.floor(x / CELL); ix <= end; ix++) {
+      cell = shape.cells.get(`${ix},${iz}`);
+      if (!cell) continue;
+      for (triangle3 of cell) {
+        if (seen.has(triangle3)) continue;
+        seen.add(triangle3);
+        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
+        if (distance > 1e-4) hits.push(distance);
       }
     }
   }
 
-  // src/picking/hitMesh.js
-  function hitMesh(mesh, data) {
-    if (!mesh.visible) return true;
-    if (!mesh.geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return;
-    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
-    const m = mesh.worldMatrix, { center: k, radius } = mesh.geometry.bounds;
-    const { x, y, z, dx, dz, reach } = data;
-    if (Math.hypot(m[0] * k[0] + m[4] * k[1] + m[8] * k[2] + m[12] - x, m[2] * k[0] + m[6] * k[1] + m[10] * k[2] + m[14] - z) > radius * Math.hypot(m[0], m[1], m[2]) + reach) return;
-    const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
-    const seen = data.seen;
+  // src/collision/countCrossings.js
+  function countCrossings(hits) {
+    let ix, j, distance;
+    for (ix = 1; ix < hits.length; ix++) {
+      distance = hits[ix];
+      j = ix - 1;
+      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
+      hits[j + 1] = distance;
+    }
+    let crossings = 0, previous = -Infinity;
+    for (distance of hits) {
+      if (distance - previous > 1e-4) crossings++;
+      previous = distance;
+    }
+    return crossings;
+  }
+
+  // src/collision/insideMesh.js
+  function insideMesh(mesh, x, y, z, seen, intersections) {
+    const geometry = mesh.geometry;
+    if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
+    if (!geometry.bounds) computeBounds(geometry);
+    const bounds = geometry.bounds;
+    const world = mesh.worldMatrix;
+    const center = bounds.center;
+    const cx = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
+    const cy = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
+    const cz = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+    const radius = bounds.radius * Math.max(
+      Math.hypot(world[0], world[1], world[2]),
+      Math.hypot(world[4], world[5], world[6]),
+      Math.hypot(world[8], world[9], world[10])
+    );
+    if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
+    const shape = collider(mesh);
+    const end = Math.floor(shape.maxX / CELL);
+    if (x >= shape.maxX) return false;
+    const iz = Math.floor(z / CELL);
+    const hits = intersections;
+    hits.length = 0;
     seen.clear();
-    let ix, iz, cell;
-    for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
-      for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
-        cell = c.cells.get(ix + "," + iz);
-        if (!cell) continue;
-        hitColliderCell(cell, c, data, ox, oy, oz);
-      }
+    collectIntersections(shape, x, y, z, seen, hits, end, iz);
+    return countCrossings(hits) % 2 === 1;
+  }
+
+  // src/collision/setTrafficNormal.js
+  function setTrafficNormal(data, x, z, distance, dx, dz) {
+    if (distance < 1e-6) {
+      data.normal[0] = -dx;
+      data.normal[1] = -dz;
+    } else {
+      data.normal[0] = x / distance;
+      data.normal[1] = z / distance;
+    }
   }
 
   // src/collision/trafficCollision.js
@@ -14762,7 +14798,8 @@
     if (!state?.mesh || !state.trips.length) return false;
     let bounds = state.collisionBounds;
     if (!bounds) {
-      bounds = state.collisionBounds = { radius: 0, minY: Infinity, maxY: -Infinity };
+      bounds = state.collisionBounds = /* alloc */
+      { radius: 0, minY: Infinity, maxY: -Infinity };
       let i, px2, py, pz2;
       for (i = 0; i < state.template.position.length; i += 3) {
         px2 = state.template.position[i];
@@ -14773,7 +14810,8 @@
         bounds.maxY = Math.max(bounds.maxY, py);
       }
     }
-    const root = rootByLayer.get(layer), position = state.position ||= {};
+    const root = rootByLayer.get(layer), position = state.position ||= /* alloc */
+    {};
     const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
     const radius = bounds.radius * scale + 0.35;
     let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
@@ -14802,149 +14840,9 @@
       data.best = entry;
       data.found = true;
       distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
-      if (distance < 1e-6) {
-        data.normal[0] = -dx;
-        data.normal[1] = -dz;
-      } else {
-        data.normal[0] = (x + entry * dx - px) / distance;
-        data.normal[1] = (z + entry * dz - pz) / distance;
-      }
+      setTrafficNormal(data, x + entry * dx - px, z + entry * dz - pz, distance, dx, dz);
     }
     return data.found;
-  }
-
-  // src/picking/hit.js
-  function hit(layer, x, y, z, dx, dz, reach, data) {
-    updateWorldMatrix(sceneByLayer.get(layer));
-    data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
-    data.best = reach, data.found = false;
-    let other;
-    for (other of layersByLayer.get(sharedByLayer.get(layer))) {
-      if (other === layer || kindByLayer.get(other) === "terrain") continue;
-      if (kindByLayer.get(other) === "traffic") {
-        trafficCollision(other, x, y, z, dx, dz, reach, data);
-        continue;
-      }
-      traverse(rootByLayer.get(other), hitMesh, data);
-    }
-    return data.found ? data.normal : null;
-  }
-
-  // src/walk/isWalkBlocked.js
-  function blocked(east, north, feet) {
-    const length = Math.hypot(east, north);
-    return length > 1e-6 && hit(this.layer, feet[0], feet[1], feet[2], east / length, -north / length, length + 0.3, this.hitData);
-  }
-
-  // src/walk/moveWalker.js
-  function moveWalker(forward, dt) {
-    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
-    const { position, scale } = rootByLayer.get(this.layer);
-    let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
-    const feet = local2.call(this, this.local);
-    let i;
-    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
-    const wall = blocked.call(this, east, north, feet);
-    if (wall) {
-      const into = east * wall[0] - north * wall[1];
-      east -= into * wall[0];
-      north += into * wall[1];
-      if (blocked.call(this, east, north, feet)) east = north = 0;
-    }
-    this.state.latlng = /* alloc */
-    new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
-    this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
-  }
-
-  // src/walk/stepWalkerHeight.js
-  function stepWalkerHeight(dt) {
-    if (this.keys.has("Space")) {
-      this.verticalSpeed = 6;
-      this.state.height += this.verticalSpeed * dt;
-      return true;
-    }
-    if (!this.verticalSpeed && !this.state.height) return false;
-    this.state.height = Math.max(0, this.state.height + this.verticalSpeed * dt - 9.81 * dt * dt / 2);
-    this.verticalSpeed = this.state.height > 0 ? this.verticalSpeed - 9.81 * dt : 0;
-    return true;
-  }
-
-  // src/walk/updateWalkerView.js
-  init_degrees();
-  init_radians();
-  init_mapGetBearing();
-  init_mapSetPitchAndBearing();
-  init_mapGetPitch();
-  function updateWalkerView(forward, turn, dt) {
-    const map = this.layer._map;
-    if (forward || turn) {
-      const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
-      if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
-      map.setView(
-        this.state.latlng,
-        map.getZoom(),
-        /* alloc */
-        { animate: false }
-      );
-    }
-    const target = forward ? 0.9 : 0;
-    if (Math.abs(this.swing - target) > 1e-3) {
-      this.swing += (target - this.swing) * Math.min(1, dt * 10);
-      return true;
-    }
-    return false;
-  }
-
-  // src/walk/resolveWalkerPosition.js
-  init_L();
-
-  // src/collision/insideMesh.js
-  function insideMesh(mesh, x, y, z, seen, intersections) {
-    const geometry = mesh.geometry;
-    if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
-    if (!geometry.bounds) computeBounds(geometry);
-    const bounds = geometry.bounds;
-    const world = mesh.worldMatrix;
-    const center = bounds.center;
-    const cx = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
-    const cy = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
-    const cz = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
-    const radius = bounds.radius * Math.max(
-      Math.hypot(world[0], world[1], world[2]),
-      Math.hypot(world[4], world[5], world[6]),
-      Math.hypot(world[8], world[9], world[10])
-    );
-    if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
-    const shape = collider(mesh);
-    const end = Math.floor(shape.maxX / CELL);
-    if (x >= shape.maxX) return false;
-    const iz = Math.floor(z / CELL);
-    const hits = intersections;
-    hits.length = 0;
-    seen.clear();
-    let ix, cell, triangle3, distance;
-    for (ix = Math.floor(x / CELL); ix <= end; ix++) {
-      cell = shape.cells.get(`${ix},${iz}`);
-      if (!cell) continue;
-      for (triangle3 of cell) {
-        if (seen.has(triangle3)) continue;
-        seen.add(triangle3);
-        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
-        if (distance > 1e-4) hits.push(distance);
-      }
-    }
-    for (ix = 1; ix < hits.length; ix++) {
-      distance = hits[ix];
-      let j = ix - 1;
-      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
-      hits[j + 1] = distance;
-    }
-    let crossings = 0, previous = -Infinity;
-    for (distance of hits) {
-      if (distance - previous > 1e-4) crossings++;
-      previous = distance;
-    }
-    return crossings % 2 === 1;
   }
 
   // src/collision/insideWalker.js
@@ -14959,7 +14857,7 @@
     const y = root.position[1] + feet[1] * root.scale[1];
     const z = root.position[2] + feet[2] * root.scale[2];
     const layers = layersByLayer.get(shared);
-    let other, node, child;
+    let other, node, child, nodes;
     for (other of layers) {
       if (other === layer || kindByLayer.get(other) === "terrain") continue;
       if (kindByLayer.get(other) === "traffic") {
@@ -14968,7 +14866,7 @@
         if (trafficCollision(other, x, y, z, 0, 0, 0, hitData)) return true;
         continue;
       }
-      const nodes = hitData.nodes;
+      nodes = hitData.nodes;
       nodes.length = 0;
       if (rootByLayer.get(other)) nodes.push(rootByLayer.get(other));
       while (nodes.length) {
@@ -15014,6 +14912,173 @@
     return false;
   }
 
+  // src/utils/wrap.js
+  function wrap(angle) {
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+  }
+
+  // src/picking/shouldSkipOther.js
+  function shouldSkipOther(other, layer) {
+    return other === layer || typeByLayer.get(other) === "terrain" || typeByLayer.get(other) === "traffic";
+  }
+
+  // src/walk/landWalker.js
+  function land(previousY) {
+    const ray = raycasterByLayer.get(this.layer);
+    const feet = local2.call(this, this.local), root = rootByLayer.get(this.layer);
+    const x = root.position[0] + feet[0] * root.scale[0];
+    const y = root.position[1] + feet[1] * root.scale[1];
+    const z = root.position[2] + feet[2] * root.scale[2];
+    if (y > previousY || this.verticalSpeed > 0) return;
+    updateWorldMatrix(sceneByLayer.get(this.layer));
+    ray.origin[0] = x;
+    ray.origin[1] = previousY + 0.01;
+    ray.origin[2] = z;
+    ray.direction[0] = 0;
+    ray.direction[1] = -1;
+    ray.direction[2] = 0;
+    ray.meshes.length = 0;
+    let layer, hit2;
+    for (layer of layersByLayer.get(sharedByLayer.get(this.layer))) {
+      if (shouldSkipOther(layer, this.layer) || kindByLayer.get(layer) === "raster" || layer.options.nightLight) continue;
+      traverse(rootByLayer.get(layer), collectVisibleMesh2, ray.meshes);
+    }
+    for (hit2 of intersectMeshes(ray, ray.meshes)) {
+      if (hit2.point[1] < y - 1e-3) break;
+      this.state.height += (hit2.point[1] - y) / root.scale[1];
+      this.verticalSpeed = 0;
+      break;
+    }
+    ray.meshes.length = 0;
+  }
+
+  // src/walk/moveWalker.js
+  init_L();
+  init_radians();
+
+  // src/picking/hitColliderCell.js
+  function hitColliderCell(cell, c, data, ox, oy, oz) {
+    const { dx, dz, seen } = data;
+    let t, height, d;
+    for (t of cell) {
+      if (seen.has(t) || dx * c.nrm[t * 2] + dz * c.nrm[t * 2 + 1] >= 0) continue;
+      seen.add(t);
+      for (height = 0.4; height < 2; height += 1.1) {
+        d = horizontalRay(c.tri, t, ox, oy + height, oz, dx, dz);
+        if (d >= 0 && d < data.best) {
+          data.best = d;
+          data.found = true;
+          data.normal[0] = c.nrm[t * 2];
+          data.normal[1] = c.nrm[t * 2 + 1];
+        }
+      }
+    }
+  }
+
+  // src/picking/hitMesh.js
+  function hitMesh(mesh, data) {
+    if (!mesh.visible) return true;
+    if (!mesh.geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return;
+    if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
+    const m = mesh.worldMatrix, { center: k, radius } = mesh.geometry.bounds;
+    const { x, y, z, dx, dz, reach } = data;
+    if (Math.hypot(m[0] * k[0] + m[4] * k[1] + m[8] * k[2] + m[12] - x, m[2] * k[0] + m[6] * k[1] + m[10] * k[2] + m[14] - z) > radius * Math.hypot(m[0], m[1], m[2]) + reach) return;
+    const c = collider(mesh), ox = x - m[12] + c.origin[0], oy = y - m[13] + c.origin[1], oz = z - m[14] + c.origin[2];
+    const seen = data.seen;
+    seen.clear();
+    let ix, iz, cell;
+    for (ix = Math.floor(Math.min(ox, ox + dx * reach) / CELL); ix <= Math.floor(Math.max(ox, ox + dx * reach) / CELL); ix++)
+      for (iz = Math.floor(Math.min(oz, oz + dz * reach) / CELL); iz <= Math.floor(Math.max(oz, oz + dz * reach) / CELL); iz++) {
+        cell = c.cells.get(ix + "," + iz);
+        if (!cell) continue;
+        hitColliderCell(cell, c, data, ox, oy, oz);
+      }
+  }
+
+  // src/picking/hit.js
+  function hit(layer, x, y, z, dx, dz, reach, data) {
+    updateWorldMatrix(sceneByLayer.get(layer));
+    data.x = x, data.y = y, data.z = z, data.dx = dx, data.dz = dz, data.reach = reach;
+    data.best = reach, data.found = false;
+    let other;
+    for (other of layersByLayer.get(sharedByLayer.get(layer))) {
+      if (other === layer || kindByLayer.get(other) === "terrain") continue;
+      if (kindByLayer.get(other) === "traffic") {
+        trafficCollision(other, x, y, z, dx, dz, reach, data);
+        continue;
+      }
+      traverse(rootByLayer.get(other), hitMesh, data);
+    }
+    return data.found ? data.normal : null;
+  }
+
+  // src/walk/isWalkBlocked.js
+  function blocked(east, north, feet) {
+    const length = Math.hypot(east, north);
+    return length > 1e-6 && hit(this.layer, feet[0], feet[1], feet[2], east / length, -north / length, length + 0.3, this.hitData);
+  }
+
+  // src/walk/moveWalker.js
+  function moveWalker(forward, dt) {
+    const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
+    const { position, scale } = rootByLayer.get(this.layer);
+    let east = Math.sin(this.state.heading) * metres, north = Math.cos(this.state.heading) * metres;
+    const feet = local2.call(this, this.local);
+    let i;
+    for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
+    const wall = blocked.call(this, east, north, feet);
+    if (wall) {
+      const into = east * wall[0] - north * wall[1];
+      east -= into * wall[0];
+      north += into * wall[1];
+      if (blocked.call(this, east, north, feet)) east = north = 0;
+    }
+    this.state.latlng = /* alloc */
+    new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
+    this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;
+  }
+
+  // src/walk/updateWalkerView.js
+  init_degrees();
+  init_radians();
+  init_mapGetBearing();
+  init_mapSetPitchAndBearing();
+  init_mapGetPitch();
+  function updateWalkerView(forward, turn, dt) {
+    const map = this.layer._map;
+    if (forward || turn) {
+      const bearing = mapGetBearing(map) * radians, behind = wrap(-this.state.heading - bearing);
+      if (Math.abs(behind) > 1e-3) mapSetPitchAndBearing(map, mapGetPitch(map), (bearing + behind * Math.min(1, dt * 4)) * degrees);
+      map.setView(
+        this.state.latlng,
+        map.getZoom(),
+        /* alloc */
+        { animate: false }
+      );
+    }
+    const target = forward ? 0.9 : 0;
+    if (Math.abs(this.swing - target) > 1e-3) {
+      this.swing += (target - this.swing) * Math.min(1, dt * 10);
+      return true;
+    }
+    return false;
+  }
+
+  // src/walk/updateWalkerFrame.js
+  function updateWalkerFrame(walker, previousY, forward, turn, dt, changed) {
+    if (turn) {
+      walker.state.heading = wrap(walker.state.heading + turn * 2.5 * dt);
+      changed = true;
+    }
+    if (forward) {
+      moveWalker.call(walker, forward, dt);
+      changed = true;
+    }
+    if (changed) land.call(walker, previousY);
+    if (updateWalkerView.call(walker, forward, turn, dt)) changed = true;
+    if (changed) place.call(walker);
+  }
+
   // src/walk/animateWalker.js
   function step(now) {
     const layer = this.layer;
@@ -15042,17 +15107,7 @@
     }
     forward = Math.sign(forward);
     turn = Math.sign(turn);
-    if (turn) {
-      this.state.heading = wrap(this.state.heading + turn * 2.5 * dt);
-      changed = true;
-    }
-    if (forward) {
-      moveWalker.call(this, forward, dt);
-      changed = true;
-    }
-    if (changed) land.call(this, previousY);
-    if (updateWalkerView.call(this, forward, turn, dt)) changed = true;
-    if (changed) place.call(this);
+    updateWalkerFrame(this, previousY, forward, turn, dt, changed);
   }
 
   // src/walk/startWalking.js

@@ -1,10 +1,10 @@
-import { L } from '../globals/L.js';
 import { buildAreaPoint } from './buildAreaPoint.js';
 import { buildAreaPolygon } from '../geometry/buildExtrudedPolygon.js';
 import { parseColor } from '../colors/parseColor.js';
 import { featureAnchor } from './featureAnchor.js';
 import { extrusionStyle } from './extrusionStyle.js';
 import { prepareAreaGeometryJob } from './prepareAreaGeometryJob.js';
+import { matchesAreaTile } from './matchesAreaTile.js';
 
 export function buildAreaFeature(context, feature) {
   const { backend: layer, area, map } = context;
@@ -12,10 +12,7 @@ export function buildAreaFeature(context, feature) {
   const coordinates = featureAnchor(feature, layer.options.nightLight);
   const geometry = feature.geometry, isTree = geometry.type === 'Point';
   const lon = coordinates[0], lat = coordinates[1];
-  if (coords) {
-    const anchor = map.project(/* alloc */ new L.LatLng(lat, lon), coords.z);
-    if (Math.floor(anchor.x / 256) !== coords.x || Math.floor(anchor.y / 256) !== coords.y) return;
-  }
+  if (!matchesAreaTile(map, coords, lon, lat)) return;
   const style = extrusionStyle(layer, feature);
   if (style === null) {
     context.skipped++;

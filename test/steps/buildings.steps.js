@@ -3,6 +3,7 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 import { prepare3DChecks } from './3d.steps.js';
 
 Then('layer counts report loaded elements and survive toggling and failures', { timeout: 30000 }, async function () {
@@ -331,7 +332,7 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
       this.buildingConcurrency--;
     }
   });
-  await this.page.setViewportSize({ width: 800, height: 600 });
+  await this.page.setViewportSize({ width: 1024, height: 600 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.evaluate(() => {
@@ -534,6 +535,7 @@ When('I move and toggle the Paris building volumes', { timeout: 60000 }, async f
   await status('2 Paris building volumes loaded');
   this.reloadedOnReturn = await meshes() === 1;
 
+  await expandLayerControl(this.page);
   await this.page.getByRole('checkbox', { name: 'Eiffel Tower', exact: true }).uncheck();
   this.independentBuildings = await this.page.evaluate(() => {
     let eiffel, buildings;

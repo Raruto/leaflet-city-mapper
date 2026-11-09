@@ -888,6 +888,10 @@ const checks = {
     const mesh = { ...emptyNode(), program: {}, geometry: { attributes: { position: { data: vertices } } } };
     const walls = collider(mesh);
     assert.equal(walls.tri.length, 9);
+    const indexedMesh = { ...emptyNode(), program: {}, geometry: { attributes: {
+      position: { data: vertices }, index: { data: [0, 1, 2] }
+    } } };
+    assert.deepEqual(collider(indexedMesh).tri, walls.tri);
     assert.equal(collider(mesh), walls);
     assert.ok(walls.cells.size > 0);
     const otherMesh = { ...emptyNode(), program: {}, geometry: { attributes: { position: { data: [...vertices] } } } };

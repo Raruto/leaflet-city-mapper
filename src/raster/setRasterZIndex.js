@@ -9,7 +9,7 @@ export function setRasterZIndex(layer, zIndex) {
   let tile, terrainMesh;
   for (tile of rasterTilesByLayer.get(layer).values()) {
     if (tile.mesh) tile.mesh.renderOrder = zIndex;
-    terrainMesh = rasterTilesByLayer.get(terrain3DByLayer.get(layer)).get(tile);
+    terrainMesh = rasterTilesByLayer.get(terrain3DByLayer.get(layer))?.get(tile);
     if (terrainMesh) terrainMesh.renderOrder = zIndex;
   }
   update(layer);

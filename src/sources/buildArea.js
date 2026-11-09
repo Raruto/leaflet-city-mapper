@@ -3,15 +3,14 @@ import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
 
 
-import { buildAreaFeature } from './buildAreaFeature.js';
 import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
 import { sourceAreaContext } from './sourceAreaContext.js';
 import { pump } from './pumpSourceAreas.js';
 import { buildAreaInWorker } from '../workers/buildAreaInWorker.js';
+import { buildAreaFeatures } from './buildAreaFeatures.js';
 
 export async function buildArea(layer, area, map) {
-  let feature;
   try {
     await /* alloc */ new Promise(requestAnimationFrame);
     await cameraViewByMap.get(map);
@@ -29,16 +28,8 @@ export async function buildArea(layer, area, map) {
     if (layer.options.worker !== false && typeof Worker !== 'undefined' && data.features.length >= 64) {
       context.jobs = /* alloc */ [];
     }
-    let deadline = performance.now() + 4;
-    for (feature of data.features) {
-      if (area.request.signal.aborted) return;
-      if (performance.now() >= deadline) {
-        await /* alloc */ new Promise(requestAnimationFrame);
-        if (area.request.signal.aborted) return;
-        deadline = performance.now() + 4;
-      }
-      buildAreaFeature(context, feature);
-    }
+    await buildAreaFeatures(context, area, data.features);
+    if (area.request.signal.aborted) return;
     if (context.jobs) await buildAreaInWorker(context, area.request.signal);
     if (area.request.signal.aborted) return;
     attachAreaMesh(context);

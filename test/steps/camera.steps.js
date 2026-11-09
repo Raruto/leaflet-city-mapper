@@ -239,7 +239,7 @@ Then('camera coordinates round-trip and native overlays remain aligned', { timeo
 });
 
 Then('camera orientation is accessible without dragging', { timeout: 30000 }, async function () {
-  await createMap(this.page, { touchRotate: true, touchPitch: true });
+  await createMap(this.page, { touchRotate: true, touchPitch: true, touchZoom: true });
   const button = this.page.getByRole('button', { name: 'Reset bearing and pitch', exact: true });
   await button.focus();
   await this.page.keyboard.press('ArrowRight');

@@ -3,6 +3,7 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
 // The lamp style lives in the example page, as the Streetlights layer style.
 const lamp = (page, properties = {}) =>
@@ -208,6 +209,7 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
   assert.ok(result.dayLampPixels > 50, `Solid poles must remain visible in daylight: ${JSON.stringify(result)}`);
   assert.deepEqual(result.gpuErrors, []);
   const control = this.page.getByRole('checkbox', { name: 'Streetlights', exact: true });
+  await expandLayerControl(this.page);
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => !streetlights._map && globals.sceneByLayer.get(streetlights)._areas.size === 0), true);
   await control.check();

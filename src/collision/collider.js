@@ -1,14 +1,15 @@
 import { colliders } from '../weakmaps/colliders.js';
 import { indexTriangle } from './indexTriangle.js';
 import { readTriangle } from './readTriangle.js';
+import { vertexCount } from './vertexCount.js';
 
 
 export function collider(mesh) {
   let c = colliders.get(mesh.geometry);
   if (c) return c;
-  const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+  const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
 
-  const vertices = index ? index.count : p.length / 3;
+  const vertices = vertexCount(position, index);
   const count = vertices * (instanceOffset?.count ?? 1);
   const tri = /* alloc */ [];
   const nrm = /* alloc */ [];

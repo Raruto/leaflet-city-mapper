@@ -2,13 +2,14 @@ import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
 
 import { locateTraffic } from '../traffic/locateTraffic.js';
+import { setTrafficNormal } from './setTrafficNormal.js';
 
 export function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
   const state = trafficByLayer.get(layer);
   if (!state?.mesh || !state.trips.length) return false;
   let bounds = state.collisionBounds;
   if (!bounds) {
-    bounds = state.collisionBounds = { radius: 0, minY: Infinity, maxY: -Infinity };
+    bounds = state.collisionBounds = /* alloc */ { radius: 0, minY: Infinity, maxY: -Infinity };
     let i, px, py, pz;
     for (i = 0; i < state.template.position.length; i += 3) {
       px = state.template.position[i];
@@ -19,7 +20,7 @@ export function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
       bounds.maxY = Math.max(bounds.maxY, py);
     }
   }
-  const root = rootByLayer.get(layer), position = state.position ||= {};
+  const root = rootByLayer.get(layer), position = state.position ||= /* alloc */ {};
   const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
   const radius = bounds.radius * scale + 0.35;
   let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
@@ -48,13 +49,7 @@ export function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
     data.best = entry;
     data.found = true;
     distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
-    if (distance < 1e-6) {
-      data.normal[0] = -dx;
-      data.normal[1] = -dz;
-    } else {
-      data.normal[0] = (x + entry * dx - px) / distance;
-      data.normal[1] = (z + entry * dz - pz) / distance;
-    }
+    setTrafficNormal(data, x + entry * dx - px, z + entry * dz - pz, distance, dx, dz);
   }
   return data.found;
 }

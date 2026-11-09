@@ -3,6 +3,7 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
 Then('the offline Paris trees render and recover after toggling', { timeout: 180000 }, async function () {
   const loaded = () => this.page.waitForFunction(() => {
@@ -29,6 +30,7 @@ Then('the offline Paris trees render and recover after toggling', { timeout: 180
   assert.equal(result.vertices, true);
   assert.equal(result.shared, true);
   const control = this.page.getByRole('checkbox', { name: 'Trees', exact: true });
+  await expandLayerControl(this.page);
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;

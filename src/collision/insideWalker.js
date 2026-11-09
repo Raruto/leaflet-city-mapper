@@ -20,7 +20,7 @@ export function insideWalker(context) {
   const y = root.position[1] + feet[1] * root.scale[1];
   const z = root.position[2] + feet[2] * root.scale[2];
   const layers = layersByLayer.get(shared);
-  let other, node, child;
+  let other, node, child, nodes;
   for (other of layers) {
     if (other === layer || kindByLayer.get(other) === 'terrain') continue;
     if (kindByLayer.get(other) === 'traffic') {
@@ -29,7 +29,7 @@ export function insideWalker(context) {
       if (trafficCollision(other, x, y, z, 0, 0, 0, hitData)) return true;
       continue;
     }
-    const nodes = hitData.nodes;
+    nodes = hitData.nodes;
     nodes.length = 0;
     if (rootByLayer.get(other)) nodes.push(rootByLayer.get(other));
     while (nodes.length) {

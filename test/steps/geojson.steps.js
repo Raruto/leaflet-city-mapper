@@ -238,8 +238,11 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   await this.page.waitForFunction(() => {
     const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._type === 'cog');
     const terrain = globals.cameraByMap.get(map)._terrain3D;
-    return rasters.every(layer => globals.sceneByLayer.get(layer)._loadingTiles === 0 &&
-      [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile => tile.done)) &&
+    return rasters.length === 2 && rasters.every(layer =>
+      globals.sceneByLayer.get(layer)._rasterTiles.size > 0 &&
+      globals.sceneByLayer.get(layer)._loadingTiles === 0 &&
+      [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile =>
+        tile.done && performance.now() - tile.loadedAt >= tile.mesh.fadeDuration)) &&
       globals.sceneByLayer.get(terrain).renderer.frameMeshes.every(mesh =>
       mesh._appearance === undefined || mesh._appearance === 1);
   });
@@ -407,9 +410,12 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     const terrain = globals.cameraByMap.get(map)._terrain3D;
     return lights && globals.sceneByLayer.get(lights)._areas.get('geojson')?.done &&
       globals.sceneByLayer.get(terrain)?._terrainReady &&
+      layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'cog').length === 2 &&
       layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'cog').every(layer =>
+        globals.sceneByLayer.get(layer)._rasterTiles.size > 0 &&
         globals.sceneByLayer.get(layer)._loadingTiles === 0 &&
-        [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile => tile.done)) &&
+        [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile =>
+          tile.done && performance.now() - tile.loadedAt >= tile.mesh.fadeDuration)) &&
       globals.sceneByLayer.get(lights).renderer.frameMeshes.every(mesh =>
         mesh._appearance === undefined || mesh._appearance === 1);
   });

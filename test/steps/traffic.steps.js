@@ -4,6 +4,7 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Given, Then } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 import { along } from '../../src/geometry/interpolateRoute.js';
 import { scheduledTrips } from '../../src/traffic/scheduledTrips.js';
 import { routeGeometry } from '../../src/geometry/routeGeometry.js';
@@ -348,6 +349,7 @@ Then('bicycles and pedestrians move with the clock and can be disabled and resto
   assert.equal(status.length, 6);
   assert.deepEqual(status.sort(), result.map(({ count, name }) => `${count} ${name}`).sort());
   const control = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
+  await expandLayerControl(this.page);
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => layers._layers.find(entry => entry.name === 'Traffic').layer.getLayers()
     .every(layer => !map.hasLayer(layer) && !globals.sceneByLayer.get(layer).root.children.length && !globals.trafficByLayer.has(layer))), true);
@@ -618,6 +620,7 @@ Then('cruise boats move along the river on scheduled trips and clean up when dis
   assert.ok(result.overviewRoutePixels > 100, `Visible route in overview: ${result.overviewRoutePixels}`);
   assert.ok(result.riverCoverage < 0.01, `Less than 1% terrain occlusion (e.g. bridge decks): ${result.riverCoverage}`);
   const control = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
+  await expandLayerControl(this.page);
   await control.uncheck();
   assert.equal(await this.page.evaluate(() => !cruiseBoats._map && !globals.sceneByLayer.get(cruiseBoats).root.children.length &&
     ![...document.querySelectorAll('.traffic-status')].some(status => status.textContent.includes('estimated, not live GPS'))), true);

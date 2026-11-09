@@ -290,7 +290,7 @@ Then('OpenLayers animates wheel and button zoom without restarting each frame', 
         else {
           const rect = map.getContainer().getBoundingClientRect();
           map.ol.getViewport().dispatchEvent(new WheelEvent('wheel', {
-            bubbles: true, cancelable: true, deltaY: -120,
+            bubbles: true, cancelable: true, deltaY: -60,
             clientX: rect.left + pixel.x, clientY: rect.top + pixel.y,
           }));
         }

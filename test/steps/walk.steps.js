@@ -451,8 +451,14 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   assert.ok(Math.abs(start.feet - start.deck) < 0.01, `Feet ${start.feet} on deck ${start.deck}`);
 
   await this.page.keyboard.down('KeyW');
-  await this.page.waitForTimeout(1500);
+  await this.page.waitForTimeout(300);
   await this.page.keyboard.up('KeyW');
+  await this.page.waitForFunction(() => {
+    const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
+    return globals.sceneByLayer.get(buildings)._inflight === 0 &&
+      [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
+  });
+  await this.page.waitForFunction(() => walk._walk.nextClearanceCheck > performance.now());
   const walked = await state();
   const north = (walked.lat - start.lat) * 111320, east = (walked.lng - start.lng) * 111320 * Math.cos(start.lat * Math.PI / 180);
   const view = -start.bearing * Math.PI / 180;
@@ -467,7 +473,8 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   await this.page.mouse.up();
   const looked = await state();
   assert.ok(Math.abs(looked.bearing - walked.bearing - 25) < 0.5, `Drag turns the camera: ${walked.bearing} -> ${looked.bearing}`);
-  assert.ok(Math.abs(looked.lat - walked.lat) < 1e-9 && Math.abs(looked.lng - walked.lng) < 1e-9, 'Dragging does not move the walker');
+  assert.ok(Math.abs(looked.lat - walked.lat) < 1e-9 && Math.abs(looked.lng - walked.lng) < 1e-9,
+    `Dragging does not move the walker: ${JSON.stringify({ walked, looked })}`);
 
   await this.page.keyboard.down('KeyD');
   await this.page.keyboard.down('KeyW');
@@ -486,7 +493,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
   assert.ok(turned.heading > looked.heading + 0.5, `D turns right: ${looked.heading} -> ${turned.heading}`);
   assert.ok(behind < 5, `The camera follows behind the walker: ${behind}°`);
 
-  // Champ de Mars side street: running south ends against a building facade (after sliding along it).
+  // Champ de Mars side street: turn into the first nearby facade after sliding along it.
   await this.page.evaluate(() => {
     const walk = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._type === 'walk');
     globals.sceneByLayer.get(walk).walker.latlng = new L.LatLng(48.8560, 2.2950);
@@ -499,17 +506,41 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
       [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
   });
   await this.page.keyboard.down('KeyW');
-  let previous, stuck;
-  for (let i = 0; i < 100 && !stuck; i++) {
+  let previous, stoppedSamples = 0, aiming = false;
+  for (let i = 0; i < 100 && stoppedSamples < 3; i++) {
     await this.page.waitForTimeout(300);
     const { lat, lng } = await state();
-    stuck = previous && Math.hypot(lat - previous.lat, lng - previous.lng) < 1e-7;
+    if (!aiming && (48.8560 - lat) * 111320 > 40) {
+      aiming = await this.page.evaluate(async () => {
+        const { local } = await import('/src/projections/walkerLocalPosition.js');
+        const { hit } = await import('/src/picking/hit.js');
+        const context = walk._walk, root = globals.sceneByLayer.get(context.layer).root;
+        const feet = local.call(context, context.local);
+        for (let n = 0; n < feet.length; n++) feet[n] = root.position[n] + root.scale[n] * feet[n];
+        const normal = hit(context.layer, ...feet, 0, 1, 5, context.hitData);
+        if (!normal) return false;
+        context.state.heading = Math.atan2(-normal[0], normal[1]);
+        return true;
+      });
+    }
+    stoppedSamples = aiming && previous && Math.hypot(lat - previous.lat, lng - previous.lng) < 1e-7
+      ? stoppedSamples + 1 : 0;
     previous = { lat, lng };
   }
   await this.page.keyboard.up('KeyW');
   const south = (48.8560 - previous.lat) * 111320;
-  assert.ok(stuck, 'A building stops the walker');
+  assert.ok(aiming, 'A building facade is visible ahead');
+  assert.equal(stoppedSamples, 3, 'A building stops the walker');
   assert.ok(south > 40 && south < 120, `Stopped ${south} m south, at the facade`);
+  assert.equal(await this.page.evaluate(async () => {
+    const { local } = await import('/src/projections/walkerLocalPosition.js');
+    const { hit } = await import('/src/picking/hit.js');
+    const context = walk._walk, root = globals.sceneByLayer.get(context.layer).root;
+    const feet = local.call(context, context.local);
+    for (let n = 0; n < feet.length; n++) feet[n] = root.position[n] + root.scale[n] * feet[n];
+    return Boolean(hit(context.layer, ...feet, Math.sin(context.state.heading), -Math.cos(context.state.heading),
+      2, context.hitData));
+  }), true, 'The stopped walker faces a nearby facade');
 
   await this.page.keyboard.press('Escape');
   const after = await this.page.evaluate(() => ({

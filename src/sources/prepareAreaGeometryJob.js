@@ -1,19 +1,10 @@
 import { projectedTree } from '../projections/projectTreePoint.js';
-import { projectRing } from '../projections/projectRing.js';
 import { parseColor } from '../colors/parseColor.js';
+import { projectAreaPolygons } from './projectAreaPolygons.js';
 
 export function prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor) {
   const geometry = feature.geometry;
-  const polygons = /* alloc */ [];
-  const rings = geometry.type === 'Polygon' ? /* alloc */ [geometry.coordinates]
-    : geometry.type === 'MultiPolygon' ? geometry.coordinates : /* alloc */ [];
-  let polygon, ring, paths;
-  for (polygon of rings) {
-    if (!polygon.length) throw /* alloc */ new Error('Empty GeoJSON polygon');
-    paths = /* alloc */ [];
-    for (ring of polygon) paths.push(projectRing(context, ring));
-    polygons.push(paths);
-  }
+  const polygons = projectAreaPolygons(context, geometry);
   const point = geometry.type === 'Point' ? projectedTree(context, lon, lat) : null;
   const nightLight = context.backend.options.nightLight;
   const crownColor = point ? parseColor(style.color ?? (nightLight ? undefined : 0x4f823b)) : baseColor;
