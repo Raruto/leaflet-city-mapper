@@ -129,6 +129,63 @@ Then('COG ranges and TIFF profile validation preserve elevation samples', async 
   } finally { globalThis.fetch = fetch; }
 });
 
+Then('COG workers preserve ranges, cache ownership, missing tiles and errors', { timeout: 30000 }, async function () {
+  const fixture = elevationFixture(), invalid = elevationFixture({ predictor: 2 });
+  const requests = [];
+  await this.context.route('**/worker-*.tif', route => {
+    const data = route.request().url().includes('invalid') ? invalid.data : fixture.data;
+    const [, start, end] = /^bytes=(\d+)-(\d+)$/.exec(route.request().headers().range).map(Number);
+    requests.push({ url: route.request().url(), start, end });
+    return route.fulfill({ status: 206, body: Buffer.from(data.slice(start, end + 1)),
+      headers: { 'Content-Range': `bytes ${start}-${end}/${data.length}` } });
+  });
+  await this.page.goto(this.baseUrl);
+  const result = await this.page.evaluate(async ({ x, y }) => {
+    const { openCogInWorker } = await import('/src/workers/openCogInWorker.js');
+    const { buildAreaInWorker } = await import('/src/workers/buildAreaInWorker.js');
+    const { geometryWorkersByMap } = await import('/src/weakmaps/geometryWorkersByMap.js');
+    const { workerMapByLayer } = await import('/src/weakmaps/workerMapByLayer.js');
+    let close;
+    const map = { once(type, handler) { close = handler; } };
+    const layer = { options: {} };
+    workerMapByLayer.set(layer, map);
+    try {
+      const archive = await openCogInWorker(layer, { url: '/worker-elevation.tif',
+        workerUrl: '/dist/leaflet-city-mapper-worker.js' });
+      const header = await archive.getHeader();
+      const tile = await archive.getZxy(14, x, y);
+      const missing = await archive.getZxy(14, x + 1, y);
+      const geometry = { backend: { options: { workerUrl: '/dist/leaflet-city-mapper-worker.js' } },
+        map, jobs: [], featureFaces: [] };
+      await buildAreaInWorker(geometry, new AbortController().signal);
+      const repeated = await archive.getZxy(14, x, y);
+      const pool = geometryWorkersByMap.get(map);
+      const reused = pool.entries.size === 1 && pool.idle.length === 1;
+      const controller = new AbortController();
+      controller.abort();
+      let aborted = false, failure = '';
+      try { await archive.getZxy(14, x, y, controller.signal); }
+      catch (error) { aborted = error.name === 'AbortError'; }
+      try { await openCogInWorker(layer, { url: '/worker-invalid.tif' }); }
+      catch (error) { failure = error.message; }
+      const heights = new Float32Array(tile.data), again = new Float32Array(repeated.data);
+      return { header, heights: [...heights], same: heights.every((v, i) => v === again[i]),
+        missing: missing === undefined, empty: geometry.positions.length, reused, aborted, failure };
+    } finally { close(); }
+  }, { x: fixture.x, y: fixture.y });
+  assert.equal(result.header.tileType, 0);
+  assert.equal(result.header.minZoom, 14);
+  assert.deepEqual(result.heights, [...fixture.heights]);
+  assert.equal(result.same, true);
+  assert.equal(result.missing, true);
+  assert.equal(result.empty, 0);
+  assert.equal(result.reused, true);
+  assert.equal(result.aborted, true);
+  assert.match(result.failure, /Unsupported COG profile/);
+  assert.equal(requests.filter(request => request.url.includes('elevation') && request.start === 0).length, 1,
+    'The same pooled worker retains the parsed TIFF directory across tile and geometry tasks');
+});
+
 Then('local archaeological COGs load by range and displace the ground', { timeout: 60000 }, async function () {
   const info = await stat(new URL('../../examples/data/colosseum.pmtiles', import.meta.url));
   assert.ok(info.size > 0 && info.size <= 25000000, `colosseum.pmtiles: ${info.size} bytes`);

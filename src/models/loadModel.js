@@ -3,14 +3,14 @@ import { modelByLayer } from '../weakmaps/modelByLayer.js';
 import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
+import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
 
 
 
-import { decodeModel } from './decodeModel.js';
+import { runSourceWorker } from '../workers/runSourceWorker.js';
 import { setParent } from '../scene/setParent.js';
 import { emptyNode } from '../scene/createSceneNode.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
-import { loadModelResources } from './loadModelResources.js';
 import { createModelContext } from './createModelContext.js';
 import { buildModelNodes } from './buildModelNodes.js';
 import { applyModelTransform } from './applyModelTransform.js';
@@ -22,14 +22,10 @@ import { applyModelTransform } from './applyModelTransform.js';
 export async function loadModel(layer) {
   await addedByLayer.get(layer).promise;
   const url = /* alloc */ new URL(modelUrlByLayer.get(layer), document.baseURI).href;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw /* alloc */ new Error(`Unable to load model: HTTP ${response.status}`);
-  }
-  const data = await response.arrayBuffer();
-  const description = decodeModel(data);
-  const directory = /* alloc */ new URL('.', url).href;
-  const images = await loadModelResources(layer, description, directory);
+  const { description, images } = await runSourceWorker(layer._map, layer.options.workerUrl,
+    /* alloc */ { type: 'model', url });
+  await addedByLayer.get(layer).promise;
+  await cameraViewByMap.get(layer._map);
   const context = createModelContext(layer, description, images);
   const scene = description.scenes?.[description.scene || 0];
   if (!scene) throw /* alloc */ new Error('Missing glTF scene');

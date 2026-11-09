@@ -1,4 +1,5 @@
 export function createGeometryWorker(url, pool) {
+  if (typeof Worker === 'undefined') throw /* alloc */ new Error('Web Workers are required to prepare source geometry');
   let workerUrl = url, blobUrl, worker;
   if (globalThis.location) {
     const resolved = /* alloc */ new URL(url, location.href);

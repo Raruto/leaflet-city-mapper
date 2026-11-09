@@ -1,7 +1,15 @@
 Feature: Geometry worker ownership
   @unit
+  Scenario: Main bundle does not retain geometry preparation
+    Then the main bundle excludes source preparation and stays below 245 KB
+
+  @unit
   Scenario: One worker bundle handles geometry and vector tiles
     Then the shared worker dispatches geometry and vector tiles with isolated responses
+
+  @unit
+  Scenario: Model workers transfer prepared vertex data instead of cloning binary resources
+    Then model worker bundles transfer decoded attributes and generated normals exactly once
 
   @unit
   Scenario: Prepared geometry preserves the CPU extrusion and point pipelines
@@ -21,6 +29,6 @@ Feature: Geometry worker ownership
     Then cross-origin vector tile workers preserve results and release blob URLs on every exit
 
   @coverage
-  Scenario: Large GeoJSON blocks use workers without changing mesh ownership
+  Scenario: All GeoJSON blocks use workers without changing mesh ownership
     Given the instrumented city mapper plugin is loaded after Leaflet alone
-    Then large GeoJSON blocks match CPU meshes and preserve replacement and cancellation
+    Then all GeoJSON blocks use workers and preserve replacement and cancellation

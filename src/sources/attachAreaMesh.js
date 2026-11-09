@@ -9,7 +9,6 @@ import { createProgram } from '../materials/createProgram.js';
 
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
-import { instanceAreaGeometry } from '../geometry/instanceAreaGeometry.js';
 
 export function attachAreaMesh(context) {
   const { backend: layer, area } = context;
@@ -18,15 +17,15 @@ export function attachAreaMesh(context) {
     return;
   }
   const device = rendererByLayer.get(layer).device;
-  const data = context.preparedGeometry || instanceAreaGeometry(context);
+  const data = context.preparedGeometry;
   const attributes = /* alloc */ {
-    position: /* alloc */ { size: 3, data: data.positions instanceof Float32Array ? data.positions : /* alloc */ new Float32Array(data.positions) },
-    normal: /* alloc */ { size: 3, data: data.normals instanceof Float32Array ? data.normals : /* alloc */ new Float32Array(data.normals) },
-    color: /* alloc */ { size: 3, data: data.colors instanceof Float32Array ? data.colors : /* alloc */ new Float32Array(data.colors) },
+    position: /* alloc */ { size: 3, data: data.positions },
+    normal: /* alloc */ { size: 3, data: data.normals },
+    color: /* alloc */ { size: 3, data: data.colors },
   };
   if (data.instanceOffsets) attributes.instanceOffset = /* alloc */ { size: 4, data: data.instanceOffsets };
   if (layer.options.nightLight) attributes.uv = /* alloc */ {
-    size: 2, data: context.uvs instanceof Float32Array ? context.uvs : /* alloc */ new Float32Array(context.uvs),
+    size: 2, data: data.uvs,
   };
   let name, attribute;
   for (name in attributes) {

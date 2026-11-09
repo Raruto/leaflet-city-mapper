@@ -4,8 +4,6 @@ import { geometryEmpty } from '../globals/geometryEmpty.js';
 import { emptyNode } from '../scene/createSceneNode.js';
 import { nodeMatrix } from '../transforms/modelNodeMatrix.js';
 import { setParent } from '../scene/setParent.js';
-import { readModelAttributes } from './readModelAttributes.js';
-import { readModelIndices } from './readModelIndices.js';
 import { createModelGeometry } from '../geometry/createModelGeometry.js';
 
 export function modelNode(context, index) {
@@ -20,13 +18,11 @@ export function modelNode(context, index) {
     name: spec.name
   };
   group.matrix = nodeMatrix(spec);
-  let primitive, attributeData, attributes, vertexCount, built, mesh, child;
+  let primitive, attributes, built, mesh, child;
   if (spec.mesh !== undefined) {
     for (primitive of description.meshes[spec.mesh].primitives) {
-      attributeData = readModelAttributes(description, primitive);
-      attributes = attributeData.attributes;
-      vertexCount = attributeData.vertexCount;
-      readModelIndices(description, primitive, attributes, vertexCount);
+      // Node instances own their CPU data and GPU buffers, even when they share a glTF mesh.
+      attributes = structuredClone(primitive.preparedAttributes);
       built = createModelGeometry(context, primitive, attributes);
       mesh = /* alloc */ {
         ...emptyNode(),

@@ -5,6 +5,7 @@ import { terrainControllerByLayer } from '../weakmaps/terrainControllerByLayer.j
 import { terrainLoadingByLayer } from '../weakmaps/terrainLoadingByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
+import { workerMapByLayer } from '../weakmaps/workerMapByLayer.js';
 
 import { createLayer } from '../scene/createLayer.js';
 
@@ -25,7 +26,9 @@ export async function loadTerrain(layer) {
     const archive = createLayer(/* alloc */ { source: /* alloc */ {
       type: 'raster',
       url: terrainSourceByLayer.get(layer), archive: layer.options.archive, asset: layer.options.asset,
+      workerUrl: layer.options.workerUrl,
     } });
+    workerMapByLayer.set(archive, layer._map);
     terrainArchiveByLayer.set(layer, archive);
     await readyByLayer.get(archive);
     const header = headerByLayer.get(archive);

@@ -2363,8 +2363,1219 @@
     }
   }
 
+  // src/cog/validateCogRange.js
+  function validateCogRange(source, offset, length) {
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || length > 32e6 || !Number.isSafeInteger(offset + length) || source.size !== void 0 && offset + length > source.size) {
+      throw (
+        /* alloc */
+        new Error("Invalid COG byte range")
+      );
+    }
+  }
+
+  // src/cog/validateCogContentRange.js
+  function validateCogContentRange(source, range, rangeStart, length) {
+    if (!range || Number(range[1]) !== rangeStart || Number(range[2]) !== rangeStart + length - 1 || !Number.isSafeInteger(Number(range[3])) || Number(range[3]) < rangeStart + length || (source.containerSize ?? source.size) !== void 0 && (source.containerSize ?? source.size) !== Number(range[3])) {
+      throw (
+        /* alloc */
+        new Error("Invalid COG range response")
+      );
+    }
+  }
+
+  // src/cog/invalidCogFullResponse.js
+  function invalidCogFullResponse(response) {
+    return response.status !== 200 || Number(response.headers.get("Content-Length")) > 32e6;
+  }
+
+  // src/cog/validateCogResponse.js
+  function validateCogResponse(source, response, rangeStart, length) {
+    const etag = response.headers.get("ETag");
+    if (source.etag && source.etag !== etag) throw (
+      /* alloc */
+      new Error("COG changed; recreate the layer")
+    );
+    if (etag) source.etag = etag;
+    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") || "");
+    if (response.status === 206) {
+      validateCogContentRange(source, range, rangeStart, length);
+      if (source.baseOffset === void 0) source.size = Number(range[3]);
+    } else if (invalidCogFullResponse(response)) {
+      throw (
+        /* alloc */
+        new Error("COG server must support byte ranges for files over 32 MB")
+      );
+    }
+  }
+
+  // src/cog/readCogBody.js
+  async function readCogBody(response, length) {
+    const reader = response.body.getReader(), chunks = (
+      /* alloc */
+      []
+    );
+    let total = 0, part;
+    try {
+      while (!(part = await reader.read()).done) {
+        total += part.value.byteLength;
+        if (total > (response.status === 206 ? length : 32e6)) {
+          await reader.cancel();
+          throw (
+            /* alloc */
+            new Error("Oversized COG response")
+          );
+        }
+        chunks.push(part.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const data = (
+      /* alloc */
+      new Uint8Array(total)
+    );
+    let start = 0, chunk;
+    for (chunk of chunks) {
+      data.set(chunk, start);
+      start += chunk.length;
+    }
+    return data;
+  }
+
+  // src/cog/readCog.js
+  async function readCog(source, offset, length, signal) {
+    signal?.throwIfAborted();
+    validateCogRange(source, offset, length);
+    if (source.full) return source.full.slice(offset, offset + length);
+    const rangeStart = (source.baseOffset || 0) + offset;
+    const response = await fetch(
+      source.url,
+      /* alloc */
+      {
+        headers: (
+          /* alloc */
+          { Range: `bytes=${rangeStart}-${rangeStart + length - 1}` }
+        ),
+        signal
+      }
+    );
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`Unable to read COG: HTTP ${response.status}`)
+    );
+    validateCogResponse(source, response, rangeStart, length);
+    const data = await readCogBody(response, length);
+    if (response.status === 200) {
+      if (source.baseOffset === void 0) source.size = data.byteLength;
+      else if (data.byteLength !== source.containerSize) throw (
+        /* alloc */
+        new Error("Truncated PMTiles COG container")
+      );
+      source.full = source.baseOffset === void 0 ? data.buffer : data.slice(source.baseOffset, source.baseOffset + source.size);
+    }
+    const result = response.status === 200 ? source.full.slice(offset, offset + length) : data.buffer;
+    if (result.byteLength !== length) throw (
+      /* alloc */
+      new Error("Truncated COG byte range")
+    );
+    return result;
+  }
+
+  // src/globals/cogTags.js
+  var cogTags = [256, 257, 258, 259, 262, 277, 284, 317, 322, 323, 324, 325, 339, 33550, 33922, 34735];
+
+  // src/cog/readCogTag.js
+  async function readCogTag(source, entries, i, tag, little) {
+    const type = entries.getUint16(i * 12 + 2, little);
+    const size = type === 3 ? 2 : type === 4 ? 4 : type === 12 ? 8 : 0;
+    const length = entries.getUint32(i * 12 + 4, little);
+    if (!size || !length || length > 1048576) throw (
+      /* alloc */
+      new Error(`Unsupported COG tag ${tag}`)
+    );
+    const data = size * length <= 4 ? (
+      /* alloc */
+      new DataView(entries.buffer, i * 12 + 8, 4)
+    ) : (
+      /* alloc */
+      new DataView(await readCog(source, entries.getUint32(i * 12 + 8, little), size * length))
+    );
+    const values = (
+      /* alloc */
+      []
+    );
+    let j;
+    for (j = 0; j < length; j++) values.push(type === 3 ? data.getUint16(j * size, little) : type === 4 ? data.getUint32(j * size, little) : data.getFloat64(j * size, little));
+    return values;
+  }
+
+  // src/cog/readCogDirectory.js
+  async function readCogDirectory(source, offset) {
+    const little = source.little;
+    const count = (
+      /* alloc */
+      new DataView(await readCog(source, offset, 2)).getUint16(0, little)
+    );
+    if (!count || count > 128) throw (
+      /* alloc */
+      new Error("Invalid COG directory size")
+    );
+    const entries = (
+      /* alloc */
+      new DataView(await readCog(source, offset + 2, count * 12 + 4))
+    );
+    const tags = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    let i, tag;
+    for (i = 0; i < count; i++) {
+      tag = entries.getUint16(i * 12, little);
+      if (tag === 42113) throw (
+        /* alloc */
+        new Error("COG nodata tags are not supported; export complete tiles")
+      );
+      if (tag === 34264) throw (
+        /* alloc */
+        new Error("COG affine transformation matrices are not supported")
+      );
+      if (!cogTags.includes(tag)) continue;
+      if (tags.has(tag)) throw (
+        /* alloc */
+        new Error("Duplicate COG tag")
+      );
+      tags.set(tag, await readCogTag(source, entries, i, tag, little));
+    }
+    return (
+      /* alloc */
+      { tags, next: entries.getUint32(count * 12, little) }
+    );
+  }
+
+  // src/cog/validCogDimensions.js
+  function validCogDimensions(tags, width, height) {
+    return !!width && !!height && width % 256 === 0 && height % 256 === 0 && tags.get(322)?.[0] === 256 && tags.get(323)?.[0] === 256 && (tags.get(259)?.[0] === 1 || tags.get(259)?.[0] === 8) && (tags.get(284)?.[0] ?? 1) === 1 && (tags.get(317)?.[0] ?? 1) === 1;
+  }
+
+  // src/cog/validCogEncoding.js
+  function validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned) {
+    if (elevation) return tags.get(262)?.[0] === 1;
+    return (samples === 3 || samples === 4) && bits?.length === samples && bytes && unsigned && tags.get(262)?.[0] === 2;
+  }
+
+  // src/cog/getCogProfile.js
+  function getCogProfile(tags) {
+    const width = tags.get(256)?.[0], height = tags.get(257)?.[0], samples = tags.get(277)?.[0] ?? 1;
+    const bits = tags.get(258), format = tags.get(339) || /* alloc */
+    [1];
+    let bytes = true, unsigned = true, floating = true, value;
+    for (value of bits || /* alloc */
+    []) bytes &&= value === 8;
+    for (value of format) {
+      unsigned &&= value === 1;
+      floating &&= value === 3;
+    }
+    const elevation = samples === 1 && bits?.length === 1 && bits[0] === 32 && floating;
+    if (!validCogDimensions(tags, width, height) || !validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned)) {
+      throw (
+        /* alloc */
+        new Error("Unsupported COG profile: expected tiled 256px RGB(A) Uint8 or Float32, DEFLATE without predictor")
+      );
+    }
+    return (
+      /* alloc */
+      { width, height, samples, elevation }
+    );
+  }
+
+  // src/cog/hasCogProjection.js
+  function hasCogProjection(keys) {
+    let projected = false, area2 = false, i;
+    if (keys) for (i = 4; i < keys.length; i += 4) {
+      if (keys[i + 1] !== 0 || keys[i + 2] !== 1) continue;
+      if (keys[i] === 3072 && keys[i + 3] === 3857) projected = true;
+      if (keys[i] === 1025 && keys[i + 3] === 1) area2 = true;
+    }
+    return projected && area2;
+  }
+
+  // src/cog/finiteCogValues.js
+  function finiteCogValues(values) {
+    let value;
+    for (value of values || /* alloc */
+    []) if (!Number.isFinite(value)) return false;
+    return true;
+  }
+
+  // src/cog/validCogGeoArrays.js
+  function validCogGeoArrays(keys, scale, tie) {
+    return !!keys && keys[0] === 1 && keys.length === 4 + keys[3] * 4 && !!scale && scale.length === 3 && finiteCogValues(scale) && scale[0] > 0 && Math.abs(scale[0] - scale[1]) <= 1e-8 && !!tie && tie.length === 6 && finiteCogValues(tie) && tie[0] === 0 && tie[1] === 0;
+  }
+
+  // src/cog/getCogBase.js
+  function getCogBase(tags, width, height, elevation) {
+    const keys = tags.get(34735), scale = tags.get(33550), tie = tags.get(33922);
+    if (!validCogGeoArrays(keys, scale, tie) || !hasCogProjection(keys)) {
+      throw (
+        /* alloc */
+        new Error("COG must use north-up EPSG:3857 PixelIsArea georeferencing")
+      );
+    }
+    return (
+      /* alloc */
+      { width, height, resolution: scale[0], left: tie[3], top: tie[4], elevation }
+    );
+  }
+
+  // src/cog/validCogGrid.js
+  function validCogGrid(source, base, profile, zoom, x, y, resolution) {
+    return zoom >= 0 && zoom <= 24 && Math.abs(20037508342789244e-9 * 2 / (256 * 2 ** zoom) - resolution) <= resolution * 1e-7 && (!profile.elevation || Number.isInteger(x) && Number.isInteger(y)) && Math.abs(base.width / profile.width - base.height / profile.height) <= 1e-7 && profile.elevation === base.elevation && x >= 0 && y >= 0 && x + profile.width / 256 <= 2 ** zoom && y + profile.height / 256 <= 2 ** zoom && !source.levels.has(zoom) && !(base.elevation && source.levels.size);
+  }
+
+  // src/cog/validateCogOffsets.js
+  function validateCogOffsets(source, level) {
+    if (level.offsets?.length !== level.columns * level.rows || level.lengths?.length !== level.offsets.length) {
+      throw (
+        /* alloc */
+        new Error("Invalid COG tile offsets or lengths")
+      );
+    }
+    let i;
+    for (i = 0; i < level.offsets.length; i++) {
+      if (!level.offsets[i] || !level.lengths[i] || level.lengths[i] > 1048576 || level.offsets[i] + level.lengths[i] > source.size) throw (
+        /* alloc */
+        new Error("Invalid COG tile offsets or lengths")
+      );
+    }
+  }
+
+  // src/cog/readCogLevel.js
+  function readCogLevel(source, directory, state) {
+    const tags = directory.tags, profile = getCogProfile(tags);
+    if (!state.base) state.base = getCogBase(tags, profile.width, profile.height, profile.elevation);
+    const base = state.base, resolution = base.resolution * base.width / profile.width;
+    const zoom = Math.round(Math.log2(20037508342789244e-9 * 2 / (256 * resolution)));
+    const span = 20037508342789244e-9 * 2 / 2 ** zoom;
+    let x = (base.left + 20037508342789244e-9) / span;
+    let y = (20037508342789244e-9 - base.top) / span;
+    if (Math.abs(x - Math.round(x)) < 1e-6) x = Math.round(x);
+    if (Math.abs(y - Math.round(y)) < 1e-6) y = Math.round(y);
+    if (!validCogGrid(source, base, profile, zoom, x, y, resolution)) {
+      throw (
+        /* alloc */
+        new Error("COG levels must align with the Web Mercator XYZ tile grid")
+      );
+    }
+    const level = (
+      /* alloc */
+      {
+        x,
+        y,
+        columns: profile.width / 256,
+        rows: profile.height / 256,
+        samples: profile.samples,
+        elevation: profile.elevation,
+        compression: tags.get(259)[0],
+        offsets: tags.get(324),
+        lengths: tags.get(325)
+      }
+    );
+    validateCogOffsets(source, level);
+    source.levels.set(zoom, level);
+    state.minZoom = Math.min(state.minZoom, zoom);
+    state.maxZoom = Math.max(state.maxZoom, zoom);
+  }
+
+  // src/cog/readCogDirectories.js
+  async function readCogDirectories(source, offset) {
+    const state = (
+      /* alloc */
+      { base: null, minZoom: Infinity, maxZoom: -Infinity }
+    );
+    const seen = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let directory;
+    while (offset) {
+      if (seen.has(offset) || seen.size >= 24) throw (
+        /* alloc */
+        new Error("Cyclic or excessive COG directories")
+      );
+      seen.add(offset);
+      directory = await readCogDirectory(source, offset);
+      readCogLevel(source, directory, state);
+      offset = directory.next;
+    }
+    if (!state.base) throw (
+      /* alloc */
+      new Error("COG has no image directory")
+    );
+    if (source.levels.size !== state.maxZoom - state.minZoom + 1) {
+      throw (
+        /* alloc */
+        new Error("COG overview zooms must be contiguous")
+      );
+    }
+    return (
+      /* alloc */
+      { base: state.base, minZoom: state.minZoom, maxZoom: state.maxZoom }
+    );
+  }
+
+  // src/cog/decodeCogTile.js
+  async function decodeCogTile(data, length, compression) {
+    if (compression === 1) {
+      if (data.byteLength !== length) throw (
+        /* alloc */
+        new Error("Invalid uncompressed COG tile size")
+      );
+      return data;
+    }
+    const stream = (
+      /* alloc */
+      new Blob(
+        /* alloc */
+        [data]
+      ).stream().pipeThrough(
+        /* alloc */
+        new DecompressionStream("deflate")
+      )
+    );
+    const reader = stream.getReader(), result = (
+      /* alloc */
+      new Uint8Array(length)
+    );
+    let offset = 0, chunk;
+    try {
+      while (!(chunk = await reader.read()).done) {
+        if (offset + chunk.value.length > length) {
+          await reader.cancel();
+          throw (
+            /* alloc */
+            new Error("Oversized decoded COG tile")
+          );
+        }
+        result.set(chunk.value, offset);
+        offset += chunk.value.length;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (offset !== length) throw (
+      /* alloc */
+      new Error("Truncated decoded COG tile")
+    );
+    return result.buffer;
+  }
+
+  // src/cog/readCogBlock.js
+  async function readCogBlock(source, level, x, y, signal) {
+    const index = y * level.columns + x;
+    return decodeCogTile(
+      await readCog(source, level.offsets[index], level.lengths[index], signal),
+      256 * 256 * (level.elevation ? 4 : level.samples),
+      level.compression
+    );
+  }
+
+  // src/cog/getElevationTile.js
+  async function getElevationTile(source, level, x, y, signal) {
+    const data = await readCogBlock(source, level, x - level.x, y - level.y, signal);
+    signal?.throwIfAborted();
+    const view = (
+      /* alloc */
+      new DataView(data)
+    ), heights = (
+      /* alloc */
+      new Float32Array(256 * 256)
+    );
+    let i, height;
+    for (i = 0; i < heights.length; i++) {
+      height = view.getFloat32(i * 4, source.little);
+      if (!Number.isFinite(height) || height < -12e3 || height > 1e4) {
+        throw (
+          /* alloc */
+          new Error("Invalid or missing COG elevation sample")
+        );
+      }
+      heights[i] = height;
+    }
+    return (
+      /* alloc */
+      { data: heights.buffer }
+    );
+  }
+
+  // src/cog/getColorTile.js
+  async function getColorTile(source, level, x, y, signal) {
+    const canvas = (
+      /* alloc */
+      new OffscreenCanvas(256, 256)
+    ), context = canvas.getContext("2d");
+    if (!context) throw (
+      /* alloc */
+      new Error("Unable to create COG tile canvas")
+    );
+    const left = (x - level.x) * 256, top = (y - level.y) * 256;
+    let bx, by, pixels, rgba, i, j, bitmap;
+    for (by = Math.max(0, Math.floor(top / 256)); by < Math.min(level.rows, Math.ceil(top / 256 + 1)); by++) {
+      for (bx = Math.max(0, Math.floor(left / 256)); bx < Math.min(level.columns, Math.ceil(left / 256 + 1)); bx++) {
+        pixels = /* alloc */
+        new Uint8Array(await readCogBlock(source, level, bx, by, signal));
+        signal?.throwIfAborted();
+        rgba = /* alloc */
+        new Uint8ClampedArray(256 * 256 * 4);
+        for (i = 0, j = 0; i < pixels.length; i += level.samples, j += 4) {
+          rgba[j] = pixels[i];
+          rgba[j + 1] = pixels[i + 1];
+          rgba[j + 2] = pixels[i + 2];
+          rgba[j + 3] = level.samples === 4 ? pixels[i + 3] : 255;
+        }
+        bitmap = await createImageBitmap(
+          /* alloc */
+          new ImageData(rgba, 256, 256)
+        );
+        context.drawImage(bitmap, bx * 256 - left, by * 256 - top);
+        bitmap.close();
+      }
+    }
+    const image = canvas.transferToImageBitmap();
+    if (signal?.aborted) {
+      image.close();
+      signal.throwIfAborted();
+    }
+    return (
+      /* alloc */
+      { image }
+    );
+  }
+
+  // src/cog/validCogTileCoordinates.js
+  function validCogTileCoordinates(z, x, y) {
+    return Number.isSafeInteger(z) && Number.isSafeInteger(x) && Number.isSafeInteger(y) && z >= 0 && z <= 24 && x >= 0 && y >= 0 && x < 2 ** z && y < 2 ** z;
+  }
+
+  // src/cog/getCogTile.js
+  async function getCogTile(source, z, x, y, signal) {
+    signal?.throwIfAborted();
+    if (!validCogTileCoordinates(z, x, y)) throw (
+      /* alloc */
+      new Error("Invalid COG tile coordinates")
+    );
+    const level = source.levels.get(z);
+    if (!level || x + 1 <= level.x || y + 1 <= level.y || x >= level.x + level.columns || y >= level.y + level.rows) return;
+    if (level.elevation) return getElevationTile(source, level, x, y, signal);
+    return getColorTile(source, level, x, y, signal);
+  }
+
+  // src/cog/getCogHeader.js
+  function getCogHeader(source) {
+    return source.header;
+  }
+
+  // src/globals/headerOffsets.js
+  var headerOffsets = [
+    "rootDirectoryOffset",
+    "rootDirectoryLength",
+    "jsonMetadataOffset",
+    "jsonMetadataLength",
+    "leafDirectoryOffset",
+    "leafDirectoryLength",
+    "tileDataOffset",
+    "tileDataLength",
+    "numAddressedTiles",
+    "numTileEntries",
+    "numTileContents"
+  ];
+
+  // src/globals/headerFlags.js
+  var headerFlags = ["clustered", "internalCompression", "tileCompression", "tileType", "minZoom", "maxZoom"];
+
+  // src/globals/headerBounds.js
+  var headerBounds = ["minLon", "minLat", "maxLon", "maxLat"];
+
+  // src/archives/decodeHeader.js
+  function decodeHeader(data) {
+    const view = data.byteLength >= 127 ? (
+      /* alloc */
+      new DataView(data)
+    ) : null;
+    if (!view || view.getUint32(0, true) !== 1767132496 || view.getUint32(4, true) !== 57894252) {
+      throw (
+        /* alloc */
+        new Error("Expected a PMTiles v3 archive")
+      );
+    }
+    const header = (
+      /* alloc */
+      {}
+    );
+    let i;
+    for (i = 0; i < headerOffsets.length; i++) header[headerOffsets[i]] = Number(view.getBigUint64(8 + i * 8, true));
+    for (i = 0; i < headerFlags.length; i++) header[headerFlags[i]] = view.getUint8(96 + i);
+    for (i = 0; i < headerBounds.length; i++) header[headerBounds[i]] = view.getInt32(102 + i * 4, true) / 1e7;
+    header.centerZoom = view.getUint8(118);
+    header.centerLon = view.getInt32(119, true) / 1e7;
+    header.centerLat = view.getInt32(123, true) / 1e7;
+    return header;
+  }
+
+  // src/cog/validateCogContainer.js
+  function validateCogContainer(container, header) {
+    if (header.tileType !== 0 || header.tileCompression !== 1 || !Number.isSafeInteger(header.jsonMetadataOffset) || !Number.isSafeInteger(header.jsonMetadataLength) || header.jsonMetadataLength <= 0 || header.jsonMetadataLength > 1048576 || !Number.isSafeInteger(header.tileDataOffset) || !Number.isSafeInteger(header.tileDataLength) || header.tileDataOffset < 127 || header.tileDataOffset + header.tileDataLength > container.size) {
+      throw (
+        /* alloc */
+        new Error("Invalid PMTiles COG asset container")
+      );
+    }
+  }
+
+  // src/archives/decompress.js
+  async function decompress(data, compression) {
+    if (compression === 1) return data;
+    if (compression !== 2) {
+      throw (
+        /* alloc */
+        new Error(`Unsupported PMTiles compression: ${compression}`)
+      );
+    }
+    const blob = (
+      /* alloc */
+      new Blob(
+        /* alloc */
+        [data]
+      )
+    );
+    const stream = (
+      /* alloc */
+      new DecompressionStream("gzip")
+    );
+    return (
+      /* alloc */
+      new Response(blob.stream().pipeThrough(stream)).arrayBuffer()
+    );
+  }
+
+  // src/cog/getCogAssetEntry.js
+  async function getCogAssetEntry(container, header, asset) {
+    const metadata = JSON.parse(
+      /* alloc */
+      new TextDecoder().decode(await decompress(
+        await readCog(container, header.jsonMetadataOffset, header.jsonMetadataLength),
+        header.internalCompression
+      ))
+    );
+    const assets = metadata.cog_assets || /* alloc */
+    {};
+    const entry = Object.hasOwn(assets, asset) ? metadata.cog_assets[asset] : null;
+    if (metadata.format !== "cog-assets-v1" || !entry || !Number.isSafeInteger(entry.offset) || !Number.isSafeInteger(entry.length) || entry.offset < 0 || entry.length < 8 || entry.offset + entry.length > header.tileDataLength) {
+      throw (
+        /* alloc */
+        new Error(`Invalid or missing PMTiles COG asset: ${asset}`)
+      );
+    }
+    return entry;
+  }
+
+  // src/cog/openCogAsset.js
+  async function openCogAsset(url, asset) {
+    const container = (
+      /* alloc */
+      { url }
+    );
+    const header = decodeHeader(await readCog(container, 0, 127));
+    validateCogContainer(container, header);
+    const entry = await getCogAssetEntry(container, header, asset);
+    const baseOffset = header.tileDataOffset + entry.offset;
+    return (
+      /* alloc */
+      {
+        url,
+        baseOffset,
+        size: entry.length,
+        containerSize: container.size,
+        etag: container.etag,
+        full: container.full?.slice(baseOffset, baseOffset + entry.length)
+      }
+    );
+  }
+
+  // src/cog/openCog.js
+  async function openCog(url, asset) {
+    const source = asset === void 0 ? (
+      /* alloc */
+      { url }
+    ) : await openCogAsset(url, asset);
+    source.levels = /* alloc */
+    /* @__PURE__ */ new Map();
+    const header = (
+      /* alloc */
+      new DataView(await readCog(source, 0, 8))
+    );
+    const order = header.getUint16(0);
+    if (order !== 18761 && order !== 19789) throw (
+      /* alloc */
+      new Error("Invalid TIFF byte order")
+    );
+    source.little = order === 18761;
+    if (header.getUint16(2, source.little) !== 42) throw (
+      /* alloc */
+      new Error("Expected classic TIFF (BigTIFF is not supported)")
+    );
+    const { base, minZoom, maxZoom } = await readCogDirectories(source, header.getUint32(4, source.little));
+    const half = 20037508342789244e-9;
+    const left = base.left + base.resolution / 2, right = base.left + (base.width - 0.5) * base.resolution;
+    const top = base.top - base.resolution / 2, bottom = base.top - (base.height - 0.5) * base.resolution;
+    source.header = /* alloc */
+    {
+      minZoom,
+      maxZoom,
+      tileType: base.elevation ? 0 : 2,
+      minLon: left / half * 180,
+      maxLon: right / half * 180,
+      minLat: Math.atan(Math.sinh(bottom / half * Math.PI)) * 180 / Math.PI,
+      maxLat: Math.atan(Math.sinh(top / half * Math.PI)) * 180 / Math.PI
+    };
+    return (
+      /* alloc */
+      {
+        getHeader: getCogHeader.bind(null, source),
+        getZxy: getCogTile.bind(null, source)
+      }
+    );
+  }
+
+  // src/globals/workerCogSource.js
+  var workerCogSource = { key: null, archive: null };
+
+  // src/workers/cogWorker.js
+  async function onCogMessage({ data }) {
+    try {
+      const key = JSON.stringify(
+        /* alloc */
+        [data.url, data.asset]
+      );
+      if (workerCogSource.key !== key) {
+        workerCogSource.key = key;
+        workerCogSource.archive = openCog(data.url, data.asset);
+      }
+      const archive = await workerCogSource.archive;
+      const result = data.z === void 0 ? await archive.getHeader() : await archive.getZxy(data.z, data.x, data.y);
+      const transfers = (
+        /* alloc */
+        []
+      );
+      if (result?.data) transfers.push(result.data);
+      if (result?.image) transfers.push(result.image);
+      self.postMessage(result, transfers);
+    } catch (error) {
+      self.postMessage(
+        /* alloc */
+        { error: (
+          /* alloc */
+          { name: error.name, message: error.message }
+        ) }
+      );
+    }
+  }
+
+  // src/globals/geometryDecoder.js
+  var geometryDecoder = new TextDecoder();
+
+  // src/models/hasUnsupportedPrimitives.js
+  function hasUnsupportedPrimitives(meshes) {
+    if (!meshes) return false;
+    let mesh, primitive;
+    for (mesh of meshes) {
+      for (primitive of mesh.primitives) {
+        if (primitive.targets || primitive.mode !== void 0 && primitive.mode !== 4) return true;
+      }
+    }
+    return false;
+  }
+
+  // src/models/decodeModel.js
+  function decodeModel(data) {
+    const view = (
+      /* alloc */
+      new DataView(data)
+    );
+    const decoder = geometryDecoder;
+    let description;
+    let offset, length, type, chunk;
+    if (view.getUint32(0, true) === 1179937895) {
+      if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== data.byteLength) {
+        throw (
+          /* alloc */
+          new Error("Invalid GLB header")
+        );
+      }
+      let binary;
+      for (offset = 12; offset < data.byteLength; ) {
+        if (offset + 8 > data.byteLength) {
+          throw (
+            /* alloc */
+            new Error("Truncated GLB chunk")
+          );
+        }
+        length = view.getUint32(offset, true), type = view.getUint32(offset + 4, true);
+        offset += 8;
+        if (offset + length > data.byteLength) {
+          throw (
+            /* alloc */
+            new Error("Truncated GLB data")
+          );
+        }
+        chunk = data.slice(offset, offset + length);
+        if (type === 1313821514) {
+          description = JSON.parse(decoder.decode(chunk));
+        }
+        if (type === 5130562) {
+          binary = chunk;
+        }
+        offset += length;
+      }
+      if (!description) {
+        throw (
+          /* alloc */
+          new Error("Missing GLB JSON")
+        );
+      }
+      if (binary) {
+        description.buffers[0].binary = binary;
+      }
+    } else {
+      description = JSON.parse(decoder.decode(data));
+    }
+    if (description.skins?.length || description.animations?.length || description.extensionsRequired?.length || hasUnsupportedPrimitives(description.meshes)) {
+      throw (
+        /* alloc */
+        new Error("Layer3D supports static triangle glTF models without required extensions")
+      );
+    }
+    return description;
+  }
+
+  // src/models/loadBuffer.js
+  async function loadBuffer(buffer, directory) {
+    if (buffer.binary) return;
+    const response = await fetch(
+      /* alloc */
+      new URL(buffer.uri, directory).href
+    );
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`Unable to load model buffer: HTTP ${response.status}`)
+    );
+    buffer.binary = await response.arrayBuffer();
+  }
+
+  // src/globals/geometryImageOptions.js
+  var geometryImageOptions = {
+    premultiplyAlpha: "none",
+    colorSpaceConversion: "none"
+  };
+
+  // src/textures/loadModelImage.js
+  async function loadImage(description, directory, image) {
+    let blob;
+    if (image.bufferView !== void 0) {
+      const view = description.bufferViews[image.bufferView];
+      const buffer = description.buffers[view.buffer].binary;
+      blob = /* alloc */
+      new Blob(
+        /* alloc */
+        [buffer.slice(view.byteOffset || 0, (view.byteOffset || 0) + view.byteLength)],
+        /* alloc */
+        { type: image.mimeType }
+      );
+    } else {
+      const response = await fetch(
+        /* alloc */
+        new URL(image.uri, directory).href
+      );
+      if (!response.ok) throw (
+        /* alloc */
+        new Error(`Unable to load model texture: HTTP ${response.status}`)
+      );
+      blob = await response.blob();
+    }
+    return createImageBitmap(blob, geometryImageOptions);
+  }
+
+  // src/models/loadModelResources.js
+  async function loadModelResources(description, directory) {
+    const bufferRequests = (
+      /* alloc */
+      []
+    );
+    let buffer;
+    for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
+    await Promise.all(bufferRequests);
+    const imageRequests = (
+      /* alloc */
+      []
+    );
+    let image;
+    for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
+    return Promise.all(imageRequests);
+  }
+
+  // src/globals/geometrySemantics.js
+  var geometrySemantics = [
+    ["POSITION", "position"],
+    ["NORMAL", "normal"],
+    ["TEXCOORD_0", "uv"]
+  ];
+
+  // src/globals/types.js
+  var types = {
+    5120: Int8Array,
+    5121: Uint8Array,
+    5122: Int16Array,
+    5123: Uint16Array,
+    5125: Uint32Array,
+    5126: Float32Array
+  };
+
+  // src/globals/sizes.js
+  var sizes = {
+    SCALAR: 1,
+    VEC2: 2,
+    VEC3: 3,
+    VEC4: 4
+  };
+
+  // src/models/readAccessorValue.js
+  function readAccessorValue(input, Type, at) {
+    return Type === Int8Array ? input.getInt8(at) : Type === Uint8Array ? input.getUint8(at) : Type === Int16Array ? input.getInt16(at, true) : Type === Uint16Array ? input.getUint16(at, true) : Type === Uint32Array ? input.getUint32(at, true) : input.getFloat32(at, true);
+  }
+
+  // src/models/readAccessorValues.js
+  function readAccessorValues(description, Type, size, data, accessorCount, indices, viewIndex, offset, count, stride) {
+    const view = description.bufferViews[viewIndex], bytes = Type.BYTES_PER_ELEMENT;
+    const buffer = description.buffers[view.buffer].binary;
+    stride ||= size * bytes;
+    if (!buffer || stride < size * bytes || offset < 0 || (view.byteOffset || 0) + view.byteLength > buffer.byteLength || (count - 1) * stride + size * bytes + offset > view.byteLength) throw (
+      /* alloc */
+      new Error("glTF accessor outside buffer view")
+    );
+    const input = (
+      /* alloc */
+      new DataView(buffer)
+    );
+    let i, j, at, output;
+    for (i = 0; i < count; i++) {
+      output = indices ? indices[i] : i;
+      if (indices && output >= accessorCount) throw (
+        /* alloc */
+        new Error("Invalid sparse glTF index")
+      );
+      for (j = 0; j < size; j++) {
+        at = (view.byteOffset || 0) + offset + i * stride + j * bytes;
+        data[output * size + j] = readAccessorValue(input, Type, at);
+      }
+    }
+  }
+
+  // src/models/readSparseAccessor.js
+  function readSparseAccessor(description, spec, Type, size, data) {
+    const sparse = spec.sparse, Index = types[sparse.indices.componentType];
+    if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {
+      throw (
+        /* alloc */
+        new Error("Invalid sparse glTF indices")
+      );
+    }
+    const view = description.bufferViews[sparse.indices.bufferView];
+    const offset = (view.byteOffset || 0) + (sparse.indices.byteOffset || 0);
+    if (sparse.count > spec.count || (sparse.indices.byteOffset || 0) + sparse.count * Index.BYTES_PER_ELEMENT > view.byteLength) {
+      throw (
+        /* alloc */
+        new Error("Invalid sparse glTF indices")
+      );
+    }
+    const indices = (
+      /* alloc */
+      new Index(description.buffers[view.buffer].binary.slice(
+        offset,
+        offset + sparse.count * Index.BYTES_PER_ELEMENT
+      ))
+    );
+    readAccessorValues(
+      description,
+      Type,
+      size,
+      data,
+      spec.count,
+      indices,
+      sparse.values.bufferView,
+      sparse.values.byteOffset || 0,
+      sparse.count,
+      0
+    );
+  }
+
+  // src/models/normalizeAccessor.js
+  function normalizeAccessor(spec, Type, data, size) {
+    const normalized = (
+      /* alloc */
+      new Float32Array(data.length)
+    );
+    let i;
+    for (i = 0; i < data.length; i++) {
+      normalized[i] = spec.normalized ? Math.max(-1, data[i] / (Type === Int8Array ? 127 : Type === Int16Array ? 32767 : Type === Uint8Array ? 255 : Type === Uint32Array ? 4294967295 : 65535)) : data[i];
+    }
+    return (
+      /* alloc */
+      { data: normalized, size, indices: data }
+    );
+  }
+
+  // src/models/readAccessor.js
+  function readAccessor(description, index) {
+    const spec = description.accessors[index], Type = types[spec.componentType], size = sizes[spec.type];
+    if (!Type || !size || !Number.isInteger(spec.count) || spec.count < 0) {
+      throw (
+        /* alloc */
+        new Error("Invalid glTF accessor")
+      );
+    }
+    const data = (
+      /* alloc */
+      new Type(spec.count * size)
+    );
+    if (spec.bufferView !== void 0) {
+      readAccessorValues(
+        description,
+        Type,
+        size,
+        data,
+        spec.count,
+        null,
+        spec.bufferView,
+        spec.byteOffset || 0,
+        spec.count,
+        description.bufferViews[spec.bufferView].byteStride
+      );
+    }
+    if (spec.sparse) {
+      readSparseAccessor(description, spec, Type, size, data);
+    }
+    if (spec.componentType === 5126) {
+      return (
+        /* alloc */
+        { data, size }
+      );
+    }
+    return normalizeAccessor(spec, Type, data, size);
+  }
+
+  // src/models/readModelAttributes.js
+  function readModelAttributes(description, primitive) {
+    const attributes = (
+      /* alloc */
+      {}
+    );
+    let semantic, name;
+    for ([semantic, name] of geometrySemantics) {
+      if (primitive.attributes[semantic] !== void 0) {
+        attributes[name] = readAccessor(description, primitive.attributes[semantic]);
+      }
+    }
+    if (!attributes.position) throw (
+      /* alloc */
+      new Error("glTF mesh has no positions")
+    );
+    const vertexCount = attributes.position.data.length / 3;
+    if (attributes.position.size !== 3 || vertexCount < 3) throw (
+      /* alloc */
+      new Error("Invalid glTF vertex attributes")
+    );
+    let attribute;
+    for (attribute of Object.values(attributes)) {
+      if (attribute.data.length / attribute.size !== vertexCount) throw (
+        /* alloc */
+        new Error("Invalid glTF vertex attributes")
+      );
+    }
+    return (
+      /* alloc */
+      { attributes, vertexCount }
+    );
+  }
+
+  // src/models/readModelIndices.js
+  function readModelIndices(description, primitive, attributes, vertexCount) {
+    if (primitive.indices !== void 0) {
+      const index = readAccessor(description, primitive.indices);
+      attributes.index = /* alloc */
+      { size: 1, data: index.indices };
+      if (!(index.indices instanceof Uint8Array || index.indices instanceof Uint16Array || index.indices instanceof Uint32Array) || index.size !== 1 || index.indices.length % 3) {
+        throw (
+          /* alloc */
+          new Error("Invalid glTF triangle indices")
+        );
+      }
+      let value;
+      for (value of index.indices) if (value >= vertexCount) throw (
+        /* alloc */
+        new Error("Invalid glTF triangle indices")
+      );
+    } else if (vertexCount % 3) {
+      throw (
+        /* alloc */
+        new Error("Incomplete glTF triangle")
+      );
+    }
+  }
+
+  // src/geometry/vertexNormals.js
+  function vertexNormals(p, indices) {
+    const normals = (
+      /* alloc */
+      new Float32Array(p.length)
+    );
+    let i, a, b, c, ux, uy, uz, vx, vy, vz, j, nx, ny, nz, index, length;
+    for (i = 0; i < (indices?.length || p.length / 3); i += 3) {
+      a = indices ? indices[i] : i, b = indices ? indices[i + 1] : i + 1, c = indices ? indices[i + 2] : i + 2;
+      ux = p[b * 3] - p[a * 3], uy = p[b * 3 + 1] - p[a * 3 + 1], uz = p[b * 3 + 2] - p[a * 3 + 2];
+      vx = p[c * 3] - p[a * 3], vy = p[c * 3 + 1] - p[a * 3 + 1], vz = p[c * 3 + 2] - p[a * 3 + 2];
+      nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (j = 0; j < 3; j++) {
+        index = j === 0 ? a : j === 1 ? b : c;
+        normals[index * 3] += nx;
+        normals[index * 3 + 1] += ny;
+        normals[index * 3 + 2] += nz;
+      }
+    }
+    for (i = 0; i < normals.length; i += 3) {
+      length = Math.hypot(normals[i], normals[i + 1], normals[i + 2]) || 1;
+      for (j = 0; j < 3; j++) {
+        normals[i + j] /= length;
+      }
+    }
+    return normals;
+  }
+
+  // src/models/prepareModelPrimitive.js
+  function prepareModelPrimitive(description, primitive) {
+    const { attributes, vertexCount } = readModelAttributes(description, primitive);
+    readModelIndices(description, primitive, attributes, vertexCount);
+    if (!attributes.normal) {
+      attributes.normal = /* alloc */
+      {
+        size: 3,
+        data: vertexNormals(attributes.position.data, attributes.index?.data)
+      };
+    }
+    if (attributes.index?.data instanceof Uint8Array) {
+      attributes.index.data = Uint16Array.from(attributes.index.data);
+    }
+    primitive.preparedAttributes = attributes;
+    return attributes;
+  }
+
+  // src/models/prepareModelGeometry.js
+  function prepareModelGeometry(description, scene) {
+    const pending = scene.nodes.slice(), visited = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    const meshes = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    ), transfers = (
+      /* alloc */
+      /* @__PURE__ */ new Set()
+    );
+    let index, spec, primitive, attribute, child;
+    while (pending.length) {
+      index = pending.pop();
+      if (visited.has(index)) continue;
+      visited.add(index);
+      spec = description.nodes[index];
+      if (!spec) throw (
+        /* alloc */
+        new Error("Invalid glTF node")
+      );
+      if (spec.mesh !== void 0) meshes.add(spec.mesh);
+      for (child of spec.children || geometryEmpty) pending.push(child);
+    }
+    for (index of meshes) {
+      for (primitive of description.meshes[index].primitives) {
+        for (attribute of Object.values(prepareModelPrimitive(description, primitive))) {
+          transfers.add(attribute.data.buffer);
+        }
+      }
+    }
+    return (
+      /* alloc */
+      [...transfers]
+    );
+  }
+
+  // src/models/prepareModel.js
+  async function prepareModel(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw (
+      /* alloc */
+      new Error(`Unable to load model: HTTP ${response.status}`)
+    );
+    const description = decodeModel(await response.arrayBuffer());
+    const scene = description.scenes?.[description.scene || 0];
+    if (!scene) throw (
+      /* alloc */
+      new Error("Missing glTF scene")
+    );
+    const images = await loadModelResources(
+      description,
+      /* alloc */
+      new URL(".", url).href
+    );
+    const transfers = prepareModelGeometry(description, scene);
+    let image;
+    for (image of images) transfers.push(image);
+    delete description.buffers;
+    delete description.bufferViews;
+    delete description.accessors;
+    return (
+      /* alloc */
+      { description, images, transfers }
+    );
+  }
+
+  // src/workers/modelWorker.js
+  async function onModelMessage({ data }) {
+    try {
+      const result = await prepareModel(data.url);
+      self.postMessage(
+        /* alloc */
+        { description: result.description, images: result.images },
+        result.transfers
+      );
+    } catch (error) {
+      self.postMessage(
+        /* alloc */
+        { error: (
+          /* alloc */
+          { name: error.name, message: error.message }
+        ) }
+      );
+    }
+  }
+
   // src/workers/geometryWorker.js
   function onGeometryMessage(event) {
+    if (event.data.type === "model") {
+      onModelMessage(event);
+      return;
+    }
+    if (event.data.type === "cog") {
+      onCogMessage(event);
+      return;
+    }
     if (event.data.type === "vector") {
       onVectorTileMessage(event);
       return;

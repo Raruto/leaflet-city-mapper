@@ -1,7 +1,17 @@
 import { assembleAreaGeometry } from '../geometry/assembleAreaGeometry.js';
 import { onVectorTileMessage } from './vectorTileWorker.js';
+import { onCogMessage } from './cogWorker.js';
+import { onModelMessage } from './modelWorker.js';
 
 export function onGeometryMessage(event) {
+  if (event.data.type === 'model') {
+    onModelMessage(event);
+    return;
+  }
+  if (event.data.type === 'cog') {
+    onCogMessage(event);
+    return;
+  }
   if (event.data.type === 'vector') {
     onVectorTileMessage(event);
     return;

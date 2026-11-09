@@ -41,6 +41,7 @@ import { tileId } from '../../src/archives/tileId.js';
 import { varint } from '../../src/archives/readVarint.js';
 import { decodeModel } from '../../src/models/decodeModel.js';
 import { loadModel } from '../../src/models/loadModel.js';
+import { prepareModel } from '../../src/models/prepareModel.js';
 import { readAccessor } from '../../src/models/readAccessor.js';
 import { nodeMatrix } from '../../src/transforms/modelNodeMatrix.js';
 import { vertexNormals } from '../../src/geometry/vertexNormals.js';
@@ -726,7 +727,19 @@ const checks = {
       _added: { promise: Promise.resolve() }, modelUrl: 'model.gltf', root, options: {},
     };
     globals.sceneByLayer.set(backend, backend);
+    const originalWorker = globalThis.Worker;
     try {
+      globalThis.Worker = class extends EventTarget {
+        async postMessage({ url }) {
+          try {
+            const { description, images } = await prepareModel(url);
+            this.dispatchEvent(new MessageEvent('message', { data: { description, images } }));
+          } catch (error) {
+            this.dispatchEvent(new MessageEvent('message', { data: { error: { name: error.name, message: error.message } } }));
+          }
+        }
+        terminate() {}
+      };
       globalThis.document = { baseURI: 'https://example.test/' };
       globalThis.fetch = async () => new Response(JSON.stringify({
         asset: { version: '2.0' }, scenes: [{ nodes: [0] }], nodes: [{}],
@@ -748,6 +761,8 @@ const checks = {
       assert.deepEqual(buffers.map(buffer => [...new Uint8Array(buffer.binary)]), [[1], [2]]);
     } finally {
       globalThis.fetch = originalFetch;
+      if (originalWorker === undefined) delete globalThis.Worker;
+      else globalThis.Worker = originalWorker;
       if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
       else delete globalThis.document;
     }

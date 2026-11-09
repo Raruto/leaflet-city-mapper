@@ -76,6 +76,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
   await this.page.goto(this.baseUrl);
   const result = await this.page.evaluate(async () => {
     const { attachAreaMesh } = await import('/src/sources/attachAreaMesh.js');
+    const { instanceAreaGeometry } = await import('/src/geometry/instanceAreaGeometry.js');
     const { emptyNode } = await import('/src/scene/createSceneNode.js');
     const globals = await import('/test/fixtures/globals.js');
     const { updateWorldMatrix } = await import('/src/transforms/updateWorldMatrix.js');
@@ -137,7 +138,13 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
         { id: 'right', vertexStart: 3, vertexEnd: 6, faceStart: 1, faceEnd: 2 },
       ],
     };
-    attachAreaMesh(context);
+    const prepare = context => {
+      const data = instanceAreaGeometry(context);
+      context.preparedGeometry = { ...data, positions: Float32Array.from(data.positions),
+        normals: Float32Array.from(data.normals), colors: Float32Array.from(data.colors) };
+      attachAreaMesh(context);
+    };
+    prepare(context);
     const compact = context.area.mesh;
     compact._appearance = 1;
     compact.fadeDuration = 0;
@@ -145,7 +152,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
     // One range prevents compaction and supplies the original, expanded reference.
     const reference = { ...context, area: { request: new AbortController() },
       featureFaces: [{ vertexStart: 0, vertexEnd: 6, faceStart: 0, faceEnd: 2 }] };
-    attachAreaMesh(reference);
+    prepare(reference);
     const expanded = reference.area.mesh;
     expanded._appearance = 1;
     updateWorldMatrix(expanded);

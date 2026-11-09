@@ -28,16 +28,16 @@ Then('configured models preserve external assets and can be detached and reattac
       occlusionTexture: { index: 0, strength: 0.6 },
     }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 }] }],
-    nodes: [{ mesh: 0 }], scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }], scenes: [{ nodes: [0, 1] }],
   };
-  await this.page.route('**/manual/model.gltf', route => route.fulfill({
+  await this.context.route('**/manual/model.gltf', route => route.fulfill({
     contentType: 'application/json', body: JSON.stringify(description),
   }));
-  await this.page.route('**/manual/vertices.bin', route => route.fulfill({
+  await this.context.route('**/manual/vertices.bin', route => route.fulfill({
     body: Buffer.concat([Buffer.from(vertices.buffer), Buffer.from(new Float32Array([0, 0, 1, 0, 0.5, 1]).buffer)]),
     contentType: 'application/octet-stream',
   }));
-  await this.page.route('**/manual/texture.png', route => route.fulfill({
+  await this.context.route('**/manual/texture.png', route => route.fulfill({
     contentType: 'image/png', body: Buffer.from(png, 'base64'),
   }));
   const result = await this.page.evaluate(async () => {
@@ -50,8 +50,16 @@ Then('configured models preserve external assets and can be detached and reattac
     layer.addTo(test3d.map);
     await loaded;
     const model = globals.sceneByLayer.get(layer).model;
-    let mesh;
-    nativeChecks.graph.traverse(model, node => { if (node.geometry) mesh = node; });
+    const meshes = [];
+    nativeChecks.graph.traverse(model, node => { if (node.geometry) meshes.push(node); });
+    const mesh = meshes[0];
+    const independent = meshes.length === 2 &&
+      mesh.geometry.attributes.position.data !== meshes[1].geometry.attributes.position.data &&
+      mesh.geometry.attributes.position.buffer !== meshes[1].geometry.attributes.position.buffer;
+    const secondX = meshes[1].geometry.attributes.position.data[0];
+    mesh.geometry.attributes.position.data[0] = 123;
+    const retainedGeometry = meshes[1].geometry.attributes.position.data[0] === secondX;
+    mesh.geometry.attributes.position.data[0] = secondX;
     const style = mesh.program._layerMaterial, device = globals.sceneByLayer.get(layer).renderer.device;
     const attached = model.parent === globals.sceneByLayer.get(layer).root && !('ready' in layer);
     const maps = style.baseTexture.format === 'rgba8unorm-srgb' &&
@@ -74,13 +82,13 @@ Then('configured models preserve external assets and can be detached and reattac
     nativeChecks.render.update(layer);
     const reattached = model.parent === globals.sceneByLayer.get(layer).root;
     layer.remove();
-    return { waitsForMap, attached, maps, factors, normals, uploaded, retained, reattached };
+    return { waitsForMap, attached, maps, factors, normals, independent, retainedGeometry, uploaded, retained, reattached };
   });
   for (const [name, value] of Object.entries(result)) {
     assert.equal(value, true, name);
   }
   delete description.meshes[0].primitives[0].attributes.TEXCOORD_0;
-  await this.page.route('**/manual/no-uv.gltf', route => route.fulfill({
+  await this.context.route('**/manual/no-uv.gltf', route => route.fulfill({
     contentType: 'application/json', body: JSON.stringify(description),
   }));
   const missingUV = await this.page.evaluate(async () => {
@@ -95,7 +103,7 @@ Then('configured models preserve external assets and can be detached and reattac
 });
 
 Then('native triangulation and glTF decoding preserve geometry without library requests', async function () {
-  await this.page.route('**/accessors.gltf?*', route => route.fulfill({
+  await this.context.route('**/accessors.gltf?*', route => route.fulfill({
     contentType: 'application/json', body: new URL(route.request().url()).searchParams.get('fixture'),
   }));
   const result = await this.page.evaluate(async () => {
@@ -369,7 +377,7 @@ When('I load a configured 3D model with {string}', async function (failure) {
     body.writeUInt32LE(32, 12);
     body.writeUInt32LE(0x4e4f534a, 16);
   }
-  await this.page.route('**/test/invalid-model.glb', route => route.fulfill({
+  await this.context.route('**/test/invalid-model.glb', route => route.fulfill({
     status, body, contentType: 'application/octet-stream',
   }));
   this.invalid3d = await this.page.evaluate(async () => {

@@ -8,13 +8,8 @@ export function sourceAreaContext(layer, area, map) {
   return /* alloc */ {
     backend: layer, area, map, crs, origin,
     metres: Math.cos(locationByLayer.get(layer).lat * radians),
-    positions: /* alloc */ [],
-    normals: /* alloc */ [],
-    colors: /* alloc */ [],
-    uvs: /* alloc */ [],
+    jobs: /* alloc */ [],
     featureFaces: /* alloc */ [],
-    lights: /* alloc */ [],
-    supports: /* alloc */ new Set(),
     skipped: 0,
   };
 }

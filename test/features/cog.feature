@@ -7,6 +7,9 @@ Feature: Offline Cloud Optimized GeoTIFF sources
   Scenario: The COG reader decodes ranged elevation tiles and rejects unsupported data
     Then COG ranges and TIFF profile validation preserve elevation samples
 
+  Scenario: COG worker requests share the geometry pool without retaining TIFF parsing on the main thread
+    Then COG workers preserve ranges, cache ownership, missing tiles and errors
+
   @coverage
   Scenario: The local Colosseum COGs render aerial and archaeological imagery on real relief
     Given the instrumented city mapper plugin is loaded after Leaflet alone

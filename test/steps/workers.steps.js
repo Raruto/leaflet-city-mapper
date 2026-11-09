@@ -12,7 +12,26 @@ import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
 import { buildAreaInWorker } from '../../src/workers/buildAreaInWorker.js';
 import { geometryWorkersByMap } from '../../src/weakmaps/geometryWorkersByMap.js';
 import { computeBounds } from '../../src/geometry/computeBounds.js';
+import { buildProjectedPoint } from '../../src/geometry/buildProjectedPoint.js';
+import { buildProjectedPolygon } from '../../src/geometry/buildProjectedPolygon.js';
+import { projectedTree } from '../../src/projections/projectTreePoint.js';
+import { projectRing } from '../../src/projections/projectRing.js';
+import { parseColor } from '../../src/colors/parseColor.js';
 import { feature, tile } from '../fixtures/vector-tile.js';
+
+Then('the main bundle excludes source preparation and stays below 245 KB', async function () {
+  const main = JSON.parse(await readFile('dist/leaflet-city-mapper.js.map', 'utf8'));
+  const worker = JSON.parse(await readFile('dist/leaflet-city-mapper-worker.js.map', 'utf8'));
+  for (const name of ['assembleAreaGeometry', 'instanceAreaGeometry', 'buildProjectedPoint',
+    'buildProjectedPolygon', 'generateTreeGeometry', 'treeGeometry', 'lampPostGeometry', 'lightGeometry',
+    'openCog', 'readCog', 'readCogDirectory', 'decodeCogTile', 'getElevationTile', 'getColorTile',
+    'decodeModel', 'readAccessor', 'readSparseAccessor', 'readModelAttributes', 'readModelIndices',
+    'loadModelResources', 'loadBuffer', 'loadModelImage', 'prepareModelGeometry']) {
+    assert.ok(worker.sources.some(path => path.endsWith(`/${name}.js`)), `${name} belongs in the worker`);
+    assert.ok(!main.sources.some(path => path.endsWith(`/${name}.js`)), `${name} must not ship in the main bundle`);
+  }
+  assert.ok((await readFile('dist/leaflet-city-mapper.js')).length < 245000);
+});
 
 Then('the shared worker dispatches geometry and vector tiles with isolated responses', async function () {
   for (const file of ['dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js']) {
@@ -52,6 +71,49 @@ Then('the shared worker dispatches geometry and vector tiles with isolated respo
   }
 });
 
+Then('model worker bundles transfer decoded attributes and generated normals exactly once', async function () {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const bytes = new Uint8Array(39);
+  bytes.set(new Uint8Array(positions.buffer));
+  bytes.set([0, 1, 2], 36);
+  const description = {
+    asset: { version: '2.0' }, buffers: [{ uri: 'vertices.bin', byteLength: 39 }],
+    bufferViews: [{ buffer: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 3 }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 1, componentType: 5121, count: 3, type: 'SCALAR' }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
+    nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }], scenes: [{ nodes: [0, 1] }],
+  };
+  for (const file of ['dist/leaflet-city-mapper-worker.js', 'dist/leaflet-city-mapper-worker-src.js']) {
+    let handler, respond, detached;
+    new Script(await readFile(file, 'utf8')).runInNewContext({
+      TextDecoder, URL,
+      fetch: async url => new Response(url.endsWith('vertices.bin') ? bytes : JSON.stringify(description)),
+      self: {
+        addEventListener(type, listener) { handler = listener; },
+        postMessage(data, transfers = []) {
+          const result = structuredClone(data, { transfer: transfers });
+          detached = Array.from(transfers, buffer => buffer.byteLength);
+          respond(result);
+        },
+      },
+    });
+    const response = new Promise(resolve => { respond = resolve; });
+    handler({ data: { type: 'model', url: 'https://fixture.test/model.gltf' } });
+    const result = await response;
+    assert.equal(result.error, undefined);
+    const attributes = result.description.meshes[0].primitives[0].preparedAttributes;
+    assert.deepEqual([...attributes.position.data], [...positions]);
+    assert.deepEqual([...attributes.normal.data], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    assert.ok(attributes.index.data instanceof Uint16Array);
+    assert.deepEqual([...attributes.index.data], [0, 1, 2]);
+    assert.deepEqual(detached, [0, 0, 0], 'Only unique output buffers are transferred; the worker relinquishes ownership');
+    assert.equal(result.description.buffers, undefined);
+    assert.equal(result.description.bufferViews, undefined);
+    assert.equal(result.description.accessors, undefined);
+  }
+});
+
 Then('prepared geometry matches CPU vertices, lights, ranges and instancing', function () {
   const previous = mockLeaflet({ LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } });
   const square = (x, y) => [[x, y], [x + 4, y], [x + 4, y + 4], [x, y + 4], [x, y]];
@@ -83,7 +145,28 @@ Then('prepared geometry matches CPU vertices, lights, ranges and instancing', fu
         featureFaces: [], lights: [], supports: new Set(), skipped: 0 });
       const cpu = makeContext(), queued = makeContext();
       queued.jobs = [];
-      for (const feature of features) { buildAreaFeature(cpu, feature); buildAreaFeature(queued, feature); }
+      for (const feature of features) {
+        buildAreaFeature(queued, feature);
+        const style = layer.options.style(feature);
+        if (style === null) { cpu.skipped++; continue; }
+        const baseColor = parseColor(style.color ?? 0xd9b38c);
+        const start = cpu.positions.length / 3;
+        const geometry = feature.geometry;
+        if (geometry.type === 'Point') {
+          const [lon, lat] = geometry.coordinates;
+          buildProjectedPoint(cpu, projectedTree(cpu, lon, lat), style, baseColor,
+            feature.properties?.cod_ouvrag || `${lon},${lat}`);
+        } else {
+          const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+          for (const polygon of polygons) {
+            buildProjectedPolygon(cpu, polygon.map(ring => projectRing(cpu, ring)),
+              style.top, style.bottom ?? 0, baseColor);
+          }
+        }
+        const end = cpu.positions.length / 3;
+        cpu.featureFaces.push({ id: feature.id ?? JSON.stringify(geometry), properties: feature.properties,
+          vertexStart: start, vertexEnd: end, faceStart: start / 3, faceEnd: end / 3 });
+      }
       const expected = instanceAreaGeometry(cpu);
       const actual = assembleAreaGeometry({ jobs: structuredClone(queued.jobs), nightLight });
       for (const name of ['positions', 'normals', 'colors']) {
@@ -442,7 +525,7 @@ Then('cross-origin vector tile workers preserve results and release blob URLs on
     }
   });
 
-Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancellation', { timeout: 60000 }, async function () {
+Then('all GeoJSON blocks use workers and preserve replacement and cancellation', { timeout: 60000 }, async function () {
   let workers = 0;
   const onWorker = () => workers++;
   this.page.on('worker', onWorker);
@@ -456,13 +539,13 @@ Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancell
         geometry: { type: 'Point', coordinates: [12.49 + i * 0.00001, 41.89] },
       })) };
       const errors = [];
-      const makeLayer = worker => new L.Layer({ source: { type: 'vector', worker,
-        data, center: [41.89, 12.49],
+      const makeLayer = (workerUrl, features = data) => new L.Layer({ source: { type: 'vector', workerUrl,
+        data: features, center: [41.89, 12.49],
         style: () => ({ top: 8, trunkRadius: 0.25, crownRadius: 2, crownBottom: 3,
           color: 'rebeccapurple', trunkColor: '#72513a', unused: () => {} }),
         tooltip: feature => feature.id } }).on('error', ({ error }) => errors.push(error.message));
       const completed = layer => new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('GeoJSON build timed out')), 10000);
+        const timer = setTimeout(() => reject(new Error(`GeoJSON build timed out (${layer.options.data.features.length} features): ${errors.join('; ')}`)), 10000);
         const progress = event => {
           if (event.pending) return;
           clearTimeout(timer);
@@ -472,16 +555,21 @@ Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancell
         };
         layer.on('progress', progress);
       });
-      const cpu = makeLayer(false), threaded = makeLayer(true);
-      let done = completed(cpu); cpu.addTo(map); await done;
+      const small = { type: 'FeatureCollection', features: data.features.slice(0, 1) };
+      const native = makeLayer('/dist/leaflet-city-mapper-worker-src.js', small), threaded = makeLayer();
+      let done = completed(native); native.addTo(map); await done;
+      const smallWorker = testWeakmaps.geometryWorkersByMap.get(map).entries.size;
+      done = completed(native); testOperations.setData(native, data); await done;
       done = completed(threaded); threaded.addTo(map); await done;
-      const cpuArea = globals.sceneByLayer.get(cpu)._areas.get('geojson');
+      const nativeArea = globals.sceneByLayer.get(native)._areas.get('geojson');
       const area = globals.sceneByLayer.get(threaded)._areas.get('geojson');
-      const same = Object.keys(cpuArea.mesh.geometry.attributes).every(name => {
-        const a = cpuArea.mesh.geometry.attributes[name].data, b = area.mesh.geometry.attributes[name].data;
+      const same = Object.keys(nativeArea.mesh.geometry.attributes).every(name => {
+        const a = nativeArea.mesh.geometry.attributes[name].data, b = area.mesh.geometry.attributes[name].data;
         return a.length === b.length && a.every((value, i) => value === b[i]);
       });
       const identity = area.mesh.extras.featureFaces.every((face, i) => face.properties === data.features[i].properties && face.id === i);
+      done = completed(threaded); testOperations.setData(threaded, { type: 'FeatureCollection', features: [] });
+      const empty = await done;
       const next = { type: 'FeatureCollection', features: data.features.slice(0, 1) };
       done = completed(threaded); testOperations.setData(threaded, next); const replaced = await done;
       const cancelled = area.request.signal.aborted;
@@ -493,12 +581,12 @@ Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancell
       threaded.remove();
       await new Promise(resolve => setTimeout(resolve, 100));
       const obsoleteAborted = obsolete.request.signal.aborted;
-      cpu.remove(); map.remove(); container.remove();
-      return { same, identity, replaced, cancelled, restored, obsoleteAborted, errors };
+      native.remove(); map.remove(); container.remove();
+      return { same, identity, smallWorker, empty, replaced, cancelled, restored, obsoleteAborted, errors };
     });
-    assert.deepEqual(result, { same: true, identity: true, replaced: 1, cancelled: true,
+    assert.deepEqual(result, { same: true, identity: true, smallWorker: 1, empty: 0, replaced: 1, cancelled: true,
       restored: 80, obsoleteAborted: true, errors: [] });
-    assert.ok(workers >= 1 && workers <= 4, 'Large GeoJSON sources must create and reuse bounded workers');
+    assert.ok(workers >= 2 && workers <= 4, 'GeoJSON sources must create and reuse bounded workers');
   } finally {
     this.page.off('worker', onWorker);
   }

@@ -1,5 +1,3 @@
-import { buildAreaPoint } from './buildAreaPoint.js';
-import { buildAreaPolygon } from '../geometry/buildExtrudedPolygon.js';
 import { parseColor } from '../colors/parseColor.js';
 import { featureAnchor } from './featureAnchor.js';
 import { extrusionStyle } from './extrusionStyle.js';
@@ -10,7 +8,7 @@ export function buildAreaFeature(context, feature) {
   const { backend: layer, area, map } = context;
   const coords = area.coords;
   const coordinates = featureAnchor(feature, layer.options.nightLight);
-  const geometry = feature.geometry, isTree = geometry.type === 'Point';
+  const geometry = feature.geometry;
   const lon = coordinates[0], lat = coordinates[1];
   if (!matchesAreaTile(map, coords, lon, lat)) return;
   const style = extrusionStyle(layer, feature);
@@ -18,25 +16,11 @@ export function buildAreaFeature(context, feature) {
     context.skipped++;
     return;
   }
-  const { top, bottom = 0, color = 0xd9b38c } = style;
+  const { color = 0xd9b38c } = style;
   const baseColor = parseColor(color);
-  if (context.jobs) {
-    prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
-    context.featureFaces.push(/* alloc */ {
-      id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
-      properties: feature.properties, baseColor,
-    });
-    return;
-  }
-  const vertexStart = context.positions.length / 3;
-  if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
-  let polygon;
-  if (geometry.type === 'Polygon') buildAreaPolygon(context, geometry.coordinates, top, bottom, baseColor);
-  else if (geometry.type === 'MultiPolygon') for (polygon of geometry.coordinates) buildAreaPolygon(context, polygon, top, bottom, baseColor);
-  const vertexEnd = context.positions.length / 3;
+  prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
   context.featureFaces.push(/* alloc */ {
     id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
     properties: feature.properties, baseColor,
-    faceStart: vertexStart / 3, faceEnd: vertexEnd / 3, vertexStart, vertexEnd,
   });
 }

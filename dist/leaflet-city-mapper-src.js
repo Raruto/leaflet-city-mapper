@@ -5646,10 +5646,10 @@
   }
 
   // src/triangulation/minimumX.js
-  function minimumX(ring3) {
+  function minimumX(ring) {
     let minimum = Infinity;
     let point;
-    for (point of ring3) minimum = Math.min(minimum, point.x);
+    for (point of ring) minimum = Math.min(minimum, point.x);
     return minimum;
   }
 
@@ -5677,10 +5677,10 @@
       /* alloc */
       []
     );
-    let ring3, width, start2, previous, i;
-    for (ring3 of holes) entries.push(
+    let ring, width, start2, previous, i;
+    for (ring of holes) entries.push(
       /* alloc */
-      { ring: ring3, x: minimumX(ring3) }
+      { ring, x: minimumX(ring) }
     );
     let source = entries, target = buffer;
     for (width = 1; width < entries.length; width *= 2) {
@@ -5706,25 +5706,25 @@
   }
 
   // src/triangulation/clean.js
-  function clean(ring3) {
+  function clean(ring) {
     let changed = true;
     let i, a, b, c;
-    while (changed && ring3.length > 3) {
+    while (changed && ring.length > 3) {
       changed = false;
-      for (i = 0; i < ring3.length; i++) {
-        a = ring3[(i + ring3.length - 1) % ring3.length], b = ring3[i], c = ring3[(i + 1) % ring3.length];
+      for (i = 0; i < ring.length; i++) {
+        a = ring[(i + ring.length - 1) % ring.length], b = ring[i], c = ring[(i + 1) % ring.length];
         if (equal(a, b) || Math.abs(cross(a, b, c)) < 1e-10) {
-          ring3.splice(i, 1);
+          ring.splice(i, 1);
           changed = true;
           break;
         }
       }
     }
-    if (ring3.length < 3) throw (
+    if (ring.length < 3) throw (
       /* alloc */
       new Error("Degenerate polygon ring")
     );
-    return ring3;
+    return ring;
   }
 
   // src/triangulation/isClockWise.js
@@ -5744,22 +5744,22 @@
       /* alloc */
       []
     );
-    let offset = 0, index, path, ring3;
+    let offset = 0, index, path, ring;
     for (index = 0; index < paths.length; index++) {
       path = paths[index];
-      ring3 = clean(vertices.slice(offset, offset += path.length));
-      if (isClockWise(ring3) !== Boolean(index)) ring3.reverse();
-      rings.push(ring3);
+      ring = clean(vertices.slice(offset, offset += path.length));
+      if (isClockWise(ring) !== Boolean(index)) ring.reverse();
+      rings.push(ring);
     }
     return rings;
   }
 
   // src/triangulation/inside.js
-  function inside(point, ring3) {
+  function inside(point, ring) {
     let result = false;
     let i, j, a, b;
-    for (i = 0, j = ring3.length - 1; i < ring3.length; j = i++) {
-      a = ring3[i], b = ring3[j];
+    for (i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      a = ring[i], b = ring[j];
       if (a.y > point.y !== b.y > point.y && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) result = !result;
     }
     return result;
@@ -5785,10 +5785,10 @@
   }
 
   // src/triangulation/crossesRing.js
-  function crossesRing(a, b, ring3) {
+  function crossesRing(a, b, ring) {
     let i;
-    for (i = 0; i < ring3.length; i++) {
-      if (intersects(a, b, ring3[i], ring3[(i + 1) % ring3.length])) return true;
+    for (i = 0; i < ring.length; i++) {
+      if (intersects(a, b, ring[i], ring[(i + 1) % ring.length])) return true;
     }
     return false;
   }
@@ -5878,11 +5878,11 @@
   }
 
   // src/triangulation/area.js
-  function area(ring3) {
+  function area(ring) {
     let sum = 0;
     let i, p, q;
-    for (i = 0; i < ring3.length; i++) {
-      p = ring3[i], q = ring3[(i + 1) % ring3.length];
+    for (i = 0; i < ring.length; i++) {
+      p = ring[i], q = ring[(i + 1) % ring.length];
       sum += p.x * q.y - q.x * p.y;
     }
     return Math.abs(sum) / 2;
@@ -5957,8 +5957,8 @@
       /* alloc */
       []
     );
-    let ring3, indices;
-    for (ring3 of projected) if (ring3.length >= 3) valid.push(ring3);
+    let ring, indices;
+    for (ring of projected) if (ring.length >= 3) valid.push(ring);
     const vertices = valid.flat();
     for (indices of triangulate(valid[0], valid.slice(1))) {
       triangle(point, fill, vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]);
@@ -5972,17 +5972,17 @@
       /* alloc */
       []
     );
-    let ring3, path, latlng;
-    for (ring3 of rings) {
+    let ring, path, latlng;
+    for (ring of rings) {
       path = /* alloc */
       [];
-      for (latlng of ring3) path.push(map.project(latlng));
+      for (latlng of ring) path.push(map.project(latlng));
       projected.push(path);
     }
     if (closed && options.fill && projected[0]?.length >= 3) {
       fillNativePolygon(context, projected);
     }
-    for (ring3 of projected) line(context, ring3, closed);
+    for (ring of projected) line(context, ring, closed);
   }
 
   // src/geometry/visitNativeCoordinates.js
@@ -8151,47 +8151,6 @@
     layer.fire("progress", progress);
   }
 
-  // src/geometry/instanceAreaGeometry.js
-  function instanceAreaGeometry(context) {
-    const { positions, normals, colors, featureFaces } = context;
-    if (context.backend.options.nightLight || featureFaces.length < 2) return context;
-    const vertices = featureFaces[0].vertexEnd;
-    const length = vertices * 3;
-    if (!vertices || positions.length !== length * featureFaces.length) return context;
-    const originX = Math.trunc(positions[0]), originY = Math.trunc(positions[1]), originZ = Math.trunc(positions[2]);
-    const template = (
-      /* alloc */
-      new Float32Array(length)
-    );
-    let i, instance, face, start2;
-    for (i = 0; i < length; i++) template[i] = positions[i] - (i % 3 === 0 ? originX : i % 3 === 1 ? originY : originZ);
-    const offsets = (
-      /* alloc */
-      new Float32Array(featureFaces.length * 4)
-    );
-    for (instance = 0; instance < featureFaces.length; instance++) {
-      face = featureFaces[instance];
-      start2 = instance * length;
-      if (face.vertexStart !== instance * vertices || face.vertexEnd !== (instance + 1) * vertices) return context;
-      offsets[instance * 4] = originX + positions[start2] - positions[0];
-      offsets[instance * 4 + 1] = originY + positions[start2 + 1] - positions[1];
-      offsets[instance * 4 + 2] = originZ + positions[start2 + 2] - positions[2];
-      offsets[instance * 4 + 3] = instance * vertices;
-      for (i = 0; i < length; i++) {
-        if (Math.fround(template[i] + offsets[instance * 4 + i % 3]) !== Math.fround(positions[start2 + i]) || Math.fround(normals[i]) !== Math.fround(normals[start2 + i]) || Math.fround(colors[i]) !== Math.fround(colors[start2 + i])) return context;
-      }
-    }
-    return (
-      /* alloc */
-      {
-        positions: template,
-        normals: normals.slice(0, length),
-        colors: colors.slice(0, length),
-        instanceOffsets: offsets
-      }
-    );
-  }
-
   // src/sources/attachAreaMesh.js
   function attachAreaMesh(context) {
     const { backend: layer, area: area2 } = context;
@@ -8200,30 +8159,21 @@
       return;
     }
     const device = rendererByLayer.get(layer).device;
-    const data = context.preparedGeometry || instanceAreaGeometry(context);
+    const data = context.preparedGeometry;
     const attributes = (
       /* alloc */
       {
         position: (
           /* alloc */
-          { size: 3, data: data.positions instanceof Float32Array ? data.positions : (
-            /* alloc */
-            new Float32Array(data.positions)
-          ) }
+          { size: 3, data: data.positions }
         ),
         normal: (
           /* alloc */
-          { size: 3, data: data.normals instanceof Float32Array ? data.normals : (
-            /* alloc */
-            new Float32Array(data.normals)
-          ) }
+          { size: 3, data: data.normals }
         ),
         color: (
           /* alloc */
-          { size: 3, data: data.colors instanceof Float32Array ? data.colors : (
-            /* alloc */
-            new Float32Array(data.colors)
-          ) }
+          { size: 3, data: data.colors }
         )
       }
     );
@@ -8232,10 +8182,7 @@
     if (layer.options.nightLight) attributes.uv = /* alloc */
     {
       size: 2,
-      data: context.uvs instanceof Float32Array ? context.uvs : (
-        /* alloc */
-        new Float32Array(context.uvs)
-      )
+      data: data.uvs
     };
     let name, attribute;
     for (name in attributes) {
@@ -8618,33 +8565,13 @@
         crs,
         origin,
         metres: Math.cos(locationByLayer.get(layer).lat * radians),
-        positions: (
-          /* alloc */
-          []
-        ),
-        normals: (
-          /* alloc */
-          []
-        ),
-        colors: (
-          /* alloc */
-          []
-        ),
-        uvs: (
+        jobs: (
           /* alloc */
           []
         ),
         featureFaces: (
           /* alloc */
           []
-        ),
-        lights: (
-          /* alloc */
-          []
-        ),
-        supports: (
-          /* alloc */
-          /* @__PURE__ */ new Set()
         ),
         skipped: 0
       }
@@ -8665,7 +8592,7 @@
       /* alloc */
       new Error("Unable to receive geometry worker buffers")
     );
-    else if (event.data.error) {
+    else if (event.data?.error) {
       const error = (
         /* alloc */
         new Error(event.data.error.message)
@@ -8717,6 +8644,10 @@
 
   // src/workers/createGeometryWorker.js
   function createGeometryWorker(url, pool) {
+    if (typeof Worker === "undefined") throw (
+      /* alloc */
+      new Error("Web Workers are required to prepare source geometry")
+    );
     let workerUrl = url, blobUrl, worker;
     if (globalThis.location) {
       const resolved = (
@@ -8791,33 +8722,25 @@
     return createGeometryWorker(url, pool);
   }
 
-  // src/workers/buildAreaInWorker.js
-  async function buildAreaInWorker(context, signal) {
-    const entry = acquireGeometryWorker(context.map || context.backend._map, context.backend.options.workerUrl || geometryWorkerUrl);
+  // src/workers/runSourceWorker.js
+  async function runSourceWorker(map, url, input, signal = (
+    /* alloc */
+    new AbortController().signal
+  )) {
+    signal.throwIfAborted();
+    const entry = acquireGeometryWorker(map, url || geometryWorkerUrl);
     const { worker, pool } = entry;
     const task = (
       /* alloc */
-      {
-        worker,
-        signal,
-        input: (
-          /* alloc */
-          { jobs: context.jobs, nightLight: Boolean(context.backend.options.nightLight) }
-        )
-      }
+      { worker, signal, input }
     );
     entry.task = task;
     let completed = false;
     try {
       const data = await /* alloc */
       new Promise(startGeometryWorker.bind(null, task));
-      let i;
-      for (i = 0; i < data.ranges.length; i++) Object.assign(context.featureFaces[i], data.ranges[i]);
-      context.positions = data.positions;
-      context.uvs = data.uvs;
-      context.lights = data.lights;
-      context.preparedGeometry = data;
       completed = true;
+      return data;
     } finally {
       worker.removeEventListener("message", task.onEvent);
       worker.removeEventListener("error", task.onEvent);
@@ -8833,457 +8756,28 @@
         URL.revokeObjectURL(entry.blobUrl);
         entry.blobUrl = null;
       }
+    }
+  }
+
+  // src/workers/buildAreaInWorker.js
+  async function buildAreaInWorker(context, signal) {
+    try {
+      const data = await runSourceWorker(
+        context.map || context.backend._map,
+        context.backend.options.workerUrl,
+        /* alloc */
+        { jobs: context.jobs, nightLight: Boolean(context.backend.options.nightLight) },
+        signal
+      );
+      let i;
+      for (i = 0; i < data.ranges.length; i++) Object.assign(context.featureFaces[i], data.ranges[i]);
+      context.positions = data.positions;
+      context.uvs = data.uvs;
+      context.lights = data.lights;
+      context.preparedGeometry = data;
+    } finally {
       context.jobs = null;
     }
-  }
-
-  // src/projections/projectTreePoint.js
-  init_L();
-  function projectedTree(context, lon, lat) {
-    const { backend: layer, crs, origin, metres, map } = context;
-    const location2 = (
-      /* alloc */
-      new L.LatLng(lat, lon)
-    );
-    const point = crs.project(location2);
-    const elevation = mapElevationOf(map, location2), root = rootByLayer.get(layer);
-    return (
-      /* alloc */
-      {
-        x: (point.x - origin.x) * metres,
-        y: (point.y - origin.y) * metres,
-        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
-      }
-    );
-  }
-
-  // src/globals/triangleContexts.js
-  var triangleContexts = [];
-
-  // src/sources/groundOffset.js
-  function groundOffset(point) {
-    return point.ground || 0;
-  }
-
-  // src/geometry/appendAreaTriangle.js
-  function addTriangle(context, a, ah, b, bh, c, ch, nx, ny, nz, color) {
-    const { backend: layer, positions, normals, colors, uvs } = context;
-    const ux = b.x - a.x, uy = bh - ah, uz = a.y - b.y;
-    const vx = c.x - a.x, vy = ch - ah, vz = a.y - c.y;
-    if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz < 0) {
-      const point = b, height = bh;
-      b = c;
-      bh = ch;
-      c = point;
-      ch = height;
-    }
-    positions.push(
-      a.x,
-      ah + groundOffset(a),
-      -a.y,
-      b.x,
-      bh + groundOffset(b),
-      -b.y,
-      c.x,
-      ch + groundOffset(c),
-      -c.y
-    );
-    normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b);
-    if (layer.options.nightLight) uvs.push(...a.uv, ...b.uv, ...c.uv);
-  }
-
-  // src/geometry/addGeneratedTriangle.js
-  function addGeneratedTriangle(...args) {
-    addTriangle(triangleContexts[triangleContexts.length - 1], ...args);
-  }
-
-  // src/geometry/generateTreeGeometry.js
-  function generateTreeGeometry(context, generator, point, style) {
-    triangleContexts.push(context);
-    try {
-      generator(point, style, addGeneratedTriangle);
-    } finally {
-      triangleContexts.pop();
-    }
-  }
-
-  // src/globals/lampDirections.js
-  var lampDirections = [
-    { x: Math.cos(0 * Math.PI / 3), y: Math.sin(0 * Math.PI / 3), nx: Math.cos(0.5 * Math.PI / 3), nz: -Math.sin(0.5 * Math.PI / 3) },
-    { x: Math.cos(1 * Math.PI / 3), y: Math.sin(1 * Math.PI / 3), nx: Math.cos(1.5 * Math.PI / 3), nz: -Math.sin(1.5 * Math.PI / 3) },
-    { x: Math.cos(2 * Math.PI / 3), y: Math.sin(2 * Math.PI / 3), nx: Math.cos(2.5 * Math.PI / 3), nz: -Math.sin(2.5 * Math.PI / 3) },
-    { x: Math.cos(3 * Math.PI / 3), y: Math.sin(3 * Math.PI / 3), nx: Math.cos(3.5 * Math.PI / 3), nz: -Math.sin(3.5 * Math.PI / 3) },
-    { x: Math.cos(4 * Math.PI / 3), y: Math.sin(4 * Math.PI / 3), nx: Math.cos(4.5 * Math.PI / 3), nz: -Math.sin(4.5 * Math.PI / 3) },
-    { x: Math.cos(5 * Math.PI / 3), y: Math.sin(5 * Math.PI / 3), nx: Math.cos(5.5 * Math.PI / 3), nz: -Math.sin(5.5 * Math.PI / 3) }
-  ];
-
-  // src/geometry/createLampRing.js
-  function ring(point, radius) {
-    const points = (
-      /* alloc */
-      new Array(lampDirections.length)
-    );
-    let i;
-    for (i = 0; i < points.length; i++) {
-      points[i] = /* alloc */
-      {
-        x: point.x + lampDirections[i].x * radius,
-        y: point.y + lampDirections[i].y * radius,
-        ground: point.ground,
-        uv: (
-          /* alloc */
-          [3, 3]
-        )
-      };
-    }
-    return points;
-  }
-
-  // src/geometry/lampPostGeometry.js
-  function lampPostGeometry(point, style, addTriangle2) {
-    const color = parseColor(5264986), radius = style.poleRadius;
-    if (!Number.isFinite(radius) || radius <= 0) {
-      throw (
-        /* alloc */
-        new Error("Invalid lamp pole radius")
-      );
-    }
-    const center = (
-      /* alloc */
-      {
-        ...point,
-        uv: (
-          /* alloc */
-          [3, 3]
-        )
-      }
-    );
-    let r, low, high, points, i, a, b, nx, nz, section;
-    for (section = 0; section < 2; section++) {
-      r = section ? radius * 2.5 : radius;
-      low = section ? style.top - 0.25 : 0;
-      high = section ? style.top + 0.15 : style.top;
-      points = ring(point, r);
-      for (i = 0; i < 6; i++) {
-        a = points[i], b = points[(i + 1) % 6];
-        nx = lampDirections[i].nx, nz = lampDirections[i].nz;
-        addTriangle2(a, low, b, low, b, high, nx, 0, nz, color);
-        addTriangle2(a, low, b, high, a, high, nx, 0, nz, color);
-        addTriangle2(center, high, a, high, b, high, 0, 1, 0, color);
-        addTriangle2(center, low, b, low, a, low, 0, -1, 0, color);
-      }
-    }
-  }
-
-  // src/geometry/quad.js
-  function quad(addTriangle2, color, a, b, c, d, height, nx, ny, nz) {
-    if (typeof nx !== "number") {
-      addTriangle2(a, height, b, height, c, height, ...nx, color);
-      addTriangle2(a, height, c, height, d, height, ...nx, color);
-    } else {
-      addTriangle2(a, height, b, height, c, height, nx, ny, nz, color);
-      addTriangle2(a, height, c, height, d, height, nx, ny, nz, color);
-    }
-  }
-
-  // src/geometry/emitter.js
-  function emitter(point, u, v, axis) {
-    const r = 0.65;
-    return (
-      /* alloc */
-      {
-        x: point.x + (axis === 2 ? 0 : u * r),
-        y: point.y + (axis === 1 ? 0 : axis === 2 ? u * r : v * r),
-        ground: point.ground + (axis === 0 ? 0 : v * r),
-        uv: (
-          /* alloc */
-          [u, v]
-        )
-      }
-    );
-  }
-
-  // src/geometry/lightGeometry.js
-  function lightGeometry(point, style, addTriangle2) {
-    if (!Number.isFinite(style.lightRadius) || style.lightRadius <= 0) throw (
-      /* alloc */
-      new Error("Invalid light radius")
-    );
-    const color = parseColor(style.color);
-    let axis;
-    for (axis = 0; axis < 3; axis++) {
-      quad(
-        addTriangle2,
-        color,
-        emitter(point, -1, -1, axis),
-        emitter(point, 1, -1, axis),
-        emitter(point, 1, 1, axis),
-        emitter(point, -1, 1, axis),
-        style.top,
-        axis === 2 ? 1 : 0,
-        axis === 0 ? 1 : 0,
-        axis === 1 ? 1 : 0
-      );
-    }
-  }
-
-  // src/globals/roundProfile.js
-  var roundProfile = [
-    [0, 0],
-    [0.35, 0.8],
-    [0.6, 1],
-    [0.85, 0.7],
-    [1, 0]
-  ];
-
-  // src/globals/ringDirections.js
-  var ringDirections = [
-    {
-      x: Math.cos(0 * Math.PI / 4),
-      y: Math.sin(0 * Math.PI / 4),
-      nx: Math.cos((0 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((0 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(1 * Math.PI / 4),
-      y: Math.sin(1 * Math.PI / 4),
-      nx: Math.cos((1 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((1 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(2 * Math.PI / 4),
-      y: Math.sin(2 * Math.PI / 4),
-      nx: Math.cos((2 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((2 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(3 * Math.PI / 4),
-      y: Math.sin(3 * Math.PI / 4),
-      nx: Math.cos((3 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((3 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(4 * Math.PI / 4),
-      y: Math.sin(4 * Math.PI / 4),
-      nx: Math.cos((4 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((4 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(5 * Math.PI / 4),
-      y: Math.sin(5 * Math.PI / 4),
-      nx: Math.cos((5 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((5 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(6 * Math.PI / 4),
-      y: Math.sin(6 * Math.PI / 4),
-      nx: Math.cos((6 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((6 + 0.5) * Math.PI / 4)
-    },
-    {
-      x: Math.cos(7 * Math.PI / 4),
-      y: Math.sin(7 * Math.PI / 4),
-      nx: Math.cos((7 + 0.5) * Math.PI / 4),
-      nz: -Math.sin((7 + 0.5) * Math.PI / 4)
-    }
-  ];
-
-  // src/geometry/createTreeRing.js
-  function ring2(point, radius) {
-    const result = (
-      /* alloc */
-      new Array(ringDirections.length)
-    );
-    let i;
-    for (i = 0; i < result.length; i++) {
-      result[i] = /* alloc */
-      {
-        x: point.x + ringDirections[i].x * radius,
-        y: point.y + ringDirections[i].y * radius,
-        ground: point.ground
-      };
-    }
-    return result;
-  }
-
-  // src/geometry/surface.js
-  function surface(point, addTriangle2, lowRadius, low, highRadius, high, color) {
-    const lower = ring2(point, lowRadius), upper = ring2(point, highRadius);
-    let i, next, slope, length, nx, nz, ny, normalX, normalZ;
-    for (i = 0; i < 8; i++) {
-      next = (i + 1) % 8;
-      slope = (lowRadius - highRadius) / (high - low);
-      length = Math.hypot(1, slope);
-      ({ nx, nz } = ringDirections[i]);
-      ny = slope / length;
-      normalX = nx / length, normalZ = nz / length;
-      if (lowRadius) addTriangle2(lower[i], low, lower[next], low, upper[next], high, normalX, ny, normalZ, color);
-      if (highRadius) addTriangle2(lower[i], low, upper[next], high, upper[i], high, normalX, ny, normalZ, color);
-    }
-  }
-
-  // src/geometry/validateTree.js
-  function validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape) {
-    if (!Number.isFinite(trunkRadius) || !Number.isFinite(crownRadius) || !Number.isFinite(crownBottom) || trunkRadius <= 0 || crownRadius < trunkRadius || crownBottom <= bottom || crownBottom >= top || crownShape !== "round" && crownShape !== "cone") {
-      throw (
-        /* alloc */
-        new Error("Invalid tree dimensions or crown shape")
-      );
-    }
-  }
-
-  // src/geometry/treeGeometry.js
-  function treeGeometry(point, style, addTriangle2) {
-    const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = "round" } = style;
-    validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);
-    const trunk = parseColor(style.trunkColor ?? 7491898);
-    const crown = parseColor(style.color ?? 5210683);
-    surface(point, addTriangle2, trunkRadius, bottom, trunkRadius, crownBottom + (top - crownBottom) * 0.25, trunk);
-    let i, low, lr, high, hr;
-    if (crownShape === "cone") {
-      const base = ring2(point, crownRadius);
-      for (i = 0; i < 8; i++) addTriangle2(
-        point,
-        crownBottom,
-        base[i],
-        crownBottom,
-        base[(i + 1) % 8],
-        crownBottom,
-        0,
-        -1,
-        0,
-        crown
-      );
-      surface(point, addTriangle2, crownRadius, crownBottom, 0, top, crown);
-    } else {
-      for (i = 1; i < roundProfile.length; i++) {
-        [low, lr] = roundProfile[i - 1], [high, hr] = roundProfile[i];
-        surface(
-          point,
-          addTriangle2,
-          lr * crownRadius,
-          crownBottom + low * (top - crownBottom),
-          hr * crownRadius,
-          crownBottom + high * (top - crownBottom),
-          crown
-        );
-      }
-    }
-  }
-
-  // src/geometry/buildProjectedPoint.js
-  function buildProjectedPoint(context, projected, style, baseColor, support) {
-    const { top } = style;
-    if (context.backend.options.nightLight) {
-      if (!Number.isFinite(style.lightFlux) || style.lightFlux <= 0) throw (
-        /* alloc */
-        new Error("Invalid light flux")
-      );
-      if (style.poleRadius > 0 && !context.supports.has(support)) {
-        generateTreeGeometry(context, lampPostGeometry, projected, style);
-        context.supports.add(support);
-      }
-      generateTreeGeometry(context, lightGeometry, projected, style);
-      context.lights.push(
-        /* alloc */
-        {
-          position: (
-            /* alloc */
-            [projected.x, projected.ground + top, -projected.y]
-          ),
-          radius: Math.hypot(top, style.lightRadius),
-          color: (
-            /* alloc */
-            [baseColor.r, baseColor.g, baseColor.b]
-          ),
-          flux: style.lightFlux
-        }
-      );
-    } else generateTreeGeometry(context, treeGeometry, projected, style);
-  }
-
-  // src/sources/buildAreaPoint.js
-  function buildAreaPoint(context, feature, lon, lat, style, baseColor) {
-    const projected = projectedTree(context, lon, lat);
-    buildProjectedPoint(context, projected, style, baseColor, feature.properties?.cod_ouvrag || `${lon},${lat}`);
-  }
-
-  // src/projections/projectRing.js
-  init_L();
-  function projectRing(context, ring3) {
-    const { backend: layer, crs, origin, metres, map } = context;
-    if (ring3.length < 4) throw (
-      /* alloc */
-      new Error("Invalid GeoJSON polygon ring")
-    );
-    const path = (
-      /* alloc */
-      []
-    );
-    const root = rootByLayer.get(layer);
-    let i, lng, lat, location2, point, elevation;
-    for (i = 0; i < ring3.length - 1; i++) {
-      lng = ring3[i][0], lat = ring3[i][1];
-      if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw (
-        /* alloc */
-        new Error("Invalid GeoJSON coordinates")
-      );
-      location2 = /* alloc */
-      new L.LatLng(lat, lng);
-      point = crs.project(location2);
-      elevation = mapElevationOf(map, location2);
-      path.push(
-        /* alloc */
-        {
-          x: (point.x - origin.x) * metres,
-          y: (point.y - origin.y) * metres,
-          ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
-        }
-      );
-    }
-    return path;
-  }
-
-  // src/geometry/buildProjectedPolygon.js
-  function buildProjectedPolygon(context, paths, top, bottom, baseColor) {
-    const points = (
-      /* alloc */
-      []
-    );
-    let path, point, a, b, c, index, sign, i, length, nx, nz;
-    for (path of paths) for (point of path) points.push(point);
-    for ([a, b, c] of triangulate(paths[0], paths.slice(1))) {
-      addTriangle(context, points[a], top, points[b], top, points[c], top, 0, 1, 0, baseColor);
-      if (bottom > 0) addTriangle(context, points[a], bottom, points[b], bottom, points[c], bottom, 0, -1, 0, baseColor);
-    }
-    for (index = 0; index < paths.length; index++) {
-      path = paths[index];
-      sign = isClockWise(path) === (index === 0) ? -1 : 1;
-      for (i = 0; i < path.length; i++) {
-        a = path[i], b = path[(i + 1) % path.length];
-        length = Math.hypot(b.x - a.x, b.y - a.y);
-        if (!length) continue;
-        nx = sign * (b.y - a.y) / length, nz = sign * (b.x - a.x) / length;
-        addTriangle(context, a, bottom, b, bottom, b, top, nx, 0, nz, baseColor);
-        addTriangle(context, a, bottom, b, top, a, top, nx, 0, nz, baseColor);
-      }
-    }
-  }
-
-  // src/geometry/buildExtrudedPolygon.js
-  function buildAreaPolygon(context, rings, top, bottom, baseColor) {
-    if (!rings.length) throw (
-      /* alloc */
-      new Error("Empty GeoJSON polygon")
-    );
-    const paths = (
-      /* alloc */
-      []
-    );
-    let ring3;
-    for (ring3 of rings) paths.push(projectRing(context, ring3));
-    buildProjectedPolygon(context, paths, top, bottom, baseColor);
   }
 
   // src/sources/featureAnchor.js
@@ -9323,6 +8817,62 @@
     return style;
   }
 
+  // src/projections/projectTreePoint.js
+  init_L();
+  function projectedTree(context, lon, lat) {
+    const { backend: layer, crs, origin, metres, map } = context;
+    const location2 = (
+      /* alloc */
+      new L.LatLng(lat, lon)
+    );
+    const point = crs.project(location2);
+    const elevation = mapElevationOf(map, location2), root = rootByLayer.get(layer);
+    return (
+      /* alloc */
+      {
+        x: (point.x - origin.x) * metres,
+        y: (point.y - origin.y) * metres,
+        ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
+      }
+    );
+  }
+
+  // src/projections/projectRing.js
+  init_L();
+  function projectRing(context, ring) {
+    const { backend: layer, crs, origin, metres, map } = context;
+    if (ring.length < 4) throw (
+      /* alloc */
+      new Error("Invalid GeoJSON polygon ring")
+    );
+    const path = (
+      /* alloc */
+      []
+    );
+    const root = rootByLayer.get(layer);
+    let i, lng, lat, location2, point, elevation;
+    for (i = 0; i < ring.length - 1; i++) {
+      lng = ring[i][0], lat = ring[i][1];
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw (
+        /* alloc */
+        new Error("Invalid GeoJSON coordinates")
+      );
+      location2 = /* alloc */
+      new L.LatLng(lat, lng);
+      point = crs.project(location2);
+      elevation = mapElevationOf(map, location2);
+      path.push(
+        /* alloc */
+        {
+          x: (point.x - origin.x) * metres,
+          y: (point.y - origin.y) * metres,
+          ground: Number.isFinite(elevation) && Number.isFinite(root.position[1]) ? elevation - root.position[1] : 0
+        }
+      );
+    }
+    return path;
+  }
+
   // src/sources/projectAreaPolygons.js
   function projectAreaPolygons(context, geometry) {
     const rings = geometry.type === "Polygon" ? (
@@ -9336,7 +8886,7 @@
       /* alloc */
       []
     );
-    let polygon2, ring3, paths;
+    let polygon2, ring, paths;
     for (polygon2 of rings) {
       if (!polygon2.length) throw (
         /* alloc */
@@ -9344,7 +8894,7 @@
       );
       paths = /* alloc */
       [];
-      for (ring3 of polygon2) paths.push(projectRing(context, ring3));
+      for (ring of polygon2) paths.push(projectRing(context, ring));
       polygons.push(paths);
     }
     return polygons;
@@ -9411,7 +8961,7 @@
     const { backend: layer, area: area2, map } = context;
     const coords = area2.coords;
     const coordinates = featureAnchor(feature, layer.options.nightLight);
-    const geometry = feature.geometry, isTree = geometry.type === "Point";
+    const geometry = feature.geometry;
     const lon = coordinates[0], lat = coordinates[1];
     if (!matchesAreaTile(map, coords, lon, lat)) return;
     const style = extrusionStyle(layer, feature);
@@ -9419,36 +8969,15 @@
       context.skipped++;
       return;
     }
-    const { top, bottom = 0, color = 14267276 } = style;
+    const { color = 14267276 } = style;
     const baseColor = parseColor(color);
-    if (context.jobs) {
-      prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
-      context.featureFaces.push(
-        /* alloc */
-        {
-          id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
-          properties: feature.properties,
-          baseColor
-        }
-      );
-      return;
-    }
-    const vertexStart = context.positions.length / 3;
-    if (isTree) buildAreaPoint(context, feature, lon, lat, style, baseColor);
-    let polygon2;
-    if (geometry.type === "Polygon") buildAreaPolygon(context, geometry.coordinates, top, bottom, baseColor);
-    else if (geometry.type === "MultiPolygon") for (polygon2 of geometry.coordinates) buildAreaPolygon(context, polygon2, top, bottom, baseColor);
-    const vertexEnd = context.positions.length / 3;
+    prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
     context.featureFaces.push(
       /* alloc */
       {
         id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
         properties: feature.properties,
-        baseColor,
-        faceStart: vertexStart / 3,
-        faceEnd: vertexEnd / 3,
-        vertexStart,
-        vertexEnd
+        baseColor
       }
     );
   }
@@ -9489,14 +9018,16 @@
           new Error("style must be a function")
         );
       }
-      const context = sourceAreaContext(layer, area2, map);
-      if (layer.options.worker !== false && typeof Worker !== "undefined" && data.features.length >= 64) {
-        context.jobs = /* alloc */
-        [];
+      if (layer.options.worker === false) {
+        throw (
+          /* alloc */
+          new Error("worker: false is no longer supported; GeoJSON geometry requires Web Workers")
+        );
       }
+      const context = sourceAreaContext(layer, area2, map);
       await buildAreaFeatures(context, area2, data.features);
       if (area2.request.signal.aborted) return;
-      if (context.jobs) await buildAreaInWorker(context, area2.request.signal);
+      await buildAreaInWorker(context, area2.request.signal);
       if (area2.request.signal.aborted) return;
       attachAreaMesh(context);
     } catch (error) {
@@ -10251,83 +9782,6 @@
   // src/weakmaps/modelByLayer.js
   var modelByLayer = /* @__PURE__ */ new WeakMap();
 
-  // src/globals/geometryDecoder.js
-  var geometryDecoder = new TextDecoder();
-
-  // src/models/hasUnsupportedPrimitives.js
-  function hasUnsupportedPrimitives(meshes) {
-    if (!meshes) return false;
-    let mesh, primitive;
-    for (mesh of meshes) {
-      for (primitive of mesh.primitives) {
-        if (primitive.targets || primitive.mode !== void 0 && primitive.mode !== 4) return true;
-      }
-    }
-    return false;
-  }
-
-  // src/models/decodeModel.js
-  function decodeModel(data) {
-    const view = (
-      /* alloc */
-      new DataView(data)
-    );
-    const decoder = geometryDecoder;
-    let description;
-    let offset, length, type, chunk;
-    if (view.getUint32(0, true) === 1179937895) {
-      if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== data.byteLength) {
-        throw (
-          /* alloc */
-          new Error("Invalid GLB header")
-        );
-      }
-      let binary;
-      for (offset = 12; offset < data.byteLength; ) {
-        if (offset + 8 > data.byteLength) {
-          throw (
-            /* alloc */
-            new Error("Truncated GLB chunk")
-          );
-        }
-        length = view.getUint32(offset, true), type = view.getUint32(offset + 4, true);
-        offset += 8;
-        if (offset + length > data.byteLength) {
-          throw (
-            /* alloc */
-            new Error("Truncated GLB data")
-          );
-        }
-        chunk = data.slice(offset, offset + length);
-        if (type === 1313821514) {
-          description = JSON.parse(decoder.decode(chunk));
-        }
-        if (type === 5130562) {
-          binary = chunk;
-        }
-        offset += length;
-      }
-      if (!description) {
-        throw (
-          /* alloc */
-          new Error("Missing GLB JSON")
-        );
-      }
-      if (binary) {
-        description.buffers[0].binary = binary;
-      }
-    } else {
-      description = JSON.parse(decoder.decode(data));
-    }
-    if (description.skins?.length || description.animations?.length || description.extensionsRequired?.length || hasUnsupportedPrimitives(description.meshes)) {
-      throw (
-        /* alloc */
-        new Error("Layer3D supports static triangle glTF models without required extensions")
-      );
-    }
-    return description;
-  }
-
   // src/geometry/conformModelToTerrain.js
   init_radians();
   init_L();
@@ -10437,74 +9891,6 @@
       computeBounds(geometry);
     }
     update(layer);
-  }
-
-  // src/models/loadBuffer.js
-  async function loadBuffer(buffer, directory) {
-    if (buffer.binary) return;
-    const response = await fetch(
-      /* alloc */
-      new URL(buffer.uri, directory).href
-    );
-    if (!response.ok) throw (
-      /* alloc */
-      new Error(`Unable to load model buffer: HTTP ${response.status}`)
-    );
-    buffer.binary = await response.arrayBuffer();
-  }
-
-  // src/globals/geometryImageOptions.js
-  var geometryImageOptions = {
-    premultiplyAlpha: "none",
-    colorSpaceConversion: "none"
-  };
-
-  // src/textures/loadModelImage.js
-  async function loadImage(description, directory, image) {
-    let blob;
-    if (image.bufferView !== void 0) {
-      const view = description.bufferViews[image.bufferView];
-      const buffer = description.buffers[view.buffer].binary;
-      blob = /* alloc */
-      new Blob(
-        /* alloc */
-        [buffer.slice(view.byteOffset || 0, (view.byteOffset || 0) + view.byteLength)],
-        /* alloc */
-        { type: image.mimeType }
-      );
-    } else {
-      const response = await fetch(
-        /* alloc */
-        new URL(image.uri, directory).href
-      );
-      if (!response.ok) throw (
-        /* alloc */
-        new Error(`Unable to load model texture: HTTP ${response.status}`)
-      );
-      blob = await response.blob();
-    }
-    return createImageBitmap(blob, geometryImageOptions);
-  }
-
-  // src/models/loadModelResources.js
-  async function loadModelResources(layer, description, directory) {
-    const bufferRequests = (
-      /* alloc */
-      []
-    );
-    let buffer;
-    for (buffer of description.buffers || geometryEmpty) bufferRequests.push(loadBuffer(buffer, directory));
-    await Promise.all(bufferRequests);
-    await addedByLayer.get(layer).promise;
-    const imageRequests = (
-      /* alloc */
-      []
-    );
-    let image;
-    for (image of description.images || geometryEmpty) imageRequests.push(loadImage(description, directory, image));
-    const images = await Promise.all(imageRequests);
-    await cameraViewByMap.get(layer._map);
-    return images;
   }
 
   // src/textures/modelTextureSampler.js
@@ -10661,223 +10047,8 @@
     );
   }
 
-  // src/globals/geometrySemantics.js
-  var geometrySemantics = [
-    ["POSITION", "position"],
-    ["NORMAL", "normal"],
-    ["TEXCOORD_0", "uv"]
-  ];
-
-  // src/globals/types.js
-  var types = {
-    5120: Int8Array,
-    5121: Uint8Array,
-    5122: Int16Array,
-    5123: Uint16Array,
-    5125: Uint32Array,
-    5126: Float32Array
-  };
-
-  // src/globals/sizes.js
-  var sizes = {
-    SCALAR: 1,
-    VEC2: 2,
-    VEC3: 3,
-    VEC4: 4
-  };
-
-  // src/models/readAccessorValue.js
-  function readAccessorValue(input, Type, at) {
-    return Type === Int8Array ? input.getInt8(at) : Type === Uint8Array ? input.getUint8(at) : Type === Int16Array ? input.getInt16(at, true) : Type === Uint16Array ? input.getUint16(at, true) : Type === Uint32Array ? input.getUint32(at, true) : input.getFloat32(at, true);
-  }
-
-  // src/models/readAccessorValues.js
-  function readAccessorValues(description, Type, size, data, accessorCount, indices, viewIndex, offset, count, stride) {
-    const view = description.bufferViews[viewIndex], bytes = Type.BYTES_PER_ELEMENT;
-    const buffer = description.buffers[view.buffer].binary;
-    stride ||= size * bytes;
-    if (!buffer || stride < size * bytes || offset < 0 || (view.byteOffset || 0) + view.byteLength > buffer.byteLength || (count - 1) * stride + size * bytes + offset > view.byteLength) throw (
-      /* alloc */
-      new Error("glTF accessor outside buffer view")
-    );
-    const input = (
-      /* alloc */
-      new DataView(buffer)
-    );
-    let i, j, at, output;
-    for (i = 0; i < count; i++) {
-      output = indices ? indices[i] : i;
-      if (indices && output >= accessorCount) throw (
-        /* alloc */
-        new Error("Invalid sparse glTF index")
-      );
-      for (j = 0; j < size; j++) {
-        at = (view.byteOffset || 0) + offset + i * stride + j * bytes;
-        data[output * size + j] = readAccessorValue(input, Type, at);
-      }
-    }
-  }
-
-  // src/models/readSparseAccessor.js
-  function readSparseAccessor(description, spec, Type, size, data) {
-    const sparse = spec.sparse, Index = types[sparse.indices.componentType];
-    if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {
-      throw (
-        /* alloc */
-        new Error("Invalid sparse glTF indices")
-      );
-    }
-    const view = description.bufferViews[sparse.indices.bufferView];
-    const offset = (view.byteOffset || 0) + (sparse.indices.byteOffset || 0);
-    if (sparse.count > spec.count || (sparse.indices.byteOffset || 0) + sparse.count * Index.BYTES_PER_ELEMENT > view.byteLength) {
-      throw (
-        /* alloc */
-        new Error("Invalid sparse glTF indices")
-      );
-    }
-    const indices = (
-      /* alloc */
-      new Index(description.buffers[view.buffer].binary.slice(
-        offset,
-        offset + sparse.count * Index.BYTES_PER_ELEMENT
-      ))
-    );
-    readAccessorValues(
-      description,
-      Type,
-      size,
-      data,
-      spec.count,
-      indices,
-      sparse.values.bufferView,
-      sparse.values.byteOffset || 0,
-      sparse.count,
-      0
-    );
-  }
-
-  // src/models/normalizeAccessor.js
-  function normalizeAccessor(spec, Type, data, size) {
-    const normalized = (
-      /* alloc */
-      new Float32Array(data.length)
-    );
-    let i;
-    for (i = 0; i < data.length; i++) {
-      normalized[i] = spec.normalized ? Math.max(-1, data[i] / (Type === Int8Array ? 127 : Type === Int16Array ? 32767 : Type === Uint8Array ? 255 : Type === Uint32Array ? 4294967295 : 65535)) : data[i];
-    }
-    return (
-      /* alloc */
-      { data: normalized, size, indices: data }
-    );
-  }
-
-  // src/models/readAccessor.js
-  function readAccessor(description, index) {
-    const spec = description.accessors[index], Type = types[spec.componentType], size = sizes[spec.type];
-    if (!Type || !size || !Number.isInteger(spec.count) || spec.count < 0) {
-      throw (
-        /* alloc */
-        new Error("Invalid glTF accessor")
-      );
-    }
-    const data = (
-      /* alloc */
-      new Type(spec.count * size)
-    );
-    if (spec.bufferView !== void 0) {
-      readAccessorValues(
-        description,
-        Type,
-        size,
-        data,
-        spec.count,
-        null,
-        spec.bufferView,
-        spec.byteOffset || 0,
-        spec.count,
-        description.bufferViews[spec.bufferView].byteStride
-      );
-    }
-    if (spec.sparse) {
-      readSparseAccessor(description, spec, Type, size, data);
-    }
-    if (spec.componentType === 5126) {
-      return (
-        /* alloc */
-        { data, size }
-      );
-    }
-    return normalizeAccessor(spec, Type, data, size);
-  }
-
-  // src/models/readModelAttributes.js
-  function readModelAttributes(description, primitive) {
-    const attributes = (
-      /* alloc */
-      {}
-    );
-    let semantic, name;
-    for ([semantic, name] of geometrySemantics) {
-      if (primitive.attributes[semantic] !== void 0) {
-        attributes[name] = readAccessor(description, primitive.attributes[semantic]);
-      }
-    }
-    if (!attributes.position) throw (
-      /* alloc */
-      new Error("glTF mesh has no positions")
-    );
-    const vertexCount2 = attributes.position.data.length / 3;
-    if (attributes.position.size !== 3 || vertexCount2 < 3) throw (
-      /* alloc */
-      new Error("Invalid glTF vertex attributes")
-    );
-    let attribute;
-    for (attribute of Object.values(attributes)) {
-      if (attribute.data.length / attribute.size !== vertexCount2) throw (
-        /* alloc */
-        new Error("Invalid glTF vertex attributes")
-      );
-    }
-    return (
-      /* alloc */
-      { attributes, vertexCount: vertexCount2 }
-    );
-  }
-
-  // src/models/readModelIndices.js
-  function readModelIndices(description, primitive, attributes, vertexCount2) {
-    if (primitive.indices !== void 0) {
-      const index = readAccessor(description, primitive.indices);
-      attributes.index = /* alloc */
-      { size: 1, data: index.indices };
-      if (!(index.indices instanceof Uint8Array || index.indices instanceof Uint16Array || index.indices instanceof Uint32Array) || index.size !== 1 || index.indices.length % 3) {
-        throw (
-          /* alloc */
-          new Error("Invalid glTF triangle indices")
-        );
-      }
-      let value;
-      for (value of index.indices) if (value >= vertexCount2) throw (
-        /* alloc */
-        new Error("Invalid glTF triangle indices")
-      );
-    } else if (vertexCount2 % 3) {
-      throw (
-        /* alloc */
-        new Error("Incomplete glTF triangle")
-      );
-    }
-  }
-
   // src/geometry/createModelGeometry.js
   function createModelGeometry(context, primitive, attributes) {
-    let normals;
-    if (!attributes.normal) {
-      normals = vertexNormals(attributes.position.data, attributes.index?.data);
-      attributes.normal = /* alloc */
-      { size: 3, data: normals };
-    }
     const style = context.materials[primitive.material] || /* alloc */
     {
       color: (
@@ -10895,7 +10066,6 @@
     const program = createProgram(context.backend, style);
     context.resources.push(program);
     const device = rendererByLayer.get(context.backend).device;
-    if (attributes.index?.data instanceof Uint8Array) attributes.index.data = Uint16Array.from(attributes.index.data);
     let name, attribute;
     for ([name, attribute] of Object.entries(attributes)) {
       attribute.size ||= 1;
@@ -10949,13 +10119,10 @@
       }
     );
     group.matrix = nodeMatrix(spec);
-    let primitive, attributeData, attributes, vertexCount2, built, mesh, child;
+    let primitive, attributes, built, mesh, child;
     if (spec.mesh !== void 0) {
       for (primitive of description.meshes[spec.mesh].primitives) {
-        attributeData = readModelAttributes(description, primitive);
-        attributes = attributeData.attributes;
-        vertexCount2 = attributeData.vertexCount;
-        readModelIndices(description, primitive, attributes, vertexCount2);
+        attributes = structuredClone(primitive.preparedAttributes);
         built = createModelGeometry(context, primitive, attributes);
         mesh = /* alloc */
         {
@@ -11030,20 +10197,14 @@
       /* alloc */
       new URL(modelUrlByLayer.get(layer), document.baseURI).href
     );
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw (
-        /* alloc */
-        new Error(`Unable to load model: HTTP ${response.status}`)
-      );
-    }
-    const data = await response.arrayBuffer();
-    const description = decodeModel(data);
-    const directory = (
+    const { description, images } = await runSourceWorker(
+      layer._map,
+      layer.options.workerUrl,
       /* alloc */
-      new URL(".", url).href
+      { type: "model", url }
     );
-    const images = await loadModelResources(layer, description, directory);
+    await addedByLayer.get(layer).promise;
+    await cameraViewByMap.get(layer._map);
     const context = createModelContext(layer, description, images);
     const scene = description.scenes?.[description.scene || 0];
     if (!scene) throw (
@@ -12478,6 +11639,9 @@
     onRemove3DLayer(layer, map);
   }
 
+  // src/weakmaps/workerMapByLayer.js
+  var workerMapByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/terrain/loadTerrainTiles.js
   async function loadTerrainTiles(state) {
     const { backend: layer, archive, controller, tiles } = state;
@@ -12565,16 +11729,16 @@
       /* alloc */
       []
     );
-    let start2 = 0, ring3, path, i;
-    for (ring3 of rings) {
+    let start2 = 0, ring, path, i;
+    for (ring of rings) {
       path = /* alloc */
       [];
-      for (i = 0; i < ring3.length; i++) path.push(
+      for (i = 0; i < ring.length; i++) path.push(
         /* alloc */
         { x: pixels[start2 + i][0], y: pixels[start2 + i][1] }
       );
       paths.push(path);
-      start2 += ring3.length;
+      start2 += ring.length;
     }
     return paths;
   }
@@ -12663,12 +11827,12 @@
 
   // src/geometry/bridgeSides.js
   function bridgeSides(context, points, rings) {
-    let start2 = 0, ring3, i;
-    for (ring3 of rings) {
-      for (i = 0; i < ring3.length; i++) {
-        bridgeEdge(context, points[start2 + i], points[start2 + (i + 1) % ring3.length]);
+    let start2 = 0, ring, i;
+    for (ring of rings) {
+      for (i = 0; i < ring.length; i++) {
+        bridgeEdge(context, points[start2 + i], points[start2 + (i + 1) % ring.length]);
       }
-      start2 += ring3.length;
+      start2 += ring.length;
     }
   }
 
@@ -12679,9 +11843,9 @@
       /* alloc */
       []
     );
-    let ring3, path, lng, lat, z, p, coordinate, paths, contour, holes, triangles;
-    for (ring3 of polygon2) {
-      path = ring3.slice(0, -1);
+    let ring, path, lng, lat, z, p, coordinate, paths, contour, holes, triangles;
+    for (ring of polygon2) {
+      path = ring.slice(0, -1);
       if (path.length >= 3) rings.push(path);
     }
     if (!rings.length) return;
@@ -12692,7 +11856,7 @@
       /* alloc */
       []
     );
-    for (ring3 of rings) for ([lng, lat, z] of ring3) {
+    for (ring of rings) for ([lng, lat, z] of ring) {
       p = map.project(
         /* alloc */
         [lat, lng],
@@ -12703,7 +11867,7 @@
         [p.x, p.y, z]
       );
     }
-    for (ring3 of rings) for (coordinate of ring3) points.push(local(coordinate, crs, origin, metres, base));
+    for (ring of rings) for (coordinate of ring) points.push(local(coordinate, crs, origin, metres, base));
     try {
       paths = bridgePaths(rings, pixels);
       [contour, ...holes] = paths;
@@ -12796,10 +11960,12 @@
             type: "raster",
             url: terrainSourceByLayer.get(layer),
             archive: layer.options.archive,
-            asset: layer.options.asset
+            asset: layer.options.asset,
+            workerUrl: layer.options.workerUrl
           }
         ) }
       );
+      workerMapByLayer.set(archive, layer._map);
       terrainArchiveByLayer.set(layer, archive);
       await readyByLayer.get(archive);
       const header = headerByLayer.get(archive);
@@ -14071,10 +13237,10 @@
       /* alloc */
       []
     );
-    let ring3, bottom, top, tint, topRing, x, z, i, j;
-    for ([ring3, bottom, top, tint, topRing = ring3] of parts2) {
+    let ring, bottom, top, tint, topRing, x, z, i, j;
+    for ([ring, bottom, top, tint, topRing = ring] of parts2) {
       low.length = high.length = 0;
-      for ([x, z] of ring3) low.push(
+      for ([x, z] of ring) low.push(
         /* alloc */
         [x, bottom, z]
       );
@@ -14082,12 +13248,12 @@
         /* alloc */
         [x, top, z]
       );
-      for (i = 0; i < ring3.length; i++) {
-        j = (i + 1) % ring3.length;
+      for (i = 0; i < ring.length; i++) {
+        j = (i + 1) % ring.length;
         triangle2(position, normal, color, low[i], low[j], high[j], tint);
         triangle2(position, normal, color, low[i], high[j], high[i], tint);
       }
-      for (i = 1; i < ring3.length - 1; i++) {
+      for (i = 1; i < ring.length - 1; i++) {
         triangle2(position, normal, color, high[0], high[i], high[i + 1], tint);
         triangle2(position, normal, color, low[0], low[i + 1], low[i], tint);
       }
@@ -17331,612 +16497,46 @@
     ready.catch(noOperation);
   }
 
-  // src/cog/validateCogRange.js
-  function validateCogRange(source, offset, length) {
-    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length <= 0 || length > 32e6 || !Number.isSafeInteger(offset + length) || source.size !== void 0 && offset + length > source.size) {
-      throw (
-        /* alloc */
-        new Error("Invalid COG byte range")
-      );
-    }
-  }
-
-  // src/cog/validateCogContentRange.js
-  function validateCogContentRange(source, range, rangeStart, length) {
-    if (!range || Number(range[1]) !== rangeStart || Number(range[2]) !== rangeStart + length - 1 || !Number.isSafeInteger(Number(range[3])) || Number(range[3]) < rangeStart + length || (source.containerSize ?? source.size) !== void 0 && (source.containerSize ?? source.size) !== Number(range[3])) {
-      throw (
-        /* alloc */
-        new Error("Invalid COG range response")
-      );
-    }
-  }
-
-  // src/cog/invalidCogFullResponse.js
-  function invalidCogFullResponse(response) {
-    return response.status !== 200 || Number(response.headers.get("Content-Length")) > 32e6;
-  }
-
-  // src/cog/validateCogResponse.js
-  function validateCogResponse(source, response, rangeStart, length) {
-    const etag = response.headers.get("ETag");
-    if (source.etag && source.etag !== etag) throw (
-      /* alloc */
-      new Error("COG changed; recreate the layer")
-    );
-    if (etag) source.etag = etag;
-    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") || "");
-    if (response.status === 206) {
-      validateCogContentRange(source, range, rangeStart, length);
-      if (source.baseOffset === void 0) source.size = Number(range[3]);
-    } else if (invalidCogFullResponse(response)) {
-      throw (
-        /* alloc */
-        new Error("COG server must support byte ranges for files over 32 MB")
-      );
-    }
-  }
-
-  // src/cog/readCogBody.js
-  async function readCogBody(response, length) {
-    const reader = response.body.getReader(), chunks = (
-      /* alloc */
-      []
-    );
-    let total = 0, part;
-    try {
-      while (!(part = await reader.read()).done) {
-        total += part.value.byteLength;
-        if (total > (response.status === 206 ? length : 32e6)) {
-          await reader.cancel();
-          throw (
-            /* alloc */
-            new Error("Oversized COG response")
-          );
-        }
-        chunks.push(part.value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    const data = (
-      /* alloc */
-      new Uint8Array(total)
-    );
-    let start2 = 0, chunk;
-    for (chunk of chunks) {
-      data.set(chunk, start2);
-      start2 += chunk.length;
-    }
-    return data;
-  }
-
-  // src/cog/readCog.js
-  async function readCog(source, offset, length, signal) {
-    signal?.throwIfAborted();
-    validateCogRange(source, offset, length);
-    if (source.full) return source.full.slice(offset, offset + length);
-    const rangeStart = (source.baseOffset || 0) + offset;
-    const response = await fetch(
-      source.url,
-      /* alloc */
-      {
-        headers: (
-          /* alloc */
-          { Range: `bytes=${rangeStart}-${rangeStart + length - 1}` }
-        ),
-        signal
-      }
-    );
-    if (!response.ok) throw (
-      /* alloc */
-      new Error(`Unable to read COG: HTTP ${response.status}`)
-    );
-    validateCogResponse(source, response, rangeStart, length);
-    const data = await readCogBody(response, length);
-    if (response.status === 200) {
-      if (source.baseOffset === void 0) source.size = data.byteLength;
-      else if (data.byteLength !== source.containerSize) throw (
-        /* alloc */
-        new Error("Truncated PMTiles COG container")
-      );
-      source.full = source.baseOffset === void 0 ? data.buffer : data.slice(source.baseOffset, source.baseOffset + source.size);
-    }
-    const result = response.status === 200 ? source.full.slice(offset, offset + length) : data.buffer;
-    if (result.byteLength !== length) throw (
-      /* alloc */
-      new Error("Truncated COG byte range")
-    );
-    return result;
-  }
-
-  // src/globals/cogTags.js
-  var cogTags = [256, 257, 258, 259, 262, 277, 284, 317, 322, 323, 324, 325, 339, 33550, 33922, 34735];
-
-  // src/cog/readCogTag.js
-  async function readCogTag(source, entries, i, tag, little) {
-    const type = entries.getUint16(i * 12 + 2, little);
-    const size = type === 3 ? 2 : type === 4 ? 4 : type === 12 ? 8 : 0;
-    const length = entries.getUint32(i * 12 + 4, little);
-    if (!size || !length || length > 1048576) throw (
-      /* alloc */
-      new Error(`Unsupported COG tag ${tag}`)
-    );
-    const data = size * length <= 4 ? (
-      /* alloc */
-      new DataView(entries.buffer, i * 12 + 8, 4)
-    ) : (
-      /* alloc */
-      new DataView(await readCog(source, entries.getUint32(i * 12 + 8, little), size * length))
-    );
-    const values = (
-      /* alloc */
-      []
-    );
-    let j;
-    for (j = 0; j < length; j++) values.push(type === 3 ? data.getUint16(j * size, little) : type === 4 ? data.getUint32(j * size, little) : data.getFloat64(j * size, little));
-    return values;
-  }
-
-  // src/cog/readCogDirectory.js
-  async function readCogDirectory(source, offset) {
-    const little = source.little;
-    const count = (
-      /* alloc */
-      new DataView(await readCog(source, offset, 2)).getUint16(0, little)
-    );
-    if (!count || count > 128) throw (
-      /* alloc */
-      new Error("Invalid COG directory size")
-    );
-    const entries = (
-      /* alloc */
-      new DataView(await readCog(source, offset + 2, count * 12 + 4))
-    );
-    const tags = (
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    let i, tag;
-    for (i = 0; i < count; i++) {
-      tag = entries.getUint16(i * 12, little);
-      if (tag === 42113) throw (
-        /* alloc */
-        new Error("COG nodata tags are not supported; export complete tiles")
-      );
-      if (tag === 34264) throw (
-        /* alloc */
-        new Error("COG affine transformation matrices are not supported")
-      );
-      if (!cogTags.includes(tag)) continue;
-      if (tags.has(tag)) throw (
-        /* alloc */
-        new Error("Duplicate COG tag")
-      );
-      tags.set(tag, await readCogTag(source, entries, i, tag, little));
-    }
-    return (
-      /* alloc */
-      { tags, next: entries.getUint32(count * 12, little) }
-    );
-  }
-
-  // src/cog/validCogDimensions.js
-  function validCogDimensions(tags, width, height) {
-    return !!width && !!height && width % 256 === 0 && height % 256 === 0 && tags.get(322)?.[0] === 256 && tags.get(323)?.[0] === 256 && (tags.get(259)?.[0] === 1 || tags.get(259)?.[0] === 8) && (tags.get(284)?.[0] ?? 1) === 1 && (tags.get(317)?.[0] ?? 1) === 1;
-  }
-
-  // src/cog/validCogEncoding.js
-  function validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned) {
-    if (elevation) return tags.get(262)?.[0] === 1;
-    return (samples === 3 || samples === 4) && bits?.length === samples && bytes && unsigned && tags.get(262)?.[0] === 2;
-  }
-
-  // src/cog/getCogProfile.js
-  function getCogProfile(tags) {
-    const width = tags.get(256)?.[0], height = tags.get(257)?.[0], samples = tags.get(277)?.[0] ?? 1;
-    const bits = tags.get(258), format = tags.get(339) || /* alloc */
-    [1];
-    let bytes = true, unsigned = true, floating = true, value;
-    for (value of bits || /* alloc */
-    []) bytes &&= value === 8;
-    for (value of format) {
-      unsigned &&= value === 1;
-      floating &&= value === 3;
-    }
-    const elevation = samples === 1 && bits?.length === 1 && bits[0] === 32 && floating;
-    if (!validCogDimensions(tags, width, height) || !validCogEncoding(tags, samples, bits, format, elevation, bytes, unsigned)) {
-      throw (
-        /* alloc */
-        new Error("Unsupported COG profile: expected tiled 256px RGB(A) Uint8 or Float32, DEFLATE without predictor")
-      );
-    }
-    return (
-      /* alloc */
-      { width, height, samples, elevation }
-    );
-  }
-
-  // src/cog/hasCogProjection.js
-  function hasCogProjection(keys) {
-    let projected = false, area2 = false, i;
-    if (keys) for (i = 4; i < keys.length; i += 4) {
-      if (keys[i + 1] !== 0 || keys[i + 2] !== 1) continue;
-      if (keys[i] === 3072 && keys[i + 3] === 3857) projected = true;
-      if (keys[i] === 1025 && keys[i + 3] === 1) area2 = true;
-    }
-    return projected && area2;
-  }
-
-  // src/cog/finiteCogValues.js
-  function finiteCogValues(values) {
-    let value;
-    for (value of values || /* alloc */
-    []) if (!Number.isFinite(value)) return false;
-    return true;
-  }
-
-  // src/cog/validCogGeoArrays.js
-  function validCogGeoArrays(keys, scale, tie) {
-    return !!keys && keys[0] === 1 && keys.length === 4 + keys[3] * 4 && !!scale && scale.length === 3 && finiteCogValues(scale) && scale[0] > 0 && Math.abs(scale[0] - scale[1]) <= 1e-8 && !!tie && tie.length === 6 && finiteCogValues(tie) && tie[0] === 0 && tie[1] === 0;
-  }
-
-  // src/cog/getCogBase.js
-  function getCogBase(tags, width, height, elevation) {
-    const keys = tags.get(34735), scale = tags.get(33550), tie = tags.get(33922);
-    if (!validCogGeoArrays(keys, scale, tie) || !hasCogProjection(keys)) {
-      throw (
-        /* alloc */
-        new Error("COG must use north-up EPSG:3857 PixelIsArea georeferencing")
-      );
-    }
-    return (
-      /* alloc */
-      { width, height, resolution: scale[0], left: tie[3], top: tie[4], elevation }
-    );
-  }
-
-  // src/cog/validCogGrid.js
-  function validCogGrid(source, base, profile, zoom, x, y, resolution) {
-    return zoom >= 0 && zoom <= 24 && Math.abs(20037508342789244e-9 * 2 / (256 * 2 ** zoom) - resolution) <= resolution * 1e-7 && (!profile.elevation || Number.isInteger(x) && Number.isInteger(y)) && Math.abs(base.width / profile.width - base.height / profile.height) <= 1e-7 && profile.elevation === base.elevation && x >= 0 && y >= 0 && x + profile.width / 256 <= 2 ** zoom && y + profile.height / 256 <= 2 ** zoom && !source.levels.has(zoom) && !(base.elevation && source.levels.size);
-  }
-
-  // src/cog/validateCogOffsets.js
-  function validateCogOffsets(source, level) {
-    if (level.offsets?.length !== level.columns * level.rows || level.lengths?.length !== level.offsets.length) {
-      throw (
-        /* alloc */
-        new Error("Invalid COG tile offsets or lengths")
-      );
-    }
-    let i;
-    for (i = 0; i < level.offsets.length; i++) {
-      if (!level.offsets[i] || !level.lengths[i] || level.lengths[i] > 1048576 || level.offsets[i] + level.lengths[i] > source.size) throw (
-        /* alloc */
-        new Error("Invalid COG tile offsets or lengths")
-      );
-    }
-  }
-
-  // src/cog/readCogLevel.js
-  function readCogLevel(source, directory, state) {
-    const tags = directory.tags, profile = getCogProfile(tags);
-    if (!state.base) state.base = getCogBase(tags, profile.width, profile.height, profile.elevation);
-    const base = state.base, resolution = base.resolution * base.width / profile.width;
-    const zoom = Math.round(Math.log2(20037508342789244e-9 * 2 / (256 * resolution)));
-    const span = 20037508342789244e-9 * 2 / 2 ** zoom;
-    let x = (base.left + 20037508342789244e-9) / span;
-    let y = (20037508342789244e-9 - base.top) / span;
-    if (Math.abs(x - Math.round(x)) < 1e-6) x = Math.round(x);
-    if (Math.abs(y - Math.round(y)) < 1e-6) y = Math.round(y);
-    if (!validCogGrid(source, base, profile, zoom, x, y, resolution)) {
-      throw (
-        /* alloc */
-        new Error("COG levels must align with the Web Mercator XYZ tile grid")
-      );
-    }
-    const level = (
-      /* alloc */
-      {
-        x,
-        y,
-        columns: profile.width / 256,
-        rows: profile.height / 256,
-        samples: profile.samples,
-        elevation: profile.elevation,
-        compression: tags.get(259)[0],
-        offsets: tags.get(324),
-        lengths: tags.get(325)
-      }
-    );
-    validateCogOffsets(source, level);
-    source.levels.set(zoom, level);
-    state.minZoom = Math.min(state.minZoom, zoom);
-    state.maxZoom = Math.max(state.maxZoom, zoom);
-  }
-
-  // src/cog/readCogDirectories.js
-  async function readCogDirectories(source, offset) {
-    const state = (
-      /* alloc */
-      { base: null, minZoom: Infinity, maxZoom: -Infinity }
-    );
-    const seen = (
-      /* alloc */
-      /* @__PURE__ */ new Set()
-    );
-    let directory;
-    while (offset) {
-      if (seen.has(offset) || seen.size >= 24) throw (
-        /* alloc */
-        new Error("Cyclic or excessive COG directories")
-      );
-      seen.add(offset);
-      directory = await readCogDirectory(source, offset);
-      readCogLevel(source, directory, state);
-      offset = directory.next;
-    }
-    if (!state.base) throw (
-      /* alloc */
-      new Error("COG has no image directory")
-    );
-    if (source.levels.size !== state.maxZoom - state.minZoom + 1) {
-      throw (
-        /* alloc */
-        new Error("COG overview zooms must be contiguous")
-      );
-    }
-    return (
-      /* alloc */
-      { base: state.base, minZoom: state.minZoom, maxZoom: state.maxZoom }
-    );
-  }
-
-  // src/cog/decodeCogTile.js
-  async function decodeCogTile(data, length, compression) {
-    if (compression === 1) {
-      if (data.byteLength !== length) throw (
-        /* alloc */
-        new Error("Invalid uncompressed COG tile size")
-      );
-      return data;
-    }
-    const stream = (
-      /* alloc */
-      new Blob(
-        /* alloc */
-        [data]
-      ).stream().pipeThrough(
-        /* alloc */
-        new DecompressionStream("deflate")
-      )
-    );
-    const reader = stream.getReader(), result = (
-      /* alloc */
-      new Uint8Array(length)
-    );
-    let offset = 0, chunk;
-    try {
-      while (!(chunk = await reader.read()).done) {
-        if (offset + chunk.value.length > length) {
-          await reader.cancel();
-          throw (
-            /* alloc */
-            new Error("Oversized decoded COG tile")
-          );
-        }
-        result.set(chunk.value, offset);
-        offset += chunk.value.length;
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    if (offset !== length) throw (
-      /* alloc */
-      new Error("Truncated decoded COG tile")
-    );
-    return result.buffer;
-  }
-
-  // src/cog/readCogBlock.js
-  async function readCogBlock(source, level, x, y, signal) {
-    const index = y * level.columns + x;
-    return decodeCogTile(
-      await readCog(source, level.offsets[index], level.lengths[index], signal),
-      256 * 256 * (level.elevation ? 4 : level.samples),
-      level.compression
-    );
-  }
-
-  // src/cog/getElevationTile.js
-  async function getElevationTile(source, level, x, y, signal) {
-    const data = await readCogBlock(source, level, x - level.x, y - level.y, signal);
-    signal?.throwIfAborted();
-    const view = (
-      /* alloc */
-      new DataView(data)
-    ), heights = (
-      /* alloc */
-      new Float32Array(256 * 256)
-    );
-    let i, height;
-    for (i = 0; i < heights.length; i++) {
-      height = view.getFloat32(i * 4, source.little);
-      if (!Number.isFinite(height) || height < -12e3 || height > 1e4) {
-        throw (
-          /* alloc */
-          new Error("Invalid or missing COG elevation sample")
-        );
-      }
-      heights[i] = height;
-    }
-    return (
-      /* alloc */
-      { data: heights.buffer }
-    );
-  }
-
-  // src/cog/getColorTile.js
-  async function getColorTile(source, level, x, y, signal) {
-    const canvas = (
-      /* alloc */
-      new OffscreenCanvas(256, 256)
-    ), context = canvas.getContext("2d");
-    if (!context) throw (
-      /* alloc */
-      new Error("Unable to create COG tile canvas")
-    );
-    const left = (x - level.x) * 256, top = (y - level.y) * 256;
-    let bx, by, pixels, rgba, i, j, bitmap;
-    for (by = Math.max(0, Math.floor(top / 256)); by < Math.min(level.rows, Math.ceil(top / 256 + 1)); by++) {
-      for (bx = Math.max(0, Math.floor(left / 256)); bx < Math.min(level.columns, Math.ceil(left / 256 + 1)); bx++) {
-        pixels = /* alloc */
-        new Uint8Array(await readCogBlock(source, level, bx, by, signal));
-        signal?.throwIfAborted();
-        rgba = /* alloc */
-        new Uint8ClampedArray(256 * 256 * 4);
-        for (i = 0, j = 0; i < pixels.length; i += level.samples, j += 4) {
-          rgba[j] = pixels[i];
-          rgba[j + 1] = pixels[i + 1];
-          rgba[j + 2] = pixels[i + 2];
-          rgba[j + 3] = level.samples === 4 ? pixels[i + 3] : 255;
-        }
-        bitmap = await createImageBitmap(
-          /* alloc */
-          new ImageData(rgba, 256, 256)
-        );
-        context.drawImage(bitmap, bx * 256 - left, by * 256 - top);
-        bitmap.close();
-      }
-    }
-    const image = canvas.transferToImageBitmap();
-    if (signal?.aborted) {
-      image.close();
-      signal.throwIfAborted();
-    }
-    return (
-      /* alloc */
-      { image }
-    );
-  }
-
-  // src/cog/validCogTileCoordinates.js
-  function validCogTileCoordinates(z, x, y) {
-    return Number.isSafeInteger(z) && Number.isSafeInteger(x) && Number.isSafeInteger(y) && z >= 0 && z <= 24 && x >= 0 && y >= 0 && x < 2 ** z && y < 2 ** z;
-  }
-
-  // src/cog/getCogTile.js
-  async function getCogTile(source, z, x, y, signal) {
-    signal?.throwIfAborted();
-    if (!validCogTileCoordinates(z, x, y)) throw (
-      /* alloc */
-      new Error("Invalid COG tile coordinates")
-    );
-    const level = source.levels.get(z);
-    if (!level || x + 1 <= level.x || y + 1 <= level.y || x >= level.x + level.columns || y >= level.y + level.rows) return;
-    if (level.elevation) return getElevationTile(source, level, x, y, signal);
-    return getColorTile(source, level, x, y, signal);
-  }
-
   // src/cog/getCogHeader.js
   function getCogHeader(source) {
     return source.header;
   }
 
-  // src/cog/validateCogContainer.js
-  function validateCogContainer(container, header) {
-    if (header.tileType !== 0 || header.tileCompression !== 1 || !Number.isSafeInteger(header.jsonMetadataOffset) || !Number.isSafeInteger(header.jsonMetadataLength) || header.jsonMetadataLength <= 0 || header.jsonMetadataLength > 1048576 || !Number.isSafeInteger(header.tileDataOffset) || !Number.isSafeInteger(header.tileDataLength) || header.tileDataOffset < 127 || header.tileDataOffset + header.tileDataLength > container.size) {
-      throw (
-        /* alloc */
-        new Error("Invalid PMTiles COG asset container")
-      );
-    }
+  // src/workers/getCogInWorker.js
+  function getCogInWorker(context, z, x, y, signal) {
+    return runSourceWorker(
+      context.layer._map || workerMapByLayer.get(context.layer),
+      context.workerUrl,
+      /* alloc */
+      { type: "cog", url: context.url, asset: context.asset, z, x, y },
+      signal
+    );
   }
 
-  // src/cog/getCogAssetEntry.js
-  async function getCogAssetEntry(container, header, asset) {
-    const metadata = JSON.parse(
-      /* alloc */
-      new TextDecoder().decode(await decompress(
-        await readCog(container, header.jsonMetadataOffset, header.jsonMetadataLength),
-        header.internalCompression
-      ))
-    );
-    const assets = metadata.cog_assets || /* alloc */
-    {};
-    const entry = Object.hasOwn(assets, asset) ? metadata.cog_assets[asset] : null;
-    if (metadata.format !== "cog-assets-v1" || !entry || !Number.isSafeInteger(entry.offset) || !Number.isSafeInteger(entry.length) || entry.offset < 0 || entry.length < 8 || entry.offset + entry.length > header.tileDataLength) {
-      throw (
-        /* alloc */
-        new Error(`Invalid or missing PMTiles COG asset: ${asset}`)
-      );
-    }
-    return entry;
-  }
-
-  // src/cog/openCogAsset.js
-  async function openCogAsset(url, asset) {
-    const container = (
-      /* alloc */
-      { url }
-    );
-    const header = decodeHeader(await readCog(container, 0, 127));
-    validateCogContainer(container, header);
-    const entry = await getCogAssetEntry(container, header, asset);
-    const baseOffset = header.tileDataOffset + entry.offset;
-    return (
+  // src/workers/openCogInWorker.js
+  async function openCogInWorker(layer, options) {
+    const context = (
       /* alloc */
       {
-        url,
-        baseOffset,
-        size: entry.length,
-        containerSize: container.size,
-        etag: container.etag,
-        full: container.full?.slice(baseOffset, baseOffset + entry.length)
+        layer,
+        url: (
+          /* alloc */
+          new URL(options.url, document.baseURI).href
+        ),
+        asset: options.asset,
+        workerUrl: options.workerUrl
       }
     );
-  }
-
-  // src/cog/openCog.js
-  async function openCog(url, asset) {
-    const source = asset === void 0 ? (
-      /* alloc */
-      { url }
-    ) : await openCogAsset(url, asset);
-    source.levels = /* alloc */
-    /* @__PURE__ */ new Map();
-    const header = (
-      /* alloc */
-      new DataView(await readCog(source, 0, 8))
-    );
-    const order = header.getUint16(0);
-    if (order !== 18761 && order !== 19789) throw (
-      /* alloc */
-      new Error("Invalid TIFF byte order")
-    );
-    source.little = order === 18761;
-    if (header.getUint16(2, source.little) !== 42) throw (
-      /* alloc */
-      new Error("Expected classic TIFF (BigTIFF is not supported)")
-    );
-    const { base, minZoom, maxZoom } = await readCogDirectories(source, header.getUint32(4, source.little));
-    const half = 20037508342789244e-9;
-    const left = base.left + base.resolution / 2, right = base.left + (base.width - 0.5) * base.resolution;
-    const top = base.top - base.resolution / 2, bottom = base.top - (base.height - 0.5) * base.resolution;
-    source.header = /* alloc */
-    {
-      minZoom,
-      maxZoom,
-      tileType: base.elevation ? 0 : 2,
-      minLon: left / half * 180,
-      maxLon: right / half * 180,
-      minLat: Math.atan(Math.sinh(bottom / half * Math.PI)) * 180 / Math.PI,
-      maxLat: Math.atan(Math.sinh(top / half * Math.PI)) * 180 / Math.PI
-    };
+    const header = await getCogInWorker(context);
     return (
       /* alloc */
       {
-        getHeader: getCogHeader.bind(null, source),
-        getZxy: getCogTile.bind(null, source)
+        getHeader: getCogHeader.bind(
+          null,
+          /* alloc */
+          { header }
+        ),
+        getZxy: getCogInWorker.bind(null, context)
       }
     );
   }
@@ -17949,11 +16549,7 @@
       {
         ariaLabel: "COG raster",
         ...options,
-        archive: options.archive || openCog(
-          /* alloc */
-          new URL(options.url, document.baseURI).href,
-          options.asset
-        )
+        archive: options.archive || openCogInWorker(layer, options)
       }
     );
   }

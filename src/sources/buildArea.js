@@ -23,14 +23,13 @@ export async function buildArea(layer, area, map) {
     if (geojsonByLayer.get(layer) && typeof layer.options.style !== 'function') {
       throw /* alloc */ new Error('style must be a function');
     }
-    const context = sourceAreaContext(layer, area, map);
-    // ponytail: feature-count cutoff avoids startup overhead; count vertices if giant single polygons matter.
-    if (layer.options.worker !== false && typeof Worker !== 'undefined' && data.features.length >= 64) {
-      context.jobs = /* alloc */ [];
+    if (layer.options.worker === false) {
+      throw /* alloc */ new Error('worker: false is no longer supported; GeoJSON geometry requires Web Workers');
     }
+    const context = sourceAreaContext(layer, area, map);
     await buildAreaFeatures(context, area, data.features);
     if (area.request.signal.aborted) return;
-    if (context.jobs) await buildAreaInWorker(context, area.request.signal);
+    await buildAreaInWorker(context, area.request.signal);
     if (area.request.signal.aborted) return;
     attachAreaMesh(context);
   } catch (error) {

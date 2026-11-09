@@ -1,14 +1,8 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 
-import { vertexNormals } from './vertexNormals.js';
 import { createProgram } from '../materials/createProgram.js';
 
 export function createModelGeometry(context, primitive, attributes) {
-  let normals;
-  if (!attributes.normal) {
-    normals = vertexNormals(attributes.position.data, attributes.index?.data);
-    attributes.normal = /* alloc */ { size: 3, data: normals };
-  }
   const style = context.materials[primitive.material] || /* alloc */ {
     color: /* alloc */ [1, 1, 1], metallic: 1,
   };
@@ -18,7 +12,6 @@ export function createModelGeometry(context, primitive, attributes) {
   const program = createProgram(context.backend, style);
   context.resources.push(program);
   const device = rendererByLayer.get(context.backend).device;
-  if (attributes.index?.data instanceof Uint8Array) attributes.index.data = Uint16Array.from(attributes.index.data);
   let name, attribute;
   for ([name, attribute] of Object.entries(attributes)) {
     attribute.size ||= 1;

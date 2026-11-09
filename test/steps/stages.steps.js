@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { buildArea } from '../../src/sources/buildArea.js';
 import { buildAreaFeature } from '../../src/sources/buildAreaFeature.js';
+import { assembleAreaGeometry } from '../../src/geometry/assembleAreaGeometry.js';
 import { sourceAreaContext } from '../../src/sources/sourceAreaContext.js';
 import { emptyNode } from '../../src/scene/createSceneNode.js';
 import { prepareFrameMeshes } from '../../src/rendering/prepareFrameMeshes.js';
@@ -372,11 +373,19 @@ Then('shared helpers preserve math, callbacks and control cleanup', async functi
 
 Then('source stages preserve features, errors and load completion', async function () {
   const previous = { requestAnimationFrame: globalThis.requestAnimationFrame,
-    GPUBufferUsage: globalThis.GPUBufferUsage, GPUShaderStage: globalThis.GPUShaderStage };
+    GPUBufferUsage: globalThis.GPUBufferUsage, GPUShaderStage: globalThis.GPUShaderStage, Worker: globalThis.Worker };
+  let closeWorkers;
   const previousLeaflet = mockLeaflet({ LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } } });
   globalThis.requestAnimationFrame = callback => setImmediate(callback);
   globalThis.GPUBufferUsage = { VERTEX: 1, COPY_DST: 2 };
   globalThis.GPUShaderStage = { VERTEX: 1, FRAGMENT: 2 };
+  globalThis.Worker = class extends EventTarget {
+    postMessage(input) {
+      const data = assembleAreaGeometry(structuredClone(input));
+      queueMicrotask(() => this.dispatchEvent(new MessageEvent('message', { data })));
+    }
+    terminate() {}
+  };
   try {
     const errors = [];
     const backend = {
@@ -385,7 +394,8 @@ Then('source stages preserve features, errors and load completion', async functi
       fire: (type, event) => errors.push([type, event.error.message]),
     };
     globals.sceneByLayer.set(backend, backend);
-    const map = { options: { crs: { project: point => ({ x: point.lng, y: point.lat }) } } };
+    const map = { options: { crs: { project: point => ({ x: point.lng, y: point.lat }) } },
+      once(type, handler) { assert.equal(type, 'unload'); closeWorkers = handler; } };
     globals.cameraByMap.set(map, map);
     const area = { request: new AbortController() };
     const context = sourceAreaContext(backend, area, map);
@@ -397,6 +407,9 @@ Then('source stages preserve features, errors and load completion', async functi
       ] },
     };
     buildAreaFeature(context, feature);
+    const prepared = assembleAreaGeometry({ jobs: context.jobs });
+    Object.assign(context, prepared);
+    Object.assign(context.featureFaces[0], prepared.ranges[0]);
     assert.equal(context.featureFaces.length, 1);
     const face = context.featureFaces[0];
     assert.equal(face.id, 'building');
@@ -432,9 +445,10 @@ Then('source stages preserve features, errors and load completion', async functi
     const lights = sourceAreaContext(backend, area, map);
     const point = { properties: { cod_ouvrag: 'pole' }, geometry: { type: 'Point', coordinates: [1, 2] } };
     buildAreaFeature(lights, point);
-    const firstCount = lights.positions.length;
+    const firstCount = assembleAreaGeometry({ jobs: lights.jobs, nightLight: true }).positions.length;
     buildAreaFeature(lights, point);
-    assert.equal(lights.supports.size, 1);
+    Object.assign(lights, assembleAreaGeometry({ jobs: lights.jobs, nightLight: true }));
+    assert.equal(lights.jobs[0].support, lights.jobs[1].support);
     assert.equal(lights.lights.length, 2);
     assert(lights.positions.length - firstCount < firstCount, 'A shared pole must be generated only once');
     assert.equal(lights.uvs.length / 2, lights.positions.length / 3);
@@ -442,7 +456,8 @@ Then('source stages preserve features, errors and load completion', async functi
       position: [1, 8, -2], radius: Math.hypot(8, 20), color: [1, 1, 1], flux: 3000,
     });
     style.lightFlux = 0;
-    assert.throws(() => buildAreaFeature(lights, point), /Invalid light flux/);
+    buildAreaFeature(lights, point);
+    assert.throws(() => assembleAreaGeometry({ jobs: lights.jobs, nightLight: true }), /Invalid light flux/);
     assert.throws(() => buildAreaFeature(lights, feature), /Night lights require Point geometry/);
 
     const uploads = [];
@@ -461,7 +476,7 @@ Then('source stages preserve features, errors and load completion', async functi
     assert.equal(area.buildings, 1);
     assert.equal(area.mesh.parent, globals.sceneByLayer.get(backend).root);
     assert.equal(area.mesh.program._layerMaterial.roofTexture, true);
-    assert.deepEqual(uploads, [context.positions, context.normals, context.colors]);
+    assert.deepEqual(uploads, [context.positions, context.normals, context.colors].map(data => Array.from(data)));
     assert.deepEqual(area.mesh.extras.featureFaces, context.featureFaces);
     assert.equal(globals.sceneByLayer.get(backend)._inflight, 0);
 
@@ -478,12 +493,27 @@ Then('source stages preserve features, errors and load completion', async functi
     assert.equal(area.error, 'Invalid GeoJSON response');
     assert.equal(globals.sceneByLayer.get(backend)._inflight, 0);
     assert.deepEqual(errors, [['error', 'Invalid GeoJSON response']]);
+    backend.options.data = { type: 'FeatureCollection', features: [feature] };
+    backend.options.worker = false;
+    globals.sceneByLayer.get(backend)._inflight++;
+    await buildArea(backend, area, map);
+    assert.match(area.error, /worker: false is no longer supported/);
+    assert.equal(errors.at(-1)[1], area.error);
+    delete backend.options.worker;
+    backend.options.workerUrl = 'missing-worker.js';
+    delete globalThis.Worker;
+    globals.sceneByLayer.get(backend)._inflight++;
+    await buildArea(backend, area, map);
+    assert.match(area.error, /Web Workers are required/);
+    assert.equal(errors.at(-1)[1], area.error);
+    assert.equal(globals.sceneByLayer.get(backend)._inflight, 0);
     area.request.abort();
     globals.sceneByLayer.get(backend)._inflight++;
     await buildArea(backend, area, map);
     assert.equal(globals.sceneByLayer.get(backend)._inflight, 0);
-    assert.equal(errors.length, 1, 'Cancelled loads must not emit errors');
+    assert.equal(errors.length, 3, 'Cancelled loads must not emit errors');
   } finally {
+    closeWorkers?.();
     mockLeaflet(previousLeaflet);
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete globalThis[name];
