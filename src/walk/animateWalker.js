@@ -16,6 +16,7 @@ import { land } from './landWalker.js';
 import { moveWalker } from './moveWalker.js';
 import { stepWalkerHeight } from './stepWalkerHeight.js';
 import { updateWalkerView } from './updateWalkerView.js';
+import { resolveWalkerPosition } from './resolveWalkerPosition.js';
 
 export function step(now) {
   const layer = this.layer;
@@ -25,6 +26,10 @@ export function step(now) {
   if (!rendererByLayer.get(layer)) return;
   let changed = false;
   let part, key;
+  if (now >= this.nextClearanceCheck) {
+    this.nextClearanceCheck = now + 250;
+    if (resolveWalkerPosition.call(this)) changed = true;
+  }
   if (!this.meshes) {
     this.meshes = /* alloc */ [];
     for ([part] of limbs) this.meshes.push(createMesh.createMesh(layer, build(parts[part])));

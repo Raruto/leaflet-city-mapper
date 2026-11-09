@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { After, AfterAll, Before, BeforeAll, Status, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium, firefox } from 'playwright';
 import { build } from 'esbuild';
@@ -57,6 +58,17 @@ BeforeAll({ timeout: 900000 }, async () => {
     define: { 'import.meta': 'null' },
     minify: true,
     write: false,
+    plugins: [{
+      name: 'shared-test-weakmaps',
+      setup(builder) {
+        builder.onLoad({ filter: /[\\/]src[\\/]weakmaps[\\/][^\\/]+\.js$/ }, async ({ path }) => {
+          const contents = await readFile(path, 'utf8');
+          const names = [...contents.matchAll(/export const (\w+)\s*=/g)].map(match => match[1]);
+          assert.ok(names.length, `No state exports in ${path}`);
+          return { contents: `${contents}\nObject.assign(globalThis.testWeakmaps ??= {}, { ${names.join(', ')} });` };
+        });
+      },
+    }],
   });
   pluginBundle = result.outputFiles[0].text;
   server = await startServer(0);
@@ -180,12 +192,14 @@ document.addEventListener`
   };
   this.pluginBundle = pluginBundle;
   // Source-level checks and the instrumented bundle share each global's identity.
-  await this.context.route('**/src/globals/*.js', async route => {
+  await this.context.route(/\/src\/(?:globals|weakmaps)\/[^/]+\.js$/, async route => {
     if (!await this.page.evaluate(() => Boolean(globalThis.globals))) return route.continue();
-    const name = new URL(route.request().url()).pathname.split('/').pop().slice(0, -3);
+    const parts = new URL(route.request().url()).pathname.split('/');
+    const name = parts.pop().slice(0, -3);
+    const namespace = parts.pop() === 'weakmaps' ? 'testWeakmaps' : 'globals';
     await route.fulfill({
       contentType: 'text/javascript',
-      body: `export const ${name} = globalThis.globals.${name};`,
+      body: `export const ${name} = globalThis.${namespace}.${name};`,
     });
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);

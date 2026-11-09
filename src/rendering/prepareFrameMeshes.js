@@ -13,7 +13,7 @@ export function prepareFrameMeshes(layer, rasters, now, meshes) {
   // Visible meshes: opaque first, transparent surfaces back-to-front.
   let mesh, progress;
   for (mesh of candidates) {
-    if (!revealRoofMesh(layer, mesh, rasters)) continue;
+    if (!revealRoofMesh(layer, mesh, rasters, now)) continue;
     if (mesh.fadeDuration) {
       mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
       progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);

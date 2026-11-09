@@ -533,7 +533,7 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
     globals.sceneByLayer.get(backend)._roofRaster = { signature: 'pending' };
     globals.sceneByLayer.get(backend)._sceneOrigin = { lat: 0, x: 0, y: 0 };
     backend._map = { options: { crs: { scale: () => 40075016.68557849 } }, project: point => point };
-    const raster = { _tileZoom: 1, header: {}, _rasterTiles: new Map() };
+    const raster = { _tileZoom: 1, header: {}, _rasterTiles: new Map(), _loadingTiles: 1 };
     globals.sceneByLayer.set(raster, raster);
     const meshes = [];
     assert.equal(prepareFrameMeshes(backend, [raster], 50, meshes), true);
@@ -543,11 +543,20 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
     assert.equal(globals.sceneByLayer.get(backend).renderer.groundOverlap, true);
     assert.deepEqual(globals.sceneByLayer.get(backend)._shadowMeshes, [opaque, fading]);
     assert.equal(globals.sceneByLayer.get(backend)._visibleMeshes.length, 0);
+    globals.sceneByLayer.get(raster)._loadingTiles = 0;
     globals.sceneByLayer.get(backend)._visibleMeshes.push(fading, roof);
     meshes.length = 0;
-    assert.equal(prepareFrameMeshes(backend, [], 100, meshes), false);
+    assert.equal(prepareFrameMeshes(backend, [raster], 100, meshes), false);
     assert.equal(fading._appearance, 1);
     assert.equal(roof._roofRevealed, true);
+    assert.ok(meshes.includes(roof), 'Incomplete raster coverage must not hide the whole building mesh');
+    const walkRoof = { ...roof, id: 7, _roofRevealed: false, _appearance: 0, fadeDuration: 100 };
+    globals.walkByMap.set(backend._map, { control: { _walk: { saved: {} } } });
+    globals.sceneByLayer.get(backend)._visibleMeshes.push(walkRoof);
+    meshes.length = 0;
+    prepareFrameMeshes(backend, [raster], 200, meshes);
+    assert.ok(meshes.includes(walkRoof), 'Walk mode must show buildings while roof imagery is loading');
+    assert.equal(walkRoof._appearance, 1);
   } finally {
     if (previous === undefined) delete globalThis.GPUTextureUsage;
     else globalThis.GPUTextureUsage = previous;

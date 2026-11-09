@@ -48,6 +48,7 @@ export function createWalk(control, {
     meshes: null,
     frame: null,
     last: undefined,
+    nextClearanceCheck: 0,
     swing: 0,
     verticalSpeed: 0,
     saved: null,

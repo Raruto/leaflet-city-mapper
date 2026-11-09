@@ -12,6 +12,8 @@ export function onAdd(map) {
       hitData: /* alloc */ {
         x: 0, y: 0, z: 0, dx: 0, dz: 0, reach: 0, best: 0, found: false,
         seen: /* alloc */ new Set(),
+        intersections: /* alloc */ [],
+        nodes: /* alloc */ [],
         normal: /* alloc */ [0, 0],
       },
       local: /* alloc */ [0, 0, 0],

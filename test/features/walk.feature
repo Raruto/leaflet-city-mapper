@@ -4,6 +4,10 @@ Feature: Third-person walk mode
   Scenario: Walk coordinate buffers stay owned by each walker
     Then walk coordinate conversion reuses only its caller-owned buffer
 
+  @unit
+  Scenario: Walk collision includes instanced objects and moving traffic
+    Then walk collision detects enclosed instances and moving traffic
+
   Scenario: Time and Walk controls support standalone use, removal and reuse
     Given a leaflet map
     Then Time and Walk controls clean up and can be added again

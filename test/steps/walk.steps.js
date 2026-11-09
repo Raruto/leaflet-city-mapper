@@ -4,8 +4,48 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { local } from '../../src/projections/walkerLocalPosition.js';
+import { insideMesh } from '../../src/collision/insideMesh.js';
+import { trafficCollision } from '../../src/collision/trafficCollision.js';
 import { onAdd as addWalk } from '../../src/walk/onAddWalkControl.js';
 import { onRemove as removeWalk } from '../../src/walk/onRemoveWalkControl.js';
+import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
+import { trafficByLayer } from '../../src/weakmaps/trafficByLayer.js';
+
+Then('walk collision detects enclosed instances and moving traffic', function () {
+  const positions = new Float32Array([
+    -1, 0, -1, -1, 2, -1, -1, 2, 1, -1, 0, -1, -1, 2, 1, -1, 0, 1,
+    1, 0, -1, 1, 2, 1, 1, 2, -1, 1, 0, -1, 1, 0, 1, 1, 2, 1,
+    -1, 0, -1, 1, 0, -1, 1, 2, -1, -1, 0, -1, 1, 2, -1, -1, 2, -1,
+    -1, 0, 1, 1, 2, 1, 1, 0, 1, -1, 0, 1, -1, 2, 1, 1, 2, 1,
+  ]);
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const mesh = {
+    visible: true,
+    worldMatrix: identity,
+    program: {},
+    geometry: { attributes: {
+      position: { data: positions, size: 3, count: positions.length / 3 },
+      instanceOffset: { data: new Float32Array([5, 0, 0, 0]), size: 4, count: 1 },
+    } },
+  };
+  const seen = new Set(), intersections = [];
+  assert.equal(insideMesh(mesh, 5, 1, 0, seen, intersections), true);
+  assert.equal(insideMesh(mesh, 8, 1, 0, seen, intersections), false);
+
+  const traffic = {}, lane = { points: [[5, 0, 0], [15, 0, 0]], lengths: [0, 10], length: 10 };
+  rootByLayer.set(traffic, { position: [0, 0, 0], scale: [1, 1, 1] });
+  trafficByLayer.set(traffic, {
+    mesh: {}, trips: [{ lane, distance: 0, speed: 0 }], template: { position: [-1, 0, -1, 1, 1.5, 1] },
+    elapsed: 0, side: 0,
+  });
+  const data = { best: 10, found: false, normal: [0, 0] };
+  assert.equal(trafficCollision(traffic, 0, 0, 0, 1, 0, 10, data), true);
+  assert.ok(data.best > 3 && data.best < 4);
+  assert.equal(data.normal[0], -1);
+  data.best = 10;
+  data.found = false;
+  assert.equal(trafficCollision(traffic, 0, -10, 0, 1, 0, 10, data), false);
+});
 
 Then('Walk scratch stays map-owned across control replacement', function () {
   const firstMap = {}, secondMap = {};

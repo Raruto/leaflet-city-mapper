@@ -10,6 +10,7 @@ import { onKey } from './onWalkKey.js';
 import { onBlur } from './onWalkBlur.js';
 import { onPointer } from './onWalkPointer.js';
 import { onTerrain } from './onWalkTerrain.js';
+import { resolveWalkerPosition } from './resolveWalkerPosition.js';
 
 
 export function start() {
@@ -34,6 +35,7 @@ export function start() {
   this.state.heading = -mapGetBearing(map) * radians;
   map.setView(this.state.latlng, zoom, /* alloc */ { animate: false });
   mapSetPitch(map, 75);
+  resolveWalkerPosition.call(this);
   L.DomEvent.on(document, 'keydown keyup', this.onKey);
   L.DomEvent.on(window, 'blur', this.onBlur);
   L.DomEvent.on(map.getContainer(), 'pointerdown pointermove pointerup pointercancel', this.onPointer);
@@ -42,5 +44,6 @@ export function start() {
   this.button.style.background = '#e4e4e4';
   this.hint.style.display = '';
   this.last = undefined;
+  this.nextClearanceCheck = 0;
   this.frame = requestAnimationFrame(this.step);
 }

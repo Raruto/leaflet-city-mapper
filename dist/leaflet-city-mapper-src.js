@@ -2580,14 +2580,18 @@
   }
 
   // src/rendering/revealRoofMesh.js
-  function revealRoofMesh(layer, mesh, rasters) {
+  function revealRoofMesh(layer, mesh, rasters, now) {
     if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;
     if (mesh.program.uniforms.roofTexture && !mesh._roofRevealed && rasters.length) {
+      if (walkByMap.get(layer._map)?.control?._walk?.saved) {
+        mesh._roofRevealed = true;
+        mesh.fadeStart = now - (mesh.fadeDuration || 0);
+      }
       if (mesh._roofCoverageSignature !== roofRasterByLayer.get(layer)?.signature) {
         mesh._roofCoverageSignature = roofRasterByLayer.get(layer)?.signature;
         mesh._roofCovered = roofCoverage(mesh, layer, rasters);
       }
-      if (!mesh._roofCovered) {
+      if (!mesh._roofRevealed && !mesh._roofCovered && rasters.some((raster) => !headerByLayer.get(raster) || loadingTilesByLayer.get(raster) > 0)) {
         mesh._appearance = 0;
         return false;
       }
@@ -2602,7 +2606,7 @@
     let appearing = false;
     let mesh, progress;
     for (mesh of candidates) {
-      if (!revealRoofMesh(layer, mesh, rasters)) continue;
+      if (!revealRoofMesh(layer, mesh, rasters, now)) continue;
       if (mesh.fadeDuration) {
         mesh.fadeStart ??= mesh.tile?.loadedAt ?? now;
         progress = Math.min(1, (now - mesh.fadeStart) / mesh.fadeDuration);
@@ -14572,17 +14576,6 @@
   // src/weakmaps/colliders.js
   var colliders = /* @__PURE__ */ new WeakMap();
 
-  // src/collision/transformTriangle.js
-  function transformTriangle(v, p, index, i, m) {
-    let k, j, x, y, z;
-    for (k = 0; k < 3; k++) {
-      j = (index ? index.data[i + k] : i + k) * 3, x = p[j], y = p[j + 1], z = p[j + 2];
-      v[k * 3] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      v[k * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      v[k * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-    }
-  }
-
   // src/collision/indexTriangle.js
   function indexTriangle(cells, v, t) {
     let ix, iz, key;
@@ -14602,8 +14595,9 @@
   function collider(mesh) {
     let c = colliders.get(mesh.geometry);
     if (c) return c;
-    const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv } = mesh.geometry.attributes;
-    const count = index ? index.count : p.length / 3;
+    const m = mesh.worldMatrix, { position: { data: p }, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+    const vertices = index ? index.count : p.length / 3;
+    const count = vertices * (instanceOffset?.count ?? 1);
     const tri = (
       /* alloc */
       []
@@ -14616,17 +14610,36 @@
       /* alloc */
       /* @__PURE__ */ new Map()
     );
+    const a = (
+      /* alloc */
+      [0, 0, 0]
+    ), b = (
+      /* alloc */
+      [0, 0, 0]
+    ), d = (
+      /* alloc */
+      [0, 0, 0]
+    );
     const v = (
       /* alloc */
       []
     );
-    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, a, h, t;
+    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
     for (i = 0; i < count; i += 3) {
-      first = index ? index.data[i] : i;
+      first = index ? index.data[i % vertices] : i % vertices;
       if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
         continue;
       }
-      transformTriangle(v, p, index, i, m);
+      readTriangle(mesh, i, a, b, d);
+      v[0] = m[0] * a[0] + m[4] * a[1] + m[8] * a[2] + m[12];
+      v[1] = m[1] * a[0] + m[5] * a[1] + m[9] * a[2] + m[13];
+      v[2] = m[2] * a[0] + m[6] * a[1] + m[10] * a[2] + m[14];
+      v[3] = m[0] * b[0] + m[4] * b[1] + m[8] * b[2] + m[12];
+      v[4] = m[1] * b[0] + m[5] * b[1] + m[9] * b[2] + m[13];
+      v[5] = m[2] * b[0] + m[6] * b[1] + m[10] * b[2] + m[14];
+      v[6] = m[0] * d[0] + m[4] * d[1] + m[8] * d[2] + m[12];
+      v[7] = m[1] * d[0] + m[5] * d[1] + m[9] * d[2] + m[13];
+      v[8] = m[2] * d[0] + m[6] * d[1] + m[10] * d[2] + m[14];
       ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
       nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
       ny = ez * fx - ex * fz, length = Math.hypot(nx, ny, nz);
@@ -14634,14 +14647,15 @@
         continue;
       }
       if (normal) {
-        j = first * 3, a = normal.data;
-        if ((m[0] * a[j] + m[4] * a[j + 1] + m[8] * a[j + 2]) * nx + (m[2] * a[j] + m[6] * a[j + 1] + m[10] * a[j + 2]) * nz < 0) {
+        j = first * 3;
+        if ((m[0] * normal.data[j] + m[4] * normal.data[j + 1] + m[8] * normal.data[j + 2]) * nx + (m[2] * normal.data[j] + m[6] * normal.data[j + 1] + m[10] * normal.data[j + 2]) * nz < 0) {
           nx = -nx;
           nz = -nz;
         }
       }
       h = Math.hypot(nx, nz), t = nrm.length / 2;
       tri.push(...v);
+      maxX = Math.max(maxX, v[0], v[3], v[6]);
       nrm.push(nx / h, nz / h);
       indexTriangle(cells, v, t);
     }
@@ -14650,6 +14664,7 @@
       tri: Float32Array.from(tri),
       nrm: Float32Array.from(nrm),
       cells,
+      maxX,
       origin: (
         /* alloc */
         [m[12], m[13], m[14]]
@@ -14711,6 +14726,63 @@
       }
   }
 
+  // src/collision/trafficCollision.js
+  function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
+    const state = trafficByLayer.get(layer);
+    if (!state?.mesh || !state.trips.length) return false;
+    let bounds = state.collisionBounds;
+    if (!bounds) {
+      bounds = state.collisionBounds = { radius: 0, minY: Infinity, maxY: -Infinity };
+      let i, px2, py, pz2;
+      for (i = 0; i < state.template.position.length; i += 3) {
+        px2 = state.template.position[i];
+        py = state.template.position[i + 1];
+        pz2 = state.template.position[i + 2];
+        bounds.radius = Math.max(bounds.radius, Math.hypot(px2, pz2));
+        bounds.minY = Math.min(bounds.minY, py);
+        bounds.maxY = Math.max(bounds.maxY, py);
+      }
+    }
+    const root = rootByLayer.get(layer), position = state.position ||= {};
+    const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
+    const radius = bounds.radius * scale + 0.35;
+    let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
+    for (trip of state.trips) {
+      ({ x: px, y: bottom, z: pz } = locateTraffic(state, trip, position));
+      bottom = root.position[1] + (bottom + bounds.minY) * root.scale[1];
+      top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
+      if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) continue;
+      px = root.position[0] + px * root.scale[0];
+      pz = root.position[2] + pz * root.scale[2];
+      projection = (px - x) * dx + (pz - z) * dz;
+      closest = Math.max(0, Math.min(reach, projection));
+      rx = x + closest * dx - px;
+      rz = z + closest * dz - pz;
+      perpendicular = rx * rx + rz * rz;
+      if (perpendicular >= radius * radius) continue;
+      if (reach === 0) {
+        data.found = true;
+        distance = Math.hypot(x - px, z - pz);
+        data.normal[0] = distance ? (x - px) / distance : 0;
+        data.normal[1] = distance ? (z - pz) / distance : 0;
+        continue;
+      }
+      entry = Math.max(0, projection - Math.sqrt(radius * radius - perpendicular));
+      if (entry > reach || entry >= data.best) continue;
+      data.best = entry;
+      data.found = true;
+      distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
+      if (distance < 1e-6) {
+        data.normal[0] = -dx;
+        data.normal[1] = -dz;
+      } else {
+        data.normal[0] = (x + entry * dx - px) / distance;
+        data.normal[1] = (z + entry * dz - pz) / distance;
+      }
+    }
+    return data.found;
+  }
+
   // src/picking/hit.js
   function hit(layer, x, y, z, dx, dz, reach, data) {
     updateWorldMatrix(sceneByLayer.get(layer));
@@ -14718,7 +14790,11 @@
     data.best = reach, data.found = false;
     let other;
     for (other of layersByLayer.get(sharedByLayer.get(layer))) {
-      if (shouldSkipOther(other, layer)) continue;
+      if (other === layer || kindByLayer.get(other) === "terrain") continue;
+      if (kindByLayer.get(other) === "traffic") {
+        trafficCollision(other, x, y, z, dx, dz, reach, data);
+        continue;
+      }
       traverse(rootByLayer.get(other), hitMesh, data);
     }
     return data.found ? data.normal : null;
@@ -14789,6 +14865,125 @@
     return false;
   }
 
+  // src/walk/resolveWalkerPosition.js
+  init_L();
+
+  // src/collision/insideMesh.js
+  function insideMesh(mesh, x, y, z, seen, intersections) {
+    const geometry = mesh.geometry;
+    if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
+    if (!geometry.bounds) computeBounds(geometry);
+    const bounds = geometry.bounds;
+    const world = mesh.worldMatrix;
+    const center = bounds.center;
+    const cx = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12];
+    const cy = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13];
+    const cz = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14];
+    const radius = bounds.radius * Math.max(
+      Math.hypot(world[0], world[1], world[2]),
+      Math.hypot(world[4], world[5], world[6]),
+      Math.hypot(world[8], world[9], world[10])
+    );
+    if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
+    const shape = collider(mesh);
+    const end = Math.floor(shape.maxX / CELL);
+    if (x >= shape.maxX) return false;
+    const iz = Math.floor(z / CELL);
+    const hits = intersections;
+    hits.length = 0;
+    seen.clear();
+    let ix, cell, triangle3, distance;
+    for (ix = Math.floor(x / CELL); ix <= end; ix++) {
+      cell = shape.cells.get(`${ix},${iz}`);
+      if (!cell) continue;
+      for (triangle3 of cell) {
+        if (seen.has(triangle3)) continue;
+        seen.add(triangle3);
+        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
+        if (distance > 1e-4) hits.push(distance);
+      }
+    }
+    for (ix = 1; ix < hits.length; ix++) {
+      distance = hits[ix];
+      let j = ix - 1;
+      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
+      hits[j + 1] = distance;
+    }
+    let crossings = 0, previous = -Infinity;
+    for (distance of hits) {
+      if (distance - previous > 1e-4) crossings++;
+      previous = distance;
+    }
+    return crossings % 2 === 1;
+  }
+
+  // src/collision/insideWalker.js
+  function insideWalker(context) {
+    const { layer, local: localBuffer, hitData } = context;
+    const shared = sharedByLayer.get(layer);
+    if (!shared || !layersByLayer.get(shared)) return false;
+    updateWorldMatrix(sceneByLayer.get(layer));
+    const root = rootByLayer.get(layer);
+    const feet = local2.call(context, localBuffer);
+    const x = root.position[0] + feet[0] * root.scale[0];
+    const y = root.position[1] + feet[1] * root.scale[1];
+    const z = root.position[2] + feet[2] * root.scale[2];
+    const layers = layersByLayer.get(shared);
+    let other, node, child;
+    for (other of layers) {
+      if (other === layer || kindByLayer.get(other) === "terrain") continue;
+      if (kindByLayer.get(other) === "traffic") {
+        hitData.best = 0;
+        hitData.found = false;
+        if (trafficCollision(other, x, y, z, 0, 0, 0, hitData)) return true;
+        continue;
+      }
+      const nodes = hitData.nodes;
+      nodes.length = 0;
+      if (rootByLayer.get(other)) nodes.push(rootByLayer.get(other));
+      while (nodes.length) {
+        node = nodes.pop();
+        if (!node.visible) continue;
+        if (node.geometry && (insideMesh(node, x, y + 0.45 * root.scale[1], z, hitData.seen, hitData.intersections) || insideMesh(node, x, y + 1.35 * root.scale[1], z, hitData.seen, hitData.intersections))) return true;
+        for (child of node.children) nodes.push(child);
+      }
+    }
+    return false;
+  }
+
+  // src/walk/resolveWalkerPosition.js
+  function resolveWalkerPosition() {
+    if (!this.saved || !insideWalker(this)) return false;
+    const map = this.layer._map;
+    const origin = this.state.latlng;
+    const height = this.state.height;
+    let distance, angle, candidate;
+    for (distance = 0.5; distance <= 20; distance += 0.5) {
+      for (angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+        candidate = /* alloc */
+        new L.LatLng(
+          origin.lat + Math.cos(angle) * distance / 111320,
+          origin.lng + Math.sin(angle) * distance / (111320 * Math.cos(origin.lat * Math.PI / 180))
+        );
+        this.state.latlng = candidate;
+        this.state.height = 0;
+        if (!insideWalker(this)) {
+          this.verticalSpeed = 0;
+          map.setView(
+            candidate,
+            map.getZoom(),
+            /* alloc */
+            { animate: false }
+          );
+          return true;
+        }
+      }
+    }
+    this.state.latlng = origin;
+    this.state.height = height;
+    return false;
+  }
+
   // src/walk/animateWalker.js
   function step(now) {
     const layer = this.layer;
@@ -14798,6 +14993,10 @@
     if (!rendererByLayer.get(layer)) return;
     let changed = false;
     let part, key;
+    if (now >= this.nextClearanceCheck) {
+      this.nextClearanceCheck = now + 250;
+      if (resolveWalkerPosition.call(this)) changed = true;
+    }
     if (!this.meshes) {
       this.meshes = /* alloc */
       [];
@@ -14858,6 +15057,7 @@
       { animate: false }
     );
     mapSetPitch(map, 75);
+    resolveWalkerPosition.call(this);
     L.DomEvent.on(document, "keydown keyup", this.onKey);
     L.DomEvent.on(window, "blur", this.onBlur);
     L.DomEvent.on(map.getContainer(), "pointerdown pointermove pointerup pointercancel", this.onPointer);
@@ -14866,6 +15066,7 @@
     this.button.style.background = "#e4e4e4";
     this.hint.style.display = "";
     this.last = void 0;
+    this.nextClearanceCheck = 0;
     this.frame = requestAnimationFrame(this.step);
   }
 
@@ -14917,6 +15118,7 @@
         meshes: null,
         frame: null,
         last: void 0,
+        nextClearanceCheck: 0,
         swing: 0,
         verticalSpeed: 0,
         saved: null,
@@ -14973,6 +15175,14 @@
             seen: (
               /* alloc */
               /* @__PURE__ */ new Set()
+            ),
+            intersections: (
+              /* alloc */
+              []
+            ),
+            nodes: (
+              /* alloc */
+              []
             ),
             normal: (
               /* alloc */

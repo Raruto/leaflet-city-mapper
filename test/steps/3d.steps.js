@@ -6,6 +6,10 @@ import { Given } from '@cucumber/cucumber';
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
+    const { rendererByLayer } = await import('/src/weakmaps/rendererByLayer.js');
+    if (rendererByLayer !== globalThis.testWeakmaps.rendererByLayer) {
+      throw new Error('Source checks and the test bundle must share WeakMap state');
+    }
     const [createMesh, createProgram, destroyTexture, disposeMesh,
       findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
       renderModule, update, compareMeshes, pump, releaseArea, emptyNode, setParent, traverse,

@@ -9,7 +9,7 @@ import { onRemove } from './onRemoveWalkControl.js';
  * (bearing, pitch); the wheel changes the camera distance.
  * The walker follows the terrain, bridges included, and `control.walker` exposes `{ latlng, heading, phase }`.
  * Options: `speed` (m/s, default 70), `distance` (camera distance in metres, default 20), `position` (button corner, default 'bottomright').
- * Visible meshes of the other 3D layers (buildings, trees, models, streetlights) are solid; terrain and traffic are not.
+ * Buildings, trees, models, streetlights and traffic block movement; the walker is moved out of newly loaded obstacles.
  */
 L.Control.Walk = L.Control.extend({
   options: { position: 'bottomright', speed: 70, distance: 20 },
