@@ -45,6 +45,21 @@
 			});
 			const layers = new L.Control.Layers({
 				'Empty': new L.LayerGroup(),
+				// TODO:
+				// 'OTM (vector)': new L.Layer({
+				// 	source: {
+				// 		type: 'vector',
+				// 		url: 'https://opentopomap.org/otm/{z}/{x}/{y}.pbf',
+				// 		style: 'https://opentopomap.org/vector/otm_layers.json',
+				// 		sourceId: 'opentopomap-vector',
+				// 		sprite: 'https://opentopomap.org/vector/otm_sprite',
+				// 		maxNativeZoom: 14,
+				// 		styleZoomOffset: -1,
+				// 		attribution: 'Style: <a href="https://opentopomap.org/vector/">&copy; OpenTopoMap</a> ' +
+				// 		'(<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</a>). Data: ' +
+				// 		'<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>'
+				// 	},
+				// }),
 				// Offline archive built by `node build/pmtiles.js`.
 				'Plan IGN': new L.Layer({
 					source: {
