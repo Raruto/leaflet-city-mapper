@@ -1,4 +1,5 @@
 import * as globals from '../fixtures/globals.js';
+import { dependencyFile } from '../fixtures/dependencies.js';
 
 
 import assert from 'node:assert/strict';
@@ -149,7 +150,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
   assert.deepEqual(result.errors, []);
 });
 
-Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
+Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 60000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('**/libs/leaflet-lens.js', async route => {
@@ -278,13 +279,21 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     assert.ok(changed.inside > 1000, `Archaeology must visibly replace the orthophoto inside the lens: ${JSON.stringify(changed)}`);
     assert.equal(changed.outside, 0, `Orthophoto must remain unchanged outside the circular lens: ${JSON.stringify(changed)}`);
   }
+  const toggle = this.page.getByRole('button', { name: 'Toggle lens', exact: true });
+  await toggle.click();
+  assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+  assert.equal(await this.page.evaluate(() => Object.values(map._layers).find(layer =>
+    layer.options.asset === 'orthophoto').options.cutout.radius), 0);
+  await toggle.click();
+  assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+  await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
   await this.page.locator('#map').dispatchEvent('pointerleave');
   assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
   await this.page.locator('#map').focus();
   assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
   await this.page.keyboard.press('Escape');
   assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
-  const toggle = this.page.getByRole('button', { name: 'Toggle lens', exact: true });
   assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
   await toggle.click();
   await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
@@ -311,6 +320,57 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
   assert.deepEqual(remoteRequests, []);
   assert.deepEqual(errors, []);
+});
+
+Then('a touch device can enable and immediately disable the lens', { timeout: 60000 }, async function () {
+  const context = await this.context.browser().newContext({
+    viewport: { width: 375, height: 667 },
+    isMobile: this.context.browser().browserType().name() !== 'firefox', hasTouch: true,
+  });
+  try {
+    await context.route('https://unpkg.com/leaflet@*/dist/*', route =>
+      route.fulfill({ path: dependencyFile(route.request().url()) }));
+    const page = await context.newPage();
+    await page.goto(this.baseUrl);
+    await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><div id="map" style="width:375px;height:600px"></div>');
+    const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-alpha.1' : '1.9.4';
+    const script = version === '1.9.4' ? 'leaflet-src.js' : 'leaflet-global-src.js';
+    await page.addStyleTag({ url: `https://unpkg.com/leaflet@${version}/dist/leaflet.css` });
+    await page.addScriptTag({ url: `https://unpkg.com/leaflet@${version}/dist/${script}` });
+    await page.evaluate(() => { globalThis.L ||= globalThis.leaflet; });
+    await page.addScriptTag({ url: `${this.baseUrl}/libs/leaflet-lens.js` });
+    await page.evaluate(() => {
+      globalThis.map = new L.Map('map', { center: [0, 0], zoom: 1 });
+      globalThis.outer = new L.Layer();
+      globalThis.inner = new L.Layer();
+      globalThis.lens = new L.Control.Lens(outer, inner).addTo(map);
+    });
+    const toggle = page.getByRole('button', { name: 'Toggle lens', exact: true });
+    assert.equal(await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches), true);
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+    await page.touchscreen.tap(180, 300);
+    assert.equal(await page.locator('.leaflet-lens').isVisible(), false);
+    await toggle.tap();
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+    await page.touchscreen.tap(180, 300);
+    assert.equal(await page.locator('.leaflet-lens').isVisible(), true);
+    assert.equal(await page.evaluate(() => outer.options.cutout.radius), 150);
+    assert.equal(await page.evaluate(() => {
+      const bounds = map.getContainer().getBoundingClientRect();
+      return Math.abs(outer.options.cutout.x - (180 - bounds.left)) < 1 &&
+        Math.abs(outer.options.cutout.y - (300 - bounds.top)) < 1;
+    }), true, 'A tap places the lens at the touched position');
+    await toggle.tap();
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+    assert.equal(await page.locator('.leaflet-lens').isVisible(), false);
+    assert.equal(await page.evaluate(() => outer.options.cutout.radius), 0);
+    await page.touchscreen.tap(180, 300);
+    assert.equal(await page.locator('.leaflet-lens').isVisible(), false);
+    assert.equal(await page.evaluate(() => new L.Control.Lens(new L.Layer(), new L.Layer(),
+      { enabled: true }).options.enabled), true);
+  } finally {
+    await context.close();
+  }
 });
 
 Then('lens controls preserve clipping options and remove their handlers', async function () {

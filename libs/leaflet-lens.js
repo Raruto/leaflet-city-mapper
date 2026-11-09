@@ -8,6 +8,9 @@
 
     initialize(outerLayer, innerLayer, options) {
       L.Util.setOptions(this, options);
+      if (options?.enabled === undefined) {
+        this.options.enabled = !matchMedia('(hover: none) and (pointer: coarse)').matches;
+      }
       if (!outerLayer?.options || !innerLayer?.options || outerLayer === innerLayer) {
         throw new TypeError('Lens requires two distinct raster layers');
       }
@@ -40,14 +43,15 @@
       this._button = L.DomUtil.create('button', '', container);
       this._button.type = 'button';
       this._button.textContent = '🔍';
-      this._button.title = 'Toggle lens; move the pointer over the map to reveal the layer underneath';
+      this._button.title = 'Toggle lens; touch or move the pointer over the map to reveal the layer underneath';
       this._button.setAttribute('aria-label', 'Toggle lens');
       this._button.style.cssText = 'display:block;border:0;border-radius:2px;padding:0 8px;min-width:30px;height:30px;background:white;color:#222;font:inherit;cursor:pointer';
       L.DomEvent.disableClickPropagation(container);
       L.DomEvent.disableScrollPropagation(container);
       L.DomEvent.on(this._button, 'click', this._toggle, this);
       this._events = {
-        pointermove: this._onPointerMove.bind(this), pointerleave: this._hide.bind(this),
+        pointerdown: this._onPointerDown.bind(this), pointermove: this._onPointerMove.bind(this),
+        pointerleave: this._onPointerLeave.bind(this), pointercancel: this._hide.bind(this),
         focus: this._onFocus.bind(this), blur: this._hide.bind(this), keydown: this._onKeyDown.bind(this),
       };
       for (const [type, handler] of Object.entries(this._events)) {
@@ -111,8 +115,16 @@
       });
     },
 
+    _onPointerDown(event) {
+      if (event.pointerType === 'touch') this._onPointerMove(event);
+    },
+
+    _onPointerLeave(event) {
+      if (event.pointerType !== 'touch') this._hide();
+    },
+
     _onFocus() {
-      this._show(this._map.getSize().divideBy(2));
+      if (this._lens.hidden) this._show(this._map.getSize().divideBy(2));
     },
 
     _onKeyDown(event) {
