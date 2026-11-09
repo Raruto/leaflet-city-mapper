@@ -310,7 +310,7 @@ Then('large GeoJSON blocks match CPU meshes and preserve replacement and cancell
         geometry: { type: 'Point', coordinates: [12.49 + i * 0.00001, 41.89] },
       })) };
       const errors = [];
-      const makeLayer = worker => new L.Layer({ source: { type: 'geojson', worker,
+      const makeLayer = worker => new L.Layer({ source: { type: 'vector', worker,
         data, center: [41.89, 12.49],
         style: () => ({ top: 8, trunkRadius: 0.25, crownRadius: 2, crownBottom: 3,
           color: 'rebeccapurple', trunkColor: '#72513a', unused: () => {} }),

@@ -6,7 +6,7 @@ import { Then } from '@cucumber/cucumber';
 
 Then('shadow maps are reused until geometry, appearance or sunlight changes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const map = test3d.map, layer = new L.Layer({ source: { type: '3d' } }).addTo(map);
+    const map = test3d.map, layer = new L.Layer({ source: { type: 'vector' } }).addTo(map);
     await nativeChecks.ready(layer);
     const mesh = nativeChecks.gpu.createMesh(layer, { position: [-20,0,-20,20,0,-20,0,20,20],
       normal: [0,1,0,0,1,0,0,1,0], color: [1,0,0,1,0,0,1,0,0] });

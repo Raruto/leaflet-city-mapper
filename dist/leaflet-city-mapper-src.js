@@ -1654,6 +1654,9 @@
   // src/weakmaps/terrain3DByMap.js
   var terrain3DByMap = /* @__PURE__ */ new WeakMap();
 
+  // src/weakmaps/streamTerrainByMap.js
+  var streamTerrainByMap = /* @__PURE__ */ new WeakMap();
+
   // src/weakmaps/bridgesByLayer.js
   var bridgesByLayer = /* @__PURE__ */ new WeakMap();
 
@@ -1719,10 +1722,44 @@
     return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
   }
 
+  // src/native/gridTerrainElevation.js
+  function gridTerrainElevation(state, location2) {
+    let z = Math.max(0, Math.min(24, Math.round(state.map.getZoom())));
+    const tiles = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    let point, limit, x, y, dx, dy, tx, ty, entry, elevation, layer, native, request;
+    for (; z >= 0; z--) {
+      point = state.map.project(location2, z), limit = 2 ** z;
+      x = Math.floor(point.x / 256), y = Math.floor(point.y / 256);
+      for (layer of Object.values(state.map._layers)) {
+        native = nativeGPUByLayer.get(layer);
+        if (native?.disposed || native?.terrainStream !== state) continue;
+        request = native.terrainRequests?.get(`${x}:${y}:${z}`);
+        if (!request?.tiles || layer._tiles[`${x}:${y}:${z}`] !== request.tile) continue;
+        elevation = terrainElevation(point, request.tiles);
+        if (Number.isFinite(elevation)) return elevation;
+      }
+      tiles.clear();
+      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) {
+        tx = ((x + dx) % limit + limit) % limit;
+        ty = Math.max(0, Math.min(limit - 1, y + dy));
+        entry = state.terrainCache.get(`${z}/${tx}/${ty}`);
+        if (entry?.data) tiles.set(`${x + dx}/${y + dy}`, entry.data);
+      }
+      elevation = terrainElevation(point, tiles);
+      if (Number.isFinite(elevation)) return elevation;
+    }
+    return null;
+  }
+
   // src/terrain/mapElevationOf.js
   function mapElevationOf(map, location2) {
     const terrain = terrain3DByMap.get(map);
-    return terrain && getElevation(terrain, location2);
+    if (terrain) return getElevation(terrain, location2);
+    const stream = streamTerrainByMap.get(map);
+    return stream && gridTerrainElevation(stream, location2);
   }
 
   // src/weakmaps/walkByMap.js
@@ -4832,11 +4869,11 @@
   }
 
   // src/native/putNativeMesh.js
-  function putNativeMesh(state, key, position, color, opacity, texture, uv) {
+  function putNativeMesh(state, key, position, color, opacity, texture, uv, terrain = false) {
     const { backend: layer, source, meshes } = state;
     if (!position.length) return;
     let mesh = meshes.get(key);
-    if (!mesh || mesh.geometry.attributes.position.data.length !== position.length || mesh.program.uniforms.baseTexture?.value !== texture) {
+    if (!mesh || mesh.geometry.attributes.position.data.length !== position.length || source instanceof L.GridLayer && mesh.program.depthWrite !== terrain || mesh.program.uniforms.baseTexture?.value !== texture) {
       const normal = (
         /* alloc */
         []
@@ -4855,14 +4892,16 @@
           color,
           opacity,
           unlit: true,
-          alphaMode: "BLEND"
+          alphaMode: "BLEND",
+          depthWrite: terrain
         }
       );
       if (texture) material.baseTexture = texture;
       if (mesh) disposeMesh(layer, mesh);
-      mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? state.rasterProgram : void 0);
+      mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? terrain ? state.terrainRasterProgram : state.rasterProgram : void 0);
       if (source instanceof L.GridLayer) {
-        state.rasterProgram ||= mesh.program;
+        if (terrain) state.terrainRasterProgram ||= mesh.program;
+        else state.rasterProgram ||= mesh.program;
         mesh.texture = texture;
       }
       meshes.set(key, mesh);
@@ -4926,18 +4965,198 @@
     return positions;
   }
 
+  // src/native/getGridTerrainTile.js
+  async function getGridTerrainTile(state, z, x, y) {
+    const limit = 2 ** z;
+    x = (x % limit + limit) % limit;
+    y = Math.max(0, Math.min(limit - 1, y));
+    const key = `${z}/${x}/${y}`;
+    let entry = state.terrainCache.get(key);
+    if (!entry) {
+      entry = /* alloc */
+      { promise: state.layer.options.getTile(z, x, y, state.terrainController.signal) };
+      state.terrainCache.set(key, entry);
+    } else {
+      state.terrainCache.delete(key);
+      state.terrainCache.set(key, entry);
+    }
+    try {
+      if (!entry.data) entry.data = await entry.promise;
+      if (!(entry.data instanceof Float32Array) || entry.data.length !== 65536) {
+        throw (
+          /* alloc */
+          new Error(`Invalid elevation tile ${key}: expected 256x256 Float32Array`)
+        );
+      }
+      if (!entry.range) {
+        let minimum = Infinity, maximum = -Infinity, elevation;
+        for (elevation of entry.data) {
+          if (!Number.isFinite(elevation) || elevation <= -1e3) continue;
+          minimum = Math.min(minimum, elevation);
+          maximum = Math.max(maximum, elevation);
+        }
+        entry.range = /* alloc */
+        [minimum, maximum];
+      }
+    } catch (error) {
+      if (state.terrainCache.get(key) === entry) state.terrainCache.delete(key);
+      throw error;
+    }
+    while (state.terrainCache.size > 256) state.terrainCache.delete(state.terrainCache.keys().next().value);
+    return entry.data;
+  }
+
+  // src/native/loadGridTerrain.js
+  async function loadGridTerrain(state, key, tile, request) {
+    const { x, y, z } = tile.coords, stream = request.stream;
+    const jobs = (
+      /* alloc */
+      []
+    ), tiles = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    let dx, dy, i = 0;
+    try {
+      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) {
+        jobs.push(getGridTerrainTile(stream, z, x + dx, y + dy));
+      }
+      const values = await Promise.all(jobs);
+      if (state.disposed || stream.terrainController.signal.aborted || state.source._tiles[key] !== tile || state.terrainRequests.get(key) !== request) return;
+      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) tiles.set(`${x + dx}/${y + dy}`, values[i++]);
+      request.tiles = tiles;
+      refreshNativeLayer(state);
+      state.map.fire("terrainchange");
+      state.source._update();
+    } catch (error) {
+      if (!state.disposed && !stream.terrainController.signal.aborted && state.source._tiles[key] === tile) {
+        request.error = error;
+        stream.layer.fire(
+          "error",
+          /* alloc */
+          { error, coords: tile.coords }
+        );
+      }
+    }
+  }
+
+  // src/native/terrainGridMesh.js
+  function terrainGridMesh(state, key, tile, request, opacity) {
+    const texture = textureFor(state, key, tile.el);
+    if (!texture) return;
+    const { x, y, z } = tile.coords, divisions = 32;
+    const northwest = localPosition(state, state.map.unproject(
+      /* alloc */
+      [x * 256, y * 256],
+      z
+    ));
+    const southeast = localPosition(state, state.map.unproject(
+      /* alloc */
+      [(x + 1) * 256, (y + 1) * 256],
+      z
+    ));
+    const vertices = (
+      /* alloc */
+      []
+    ), position = (
+      /* alloc */
+      []
+    ), uv = (
+      /* alloc */
+      []
+    );
+    const base = rootByLayer.get(state.backend).position[1];
+    let row, col, u, v, elevation, a, b, c, d, index;
+    for (row = 0; row <= divisions; row++) for (col = 0; col <= divisions; col++) {
+      u = col / divisions;
+      v = row / divisions;
+      elevation = terrainElevation(
+        /* alloc */
+        { x: (x + u) * 256, y: (y + v) * 256 },
+        request.tiles
+      );
+      if (!Number.isFinite(elevation)) throw (
+        /* alloc */
+        new Error(`Missing elevation sample in ${z}/${x}/${y}`)
+      );
+      vertices.push(
+        /* alloc */
+        [
+          northwest[0] + (southeast[0] - northwest[0]) * u,
+          elevation - base,
+          northwest[2] + (southeast[2] - northwest[2]) * v,
+          u,
+          v
+        ]
+      );
+    }
+    for (row = 0; row < divisions; row++) for (col = 0; col < divisions; col++) {
+      a = row * (divisions + 1) + col;
+      b = a + 1;
+      c = a + divisions + 1;
+      d = c + 1;
+      for (
+        index of
+        /* alloc */
+        [a, c, b, b, c, d]
+      ) {
+        position.push(vertices[index][0], vertices[index][1], vertices[index][2]);
+        uv.push(vertices[index][3], vertices[index][4]);
+      }
+    }
+    const mesh = putNativeMesh(state, key, position, coreWhite, opacity, texture, uv, true);
+    mesh._terrainRequest = request;
+    return mesh;
+  }
+
   // src/native/syncGridLayer.js
   function syncGridLayer(state) {
     const { source, textures, meshes } = state;
-    let key, tile, opacity, retained, mesh, nw, se;
+    const stream = streamTerrainByMap.get(state.map);
+    if (state.terrainStream !== stream) {
+      state.terrainStream = stream;
+      state.terrainRequests = stream ? (
+        /* alloc */
+        /* @__PURE__ */ new Map()
+      ) : null;
+    }
+    let key, tile, opacity, retained, mesh, nw, se, request, pending = false;
+    if (state.terrainRequests) {
+      for (key of state.terrainRequests.keys()) {
+        if (!source._tiles[key]) state.terrainRequests.delete(key);
+      }
+    }
     for (key in source._tiles) {
       if (!Object.hasOwn(source._tiles, key)) continue;
       tile = source._tiles[key];
-      if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) continue;
+      if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) {
+        if (stream) pending = true;
+        continue;
+      }
       opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
       retained = textures.get(key);
       mesh = meshes.get(key);
-      if (mesh && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
+      if (state.terrainRequests) {
+        request = state.terrainRequests.get(key);
+        if (!request || request.tile !== tile) {
+          request = /* alloc */
+          { tile, stream };
+          state.terrainRequests.set(key, request);
+          loadGridTerrain(state, key, tile, request);
+        }
+        if (!request.tiles) {
+          pending = true;
+          if (mesh && retained?.image === tile.el) {
+            retained.used = true;
+            styleNativeMesh(state, mesh, coreWhite, opacity);
+          }
+          continue;
+        }
+        if (mesh && mesh._terrainRequest === request && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
+          retained.used = true;
+          styleNativeMesh(state, mesh, coreWhite, opacity);
+        } else mesh = terrainGridMesh(state, key, tile, request, opacity);
+      } else if (mesh && !mesh._terrainRequest && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
         retained.used = true;
         styleNativeMesh(state, mesh, coreWhite, opacity);
       } else {
@@ -4949,6 +5168,15 @@
         ), opacity);
       }
       if (mesh) mesh.renderOrder += tile.coords.z / 100;
+    }
+    if (stream && (pending || !Object.keys(source._tiles).length)) {
+      for ([key, mesh] of meshes) {
+        if (source._tiles[key] || !mesh._terrainRequest) continue;
+        retained = textures.get(key);
+        if (!retained) continue;
+        retained.used = true;
+        mesh._nativeUsed = true;
+      }
     }
   }
 
@@ -5024,6 +5252,10 @@
   function markerQuadCorners(state, key, image) {
     const { source, map, backend: layer } = state;
     const position = localPosition(state, source.getLatLng());
+    if (streamTerrainByMap.get(map)) {
+      const root2 = rootByLayer.get(layer), elevation = mapElevationOf(map, source.getLatLng());
+      if (Number.isFinite(elevation)) position[1] = (elevation - root2.position[1]) / root2.scale[1];
+    }
     const size = map.getSize();
     const matrices = state.markerMatrices ||= /* alloc */
     {
@@ -6565,7 +6797,8 @@
   }
 
   // src/native/refreshNativeEvent.js
-  function refreshNativeEvent() {
+  function refreshNativeEvent(event) {
+    if (event?.type === "terrainchange" && this.marker) this.source.update();
     refreshNativeLayer(this);
   }
 
@@ -6599,7 +6832,7 @@
     const { source, map, backend: layer, meshes, textures, images } = state;
     const events = "load tileload tileunload move drag";
     source.off(events, refreshNativeEvent, state);
-    map.off("zoomend", refreshNativeEvent, state);
+    map.off("zoomend terrainchange", refreshNativeEvent, state);
     if (state.marker) map.off("move zoom rotate pitch resize viewreset", updateNativeLayerView, state);
     removeNativeEvents(state);
     let name, methods, mesh, texture, image;
@@ -6647,7 +6880,7 @@
       {
         source: (
           /* alloc */
-          { type: "3d" }
+          { type: "vector" }
         )
       }
     );
@@ -6671,7 +6904,7 @@
     state.disposed = false;
     const currentEvents = "load tileload tileunload move drag";
     source.on(currentEvents, refreshNativeEvent, state);
-    map.on("zoomend", refreshNativeEvent, state);
+    map.on("zoomend terrainchange", refreshNativeEvent, state);
     if (state.marker) map.on("move zoom rotate pitch resize viewreset", updateNativeLayerView, state);
     nativeEvents(state);
     let name, own, original;
@@ -6792,7 +7025,7 @@
   }
 
   // src/projections/projectCameraPoint.js
-  function project(map, point, inverse = false, limit = false) {
+  function project(map, point, inverse = false, limit = false, height = 0) {
     const size = map.getSize(), halfX = size.x / 2, halfY = size.y / 2, distance = size.y * 1.5;
     const result = pointOf(point);
     if (!distance) return result;
@@ -6801,17 +7034,17 @@
     if (inverse) {
       const far = size.y * map.options.pitchMaxDistance;
       const denominator = tilt * distance + rise * y;
-      let v2 = denominator * tilt > 0 ? y * distance / denominator : -far;
+      let v2 = denominator * tilt > 0 ? (y * (distance - tilt * height) + distance * rise * height) / denominator : -far;
       if (limit) v2 = Math.max(-far, Math.min(far, v2));
-      const u2 = x * (distance - rise * v2) / distance;
+      const u2 = x * (distance - rise * v2 - tilt * height) / distance;
       result.x = cos * u2 + sin * v2 + halfX;
       result.y = -sin * u2 + cos * v2 + halfY;
       return result;
     }
     const u = cos * x - sin * y, v = sin * x + cos * y;
-    const scale = distance / (distance - rise * v);
+    const scale = distance / (distance - rise * v - tilt * height);
     result.x = u * scale + halfX;
-    result.y = tilt * v * scale + halfY;
+    result.y = (tilt * v - rise * height) * scale + halfY;
     return result;
   }
 
@@ -6885,7 +7118,7 @@
 
   // src/projections/groundBounds.js
   init_L();
-  function groundBounds(map, padding = cameraZeroPadding) {
+  function groundBounds(map, padding = cameraZeroPadding, height = 0) {
     const min = pointOf(padding).divideBy(2), max = map.getSize().subtract(min);
     const bounds = (
       /* alloc */
@@ -6896,7 +7129,7 @@
     for (i = 0; i < 4; i++) {
       min.x = i % 2 ? max.x : minX;
       min.y = i < 2 ? minY : max.y;
-      bounds.extend(project(map, min, true, true));
+      bounds.extend(project(map, min, true, true, height));
     }
     return bounds;
   }
@@ -7166,13 +7399,23 @@
   }
 
   // src/projections/displayContainerPoint.js
-  function displayPoint(map, point) {
-    return map.layerPointToContainerPoint(point).subtract(map._getMapPanePos());
+  init_radians();
+  function displayPoint(map, point, location2) {
+    const shared = renderers.get(map), origin = shared && sceneOriginByLayer.get(shared);
+    if (!streamTerrainByMap.get(map) || !origin) {
+      return map.layerPointToContainerPoint(point).subtract(map._getMapPanePos());
+    }
+    const elevation = mapElevationOf(map, location2 || map.layerPointToLatLng(point)) ?? 0;
+    const center = mapElevationOf(map, map.getCenter()) ?? 0;
+    const zoom = cameraViewByMap.get(map)?.zoom ?? map.getZoom();
+    const height = (elevation - center) * map.options.crs.scale(zoom) / (earthCirc * Math.cos(origin.lat * radians));
+    const raw = animationPoint(map, mapMethods.value.layerPointToContainerPoint.call(map, point));
+    return project(map, raw, false, false, height).subtract(map._getMapPanePos());
   }
 
   // src/core/markerSetPos.js
   function markerSetPos(point) {
-    markerMethods.value._setPos.call(this, displayPoint(this._map, point));
+    markerMethods.value._setPos.call(this, displayPoint(this._map, point, this.getLatLng()));
     let i, element, key, direction, options, anchor;
     for (i = 0; i < 2; i++) {
       element = i ? this._shadow : this._icon;
@@ -7302,14 +7545,14 @@
   // src/core/popupGetEvents.js
   function popupGetEvents() {
     const events = popupEvents.value.call(this);
-    events.rotate = events.pitch = events.move = this._updatePosition;
+    events.rotate = events.pitch = events.move = events.terrainchange = this._updatePosition;
     return events;
   }
 
   // src/core/tooltipGetEvents.js
   function tooltipGetEvents() {
     const events = tooltipEvents.value.call(this);
-    events.rotate = events.pitch = events.move = this._updatePosition;
+    events.rotate = events.pitch = events.move = events.terrainchange = this._updatePosition;
     return events;
   }
 
@@ -7347,7 +7590,7 @@
   function popupUpdatePosition() {
     popupPosition.value.call(this);
     if (!this._map) return;
-    const point = this._map.latLngToLayerPoint(this._latlng), delta = displayPoint(this._map, point).subtract(point);
+    const point = this._map.latLngToLayerPoint(this._latlng), delta = displayPoint(this._map, point, this._latlng).subtract(point);
     if (this._zoomAnimated) {
       L.DomUtil.setPosition(this._container, L.DomUtil.getPosition(this._container).add(delta));
     } else {
@@ -7360,7 +7603,7 @@
   init_L();
   function tooltipSetPosition(point) {
     tooltipPosition.value.call(this, point);
-    const delta = displayPoint(this._map, point).subtract(point);
+    const delta = displayPoint(this._map, point, this._latlng).subtract(point);
     L.DomUtil.setPosition(this._container, L.DomUtil.getPosition(this._container).add(delta));
   }
 
@@ -7376,16 +7619,40 @@
   init_L();
   init_mapGetBearing();
   init_mapGetPitch();
+  init_radians();
   function gridlayerGetTiledPixelBounds(center) {
-    if (!mapGetBearing(this._map) && !mapGetPitch(this._map)) return tiledBounds.value.call(this, center);
-    const bounds = this._map.getBounds();
-    return (
+    const map = this._map, stream = streamTerrainByMap.get(map);
+    if (!stream && !mapGetBearing(map) && !mapGetPitch(map)) return tiledBounds.value.call(this, center);
+    const bounds = map.getBounds();
+    const result = (
       /* alloc */
       new L.Bounds(
-        this._map.project(bounds.getNorthWest(), this._tileZoom),
-        this._map.project(bounds.getSouthEast(), this._tileZoom)
+        map.project(bounds.getNorthWest(), this._tileZoom),
+        map.project(bounds.getSouthEast(), this._tileZoom)
       )
     );
+    const shared = renderers.get(map), origin = shared && sceneOriginByLayer.get(shared);
+    if (!stream || !origin) return result;
+    let minimum = Infinity, maximum = -Infinity, key, entry;
+    for ([key, entry] of stream.terrainCache) {
+      if (!key.startsWith(`${this._tileZoom}/`) || !entry.range) continue;
+      minimum = Math.min(minimum, entry.range[0]);
+      maximum = Math.max(maximum, entry.range[1]);
+    }
+    if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return result;
+    const zoom = cameraViewByMap.get(map)?.zoom ?? map.getZoom();
+    const scale = map.options.crs.scale(zoom) / (earthCirc * Math.cos(origin.lat * radians));
+    const target = mapElevationOf(map, map.getCenter()) ?? 0;
+    let i, j, footprint, point, raw;
+    for (i = 0; i < 2; i++) {
+      footprint = groundBounds(map, void 0, ((i ? maximum : minimum) - target) * scale);
+      for (j = 0; j < 2; j++) {
+        point = j ? footprint.max : footprint.min;
+        raw = mapMethods.value.containerPointToLayerPoint.call(map, animationPoint(map, point, true));
+        result.extend(map.project(map.layerPointToLatLng(raw), this._tileZoom));
+      }
+    }
+    return result;
   }
 
   // src/camera/mapCamera.js
@@ -9624,16 +9891,10 @@
   function mountRenderer(layer, map, canvas) {
     sizeByLayer.set(layer, null);
     canvas.className = "leaflet-3d";
-    canvas.style.cssText = "position:absolute;top:0;left:0;pointer-events:none";
+    canvas.style.cssText = "position:absolute;top:0;left:0;z-index:1;pointer-events:none";
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", layer.options.ariaLabel ?? "3D scene");
-    let pane = map.getPane("webgpuPane");
-    if (!pane) {
-      pane = map.createPane("webgpuPane", map.getContainer());
-      pane.style.zIndex = 1;
-      pane.style.pointerEvents = "none";
-    }
-    pane.append(canvas);
+    map.getPane("mapPane").before(canvas);
     map.on("move zoom rotate pitch resize viewreset layeradd layerremove", onMapChange, layer);
     map.on("zoomstart", startZoom, layer);
     map.on("zoomanim", onZoomAnim, layer);
@@ -11913,6 +12174,9 @@
     readyByLayer.set(layer, Promise.resolve(layer.options.archive || layer).then(readyRaster.bind(null, layer)).catch(reportError2.bind(null, layer)));
   }
 
+  // src/weakmaps/streamTerrainByLayer.js
+  var streamTerrainByLayer = /* @__PURE__ */ new WeakMap();
+
   // src/globals/renderEmpty.js
   var renderEmpty = Object.freeze([]);
 
@@ -11923,6 +12187,15 @@
 
   // src/terrain/onTerrainRemove.js
   function onTerrainRemove(layer, map) {
+    const stream = streamTerrainByMap.get(map);
+    if (stream?.layer === layer) {
+      streamTerrainByMap.delete(map);
+      stream.terrainController.abort();
+      stream.terrainCache.clear();
+      map.fire("terrainchange");
+      onRemove3DLayer(layer, map);
+      return;
+    }
     terrainControllerByLayer.get(layer)?.abort();
     terrainLoadingByLayer.set(layer, false);
     terrainReadyByLayer.set(layer, false);
@@ -12269,7 +12542,7 @@
         { source: (
           /* alloc */
           {
-            type: layer.options.asset !== void 0 || /\.tiff?(?:[?#]|$)/i.test(terrainSourceByLayer.get(layer)) ? "cog" : "pmtiles",
+            type: "raster",
             url: terrainSourceByLayer.get(layer),
             archive: layer.options.archive,
             asset: layer.options.asset
@@ -12483,11 +12756,32 @@
 
   // src/terrain/onTerrainAdd.js
   function onTerrainAdd(layer, map) {
-    if (terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
+    if (streamTerrainByMap.get(map) || terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
       throw (
         /* alloc */
         new Error("Only one terrain layer can be active per map")
       );
+    }
+    if (streamTerrainByLayer.get(layer)) {
+      streamTerrainByMap.set(
+        map,
+        /* alloc */
+        {
+          layer,
+          map,
+          terrainCache: (
+            /* alloc */
+            /* @__PURE__ */ new Map()
+          ),
+          terrainController: (
+            /* alloc */
+            new AbortController()
+          )
+        }
+      );
+      onAdd3DLayer(layer, map);
+      map.fire("terrainchange");
+      return;
     }
     terrain3DByMap.set(map, layer);
     onAdd3DLayer(layer, map);
@@ -12508,6 +12802,12 @@
 
   // src/terrain/initTerrain.js
   function initTerrain(layer, options) {
+    if (options.getTile !== void 0 && typeof options.getTile !== "function") {
+      throw (
+        /* alloc */
+        new Error("Streamed terrain requires a getTile function")
+      );
+    }
     const terrainSource = options.url;
     const layerOptions = (
       /* alloc */
@@ -12527,6 +12827,7 @@
       /* @__PURE__ */ new Map()
     );
     terrainReadyByLayer.set(layer, false);
+    if (options.getTile) streamTerrainByLayer.set(layer, true);
     kindByLayer.set(layer, "terrain");
   }
 
@@ -12866,7 +13167,6 @@
     status.setAttribute("role", "status");
     const note = document.createElement("small");
     note.style.color = "#555";
-    note.textContent = "Indicative \xB7 loaded geometry only. Streetlight illumination is estimated, not measured lux.";
     container.append(date, slider, timeRow, status, note);
     const state = (
       /* alloc */
@@ -16197,14 +16497,10 @@
   }
 
   // src/scene/initializerFor.js
-  function initializerFor(type) {
+  function initializerFor(type, options = {}) {
     switch (type) {
-      case "geojson":
-        return initializeGeoJSON;
-      case "pmtiles":
-        return initRaster;
-      case "cog":
-        return initCog;
+      case "raster":
+        return options.asset !== void 0 || /\.tiff?(?:[?#]|$)/i.test(options.url) ? initCog : initRaster;
       case "terrain":
         return initTerrain;
       case "traffic":
@@ -16217,7 +16513,7 @@
   // src/scene/resolveNextInitialization.js
   function resolveNextInitialization() {
     const task = pendingInitializations.shift();
-    task.initialize = initializerFor(task.type);
+    task.initialize = initializerFor(task.type, task.settings);
     if (!task.initialize) {
       task.error = /* alloc */
       new Error(`Unknown layer type: ${task.type}`);
@@ -16259,21 +16555,19 @@
       L.Util.setOptions(this, options);
       return;
     }
-    const {
-      source: {
-        type = options.source.data?.type === "FeatureCollection" ? "geojson" : /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? "pmtiles" : /\.tiff?(?:[?#]|$)/i.test(options.source.url) ? "cog" : "3d",
-        ...source
-      },
-      ...core
-    } = options;
+    const { source: { type = /\.pmtiles(?:[?#]|$)|\.tiff?(?:[?#]|$)/i.test(options.source.url) ? "raster" : "vector", ...source }, ...core } = options;
     const settings = (
       /* alloc */
       { ...source, ...core }
     );
     L.Util.setOptions(this, core);
     typeByLayer.set(this, type);
-    if (type === "3d") {
-      init3D(this, settings);
+    if (type === "vector") {
+      if (settings.data !== void 0 || settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
+        initializeGeoJSON(this, settings);
+      } else {
+        init3D(this, settings);
+      }
       return;
     }
     kindByLayer.set(this, "pending");

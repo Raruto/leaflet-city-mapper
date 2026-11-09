@@ -242,7 +242,7 @@ Then('cycling counts are only assigned to nearby paths and preserve zero or miss
 
 Then('all traffic models match CPU poses on GPU workgroup boundaries', { timeout: 60000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: 'vector' } }).addTo(test3d.map);
     await globals.sceneByLayer.get(layer).ready;
     await globals.sceneByLayer.get(layer)._added.promise;
     try {

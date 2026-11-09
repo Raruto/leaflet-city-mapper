@@ -17,7 +17,7 @@ export function disposeNativeLayer() {
   const { source, map, backend: layer, meshes, textures, images } = state;
   const events = 'load tileload tileunload move drag';
   source.off(events, refreshNativeEvent, state);
-  map.off('zoomend', refreshNativeEvent, state);
+  map.off('zoomend terrainchange', refreshNativeEvent, state);
   if (state.marker) map.off('move zoom rotate pitch resize viewreset', updateNativeLayerView, state);
   removeNativeEvents(state);
   let name, methods, mesh, texture, image;

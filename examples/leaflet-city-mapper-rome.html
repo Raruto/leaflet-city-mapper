@@ -42,7 +42,7 @@
     }).addTo(map);
     const ancient = new L.Layer({
       source: {
-        type: 'cog',
+        type: 'raster',
         url: 'data/colosseum.pmtiles',
         asset: 'archaeology',
       },
@@ -51,7 +51,7 @@
     }).addTo(map);
     const modern = new L.Layer({
       source: {
-        type: 'cog',
+        type: 'raster',
         url: 'data/colosseum.pmtiles',
         asset: 'orthophoto',
       },
@@ -76,7 +76,7 @@
 
     new L.Layer({
       source: {
-        type: 'geojson',
+        type: 'vector',
         url: 'data/colosseum-lights.json',
         nightLight: true,
         style: ({ properties }) => ({

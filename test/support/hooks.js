@@ -170,7 +170,7 @@ document.addEventListener`
     if (initialize && !initialize._testArchive) {
       L.Layer.prototype.initialize = Object.assign(function (options = {}) {
         const source = options.source;
-        if (source?.url && source.type !== 'pmtiles' && source.type !== 'terrain' && source.type !== 'cog' &&
+        if (source?.url && source.type !== 'raster' && source.type !== 'terrain' &&
           !/\\.(glb|gltf|tif|tiff)(?:[?#]|$)/i.test(source.url) && !source.archive) {
           const url = new URL(source.url, document.baseURI).href;
           options = { ...options, source: { ...source, archive: {

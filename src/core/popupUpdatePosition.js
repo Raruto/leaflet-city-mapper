@@ -7,7 +7,7 @@ import { displayPoint } from '../projections/displayContainerPoint.js';
 export function popupUpdatePosition() {
   popupPosition.value.call(this);
   if (!this._map) return;
-  const point = this._map.latLngToLayerPoint(this._latlng), delta = displayPoint(this._map, point).subtract(point);
+  const point = this._map.latLngToLayerPoint(this._latlng), delta = displayPoint(this._map, point, this._latlng).subtract(point);
   if (this._zoomAnimated) {
     L.DomUtil.setPosition(this._container, L.DomUtil.getPosition(this._container).add(delta));
   } else {

@@ -5,7 +5,7 @@ import { markerCameraIconPoint } from '../projections/markerCameraIconPoint.js';
 import { displayPoint } from '../projections/displayContainerPoint.js';
 
 export function markerSetPos(point) {
-  markerMethods.value._setPos.call(this, displayPoint(this._map, point));
+  markerMethods.value._setPos.call(this, displayPoint(this._map, point, this.getLatLng()));
   let i, element, key, direction, options, anchor;
   for (i = 0; i < 2; i++) {
     element = i ? this._shadow : this._icon;

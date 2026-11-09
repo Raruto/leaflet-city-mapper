@@ -222,7 +222,7 @@ const checks = {
       const server = await startServer(0, { watch });
       const baseUrl = `http://127.0.0.1:${server.address().port}`;
       try {
-        for (const name of ['leaflet-city-mapper', 'leaflet-city-mapper-geojson']) {
+        for (const name of ['leaflet-city-mapper', 'leaflet-city-mapper-rome']) {
           const url = `${baseUrl}/examples/${name}.html`;
           const original = await readFile(new URL(`../../examples/${name}.html`, import.meta.url), 'utf8');
           const response = await fetch(url);

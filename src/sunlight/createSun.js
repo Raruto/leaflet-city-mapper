@@ -38,7 +38,6 @@ export function createSun(map) {
   status.setAttribute('role', 'status');
   const note = document.createElement('small');
   note.style.color = '#555';
-  note.textContent = 'Indicative · loaded geometry only. Streetlight illumination is estimated, not measured lux.';
   container.append(date, slider, timeRow, status, note);
   const state = /* alloc */ {
     control: null, map, originalSky: '', container, sunDisc, moonDisc, date, slider, output, status,

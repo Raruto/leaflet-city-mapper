@@ -75,7 +75,7 @@ Then('compass permission results preserve denial, stale requests and registratio
 });
 
 Then('source lookup returns a known missing value and queued failures remain observable', async function () {
-  for (const type of ['geojson', 'pmtiles', 'terrain', 'traffic']) {
+  for (const type of ['raster', 'terrain', 'traffic']) {
     assert.equal(typeof initializerFor(type), 'function');
   }
   assert.equal(initializerFor('unknown'), null);
@@ -91,10 +91,10 @@ Then('source lookup returns a known missing value and queued failures remain obs
     const failed = initializeLayer(task);
     assert.deepEqual(events, [['error', task.error]]);
     await assert.rejects(failed, error => error === task.error);
-    const next = { type: 'geojson', layer };
+    const next = { type: 'raster', layer };
     globals.pendingInitializations.push(next);
     assert.equal(resolveNextInitialization(), next);
-    assert.equal(next.initialize, initializerFor('geojson'));
+    assert.equal(next.initialize, initializerFor('raster'));
     assert.equal(next.error, undefined);
   } finally {
     globals.pendingInitializations.splice(0, globals.pendingInitializations.length, ...pending);
@@ -629,7 +629,7 @@ Then('roof and uniform stages preserve GPU uploads and resource reuse', async fu
     const image = {};
     const tile = { coords: { x: 0, y: 0, z: 0 }, done: true, request: new AbortController(), image,
       texture: { texture: { width: 256, height: 256, createView: () => ({}) }, image, uploaded: null } };
-    const raster = { id: 1, kind: 'raster', _type: 'pmtiles', _rasterVersion: 1, _rasterTiles: new Map([['tile', tile]]),
+    const raster = { id: 1, kind: 'raster', _type: 'raster', _rasterVersion: 1, _rasterTiles: new Map([['tile', tile]]),
       options: { opacity: 0.5, zIndex: 1 } };
     globals.sceneByLayer.set(raster, raster);
     const backend = {

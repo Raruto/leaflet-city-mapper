@@ -11,6 +11,7 @@ import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
+import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';
 
 
 import { renderEmpty } from '../globals/renderEmpty.js';
@@ -25,7 +26,15 @@ import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
 export function onTerrainRemove(layer, map) {
-
+  const stream = streamTerrainByMap.get(map);
+  if (stream?.layer === layer) {
+    streamTerrainByMap.delete(map);
+    stream.terrainController.abort();
+    stream.terrainCache.clear();
+    map.fire('terrainchange');
+    onRemove3DLayer(layer, map);
+    return;
+  }
   terrainControllerByLayer.get(layer)?.abort();
   terrainLoadingByLayer.set(layer, false);
   terrainReadyByLayer.set(layer, false);

@@ -327,8 +327,8 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
     const visible = document.elementsFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
       .some(element => popup.contains(element));
     const canvas = globals.sceneByLayer.get(globals.renderers.get(map)).renderer.canvas;
-    const pane = map.getPane('webgpuPane'), mapPane = map.getPane('mapPane');
-    const below = Number(getComputedStyle(pane).zIndex) < Number(getComputedStyle(mapPane).zIndex);
+    const mapPane = map.getPane('mapPane');
+    const below = Number(getComputedStyle(canvas).zIndex) < Number(getComputedStyle(mapPane).zIndex);
     map.closePopup();
     layer.openTooltip();
     await new Promise(requestAnimationFrame);
@@ -343,7 +343,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
     await new Promise(requestAnimationFrame);
     const sky = globals.cameraByMap.get(map)._pitchSky, bounds = map.getContainer().getBoundingClientRect();
     const skyVisible = sky && getComputedStyle(sky).display !== 'none' && sky.clientHeight > 0;
-    const aboveSky = skyVisible && Number(getComputedStyle(pane).zIndex) > Number(getComputedStyle(sky).zIndex);
+    const aboveSky = skyVisible && Number(getComputedStyle(canvas).zIndex) > Number(getComputedStyle(sky).zIndex);
     const canvasPointer = canvas.style.pointerEvents, skyPointer = sky?.style.pointerEvents;
     canvas.style.pointerEvents = 'auto';
     if (sky) sky.style.pointerEvents = 'auto';
@@ -353,7 +353,7 @@ Then('native popups and tooltips remain above the GPU canvas', async function ()
     sky.style.pointerEvents = skyPointer;
     testOperations.setBearing(map, 0); testOperations.setPitch(map, 0);
     return { visible, tipVisible, below, aboveSky, unclipped, cameraAligned,
-      untransformed: canvas.parentNode.parentNode === map.getContainer() };
+      untransformed: canvas.parentNode === map.getContainer() };
   });
   assert.deepEqual(result, { visible: true, tipVisible: true, below: true, aboveSky: true, unclipped: true,
     cameraAligned: true, untransformed: true });

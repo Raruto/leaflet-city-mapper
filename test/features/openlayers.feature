@@ -15,5 +15,5 @@ Feature: OpenLayers example bindings
     Examples:
       | example                          |
       | leaflet-city-mapper.html          |
-      | leaflet-city-mapper-geojson.html  |
+      | leaflet-city-mapper-rome.html  |
       | leaflet-city-mapper-native.html   |

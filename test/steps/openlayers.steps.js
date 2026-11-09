@@ -114,7 +114,7 @@ Then('its button reloads the same scene on OpenLayers and back to Leaflet', { ti
       globals.sceneByLayer.get(layer)?._type === 'terrain' &&
       globals.sceneByLayer.get(layer)._terrainReady && globals.sceneByLayer.get(layer)._rasterTiles.size > 0));
     assert.equal(await this.page.evaluate(() => Object.values(map._layers).filter(layer =>
-      globals.sceneByLayer.get(layer)?._type === 'cog').length), 2);
+      globals.sceneByLayer.get(layer)?._type === 'raster').length), 2);
     await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 200, clientY: 200 });
     assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
     assert.equal(await this.page.evaluate(() => map.getPitch()), 45);
@@ -177,7 +177,7 @@ Then('its button reloads the same scene on OpenLayers and back to Leaflet', { ti
 Given('the shared example can load OpenLayers', { timeout: 60000 }, async function () {
   const [bindings, minifiedBindings, ...examples] = await Promise.all([
     'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
-    'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-geojson.html',
+    'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-rome.html',
     'examples/leaflet-city-mapper-native.html',
   ].map(name => readFile(new URL(`../../${name}`, import.meta.url), 'utf8')));
   for (const example of examples) assert.match(example, /<script src="https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/libs\/leaflet\.js"><\/script>/);

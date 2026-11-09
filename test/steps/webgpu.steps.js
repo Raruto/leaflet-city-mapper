@@ -315,7 +315,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
       }
       const atlas = globals.sceneByLayer.get(owner)._roofRaster.texture;
       const tiles = Object.values(map._layers)
-        .filter(layer => globals.sceneByLayer.get(layer)._type === 'pmtiles' && globals.sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0)
+        .filter(layer => globals.sceneByLayer.get(layer)._type === 'raster' && globals.sceneByLayer.get(layer)._rasterTiles && layer.options.opacity > 0)
         .flatMap(layer => [...globals.sceneByLayer.get(layer)._rasterTiles.values()]
           .filter(tile => tile.done && !tile.request.signal.aborted && tile.image)
           .map(tile => ({ tile, layer })));

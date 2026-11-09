@@ -253,7 +253,7 @@ Given('a leaflet map', { timeout: 30000 }, async function () {
       <script>
         Promise.all([
           testOperations.ready(new L.Layer({ source: { type: 'terrain' } })),
-          testOperations.ready(new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+          testOperations.ready(new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles',
             archive: { getHeader: async () => ({ maxZoom: 19 }) } } })),
         ]).then(() => window.test3d = { map: new L.Map('first', {
           center: [48.8582601, 2.29449985], zoom: 17, rotate: true, pitch: 45, bearing: 30

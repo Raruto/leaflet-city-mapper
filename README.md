@@ -12,8 +12,12 @@
 _For a working example see one of the following demos:_
 
 - [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
-- [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-geojson.html)
+- [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-rome.html)
+- [Matterhorn in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-matterhorn.html)
 - [Native Leaflet layers on WebGPU](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-native.html)
+
+The Matterhorn example uses the repository's `dist` bundle. Run `npm run build`
+after changing the source to update it.
 
 ## How to use
 
@@ -35,7 +39,7 @@ For example, here is how you can load a `geojson` object:
 ```js
 const buildings = new L.Layer({
   source: {
-    type: 'geojson',
+    type: 'vector',
     data: GeoJSON,
     style: ({ properties }) => ({ top: properties.height, color: properties.color }),
     tooltip: ({ properties }) => `${properties.name}: ${properties.height} m`,

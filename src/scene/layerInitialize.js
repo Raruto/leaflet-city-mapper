@@ -12,6 +12,7 @@ import { loading } from '../globals/loading.js';
 
 
 import { init3D } from './init3D.js';
+import { initializeGeoJSON } from '../sources/initializeGeoJSON.js';
 import { noOperation } from '../utils/noOperation.js';
 import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
@@ -25,21 +26,18 @@ export function layerInitialize(options = sceneEmptyOptions) {
     L.Util.setOptions(this, options);
     return;
   }
-  const {
-    source: {
-      type = options.source.data?.type === 'FeatureCollection'
-        ? 'geojson'
-        : /\.pmtiles(?:[?#]|$)/i.test(options.source.url) ? 'pmtiles'
-        : /\.tiff?(?:[?#]|$)/i.test(options.source.url) ? 'cog' : '3d',
-      ...source
-    },
-    ...core
-  } = options;
+  const { source: { type = /\.pmtiles(?:[?#]|$)|\.tiff?(?:[?#]|$)/i.test(options.source.url)
+    ? 'raster' : 'vector', ...source }, ...core } = options;
   const settings = /* alloc */ { ...source, ...core };
   L.Util.setOptions(this, core);
   typeByLayer.set(this, type);
-  if (type === '3d') {
-    init3D(this, settings);
+  if (type === 'vector') {
+    if (settings.data !== undefined ||
+        settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
+      initializeGeoJSON(this, settings);
+    } else {
+      init3D(this, settings);
+    }
     return;
   }
   kindByLayer.set(this, 'pending');

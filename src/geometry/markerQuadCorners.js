@@ -8,11 +8,17 @@ import { localPosition } from '../projections/localPosition.js';
 
 import { transformNativePoint } from '../transforms/transformNativePoint.js';
 import { markerImageBounds } from './markerImageBounds.js';
+import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';
+import { mapElevationOf } from '../terrain/mapElevationOf.js';
 
 export function markerQuadCorners(state, key, image) {
   const { source, map, backend: layer } = state;
 
   const position = localPosition(state, source.getLatLng());
+  if (streamTerrainByMap.get(map)) {
+    const root = rootByLayer.get(layer), elevation = mapElevationOf(map, source.getLatLng());
+    if (Number.isFinite(elevation)) position[1] = (elevation - root.position[1]) / root.scale[1];
+  }
   const size = map.getSize();
   const matrices = state.markerMatrices ||= /* alloc */ {
     root: /* alloc */ new DOMMatrix(),

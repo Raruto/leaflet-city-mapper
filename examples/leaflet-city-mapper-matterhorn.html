@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>leaflet-city-mapper.js</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/libs/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-city-mapper@0.0.6/dist/leaflet-city-mapper.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+  </style>
+</head>
+<body>
+  <div id="map" aria-label="3D satellite view of the Matterhorn"></div>
+  <script>
+    const map = new L.Map('map', {
+      center: [45.9763, 7.6586],
+      zoom: 14,
+      rotate: true,
+      bearing: 25,
+      pitch: 45,
+      rotateControl: true,
+      touchRotate: true,
+      touchPitch: true,
+    });
+
+    new L.Layer({
+      source: {
+        type: 'terrain',
+        async getTile(z, x, y, signal) {
+          this.cache = this.cache || new Map();
+          const sourceZoom = Math.max(0, Math.min(17, z - 1));
+          const factor = 2 ** (z - sourceZoom);
+          const url = `https://tiles.mapterhorn.com/${sourceZoom}/${Math.floor(x / factor)}/${Math.floor(y / factor)}.webp`;
+          let tile = this.cache.get(url);
+          if (tile && tile.signal?.aborted) {
+            this.cache.delete(url);
+            tile = null;
+          }
+          if (!tile) {
+            tile = {
+              promise: (async () => {
+                const response = await fetch(url, { signal });
+                if (!response.ok) throw new Error(`Mapterhorn: HTTP ${response.status} (${url})`);
+                const image = await createImageBitmap(await response.blob());
+                try {
+                  if (image.width !== 512 || image.height !== 512) throw new Error(`Invalid Tile: ${url}`);
+                  const canvas = document.createElement('canvas');
+                  canvas.width = canvas.height = 512;
+                  const context = canvas.getContext('2d', { willReadFrequently: true });
+                  context.drawImage(image, 0, 0);
+                  return context.getImageData(0, 0, 512, 512).data;
+                } finally {
+                  image.close();
+                }
+              })(),
+              signal
+            };
+            this.cache.set(url, tile);
+            if (this.cache.size > 64) this.cache.delete(this.cache.keys().next().value);
+          }
+          try {
+            const pixels = await tile.promise;
+            const heights = new Float32Array(256 * 256);
+            const size = 512 / factor;
+            for (let i = 0; i < heights.length; i++) {
+              const px = Math.floor((x % factor) * size + (i % 256 + 0.5) * size / 256);
+              const py = Math.floor((y % factor) * size + (Math.floor(i / 256) + 0.5) * size / 256);
+              const index = (py * 512 + px) * 4;
+              if (pixels[index + 3] !== 255) throw new Error(`Missing elevation values: ${url}`);
+              heights[i] = pixels[index] * 256 + pixels[index + 1] + pixels[index + 2] / 256 - 32768;
+            }
+            return heights;
+          } catch (error) {
+            if (this.cache.get(url) === tile) this.cache.delete(url);
+            throw error;
+          }
+        }
+      },
+      attribution: 'Elevazione: <a href="https://mapterhorn.com/attribution">&copy; Mapterhorn</a>',
+    }).addTo(map);
+
+    new L.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20,
+      maxNativeZoom: 19,
+      crossOrigin: true,
+      attribution: 'Images: Esri, Maxar, Earthstar Geographics and GIS contributors',
+    }).addTo(map);
+
+    new L.Marker([45.9763, 7.6586])
+      .bindPopup('<b>Monte Cervino / Matterhorn</b><br>4.478 m')
+      .bindTooltip('Monte Cervino · 4.478 m')
+      .addTo(map);
+
+    new L.Control.Time().layer.addTo(map);
+  </script>
+</body>
+</html>

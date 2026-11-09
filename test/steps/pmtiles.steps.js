@@ -77,7 +77,7 @@ Then('the native PMTiles methods handle directories, compression and failures', 
     });
   });
   const result = await this.page.evaluate(async () => {
-    const archive = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles' } });
+    const archive = new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles' } });
     await globals.sceneByLayer.get(archive).ready;
     const header = globals.sceneByLayer.get(archive).header;
     const read = async (x, y) => {
@@ -89,18 +89,18 @@ Then('the native PMTiles methods handle directories, compression and failures', 
     const cancelled = await testOperations.getZxy(archive, 1, 0, 0, abort.signal).then(() => false, error => error.name === 'AbortError');
     const errors = [];
     for (const query of ['version', 'compression', 'http', 'truncated', 'changed']) {
-      const reader = new L.Layer({ source: { type: 'pmtiles', url: `fixture.pmtiles?${query}` } });
+      const reader = new L.Layer({ source: { type: 'raster', url: `fixture.pmtiles?${query}` } });
       errors.push(await globals.sceneByLayer.get(reader).ready.then(() => testOperations.getZxy(reader, 1, 0, 0))
         .then(() => '', error => error.message));
     }
     const invalid = await testOperations.getZxy(archive, 1, 2, 0).then(() => false, error => error.message === 'Invalid PMTiles tile coordinates');
-    const full = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?full' } });
+    const full = new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles?full' } });
     await globals.sceneByLayer.get(full).ready;
     const fullTile = await testOperations.getZxy(full, 1, 1, 0);
-    const plain = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?plain' } });
+    const plain = new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles?plain' } });
     await globals.sceneByLayer.get(plain).ready;
     const plainTile = await testOperations.getZxy(plain, 1, 1, 0);
-    const badDirectory = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles?directory' } });
+    const badDirectory = new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles?directory' } });
     const directoryError = await globals.sceneByLayer.get(badDirectory).ready.then(() => testOperations.getZxy(badDirectory, 1, 0, 0))
       .then(() => false, error => error instanceof Error);
     return { tiles, cancelled, invalid, zoom: [header.minZoom, header.maxZoom], errors,
@@ -122,13 +122,13 @@ Then('the native PMTiles methods handle directories, compression and failures', 
   }
   const real = await this.page.evaluate(async () => {
     const { getZxy } = await import('/src/archives/getZxy.js');
-    const buildings = new L.Layer({ source: { type: 'pmtiles', url: '../examples/data/paris-buildings.pmtiles' } });
+    const buildings = new L.Layer({ source: { type: 'raster', url: '../examples/data/paris-buildings.pmtiles' } });
     await globals.sceneByLayer.get(buildings).ready;
     const header = globals.sceneByLayer.get(buildings).header;
     const point = test3d.map.project(new L.LatLng(48.85826, 2.2945), header.minZoom).divideBy(256).floor();
     const tile = await getZxy(buildings, header.minZoom, point.x, point.y);
     const collection = JSON.parse(new TextDecoder().decode(tile.data));
-    const raster = new L.Layer({ source: { type: 'pmtiles', url: '../examples/data/paris-orthophotos.pmtiles' } });
+    const raster = new L.Layer({ source: { type: 'raster', url: '../examples/data/paris-orthophotos.pmtiles' } });
     await globals.sceneByLayer.get(raster).ready;
     const rasterHeader = globals.sceneByLayer.get(raster).header;
     const rasterPoint = test3d.map.project(new L.LatLng(48.85826, 2.2945), rasterHeader.maxZoom).divideBy(256).floor();
@@ -153,7 +153,7 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         getHeader: () => new Promise(resolve => { resolveHeader = resolve; }),
         getZxy: async () => ({ data: image }),
       };
-      const layer = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles', archive } }).addTo(map);
+      const layer = new L.Layer({ source: { type: 'raster', url: 'test.pmtiles', archive } }).addTo(map);
       const delayed = !globals.sceneByLayer.get(layer)._rasterTiles?.size;
       // The first routed layer may still be loading its router.
       while (!resolveHeader) await new Promise(resolve => setTimeout(resolve));
@@ -209,14 +209,14 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
       }
       const oldTilesRemoved = ![...globals.sceneByLayer.get(layer)._rasterTiles.keys()].some(key => key.startsWith('8/'));
       layer.remove();
-      const override = await globals.sceneByLayer.get(new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+      const override = await globals.sceneByLayer.get(new L.Layer({ source: { type: 'raster', url: 'test.pmtiles',
         archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }) }, maxNativeZoom: 10 } })).ready;
-      const failed = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+      const failed = new L.Layer({ source: { type: 'raster', url: 'test.pmtiles',
         archive: { getHeader: async () => { throw new Error('Missing archive'); } } } });
       let emitted;
       failed.on('error', event => { emitted = event.error; });
       const error = await globals.sceneByLayer.get(failed).ready.then(() => null, error => error);
-      const missing = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+      const missing = new L.Layer({ source: { type: 'raster', url: 'test.pmtiles',
         archive: { getHeader: async () => ({ minZoom: 0, maxZoom: 12 }), getZxy: async () => undefined } } }).addTo(map);
       let tileError;
       missing.on('tileerror', event => { tileError = event; });
@@ -228,7 +228,7 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
       missing.remove();
       let started;
       const requestStarted = new Promise(resolve => { started = resolve; });
-      const cancelled = new L.Layer({ source: { type: 'pmtiles', url: 'test.pmtiles',
+      const cancelled = new L.Layer({ source: { type: 'raster', url: 'test.pmtiles',
         archive: {
           getHeader: async () => ({ minZoom: 0, maxZoom: 12 }),
           getZxy: (_, __, ___, signal) => new Promise((resolve, reject) => {
@@ -244,7 +244,7 @@ Then('PMTiles layers own archive initialization and native zoom selection', { ti
         failed: error?.message === 'Missing archive' && emitted === error,
         noFallback: failed.options.maxNativeZoom === undefined,
         tileBase: Object.getPrototypeOf(layer) === L.Layer.prototype &&
-          globals.sceneByLayer.get(layer)._type === 'pmtiles' && !(layer instanceof L.TileLayer) &&
+          globals.sceneByLayer.get(layer)._type === 'raster' && !(layer instanceof L.TileLayer) &&
           !(layer instanceof L.GridLayer),
         directCanvas: !('_container' in layer) && !('createTile' in layer),
         missingRaster: tileError.error.message ===

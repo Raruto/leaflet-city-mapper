@@ -63,7 +63,7 @@ Then('maps and markers expose only the approved plugin methods', async function 
 Then('native instance data is isolated in explicit feature associations', async function () {
   const result = await this.page.evaluate(async () => {
     const layers = [];
-    for (const type of ['3d', 'geojson', 'pmtiles', 'terrain', 'traffic']) {
+    for (const type of ['vector', 'raster', 'terrain', 'traffic']) {
       const layer = new L.Layer({ source: {
         type, data: { type: 'FeatureCollection', features: [] },
         archive: { getHeader: async () => ({ maxZoom: 19 }) },
@@ -182,7 +182,7 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
       Popup: () => new L.Popup(),
       Tooltip: () => new L.Tooltip(),
     };
-    for (const type of ['3d', 'geojson', 'pmtiles', 'terrain', 'traffic']) {
+    for (const type of ['vector', 'raster', 'terrain', 'traffic']) {
       factories[`Layer(${type})`] = () => new L.Layer({ source: {
         type,
         data: { type: 'FeatureCollection', features: [] },
@@ -236,13 +236,13 @@ Then('the plugin adds no methods or properties to native Leaflet instances', asy
 Then('each source initializes from the single bundle', async function () {
   assert.deepEqual(this.sourceRequests, ['/dist/leaflet-city-mapper.js']);
   const specialized = ['terrain', 'traffic'];
-  for (const [index, type] of ['pmtiles', 'geojson', ...specialized].entries()) {
+  for (const [index, type] of ['raster', 'vector', ...specialized].entries()) {
     await this.page.evaluate(async type => {
       const layer = new L.Layer({ source: {
         type,
         url: 'fixture.pmtiles',
-        ...(type === 'pmtiles' ? { archive: { getHeader: async () => ({ maxZoom: 19 }) } } : {}),
-        ...(type === 'geojson' ? { data: { type: 'FeatureCollection', features: [] } } : {}),
+        ...(type === 'raster' ? { archive: { getHeader: async () => ({ maxZoom: 19 }) } } : {}),
+        ...(type === 'vector' ? { data: { type: 'FeatureCollection', features: [] } } : {}),
       } });
       await waitLayer(layer);
       if ('ready' in layer || 'setData' in layer || 'ready' in L.Layer || 'setData' in L.Layer) {
@@ -260,12 +260,12 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
       ['_init3D', '_initRaster', '_initNativeGPU'].every(name => !(name in L.Layer.prototype));
     const archive = { getHeader: async () => ({ maxZoom: 19 }) };
     const first = new L.Layer({ source: { url: 'fixture.pmtiles', maxZoom: 24, archive } });
-    const second = new L.Layer({ source: { type: 'pmtiles', url: 'second.pmtiles', archive } });
+    const second = new L.Layer({ source: { type: 'raster', url: 'second.pmtiles', archive } });
     const firstReady = waitLayer(first), secondReady = waitLayer(second);
     const pending = firstReady instanceof Promise && secondReady instanceof Promise;
     const firstPrototype = Object.getPrototypeOf(first);
     await Promise.all([firstReady, secondReady]);
-    const warm = new L.Layer({ source: { type: 'pmtiles', url: 'warm.pmtiles', archive } });
+    const warm = new L.Layer({ source: { type: 'raster', url: 'warm.pmtiles', archive } });
     await waitLayer(warm);
     const plain = new L.Layer();
     const configured = new L.Layer({ attribution: 'Plain layer' });
@@ -312,7 +312,7 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
 Then('an unknown source rejects readiness and subsequent sources still initialize', async function () {
   const result = await this.page.evaluate(async () => {
     const invalid = new L.Layer({ source: { type: 'unknown' } });
-    const valid = new L.Layer({ source: { type: 'pmtiles', url: 'fixture.pmtiles',
+    const valid = new L.Layer({ source: { type: 'raster', url: 'fixture.pmtiles',
       archive: { getHeader: async () => ({ maxZoom: 19 }) } } });
     let emitted;
     invalid.on('error', ({ error }) => { emitted = error; });

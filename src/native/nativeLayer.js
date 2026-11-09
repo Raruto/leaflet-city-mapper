@@ -25,7 +25,7 @@ import { synchronizeNativeLayer } from './synchronizeNativeLayer.js';
 export async function nativeLayer(state) {
   const { source, map } = state;
   const layer = state.backend = createLayer(/* alloc */ {
-    source: /* alloc */ { type: '3d' },
+    source: /* alloc */ { type: 'vector' },
   });
   state.meshes = /* alloc */ new Map();
   state.textures = /* alloc */ new Map();
@@ -43,7 +43,7 @@ export async function nativeLayer(state) {
   state.disposed = false;
   const currentEvents = 'load tileload tileunload move drag';
   source.on(currentEvents, refreshNativeEvent, state);
-  map.on('zoomend', refreshNativeEvent, state);
+  map.on('zoomend terrainchange', refreshNativeEvent, state);
   if (state.marker) map.on('move zoom rotate pitch resize viewreset', updateNativeLayerView, state);
   nativeEvents(state);
   let name, own, original;

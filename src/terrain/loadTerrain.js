@@ -23,7 +23,7 @@ export async function loadTerrain(layer) {
   try {
     if (!terrainSourceByLayer.get(layer)) throw /* alloc */ new Error('Terrain layer requires a PMTiles or COG elevation archive');
     const archive = createLayer(/* alloc */ { source: /* alloc */ {
-      type: layer.options.asset !== undefined || /\.tiff?(?:[?#]|$)/i.test(terrainSourceByLayer.get(layer)) ? 'cog' : 'pmtiles',
+      type: 'raster',
       url: terrainSourceByLayer.get(layer), archive: layer.options.archive, asset: layer.options.asset,
     } });
     terrainArchiveByLayer.set(layer, archive);

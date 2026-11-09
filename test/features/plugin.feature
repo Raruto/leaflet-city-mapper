@@ -34,5 +34,5 @@ Feature: Separate plugin integration
     Examples:
       | example                      |
       | leaflet-city-mapper          |
-      | leaflet-city-mapper-geojson  |
+      | leaflet-city-mapper-rome  |
       | leaflet-city-mapper-native   |

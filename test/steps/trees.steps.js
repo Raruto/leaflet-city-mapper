@@ -48,7 +48,7 @@ Then('the offline Paris trees render and recover after toggling', { timeout: 180
 Then('tree points preserve dimensions, terrain elevation, picking and validation', async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(map);
+    const layer = new L.Layer({ source: { type: 'vector' } }).addTo(map);
     await nativeChecks.ready(layer);
     const center = map.getCenter(), zoom = 16;
     const tile = map.project(center, zoom).divideBy(256).floor();

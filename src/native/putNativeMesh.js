@@ -3,11 +3,12 @@ import { disposeMesh } from '../rendering/disposeMesh.js';
 import { createMesh } from '../rendering/createMesh.js';
 import { styleNativeMesh } from './styleNativeMesh.js';
 
-export function putNativeMesh(state, key, position, color, opacity, texture, uv) {
+export function putNativeMesh(state, key, position, color, opacity, texture, uv, terrain = false) {
   const { backend: layer, source, meshes } = state;
   if (!position.length) return;
   let mesh = meshes.get(key);
   if (!mesh || mesh.geometry.attributes.position.data.length !== position.length ||
+    (source instanceof L.GridLayer && mesh.program.depthWrite !== terrain) ||
     mesh.program.uniforms.baseTexture?.value !== texture) {
     const normal = /* alloc */ [];
     let index;
@@ -15,13 +16,15 @@ export function putNativeMesh(state, key, position, color, opacity, texture, uv)
     const data = /* alloc */ { position, normal };
     if (uv) data.uv = uv;
     const material = /* alloc */ {
-      vertexColors: false, color, opacity, unlit: true, alphaMode: 'BLEND',
+      vertexColors: false, color, opacity, unlit: true, alphaMode: 'BLEND', depthWrite: terrain,
     };
     if (texture) material.baseTexture = texture;
     if (mesh) disposeMesh(layer, mesh);
-    mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? state.rasterProgram : undefined);
+    mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer
+      ? terrain ? state.terrainRasterProgram : state.rasterProgram : undefined);
     if (source instanceof L.GridLayer) {
-      state.rasterProgram ||= mesh.program;
+      if (terrain) state.terrainRasterProgram ||= mesh.program;
+      else state.rasterProgram ||= mesh.program;
       mesh.texture = texture;
     }
     meshes.set(key, mesh);

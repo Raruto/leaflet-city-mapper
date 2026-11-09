@@ -7,7 +7,7 @@ import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
 Then('layer-owned objects preserve values and visibility without engine classes', async function () {
   const result = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d' } });
+    const layer = new L.Layer({ source: { type: 'vector' } });
     await nativeChecks.ready(layer);
     layer.addTo(test3d.map);
     await globals.sceneByLayer.get(layer)._added.promise;
@@ -94,8 +94,8 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const initial = map.getCenter();
-    const beforeReady = new L.Layer({ source: { type: '3d', ariaLabel: 'Automatic origin' } }).addTo(map);
-    const afterReady = new L.Layer({ source: { type: '3d' } });
+    const beforeReady = new L.Layer({ source: { type: 'vector', ariaLabel: 'Automatic origin' } }).addTo(map);
+    const afterReady = new L.Layer({ source: { type: 'vector' } });
     await Promise.all([beforeReady, afterReady].map(nativeChecks.ready));
     const deferred = globals.sceneByLayer.get(afterReady).location == null && !globals.sceneByLayer.get(afterReady).renderer;
     afterReady.addTo(map);
@@ -114,7 +114,7 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
     beforeReady.remove();
     afterReady.remove();
     const center = [48.858, 2.295];
-    const explicit = new L.Layer({ source: { type: '3d', center } });
+    const explicit = new L.Layer({ source: { type: 'vector', center } });
     await nativeChecks.ready(explicit);
     center[0] = 0;
     const explicitPreserved = globals.sceneByLayer.get(explicit).location.equals([48.858, 2.295]);
@@ -127,13 +127,13 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
   this.shared3d = await this.page.evaluate(async () => {
     const { map } = test3d;
     const control = new L.Control.Layers().addTo(map);
-    const pending = new L.Layer({ source: { type: '3d', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
+    const pending = new L.Layer({ source: { type: 'vector', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
     pending.remove();
     await nativeChecks.ready(pending);
     const pendingRemoved = !document.querySelector('.leaflet-3d');
-    const first = new L.Layer({ source: { type: '3d', center: [48.8582601, 2.29449985] } }).addTo(map);
+    const first = new L.Layer({ source: { type: 'vector', center: [48.8582601, 2.29449985] } }).addTo(map);
     control.addOverlay(first, 'First 3D layer');
-    const second = new L.Layer({ source: { type: '3d', center: [48.8602, 2.298] } }).addTo(map);
+    const second = new L.Layer({ source: { type: 'vector', center: [48.8602, 2.298] } }).addTo(map);
     await Promise.all([first, second].map(nativeChecks.ready));
     const backend = first;
     const object = nativeChecks.group();
@@ -157,9 +157,9 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     const size = map.getSize();
     const error = new L.Point((screen[0] + 1) * size.x / 2, (1 - screen[1]) * size.y / 2).distanceTo(expected);
     const renderer = globals.sceneByLayer.get(second).renderer;
-    const canvasDefaults = renderer.canvas.parentNode === map.getPane('webgpuPane') &&
-      map.getPane('webgpuPane').parentNode === map.getContainer() &&
-      map.getPane('webgpuPane').style.zIndex === '1' &&
+    const canvasDefaults = renderer.canvas.parentNode === map.getContainer() &&
+      renderer.canvas.nextSibling === map.getPane('mapPane') &&
+      renderer.canvas.style.zIndex === '1' &&
       renderer.dpr === Math.min(window.devicePixelRatio, 2);
     let disposals = 0;
     const destroy = renderer.device.destroy.bind(renderer.device);
@@ -198,7 +198,7 @@ When('I add and remove independent 3D layers', { timeout: 60000 }, async functio
     await globals.sceneByLayer.get(first)._added.promise;
     const checkboxEnabled = map.hasLayer(first) && globals.sceneByLayer.get(first).renderer === renderer;
     const other = await nativeChecks.ready(new L.Layer({ source: {
-      type: '3d', center: [globals.sceneByLayer.get(second).location.lat, globals.sceneByLayer.get(second).location.lng],
+      type: 'vector', center: [globals.sceneByLayer.get(second).location.lat, globals.sceneByLayer.get(second).location.lng],
     } }).addTo(otherMap));
     const isolated = globals.sceneByLayer.get(other).renderer !== renderer && document.querySelectorAll('.leaflet-3d').length === 2;
     second.remove();
@@ -233,7 +233,7 @@ Then('an unavailable WebGPU adapter emits an error and shows a warning without l
       value: { requestAdapter: async () => null },
     });
     try {
-      const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+      const layer = new L.Layer({ source: { type: 'vector' } }).addTo(test3d.map);
       let emitted;
       layer.on('error', event => { emitted = event.error; });
       const error = await nativeChecks.ready(layer).then(() => null, error => error);

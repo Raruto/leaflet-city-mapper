@@ -39,19 +39,18 @@ import { layerCallInitHooks } from './core/layerCallInitHooks.js';
  * Operations receive the layer explicitly, without subclasses or prototype replacement.
  * Dataset-specific code and data (routes, timetables, API loaders) belong to the application, e.g. misc/.
  *
- * When `type` is omitted, inline FeatureCollections use 'geojson'; *.pmtiles URLs use
- * 'pmtiles', *.tif/*.tiff URLs use 'cog', and other sources use '3d'.
+ * When `type` is omitted, *.pmtiles and *.tif/*.tiff URLs use 'raster'; other sources use 'vector'.
  */
 
 layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
 sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
 
 /**
- * The '3d' layer type: native WebGPU scene synchronized with the map camera.
+ * The 'vector' layer type: native WebGPU scene synchronized with the map camera.
  * Layers on one map share a canvas, scene and camera; each has its own root transform.
  *
  * @typedef {Object} Layer3DOptions Layer options; pane and attribution remain standard L.Layer options.
- * @property {string} [type] '3d', 'geojson', 'pmtiles', 'cog', 'terrain' or 'traffic'.
+ * @property {'vector'|'raster'|'terrain'|'traffic'} [type]
  * @property {number[]} [center] Local origin [lat,lng]; defaults to the first map center.
  * @property {number} [terrainOffset=0] Vertical offset in metres when terrain is enabled.
  * @property {boolean} [terrainConform=false] Fit lower model geometry to local terrain elevation.

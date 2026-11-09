@@ -15,7 +15,7 @@ Then('layer counts report loaded elements and survive toggling and failures', { 
       { type: 'Feature', properties: {}, geometry: { type: 'Polygon',
         coordinates: [[[2.292, 48.85], [2.293, 48.85], [2.293, 48.851], [2.292, 48.85]]] } },
     ] };
-    const layer = new L.Layer({ source: { type: 'geojson', data, style: () => ({ top: 8 }) } });
+    const layer = new L.Layer({ source: { type: 'vector', data, style: () => ({ top: 8 }) } });
     const control = new L.Control.Layers({}, { Buildings: layer }, { collapsed: false }).addTo(map);
     layer.addTo(map);
     await nativeChecks.ready(layer);
@@ -73,8 +73,8 @@ Then('source layers share load slots and start nearby blocks before distant ones
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     testOperations.setPitch(map, 80);
-    const layers = Array.from({ length: 3 }, () => new L.Layer({ source: { type: '3d' } }).addTo(map));
-    const ground = new L.Layer({ source: { type: 'pmtiles', url: 'priority-ground.pmtiles', archive: {
+    const layers = Array.from({ length: 3 }, () => new L.Layer({ source: { type: 'vector' } }).addTo(map));
+    const ground = new L.Layer({ source: { type: 'raster', url: 'priority-ground.pmtiles', archive: {
       getHeader: async () => ({ minZoom: 16, maxZoom: 16, minLat: -80, maxLat: -79, minLon: -170, maxLon: -169 }),
       getZxy: async () => { throw new Error('Out-of-view ground should not be requested'); },
     } } }).addTo(map);
@@ -119,7 +119,7 @@ Then('source layers share load slots and start nearby blocks before distant ones
 Then('cancelled building downloads recover without errors or stale meshes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = new L.Layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
+    const layer = new L.Layer({ source: { type: 'vector', url: 'paris-buildings.pmtiles' } }).addTo(map);
     await nativeChecks.ready(layer);
     const idle = async () => {
       const deadline = performance.now() + 3000;
@@ -184,7 +184,7 @@ Then('cancelled building downloads recover without errors or stale meshes', { ti
 Then('building blocks cover pitched views and retain overlapping areas', async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = new L.Layer({ source: { type: '3d', url: 'paris-buildings.pmtiles' } }).addTo(map);
+    const layer = new L.Layer({ source: { type: 'vector', url: 'paris-buildings.pmtiles' } }).addTo(map);
     await nativeChecks.ready(layer);
     const idle = async () => { while (globals.sceneByLayer.get(layer)._inflight) await new Promise(requestAnimationFrame); };
     await idle();
@@ -238,7 +238,7 @@ Then('building blocks cover pitched views and retain overlapping areas', async f
 
 Then('a source block with {string} reports {string} without attaching a mesh', async function (invalid, message) {
   const result = await this.page.evaluate(async invalid => {
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: 'vector' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
     layer.options.style = () => ({ top: 10 });
     const anchor = globals.sceneByLayer.get(layer).location, west = anchor.lng, south = anchor.lat;

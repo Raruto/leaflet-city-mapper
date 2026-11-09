@@ -26,7 +26,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
     const data = await (await fetch('/buildings.geojson')).json();
     const errors = [];
     const layer = new L.Layer({ source: {
-      ...(input === 'inline' ? { data } : { type: 'geojson', url: '/buildings.geojson' }),
+      ...(input === 'inline' ? { data } : { url: '/buildings.geojson' }),
       style: feature => ({ top: feature.properties.height }),
       tooltip: feature => feature.id,
     } });
@@ -86,7 +86,7 @@ Then('a GeoJSON source from {string} renders and supports replacement and re-add
   const progress = loaded => ({ loaded, errors: [] });
   assert.deepEqual(result, {
     first: progress(1), empty: progress(0), replaced: progress(1), readded: progress(1),
-    type: 'geojson',
+    type: 'vector',
     identity: true, geometry: true, retained: true, terrainUpdated: true, released: true, removed: true, tooltip: true, errors: [],
   });
 });
@@ -104,7 +104,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       { url: '/missing.geojson' }, { url: '/broken.geojson' },
       { data: { type: 'FeatureCollection', features: [] }, style: null },
     ]) {
-      const layer = new L.Layer({ source: { type: 'geojson', style: () => ({ top: 10 }), ...source } });
+      const layer = new L.Layer({ source: { type: 'vector', style: () => ({ top: 10 }), ...source } });
       const failed = new Promise(resolve => layer.once('error', ({ error }) => resolve(error.message)));
       layer.addTo(map);
       failures.push(await failed);
@@ -123,7 +123,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
       }, { once: true });
     });
     const layer = new L.Layer({ source: {
-      type: 'geojson', url: '/slow.geojson', style: () => ({ top: 10 }),
+      type: 'vector', url: '/slow.geojson', style: () => ({ top: 10 }),
     } });
     const errors = [];
     layer.on('error', ({ error }) => errors.push(error.message));
@@ -165,7 +165,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
       remoteRequests.push(request.url());
     }
   });
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
       [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
@@ -226,7 +226,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     holes: [2, 2, 2], closed: true, arenaOpen: true, centered: true,
   });
   await this.page.waitForFunction(() => {
-    return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._type === 'cog' &&
+    return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._type === 'raster' &&
       [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.done));
   });
   assert.equal(await this.page.locator('canvas.leaflet-3d').count(), 1);
@@ -237,7 +237,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson).remove();
   });
   await this.page.waitForFunction(() => {
-    const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._type === 'cog');
+    const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._type === 'raster');
     const terrain = globals.cameraByMap.get(map)._terrain3D;
     return rasters.length === 2 && rasters.every(layer =>
       globals.sceneByLayer.get(layer)._rasterTiles.size > 0 &&
@@ -461,7 +461,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 60000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-geojson.html`, { waitUntil: 'domcontentloaded' });
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.locator('#map').dispatchEvent('pointerleave');
   await this.page.waitForFunction(() => {
@@ -470,8 +470,8 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     const terrain = globals.cameraByMap.get(map)._terrain3D;
     return lights && globals.sceneByLayer.get(lights)._areas.get('geojson')?.done &&
       globals.sceneByLayer.get(terrain)?._terrainReady &&
-      layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'cog').length === 2 &&
-      layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'cog').every(layer =>
+      layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'raster').length === 2 &&
+      layers.filter(layer => globals.sceneByLayer.get(layer)._type === 'raster').every(layer =>
         globals.sceneByLayer.get(layer)._rasterTiles.size > 0 &&
         globals.sceneByLayer.get(layer)._loadingTiles === 0 &&
         [...globals.sceneByLayer.get(layer)._rasterTiles.values()].every(tile =>

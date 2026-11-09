@@ -243,7 +243,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   await this.page.evaluate(async () => {
     const map = test3d.map;
     testOperations.setBearing(map, 0);
-    const wall = new L.Layer({ source: { type: '3d' } }).addTo(map);
+    const wall = new L.Layer({ source: { type: 'vector' } }).addTo(map);
     await nativeChecks.ready(wall);
     nativeChecks.gpu.createMesh(wall, {
       position: [-10, 0, -4, 10, 0, -4, 10, 4, -4, -10, 0, -4, 10, 4, -4, -10, 4, -4],
@@ -362,7 +362,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   assert.equal(jumped.landedAfterBlur, true, 'Losing window focus restores gravity');
   const rooftop = await this.page.evaluate(async () => {
     const walk = walkControl._walk, state = globals.sceneByLayer.get(walk.layer);
-    const roof = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const roof = new L.Layer({ source: { type: 'vector' } }).addTo(test3d.map);
     await nativeChecks.ready(roof);
     const root = globals.sceneByLayer.get(roof).root;
     const x = walk.meshes[0].position[0] + state.root.position[0] - root.position[0];

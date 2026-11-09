@@ -42,7 +42,7 @@ Then('configured models preserve external assets and can be detached and reattac
   }));
   const result = await this.page.evaluate(async () => {
     const url = new URL('manual/model.gltf', document.baseURI).href;
-    const layer = new L.Layer({ source: { type: '3d', url: url } });
+    const layer = new L.Layer({ source: { type: 'vector', url: url } });
     let ready = false;
     const loaded = nativeChecks.ready(layer).then(() => { ready = true; });
     await new Promise(requestAnimationFrame);
@@ -84,7 +84,7 @@ Then('configured models preserve external assets and can be detached and reattac
     contentType: 'application/json', body: JSON.stringify(description),
   }));
   const missingUV = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d', url: 'manual/no-uv.gltf' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: 'vector', url: 'manual/no-uv.gltf' } }).addTo(test3d.map);
     const error = await nativeChecks.ready(layer).then(() => null, error => error);
     const result = error?.message === 'Textured model mesh requires UV coordinates' &&
       !globals.sceneByLayer.get(layer).model && globals.sceneByLayer.get(layer).root.children.length === 0;
@@ -99,7 +99,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     contentType: 'application/json', body: new URL(route.request().url()).searchParams.get('fixture'),
   }));
   const result = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: 'vector' } }).addTo(test3d.map);
     await nativeChecks.ready(layer);
     const square = (x, y, size) => [{ x, y }, { x: x + size, y },
       { x: x + size, y: y + size }, { x, y: y + size }];
@@ -152,7 +152,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
     }];
     const url = new URL('accessors.gltf', document.baseURI);
     url.searchParams.set('fixture', JSON.stringify(description));
-    const configured = new L.Layer({ source: { type: '3d', url: url.href } }).addTo(test3d.map);
+    const configured = new L.Layer({ source: { type: 'vector', url: url.href } }).addTo(test3d.map);
     await nativeChecks.ready(configured);
     const model = globals.sceneByLayer.get(configured).model;
     const [first, second] = model.children.map(node => node.children[0]);
@@ -179,7 +179,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
 Then('a configured 3D model loads with its transforms and attribution', { timeout: 60000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
-    const layer = new L.Layer({ source: { type: '3d',
+    const layer = new L.Layer({ source: { type: 'vector',
       center: [48.8582601, 2.29449985],
       url: '../examples/data/eiffel-tower.glb',
       rotation: [0, 0.8, 0],
@@ -373,7 +373,7 @@ When('I load a configured 3D model with {string}', async function (failure) {
     status, body, contentType: 'application/octet-stream',
   }));
   this.invalid3d = await this.page.evaluate(async () => {
-    const layer = new L.Layer({ source: { type: '3d', url: 'invalid-model.glb' } }).addTo(test3d.map);
+    const layer = new L.Layer({ source: { type: 'vector', url: 'invalid-model.glb' } }).addTo(test3d.map);
     let emitted;
     layer.on('error', event => { emitted = event.error; });
     const error = await nativeChecks.ready(layer).then(() => null, error => error);
@@ -557,7 +557,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async 
     let maskDepthWrite = eiffel.options.alphaMode === 'MASK' && eiffel.options.terrainConform;
     let baseLayer;
     map.eachLayer(layer => {
-      if (globals.sceneByLayer.get(layer)._type === 'pmtiles' && layer._map) baseLayer = layer;
+      if (globals.sceneByLayer.get(layer)._type === 'raster' && layer._map) baseLayer = layer;
     });
     for (const [zoom, pitch, bearing] of [[17, 0, 0], [17, 45, 30], [18, 60, 135], [16, 80, 270]]) {
       map.setView(globals.sceneByLayer.get(tower).location, zoom, { animate: false });

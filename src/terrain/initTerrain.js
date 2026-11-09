@@ -3,6 +3,7 @@ import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
+import { streamTerrainByLayer } from '../weakmaps/streamTerrainByLayer.js';
 
 
 
@@ -12,10 +13,14 @@ import { init3D } from '../scene/init3D.js';
 
 /**
  * Renders Float32 DEM tiles and archived raster basemaps in the shared WebGPU scene.
- * Source options: `url` (single-zoom Float32 PMTiles or supported COG DEM);
+ * Source options: `url` (single-zoom Float32 PMTiles or supported COG DEM),
+ * or `getTile(z, x, y, signal)` for streamed 256px Float32 elevations;
  * `bridges` (optional GeoJSON deck polygons with Z, see _addBridges).
  */
 export function initTerrain(layer, options) {
+  if (options.getTile !== undefined && typeof options.getTile !== 'function') {
+    throw /* alloc */ new Error('Streamed terrain requires a getTile function');
+  }
   const terrainSource = options.url;
   const layerOptions = /* alloc */ { ...options };
   delete layerOptions.url;
@@ -24,5 +29,6 @@ export function initTerrain(layer, options) {
   terrainTilesByLayer.set(layer, /* alloc */ new Map());
   rasterTilesByLayer.set(layer, /* alloc */ new Map());
   terrainReadyByLayer.set(layer, false);
+  if (options.getTile) streamTerrainByLayer.set(layer, true);
   kindByLayer.set(layer, 'terrain');
 }

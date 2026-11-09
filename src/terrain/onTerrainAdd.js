@@ -1,6 +1,8 @@
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
+import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';
+import { streamTerrainByLayer } from '../weakmaps/streamTerrainByLayer.js';
 
 
 
@@ -13,8 +15,16 @@ import { setLayerTerrain } from './setLayerTerrain.js';
 
 export function onTerrainAdd(layer, map) {
 
-  if (terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
+  if (streamTerrainByMap.get(map) || terrain3DByMap.get(map) && terrain3DByMap.get(map) !== layer) {
     throw /* alloc */ new Error('Only one terrain layer can be active per map');
+  }
+  if (streamTerrainByLayer.get(layer)) {
+    streamTerrainByMap.set(map, /* alloc */ {
+      layer, map, terrainCache: /* alloc */ new Map(), terrainController: /* alloc */ new AbortController(),
+    });
+    onAdd3DLayer(layer, map);
+    map.fire('terrainchange');
+    return;
   }
   terrain3DByMap.set(map, layer);
   onAdd3DLayer(layer, map);
