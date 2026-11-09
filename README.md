@@ -47,30 +47,6 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
-### Source workers
-
-The shared dedicated Web Worker prepares GeoJSON geometry, COG tiles and
-glTF/GLB models. TIFF parsing, decompression, pixel conversion, glTF accessor
-decoding, normal generation and image decoding run off the main thread.
-Vertex/elevation buffers and decoded images are transferred to it; Leaflet
-callbacks, feature properties, GPU uploads and scene ownership stay on the
-main thread. Rendering already uses WebGPU.
-
-Keep `dist/leaflet-city-mapper-worker.js` beside the main bundle when
-self-hosting, or configure `source.workerUrl` (also supported by terrain
-sources). Custom workers must implement the shared geometry, vector, COG and
-model tasks. Cross-origin workers require CORS and CSP permission for `blob:`
-workers. Workers are pooled per map, reused across source tasks and terminated
-on map unload or task cancellation/failure. Each worker caches one COG archive
-at a time; switching archives rereads its directory.
-
-Web Workers are required, including for small GeoJSON blocks.
-`source.worker: false` emits a layer `error` instead of enabling main-thread
-geometry. No Service Worker or offline cache is registered.
-
-Moving source preparation reduces the main bundle, not the combined download
-by the same amount: the worker contains these readers and decoders.
-
 ### Time and walk controls
 
 The walk camera follows vertical ascent and descent as well as horizontal
