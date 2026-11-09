@@ -11,7 +11,7 @@ const openlayers = new URLSearchParams(location.search).get('engine') === 'openl
 document.write((openlayers
   ? '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">' +
     '<script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"><\/script>' +
-    '<script src="https://unpkg.com/leaflet-city-mapper@0.0.6/libs/openlayers-bindings.min.js"><\/script>'
+    '<script src="https://unpkg.com/leaflet-city-mapper@0.0.7/libs/openlayers-bindings.min.js"><\/script>'
   : '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"><\/script>'));
 
 const engineStyle = document.createElement('style');
