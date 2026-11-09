@@ -1707,16 +1707,16 @@
   }
 
   // src/terrain/getElevation.js
-  function getElevation(layer, location) {
+  function getElevation(layer, location2) {
     if (!layer._map || !terrainReadyByLayer.get(layer)) return null;
-    const point = location instanceof L.Point ? location : layer._map.project(location, terrainZoomByLayer.get(layer));
+    const point = location2 instanceof L.Point ? location2 : layer._map.project(location2, terrainZoomByLayer.get(layer));
     return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
   }
 
   // src/terrain/mapElevationOf.js
-  function mapElevationOf(map, location) {
+  function mapElevationOf(map, location2) {
     const terrain = terrain3DByMap.get(map);
-    return terrain && getElevation(terrain, location);
+    return terrain && getElevation(terrain, location2);
   }
 
   // src/weakmaps/walkByMap.js
@@ -7628,12 +7628,12 @@
   init_L();
   function projectedTree(context, lon, lat) {
     const { backend: layer, crs, origin, metres, map } = context;
-    const location = (
+    const location2 = (
       /* alloc */
       new L.LatLng(lat, lon)
     );
-    const point = crs.project(location);
-    const elevation = mapElevationOf(map, location), root = rootByLayer.get(layer);
+    const point = crs.project(location2);
+    const elevation = mapElevationOf(map, location2), root = rootByLayer.get(layer);
     return (
       /* alloc */
       {
@@ -8009,17 +8009,17 @@
       []
     );
     const root = rootByLayer.get(layer);
-    let i, lng, lat, location, point, elevation;
+    let i, lng, lat, location2, point, elevation;
     for (i = 0; i < ring3.length - 1; i++) {
       lng = ring3[i][0], lat = ring3[i][1];
       if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw (
         /* alloc */
         new Error("Invalid GeoJSON coordinates")
       );
-      location = /* alloc */
+      location2 = /* alloc */
       new L.LatLng(lat, lng);
-      point = crs.project(location);
-      elevation = mapElevationOf(map, location);
+      point = crs.project(location2);
+      elevation = mapElevationOf(map, location2);
       path.push(
         /* alloc */
         {
@@ -8827,19 +8827,37 @@
         pool.entries.delete(entry);
       }
     }
-    entry = /* alloc */
-    {
-      url,
-      pool,
-      worker: (
+    let workerUrl = url, blobUrl, worker;
+    if (globalThis.location) {
+      const resolved = (
         /* alloc */
-        new Worker(
-          url,
+        new URL(url, location.href)
+      );
+      if ((resolved.protocol === "https:" || resolved.protocol === "http:") && resolved.origin !== location.origin) {
+        blobUrl = URL.createObjectURL(
           /* alloc */
-          { type: "module" }
-        )
-      )
-    };
+          new Blob(
+            /* alloc */
+            [`import ${JSON.stringify(resolved.href)};`],
+            /* alloc */
+            { type: "text/javascript" }
+          )
+        );
+        workerUrl = blobUrl;
+      }
+    }
+    try {
+      worker = /* alloc */
+      new Worker(
+        workerUrl,
+        /* alloc */
+        { type: "module" }
+      );
+    } finally {
+      if (!worker && blobUrl) URL.revokeObjectURL(blobUrl);
+    }
+    entry = /* alloc */
+    { url, pool, worker, blobUrl };
     if (pool) pool.entries.add(entry);
     return entry;
   }
@@ -8881,6 +8899,10 @@
       else {
         if (!entry.closed) worker.terminate();
         if (pool) pool.entries.delete(entry);
+      }
+      if (entry.blobUrl) {
+        URL.revokeObjectURL(entry.blobUrl);
+        entry.blobUrl = null;
       }
       context.jobs = null;
     }
@@ -14446,8 +14468,8 @@
   function local2(output) {
     const { layer, state } = this;
     const map = layer._map, crs = map.options.crs;
-    const location = locationByLayer.get(layer), root = rootByLayer.get(layer);
-    const origin = crs.project(location), metres = Math.cos(location.lat * radians);
+    const location2 = locationByLayer.get(layer), root = rootByLayer.get(layer);
+    const origin = crs.project(location2), metres = Math.cos(location2.lat * radians);
     const p = crs.project(state.latlng);
     const ground = mapElevationOf(map, state.latlng) || 0;
     output[0] = (p.x - origin.x) * metres;

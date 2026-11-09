@@ -31,6 +31,10 @@ export async function buildAreaInWorker(context, signal) {
       if (!entry.closed) worker.terminate();
       if (pool) pool.entries.delete(entry);
     }
+    if (entry.blobUrl) {
+      URL.revokeObjectURL(entry.blobUrl);
+      entry.blobUrl = null;
+    }
     context.jobs = null;
   }
 }

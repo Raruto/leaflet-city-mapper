@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { build } from 'esbuild';
 import { Then } from '@cucumber/cucumber';
 import { mockLeaflet } from '../fixtures/leaflet.js';
 import { buildAreaFeature } from '../../src/sources/buildAreaFeature.js';
@@ -213,6 +216,83 @@ Then('native and bundled geometry workers preserve results without blocking anim
     console.log('Geometry worker benchmark:', JSON.stringify(result));
   } finally {
     await context.close();
+  }
+});
+
+Then('cross-origin geometry workers preserve results, report failures and release blob URLs', { timeout: 60000 }, async function () {
+  const bundle = await readFile('dist/leaflet-city-mapper-worker.js');
+  const plugin = await build({
+    stdin: {
+      contents: "import { buildAreaInWorker } from './src/workers/buildAreaInWorker.js'; globalThis.workerTest = buildAreaInWorker;",
+      resolveDir: process.cwd(),
+    },
+    bundle: true, format: 'iife', define: { 'import.meta': 'null' }, write: false,
+  });
+  const requests = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url);
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Content-Type', 'text/javascript');
+    if (request.url === '/plugin.js') response.end(plugin.outputFiles[0].text);
+    else if (request.url === '/leaflet-city-mapper-worker.js') response.end("import './actual.js';");
+    else if (request.url === '/actual.js') response.end(bundle);
+    else response.writeHead(404).end('Not found');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await this.page.goto(this.baseUrl);
+    const workerOrigin = `http://127.0.0.1:${server.address().port}`;
+    await this.page.addScriptTag({ url: `${workerOrigin}/plugin.js` });
+    const result = await this.page.evaluate(async workerOrigin => {
+      const buildAreaInWorker = globalThis.workerTest;
+      const created = [], revoked = [];
+      const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
+      URL.createObjectURL = blob => { const url = create.call(URL, blob); created.push(url); return url; };
+      URL.revokeObjectURL = url => { revoked.push(url); revoke.call(URL, url); };
+      try {
+        let close;
+        const map = { once(type, handler) { close = handler; } };
+        const run = url => buildAreaInWorker({
+          backend: { options: { workerUrl: url } }, map, jobs: [], featureFaces: [],
+        }, new AbortController().signal);
+        await run(undefined);
+        await run(undefined);
+        let error = '';
+        try { await run(`${workerOrigin}/missing.js`); } catch (failure) { error = failure.message; }
+        const controller = new AbortController();
+        const pending = buildAreaInWorker({
+          backend: { options: {} }, map, jobs: [], featureFaces: [],
+        }, controller.signal);
+        controller.abort();
+        let aborted = false;
+        try { await pending; } catch (failure) { aborted = failure.name === 'AbortError'; }
+        const Worker = globalThis.Worker;
+        let constructorError = '';
+        try {
+          globalThis.Worker = class { constructor() { throw new Error('Worker blocked'); } };
+          await run(undefined);
+        } catch (failure) {
+          constructorError = failure.message;
+        } finally {
+          globalThis.Worker = Worker;
+        }
+        close();
+        return { created, revoked, error, aborted, constructorError };
+      } finally {
+        URL.createObjectURL = create;
+        URL.revokeObjectURL = revoke;
+      }
+    }, workerOrigin);
+    assert.equal(result.created.length, 4, 'The same cross-origin worker must be reused');
+    assert.deepEqual(result.revoked, result.created);
+    assert.match(result.error, /Geometry worker failed/);
+    assert.equal(result.aborted, true);
+    assert.equal(result.constructorError, 'Worker blocked');
+    assert.ok(requests.includes('/leaflet-city-mapper-worker.js'));
+    assert.ok(requests.includes('/actual.js'), 'Relative imports must resolve against the worker URL');
+    assert.ok(requests.includes('/missing.js'));
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
 

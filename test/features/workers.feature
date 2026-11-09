@@ -10,6 +10,9 @@ Feature: Geometry worker ownership
   Scenario: Geometry workers run off-thread with transferable buffers
     Then native and bundled geometry workers preserve results without blocking animation frames
 
+  Scenario: Cross-origin geometry workers load with CORS
+    Then cross-origin geometry workers preserve results, report failures and release blob URLs
+
   @coverage
   Scenario: Large GeoJSON blocks use workers without changing mesh ownership
     Given the instrumented city mapper plugin is loaded after Leaflet alone
