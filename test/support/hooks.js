@@ -98,6 +98,10 @@ BeforeAll({ timeout: 900000 }, async () => {
   pluginBundle = result.outputFiles[0].text;
   server = await startServer(0);
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+  if (process.platform === 'linux' && process.env.CI) {
+    await getBrowser();
+    assert.ok(webgpu, 'WebGPU adapter unavailable during CI setup; see Chromium GPU diagnostics above');
+  }
 });
 
 async function getBrowser() {
@@ -111,7 +115,9 @@ async function getBrowser() {
     ? {
       ...options,
       channel: options.channel || 'chromium',
-      args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan', '--use-angle=vulkan', '--disable-vulkan-surface'],
+      // Use Chromium's bundled software adapters, not the runner's GPU drivers.
+      args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
+        '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader'],
     }
     : options;
   browser = await engine.launch(launchOptions);
@@ -122,6 +128,15 @@ async function getBrowser() {
   webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
   await page.close();
   if (webgpu) return;
+  if (process.env.CI) {
+    if (engine === chromium) {
+      const session = await browser.newBrowserCDPSession();
+      const { gpu } = await session.send('SystemInfo.getInfo');
+      console.error('Chromium GPU diagnostics:', JSON.stringify(gpu, null, 2));
+      await session.detach();
+    }
+    return;
+  }
   const headed = await engine.launch({ ...launchOptions, headless: false }).catch(() => null);
   if (headed) {
     await browser.close();
