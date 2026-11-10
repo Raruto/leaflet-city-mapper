@@ -8,6 +8,7 @@ import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 import { prepareDependencies } from '../fixtures/dependencies.js';
 import { createTestContext, createTestPage, fetchLocal, resetTestContext } from '../fixtures/browser-environment.js';
 import { withScenarioBudget } from './scenario-budget.js';
+import { focusParisLayers } from '../fixtures/focused-paris.js';
 
 setDefaultTimeout(10000);
 setDefinitionFunctionWrapper(withScenarioBudget);
@@ -230,6 +231,9 @@ Before({ tags: 'not @unit', timeout: 30000 }, async function () {
       .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, `${baseUrl}/`)
       .replace(/\bconst (map|esri|osm|layers|markers|path|circle|polygon|rectangle) =/g, 'const $1 = window.$1 =')
       .replace('const layers = window.layers = {', 'const layers = window.nativeLayers = window.layers = {');
+    if (this.focusedParisLayers && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper.html') {
+      body = focusParisLayers(body, this.focusedParisLayers);
+    }
     if (version === '2') {
       body = body
         .replace(

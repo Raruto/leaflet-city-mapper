@@ -311,14 +311,25 @@ const openEiffelExample = async function () {
   assert.equal(layout.globalLibraries, true);
   assert.equal(layout.vectorLayers, 0);
   assert.deepEqual(layout.backgrounds, ['Empty', 'Plan IGN', 'Orthophoto IGN']);
-  assert.deepEqual(layout.activeBackgrounds, ['Orthophoto IGN']);
-  assert.match(layout.orthophotoUrl, /\/examples\/data\/paris-orthophotos\.pmtiles$/);
+  if (!this.focusedParisLayers || this.focusedParisLayers.includes('Orthophoto IGN')) {
+    assert.deepEqual(layout.activeBackgrounds, ['Orthophoto IGN']);
+    assert.match(layout.orthophotoUrl, /\/examples\/data\/paris-orthophotos\.pmtiles$/);
+  } else {
+    assert.deepEqual(layout.activeBackgrounds, []);
+  }
 };
 
 Given('the Eiffel Tower example page is open', { timeout: 30000 }, openEiffelExample);
 
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
 Given('the Eiffel Tower example page is open with its offline archives', { timeout: 30000 }, async function () {
+  await this.context.route('**/dist/leaflet-city-mapper.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
+  await openEiffelExample.call(this);
+});
+
+Given('the offline Paris example loads only {string}', { timeout: 30000 }, async function (names) {
+  this.focusedParisLayers = names.split(', ');
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await openEiffelExample.call(this);

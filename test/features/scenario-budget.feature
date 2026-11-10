@@ -5,3 +5,6 @@ Feature: Bounded scenario execution
 
   Scenario: Test definitions cannot raise the scenario budget
     Then test steps and browser waits declare no timeout above thirty seconds
+
+  Scenario: Focused scenes do not initialize unrelated sources
+    Then focused Paris fixtures keep real selected layers and preserve control labels

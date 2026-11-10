@@ -21,6 +21,7 @@ import { updateTrafficLights } from '../../src/traffic/updateTrafficLights.js';
 import { placeTraffic } from '../../src/traffic/placeTraffic.js';
 import { cacheLightGrid } from '../../src/lighting/cacheLightGrid.js';
 import { prepare3DChecks } from './3d.steps.js';
+import { focusParisLayers } from '../fixtures/focused-paris.js';
 
 Then('traffic interpolation scratch preserves lights and invalidates lighting snapshots', function () {
   const lane = { points: [[0, 0, 10], [60, 0, 16]], lengths: [0, 60], length: 60 };
@@ -294,9 +295,7 @@ async function openTrafficExample(world, boats, terrain = false) {
     let body = readFileSync(new URL('../../examples/leaflet-city-mapper.html', import.meta.url), 'utf8')
       .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\//g, `${world.baseUrl}/`)
       .replace(/\bconst (map|layers) =/g, 'const $1 = window.$1 =');
-    const omitted = ['Orthophoto IGN', 'Buildings', 'Trees', 'Eiffel Tower', 'Streetlights',
-      ...(terrain ? [] : ['Terrain \\(3D\\)'])];
-    body = body.replace(new RegExp(`('(?:${omitted.join('|')})':)[\\s\\S]*?\\.addTo\\(map\\)`, 'g'), '$1 new L.LayerGroup()')
+    body = focusParisLayers(body, ['Traffic', 'Time', ...(terrain ? ['Terrain (3D)'] : [])])
       .replace(/\]\)\.addTo\(map\),(\s*'Time')/,
         `].filter((layer, index) => index ${boats ? '===' : '!=='} 0)).addTo(map),$1`);
     return route.fulfill({ contentType: 'text/html', body });

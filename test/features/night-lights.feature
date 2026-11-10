@@ -1,11 +1,11 @@
 @coverage
 Feature: Indicative Paris night lighting
   Scenario: Real lamp inventory preserves supports, geometry and safe tooltips
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Streetlights, Eiffel Tower, Time"
     Then the real streetlight inventory has valid geometry, supports and tooltips
 
   Scenario Outline: Real lighting renders one effect at a time
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Streetlights, Eiffel Tower, Time"
     Then real night lighting preserves "<effect>"
 
     Examples:
@@ -16,7 +16,7 @@ Feature: Indicative Paris night lighting
       | daylight poles and disabled lighting    |
 
   Scenario: Streetlight toggles rebuild the inventory without stale meshes
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Streetlights, Time"
     Then streetlight toggles release areas and rebuild fresh meshes
 
   Scenario: Lamp styles follow the recorded inventory with documented fallbacks

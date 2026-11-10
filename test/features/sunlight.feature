@@ -5,7 +5,7 @@ Feature: Visible solar time control
     Then shadow maps are reused until geometry, appearance or sunlight changes
 
   Scenario: Solar control initially shows current UTC time
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Time"
     Then the solar control starts at current time inside the layer control
 
   Scenario: Solar slider selects UTC time and Now resumes the clock
@@ -19,7 +19,7 @@ Feature: Visible solar time control
     Then solar control toggles and invalid dates clear lighting and recover
 
   Scenario Outline: Solar depth, shadows and night lighting are checked independently
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Time"
     Then solar lighting preserves "<effect>"
 
     Examples:
@@ -29,7 +29,7 @@ Feature: Visible solar time control
       | night without direct light |
 
   Scenario: Sky and terrain change from day to night
-    Given the Eiffel Tower example page is open with its offline archives
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Time"
     Then sky and terrain change from day to night and restore after removal
 
   Scenario: Sun and moon follow time and viewing direction
