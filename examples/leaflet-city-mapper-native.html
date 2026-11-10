@@ -13,11 +13,12 @@
 <body>
   <div id="map" aria-label="Gallery of native Leaflet layers rendered with WebGPU"></div>
   <script>
-    const mapOptions = { center: [48.8583, 2.2945], zoom: 15, rotate: true };
-    if (L.Canvas && new URLSearchParams(location.search).has('canvas')) {
-      mapOptions.renderer = new L.Canvas();
-    }
-    const map = new L.Map('map', mapOptions);
+    const map = new L.Map('map', {
+      center: [48.8583, 2.2945],
+      zoom: 15,
+      rotate: true,
+      renderer: L.Canvas && new URLSearchParams(location.search).has('canvas') ? new L.Canvas() : undefined,
+    });
     const image = (color, text) => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 128;

@@ -43,8 +43,7 @@
 				touchRotate: true,
 				touchPitch: true
 			});
-			const LayersControl = L.LayersControl || L.Control.Layers;
-			const layers = new LayersControl({
+			const layers = new (L.LayersControl || L.Control.Layers)({
 				'Empty': new L.LayerGroup(),
 				// TODO:
 				// 'OTM (vector)': new L.Layer({
