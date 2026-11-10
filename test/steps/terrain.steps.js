@@ -193,7 +193,7 @@ Then('coarse ground imagery precedes detail and survives delayed replacements', 
 });
 
 Then('fading terrain detail covers retained ground without depth interference', { timeout: 30000 }, async function () {
-  const result = await this.page.evaluate(async () => {
+  await this.page.evaluate(async () => {
     const map = test3d.map, zoom = map.getZoom();
     testOperations.setPitch(map, 45); testOperations.setBearing(map, 30);
     const cell = map.project(map.getCenter(), zoom).divideBy(256).floor();
@@ -250,6 +250,17 @@ Then('fading terrain detail covers retained ground without depth interference', 
       for (const [tile, mesh] of globals.sceneByLayer.get(terrain)._rasterTiles) tile.loadedAt = mesh.fadeStart = performance.now() - 300;
       release();
       await wait(() => !testOperations.isLoading(raster) && globals.sceneByLayer.get(terrain)._rasterTiles.size === globals.sceneByLayer.get(raster)._rasterTiles.size);
+      window.terrainOverlap = { terrain, raster, zoom };
+    } catch (error) {
+      release(); raster.remove(); terrain.remove();
+      throw error;
+    }
+  });
+  let result;
+  try {
+    await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+    result = await this.page.evaluate(async () => {
+      const map = test3d.map, { terrain, raster, zoom } = window.terrainOverlap;
       const object = nativeChecks.gpu.createMesh(terrain, {
         position: [-500, -10, -500, 500, -10, -500, 500, -10, 500,
           -500, -10, -500, 500, -10, 500, -500, -10, 500],
@@ -285,10 +296,18 @@ Then('fading terrain detail covers retained ground without depth interference', 
       const steadyDepth = !globals.sceneByLayer.get(raster).renderer.groundOverlap &&
         globals.sceneByLayer.get(terrain)._rasterProgram.pipelineCache.has('back:ccw:less-equal');
       return { failures, above, steadyDepth };
+    });
+  } finally {
+    try {
+      await this.page.evaluate(() => {
+        const { terrain, raster } = window.terrainOverlap;
+        raster.remove(); terrain.remove();
+        delete window.terrainOverlap;
+      });
     } finally {
-      release(); raster.remove(); terrain.remove();
+      await this.page.clock.resume();
     }
-  });
+  }
   assert.ok(result.failures.every(frame => frame.bad === 0 && frame.coarse > 0), JSON.stringify(result));
   assert.deepEqual(result.above, [0, 255, 0, 255]);
   assert.equal(result.steadyDepth, true);
