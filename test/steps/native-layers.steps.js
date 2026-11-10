@@ -519,30 +519,42 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
   });
   await this.page.waitForFunction(() => Object.values(nativeLayers).filter(layer => layer instanceof L.GridLayer)
     .every(layer => !testOperations.isLoading(layer) && Object.values(layer._tiles).every(tile => !tile.current || tile.active)));
-  const result = await this.page.evaluate(async () => {
-    const owner = globals.renderers.get(map), marker = nativeLayers.Marker;
-    const distance = () => Math.hypot(...globals.sceneByLayer.get(owner).camera.position.map((value, i) => value - globals.sceneByLayer.get(owner).camera.target[i]));
-    const start = distance(), samples = [];
-    map.setZoomAround(new L.Point(500, 300), 16, { animate: true });
-    for (let i = 0; i < 24; i++) {
-      await new Promise(requestAnimationFrame);
-      const dom = L.DomUtil.getPosition(marker._icon).add(map._getMapPanePos());
-      const crs = map.options.crs, location = crs.project(marker.getLatLng()), origin = crs.project(globals.sceneByLayer.get(owner)._sceneOrigin);
-      const metres = Math.cos(globals.sceneByLayer.get(owner)._sceneOrigin.lat * Math.PI / 180), size = map.getSize();
-      const clip = new DOMPoint((location.x - origin.x) * metres, 0, -(location.y - origin.y) * metres, 1)
-        .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(owner).camera.projectionViewMatrix));
-      const gpu = new L.Point((clip.x / clip.w + 1) * size.x / 2, (1 - clip.y / clip.w) * size.y / 2);
-      samples.push({ distance: distance(), error: dom.distanceTo(gpu) });
-    }
-    const intermediate = samples.filter(sample => sample.distance < start * 0.99 && sample.distance > start * 0.51);
-    const cleaned = !globals.cameraByMap.get(map)._cameraView && !map.getContainer().classList.contains('leaflet-camera-zoom');
-    return { intermediate: intermediate.length, error: Math.max(...samples.map(sample => sample.error)),
-      finalScale: start / distance(), cleaned };
-  });
-  assert.ok(result.intermediate > 0, `Intermediate camera frames: ${JSON.stringify(result)}`);
-  assert.ok(result.error < 2, `Animated DOM/GPU anchor drift: ${result.error}px`);
-  assert.ok(Math.abs(result.finalScale - 2) < 0.001, `Final zoom scale: ${result.finalScale}`);
-  assert.equal(result.cleaned, true);
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+  try {
+    await this.page.evaluate(() => {
+      const owner = globals.renderers.get(map), marker = nativeLayers.Marker;
+      const distance = () => Math.hypot(...globals.sceneByLayer.get(owner).camera.position.map((value, i) => value - globals.sceneByLayer.get(owner).camera.target[i]));
+      const start = distance(), samples = [];
+      const sample = () => {
+        const dom = L.DomUtil.getPosition(marker._icon).add(map._getMapPanePos());
+        const crs = map.options.crs, location = crs.project(marker.getLatLng()), origin = crs.project(globals.sceneByLayer.get(owner)._sceneOrigin);
+        const metres = Math.cos(globals.sceneByLayer.get(owner)._sceneOrigin.lat * Math.PI / 180), size = map.getSize();
+        const clip = new DOMPoint((location.x - origin.x) * metres, 0, -(location.y - origin.y) * metres, 1)
+          .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(owner).camera.projectionViewMatrix));
+        const gpu = new L.Point((clip.x / clip.w + 1) * size.x / 2, (1 - clip.y / clip.w) * size.y / 2);
+        samples.push({ distance: distance(), error: dom.distanceTo(gpu) });
+        if (map._animatingZoom) requestAnimationFrame(sample);
+      };
+      window.nativeZoomMeasurement = { start, samples, distance };
+      map.once('zoomanim', () => requestAnimationFrame(sample));
+      map.setZoomAround(new L.Point(500, 300), 16, { animate: true });
+    });
+    await this.page.clock.runFor(600);
+    const result = await this.page.evaluate(() => {
+      const { start, samples, distance } = window.nativeZoomMeasurement;
+      delete window.nativeZoomMeasurement;
+      const intermediate = samples.filter(sample => sample.distance < start * 0.99 && sample.distance > start * 0.51);
+      const cleaned = !globals.cameraByMap.get(map)._cameraView && !map.getContainer().classList.contains('leaflet-camera-zoom');
+      return { intermediate: intermediate.length, error: Math.max(...samples.map(sample => sample.error)),
+        finalScale: start / distance(), cleaned };
+    });
+    assert.ok(result.intermediate > 0, `Intermediate camera frames: ${JSON.stringify(result)}`);
+    assert.ok(result.error < 2, `Animated DOM/GPU anchor drift: ${result.error}px`);
+    assert.ok(Math.abs(result.finalScale - 2) < 0.001, `Final zoom scale: ${result.finalScale}`);
+    assert.equal(result.cleaned, true);
+  } finally {
+    await this.page.clock.resume();
+  }
 });
 
 Then('circle geometry scales with zoom and path queries work immediately', async function () {

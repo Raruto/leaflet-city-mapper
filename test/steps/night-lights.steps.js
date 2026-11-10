@@ -67,7 +67,23 @@ Then('streetlights and the Eiffel Tower emit light only during simulated night',
         ? testOperations.isLoading(layer) : layer.isLoading?.()) &&
       [...globals.sceneByLayer.get(owner)._layers].every(layer => !globals.sceneByLayer.get(layer)._3d || !globals.sceneByLayer.get(layer).url || (globals.sceneByLayer.get(layer)._inflight === 0 &&
         [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done || area.error)));
-  }, null, { timeout: 60000 });
+  }, null, { timeout: 60000 }).catch(async error => {
+    const state = await this.page.evaluate(() => ({
+      roof: Boolean(globals.sceneByLayer.get(globals.renderers.get(map))?._roofRaster),
+      terrainTiles: globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles?.size,
+      layers: Object.values(map._layers).map(layer => {
+        const state = globals.sceneByLayer.get(layer);
+        return { type: state.kind, url: state.url, loading: state._loadingTiles,
+          nativeLoading: layer.isLoading?.(), inflight: state._inflight,
+          tiles: state._rasterTiles?.size,
+          areas: state._areas && [...state._areas.values()].map(area => ({
+            started: area.started, done: area.done, error: area.error,
+          })) };
+      }),
+    }));
+    error.message += `\nScene state: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
+    throw error;
+  });
   const result = await this.page.evaluate(async () => {
     const { style: lampStyle, tooltip: lampTooltip } = streetlights.options;
     const layer = streetlights, owner = globals.renderers.get(map);

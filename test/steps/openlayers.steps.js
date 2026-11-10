@@ -35,8 +35,13 @@ async function assertEngineControl(page, openlayers) {
       if (!attribution) return false;
       const ribbon = document.querySelector('.view-on-github')?.getBoundingClientRect();
       const status = document.querySelector('#status')?.getBoundingClientRect();
-      return control.bottom + 5 > attribution.top ||
-        ribbon && ribbon.bottom > attribution.top || status && status.bottom > attribution.top;
+      if (control.bottom + 5 > attribution.top ||
+        ribbon && ribbon.bottom > attribution.top || status && status.bottom > attribution.top) {
+        return { width: container.getBoundingClientRect().width, control: control.toJSON(),
+          attribution: attribution.toJSON(), ribbon: ribbon?.toJSON(), status: status?.toJSON(),
+          footerHeight: container.style.getPropertyValue('--map-attribution-height') };
+      }
+      return null;
     };
     try {
       await settle();
@@ -51,7 +56,8 @@ async function assertEngineControl(page, openlayers) {
       await settle();
     }
   });
-  assert.equal(Boolean(overlap), false, 'Controls, GitHub link and status must stay above attribution, including in narrow maps');
+  assert.equal(Boolean(overlap), false,
+    `Controls, GitHub link and status must stay above attribution, including in narrow maps: ${JSON.stringify(overlap)}`);
 }
 
 async function assertParisAttributions(page) {
