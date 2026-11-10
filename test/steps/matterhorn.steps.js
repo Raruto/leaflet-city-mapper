@@ -13,6 +13,14 @@ function whiteFraction(buffer) {
 
 Then('the Matterhorn example streams elevations for its satellite tiles while navigating',
   { timeout: 90000 }, async function () {
+    const waitForTerrain = () => this.page.waitForFunction(() => {
+      const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
+      const state = globals.sceneByLayer.get(layer)._nativeGPU;
+      return Object.keys(layer._tiles).length > 0 && Object.entries(layer._tiles).every(([key, tile]) =>
+        tile.loaded && (tile._gpuOpacity ?? 1) === 1 && state.terrainRequests.get(key)?.tiles &&
+        state.meshes.get(key)?._terrainRequest === state.terrainRequests.get(key)) &&
+        [...state.meshes.values()].every(mesh => mesh._appearance === undefined || mesh._appearance === 1);
+    }, null, { timeout: 45000 });
     const terrain = new PNG({ width: 512, height: 512 });
     for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
       terrain.data.set([128 + Math.floor(x / 256) + 2 * Math.floor(y / 256), 10, 128, 255], (y * 512 + x) * 4);
@@ -122,20 +130,14 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
     assert.equal(evicted.cached, false, 'center elevation should be evicted from the bounded cache');
     assert.ok(Math.abs(evicted.target - evicted.expected) < 1,
       `camera lost visible terrain elevation after eviction: ${JSON.stringify(evicted)}`);
+    await waitForTerrain();
+    await this.page.evaluate(async () => {
+      const owner = globals.renderers.get(map);
+      await globals.sceneByLayer.get(owner).renderer.device.queue.onSubmittedWorkDone();
+    });
     assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after cache eviction');
     await this.page.evaluate(() => cityMapperTestOperations.mapSetPitchAndBearing(map, 60, 210));
-    await this.page.waitForFunction(() => {
-      const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
-      const state = globals.sceneByLayer.get(layer)._nativeGPU;
-      return Object.keys(layer._tiles).length > 0 && Object.entries(layer._tiles).every(([key, tile]) =>
-        tile.loaded && (tile._gpuOpacity ?? 1) === 1 && state.terrainRequests.get(key)?.tiles &&
-        state.meshes.get(key)?._terrainRequest === state.terrainRequests.get(key));
-    }, null, { timeout: 45000 });
-    await this.page.waitForFunction(() => {
-      const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
-      const state = globals.sceneByLayer.get(layer)._nativeGPU;
-      return [...state.meshes.values()].every(mesh => mesh._appearance === undefined || mesh._appearance === 1);
-    });
+    await waitForTerrain();
     await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
