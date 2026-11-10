@@ -3175,7 +3175,7 @@
   }
 
   // src/globals/workerCogSource.js
-  var workerCogSource = { key: null, archive: null };
+  var workerCogSource = /* @__PURE__ */ new Map();
 
   // src/workers/cogWorker.js
   async function onCogMessage({ data }) {
@@ -3184,11 +3184,11 @@
         /* alloc */
         [data.url, data.asset]
       );
-      if (workerCogSource.key !== key) {
-        workerCogSource.key = key;
-        workerCogSource.archive = openCog(data.url, data.asset);
+      if (!workerCogSource.has(key)) {
+        workerCogSource.set(key, openCog(data.url, data.asset));
+        if (workerCogSource.size > 4) workerCogSource.delete(workerCogSource.keys().next().value);
       }
-      const archive = await workerCogSource.archive;
+      const archive = await workerCogSource.get(key);
       const result = data.z === void 0 ? await archive.getHeader() : await archive.getZxy(data.z, data.x, data.y);
       const transfers = (
         /* alloc */

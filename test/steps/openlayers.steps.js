@@ -28,7 +28,11 @@ async function assertEngineControl(page, openlayers) {
   }), true, 'Engine control must not be covered by attribution or status text');
   const overlap = await page.evaluate(async () => {
     const container = map.getContainer(), width = container.style.width;
-    const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const settle = () => new Promise(resolve => {
+      // The test clock's animation frames do not flush native ResizeObserver callbacks.
+      const observer = new ResizeObserver(() => { observer.disconnect(); resolve(); });
+      observer.observe(container.querySelector('.map-attribution-footer'));
+    });
     const check = () => {
       const control = container.querySelector('.map-engine-control').getBoundingClientRect();
       const attribution = container.querySelector('.leaflet-control-attribution,.ol-attribution')?.getBoundingClientRect();

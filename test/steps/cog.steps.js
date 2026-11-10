@@ -158,6 +158,8 @@ Then('COG workers preserve ranges, cache ownership, missing tiles and errors', {
       const geometry = { backend: { options: { workerUrl: '/dist/leaflet-city-mapper-worker.js' } },
         map, jobs: [], featureFaces: [] };
       await buildAreaInWorker(geometry, new AbortController().signal);
+      await openCogInWorker(layer, { url: '/worker-secondary.tif',
+        workerUrl: '/dist/leaflet-city-mapper-worker.js' });
       const repeated = await archive.getZxy(14, x, y);
       const pool = geometryWorkersByMap.get(map);
       const reused = pool.entries.size === 1 && pool.idle.length === 1;
@@ -183,7 +185,7 @@ Then('COG workers preserve ranges, cache ownership, missing tiles and errors', {
   assert.equal(result.aborted, true);
   assert.match(result.failure, /Unsupported COG profile/);
   assert.equal(requests.filter(request => request.url.includes('elevation') && request.start === 0).length, 1,
-    'The same pooled worker retains the parsed TIFF directory across tile and geometry tasks');
+    'The pooled worker retains the TIFF directory across geometry tasks and interleaved COG sources');
 });
 
 Then('local archaeological COGs load by range and displace the ground', { timeout: 60000 }, async function () {

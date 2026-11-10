@@ -1,1 +1,1 @@
-export const workerCogSource = { key: null, archive: null };
+export const workerCogSource = new Map();
