@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const cache = new URL('../../node_modules/.cache/browser-test-dependencies/', import.meta.url);
 const files = new Map();
-for (const version of ['1.9.4', '2.0.0-beta.2']) {
+for (const version of ['1.9.4', '2.0.0-beta.3']) {
   const leaflet2 = version.startsWith('2.');
   for (const file of [leaflet2 ? 'leaflet-global.js' : 'leaflet-src.js', 'leaflet.css',
     ...(!leaflet2 ? ['images/marker-icon.png', 'images/marker-icon-2x.png', 'images/marker-shadow.png',

@@ -5,7 +5,7 @@ import { wrapVectorLabel } from './wrapVectorLabel.js';
 export function vectorLabelIcon(label, sheet) {
   if (label.icon) return vectorSpriteIcon(label, sheet);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  const lines = label.along ? [label.text] : wrapVectorLabel(label.text);
+  const lines = label.along ? /* alloc */ [label.text] : wrapVectorLabel(label.text);
   let longest = 0, line, key, text, index;
   for (line of lines) longest = Math.max(longest, Array.from(line).length);
   const width = Math.max(40, longest * label.size * 0.65 + 12);

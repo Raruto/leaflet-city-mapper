@@ -247,7 +247,7 @@ Given('a leaflet map', { timeout: 30000 }, async function () {
     body: `<!doctype html><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
       <div id="first" style="width:400px;height:300px"></div>
       <div id="second" style="width:400px;height:300px"></div>
-      <script src="https://unpkg.com/leaflet@${process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.2/dist/leaflet-global.js' : '1.9/dist/leaflet-src.js'}"></script>
+      <script src="https://unpkg.com/leaflet@${process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.3/dist/leaflet-global.js' : '1.9/dist/leaflet-src.js'}"></script>
       <script>globalThis.L = globalThis.leaflet || globalThis.L;</script>
       <script src="../dist/leaflet-city-mapper.js"></script>
       <script>

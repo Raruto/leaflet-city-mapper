@@ -19,17 +19,18 @@ import { materialShaders } from '../shaders/materialShaders.js';
 import { reportCompilation } from '../gpu/reportShaderCompilation.js';
 
 export function createProgram(layer, material = defaultMaterial) {
+  const renderer = rendererByLayer.get(layer), { device } = renderer;
   const shaders = materialShaders(
     material,
     !!layer.options.nightSparkle,
     material.terrain ? elevationWGSL : ''
   );
-  const vertex = rendererByLayer.get(layer).device.createShaderModule((
+  const vertex = device.createShaderModule((
     vertexShader.code = shaders.vertex,
     vertexShader
   ));
   vertexShader.code = null;
-  const fragment = rendererByLayer.get(layer).device.createShaderModule((
+  const fragment = device.createShaderModule((
     fragmentShader.code = shaders.fragment,
     fragmentShader
   ));
@@ -45,17 +46,17 @@ export function createProgram(layer, material = defaultMaterial) {
     shaders.textured ? uVLayout : null,
   ];
   if (material.instanced) vertexBuffers.push(instanceLayout);
-  const bindGroupLayout = createProgramLayout(rendererByLayer.get(layer).device, shaders);
-  const pipelineLayout = rendererByLayer.get(layer).device.createPipelineLayout((
+  const bindGroupLayout = createProgramLayout(device, shaders);
+  const pipelineLayout = device.createPipelineLayout((
     sharedPipelineLayout.bindGroupLayouts[0] = bindGroupLayout,
-    sharedPipelineLayout.bindGroupLayouts[1] = rendererByLayer.get(layer).sunlight.layout,
+    sharedPipelineLayout.bindGroupLayouts[1] = renderer.sunlight.layout,
     sharedPipelineLayout
   ));
   sharedPipelineLayout.bindGroupLayouts[0] = null;
   sharedPipelineLayout.bindGroupLayouts[1] = null;
   const uniforms = createProgramUniforms(material);
   return /* alloc */ {
-    device: rendererByLayer.get(layer).device,
+    device,
     vertex,
     fragment,
     bindings: shaders.bindings,

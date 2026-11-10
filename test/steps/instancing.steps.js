@@ -120,7 +120,10 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
         camera: { viewMatrix: identity, projectionMatrix: identity },
         renderer: { device: gpu, sunlight: sun, format: 'rgba8unorm', canvas: { width: 64, height: 64 },
           context: { getCurrentTexture: () => color },
-          depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT }) },
+          colorTexture: gpu.createTexture({ size: [64, 64], format: 'rgba8unorm',
+            sampleCount: 4, usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+          depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth24plus',
+            sampleCount: 4, usage: GPUTextureUsage.RENDER_ATTACHMENT }) },
       };
       globals.sceneByLayer.set(backend, backend);
       globals.sceneByLayer.get(backend)._shared = backend;

@@ -33,17 +33,19 @@ export function updateMapCamera(layer, size) {
   const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
   const pitch = mapGetPitch(map) * radians;
   const bearing = mapGetBearing(map) * radians;
+  const sinPitch = Math.sin(pitch), cosPitch = Math.cos(pitch);
+  const sinBearing = Math.sin(bearing), cosBearing = Math.cos(bearing);
   const camera = cameraByLayer.get(layer);
   camera.fov = cameraFov;
   camera.aspect = size.x / size.y;
   camera.near = Math.max(0.1, distance / 10000);
   camera.far = Math.max(10000, distance * 10);
-  camera.position[0] = targetX + Math.sin(bearing) * Math.sin(pitch) * distance;
-  camera.position[1] = targetY + Math.cos(pitch) * distance;
-  camera.position[2] = targetZ + Math.cos(bearing) * Math.sin(pitch) * distance;
-  camera.up[0] = -Math.sin(bearing) * Math.cos(pitch);
-  camera.up[1] = Math.sin(pitch);
-  camera.up[2] = -Math.cos(bearing) * Math.cos(pitch);
+  camera.position[0] = targetX + sinBearing * sinPitch * distance;
+  camera.position[1] = targetY + cosPitch * distance;
+  camera.position[2] = targetZ + cosBearing * sinPitch * distance;
+  camera.up[0] = -sinBearing * cosPitch;
+  camera.up[1] = sinPitch;
+  camera.up[2] = -cosBearing * cosPitch;
   camera.target[0] = targetX; camera.target[1] = targetY; camera.target[2] = targetZ;
   // Refresh the camera view, projection and combined projection-view matrices.
   updateCamera(camera);

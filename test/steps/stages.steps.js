@@ -168,6 +168,7 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
         renderer: {
           canvas: { width: 320, height: 240 }, sunlight: { enabled: false, bindGroup: {} },
           context: { getCurrentTexture: () => ({ createView: () => ({}) }) },
+          colorTexture: { createView: () => ({}) },
           depthTexture: { createView: () => ({}) },
           device: {
             createCommandEncoder: () => encoder, createBuffer: descriptor => ({ ...descriptor }),
@@ -531,7 +532,7 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
       canvas: { style: {} }, dpr: 2,
       device: {
         createTexture: descriptor => {
-          const texture = { descriptor, destroy: () => destroyed.push(texture) };
+          const texture = { descriptor: structuredClone(descriptor), destroy: () => destroyed.push(texture) };
           created.push(texture);
           return texture;
         },
@@ -542,13 +543,15 @@ Then('frame stages preserve visibility, fading and buffer reuse', async function
     const size = { x: 320, y: 240, equals(other) { return this.x === other.x && this.y === other.y; } };
     resizeRenderer(backend, size);
     resizeRenderer(backend, size);
-    assert.equal(created.length, 1);
+    assert.equal(created.length, 2);
     assert.deepEqual(created[0].descriptor.size, [640, 480]);
+    assert.equal(created[0].descriptor.sampleCount, 4);
+    assert.equal(created[1].descriptor.sampleCount, 4);
     assert.equal(globals.sceneByLayer.get(backend).renderer.canvas.style.width, '320px');
     resizeRenderer(backend, { ...size, x: 640 });
     await Promise.resolve();
-    assert.equal(created.length, 2);
-    assert.equal(destroyed.length, 1);
+    assert.equal(created.length, 4);
+    assert.equal(destroyed.length, 2);
 
     const opaque = { id: 1, visible: true, program: { transparent: false, uniforms: {} } };
     const fading = { id: 2, visible: true, fadeDuration: 100, fadeStart: 0,

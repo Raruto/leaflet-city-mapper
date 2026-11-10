@@ -1652,17 +1652,18 @@
 
   // src/rendering/resizeRenderer.js
   function resizeRenderer(layer, size) {
+    const renderer = rendererByLayer.get(layer);
     if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {
-      rendererByLayer.get(layer).width = size.x;
-      rendererByLayer.get(layer).height = size.y;
-      rendererByLayer.get(layer).canvas.width = Math.round(size.x * rendererByLayer.get(layer).dpr);
-      rendererByLayer.get(layer).canvas.height = Math.round(size.y * rendererByLayer.get(layer).dpr);
-      rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
-      rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
-      if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
-      rendererByLayer.get(layer).colorTexture?.destroy();
-      rendererByLayer.get(layer).colorTexture = rendererByLayer.get(layer).device.createTexture((colorTexture.size[0] = rendererByLayer.get(layer).canvas.width, colorTexture.size[1] = rendererByLayer.get(layer).canvas.height, colorTexture.format = rendererByLayer.get(layer).format, colorTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, colorTexture));
-      rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((depthTexture.size[0] = rendererByLayer.get(layer).canvas.width, depthTexture.size[1] = rendererByLayer.get(layer).canvas.height, depthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, depthTexture));
+      renderer.width = size.x;
+      renderer.height = size.y;
+      renderer.canvas.width = Math.round(size.x * renderer.dpr);
+      renderer.canvas.height = Math.round(size.y * renderer.dpr);
+      renderer.canvas.style.width = `${size.x}px`;
+      renderer.canvas.style.height = `${size.y}px`;
+      if (renderer.depthTexture) destroyTexture(layer, renderer.depthTexture);
+      renderer.colorTexture?.destroy();
+      renderer.colorTexture = renderer.device.createTexture((colorTexture.size[0] = renderer.canvas.width, colorTexture.size[1] = renderer.canvas.height, colorTexture.format = renderer.format, colorTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, colorTexture));
+      renderer.depthTexture = renderer.device.createTexture((depthTexture.size[0] = renderer.canvas.width, depthTexture.size[1] = renderer.canvas.height, depthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT, depthTexture));
       sizeByLayer.set(layer, size);
     }
   }
@@ -1754,6 +1755,21 @@
     return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
   }
 
+  // src/native/nativeTerrainElevation.js
+  function nativeTerrainElevation(state, point, x, y, z) {
+    let layer, native, request, elevation;
+    const key = `${x}:${y}:${z}`;
+    for (layer of Object.values(state.map._layers)) {
+      native = nativeGPUByLayer.get(layer);
+      if (native?.disposed || native?.terrainStream !== state) continue;
+      request = native.terrainRequests?.get(key);
+      if (!request?.tiles || layer._tiles[key] !== request.tile) continue;
+      elevation = terrainElevation(point, request.tiles);
+      if (Number.isFinite(elevation)) return elevation;
+    }
+    return null;
+  }
+
   // src/native/gridTerrainElevation.js
   function gridTerrainElevation(state, location2) {
     let z = Math.max(0, Math.min(24, Math.round(state.map.getZoom())));
@@ -1761,20 +1777,16 @@
       /* alloc */
       /* @__PURE__ */ new Map()
     );
-    let point, limit, x, y, dx, dy, tx, ty, entry, elevation, layer, native, request;
+    let point, limit, x, y, index, dx, dy, tx, ty, entry, elevation;
     for (; z >= 0; z--) {
       point = state.map.project(location2, z), limit = 2 ** z;
       x = Math.floor(point.x / 256), y = Math.floor(point.y / 256);
-      for (layer of Object.values(state.map._layers)) {
-        native = nativeGPUByLayer.get(layer);
-        if (native?.disposed || native?.terrainStream !== state) continue;
-        request = native.terrainRequests?.get(`${x}:${y}:${z}`);
-        if (!request?.tiles || layer._tiles[`${x}:${y}:${z}`] !== request.tile) continue;
-        elevation = terrainElevation(point, request.tiles);
-        if (Number.isFinite(elevation)) return elevation;
-      }
+      elevation = nativeTerrainElevation(state, point, x, y, z);
+      if (Number.isFinite(elevation)) return elevation;
       tiles.clear();
-      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) {
+      for (index = 0; index < 9; index++) {
+        dx = index % 3 - 1;
+        dy = Math.floor(index / 3) - 1;
         tx = ((x + dx) % limit + limit) % limit;
         ty = Math.max(0, Math.min(limit - 1, y + dy));
         entry = state.terrainCache.get(`${z}/${tx}/${ty}`);
@@ -1894,17 +1906,19 @@
     const targetZ = (size.y / 2 - origin.y) / pixelsPerMeter;
     const pitch = mapGetPitch(map) * radians;
     const bearing = mapGetBearing(map) * radians;
+    const sinPitch = Math.sin(pitch), cosPitch = Math.cos(pitch);
+    const sinBearing = Math.sin(bearing), cosBearing = Math.cos(bearing);
     const camera = cameraByLayer.get(layer);
     camera.fov = cameraFov;
     camera.aspect = size.x / size.y;
     camera.near = Math.max(0.1, distance / 1e4);
     camera.far = Math.max(1e4, distance * 10);
-    camera.position[0] = targetX + Math.sin(bearing) * Math.sin(pitch) * distance;
-    camera.position[1] = targetY + Math.cos(pitch) * distance;
-    camera.position[2] = targetZ + Math.cos(bearing) * Math.sin(pitch) * distance;
-    camera.up[0] = -Math.sin(bearing) * Math.cos(pitch);
-    camera.up[1] = Math.sin(pitch);
-    camera.up[2] = -Math.cos(bearing) * Math.cos(pitch);
+    camera.position[0] = targetX + sinBearing * sinPitch * distance;
+    camera.position[1] = targetY + cosPitch * distance;
+    camera.position[2] = targetZ + cosBearing * sinPitch * distance;
+    camera.up[0] = -sinBearing * cosPitch;
+    camera.up[1] = sinPitch;
+    camera.up[2] = -cosBearing * cosPitch;
     camera.target[0] = targetX;
     camera.target[1] = targetY;
     camera.target[2] = targetZ;
@@ -3334,7 +3348,7 @@
 
   // src/rendering/drawGeometry.js
   function drawGeometry(layer, mesh, pass, cullMode, frontFace) {
-    const { geometry } = mesh;
+    const { geometry } = mesh, { attributes, drawRange } = geometry;
     const renderer = rendererByLayer.get(layer);
     const { device } = renderer;
     const pipeline = drawPipeline(renderer, mesh, cullMode, frontFace);
@@ -3342,26 +3356,26 @@
     prepareMeshTextures(renderer, mesh);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, mesh.bindGroup, (meshOffsets[0] = offset, meshOffsets));
-    pass.setVertexBuffer(0, geometry.attributes.position.buffer);
-    pass.setVertexBuffer(1, geometry.attributes.normal.buffer);
-    if (geometry.attributes.color) pass.setVertexBuffer(2, geometry.attributes.color.buffer);
-    if (geometry.attributes.uv) pass.setVertexBuffer(3, geometry.attributes.uv.buffer);
-    const instances = geometry.attributes.instanceOffset;
+    pass.setVertexBuffer(0, attributes.position.buffer);
+    pass.setVertexBuffer(1, attributes.normal.buffer);
+    if (attributes.color) pass.setVertexBuffer(2, attributes.color.buffer);
+    if (attributes.uv) pass.setVertexBuffer(3, attributes.uv.buffer);
+    const instances = attributes.instanceOffset;
     if (instances) pass.setVertexBuffer(4, instances.buffer);
     let name, attribute;
-    for (name in geometry.attributes) {
-      attribute = geometry.attributes[name];
+    for (name in attributes) {
+      attribute = attributes[name];
       if (!attribute.needsUpdate) continue;
       device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
       attribute.needsUpdate = false;
       if (name === "position" || name === "instanceOffset") geometry.bounds = null;
     }
-    const index = geometry.attributes.index;
+    const index = attributes.index;
     if (index) {
       pass.setIndexBuffer(index.buffer, index.indexFormat);
-      pass.drawIndexed(geometry.drawRange.count, instances?.count ?? 1, geometry.drawRange.start, 0, 0);
+      pass.drawIndexed(drawRange.count, instances?.count ?? 1, drawRange.start, 0, 0);
     } else {
-      pass.draw(geometry.drawRange.count, instances?.count ?? 1, geometry.drawRange.start, 0);
+      pass.draw(drawRange.count, instances?.count ?? 1, drawRange.start, 0);
     }
   }
 
@@ -3758,9 +3772,10 @@
     let pipeline = sun.pipeline;
     pass.setPipeline(pipeline);
     pass.setBindGroup(1, sun.depthBindGroup);
-    let mesh, instances, nextPipeline, offset, attribute, index, range;
+    let mesh, attributes, instances, nextPipeline, offset, attribute, index, range;
     for (mesh of meshes) {
-      instances = mesh.geometry.attributes.instanceOffset;
+      attributes = mesh.geometry.attributes;
+      instances = attributes.instanceOffset;
       nextPipeline = instances ? sun.instancePipeline : sun.pipeline;
       if (nextPipeline !== pipeline) {
         pipeline = nextPipeline;
@@ -3775,16 +3790,16 @@
         shadowBindGroup.layout = null;
         shadowBindGroup.entries[0].resource.buffer = null;
       }
-      for (attribute of Object.values(mesh.geometry.attributes)) {
+      for (attribute of Object.values(attributes)) {
         if (attribute.needsUpdate) {
           device.queue.writeBuffer(attribute.buffer, 0, attribute.data);
           attribute.needsUpdate = false;
         }
       }
       pass.setBindGroup(0, mesh._shadowBindGroup, (shadowOffsets[0] = offset, shadowOffsets));
-      pass.setVertexBuffer(0, mesh.geometry.attributes.position.buffer);
+      pass.setVertexBuffer(0, attributes.position.buffer);
       if (instances) pass.setVertexBuffer(1, instances.buffer);
-      index = mesh.geometry.attributes.index, range = mesh.geometry.drawRange;
+      index = attributes.index, range = mesh.geometry.drawRange;
       if (index) {
         pass.setIndexBuffer(index.buffer, index.indexFormat);
         pass.drawIndexed(range.count, instances?.count ?? 1, range.start, 0, 0);
@@ -3972,7 +3987,26 @@
     return nativeGPUByLayer.get(state.source) === state && state.map.hasLayer(state.source);
   }
 
-  // src/native/syncGridLayer.js
+  // src/native/prepareGridTerrainRequests.js
+  function prepareGridTerrainRequests(state) {
+    const stream = streamTerrainByMap.get(state.map);
+    if (state.terrainStream !== stream) {
+      state.terrainStream = stream;
+      state.terrainRequests = stream ? (
+        /* alloc */
+        /* @__PURE__ */ new Map()
+      ) : null;
+    }
+    if (state.terrainRequests) {
+      let key;
+      for (key of state.terrainRequests.keys()) {
+        if (!state.source._tiles[key]) state.terrainRequests.delete(key);
+      }
+    }
+    return stream;
+  }
+
+  // src/native/syncGridTile.js
   init_L();
 
   // src/globals/coreWhite.js
@@ -4840,14 +4874,15 @@
 
   // src/materials/createProgram.js
   function createProgram(layer, material = defaultMaterial) {
+    const renderer = rendererByLayer.get(layer), { device } = renderer;
     const shaders = materialShaders(
       material,
       !!layer.options.nightSparkle,
       material.terrain ? elevationWGSL : ""
     );
-    const vertex = rendererByLayer.get(layer).device.createShaderModule((vertexShader.code = shaders.vertex, vertexShader));
+    const vertex = device.createShaderModule((vertexShader.code = shaders.vertex, vertexShader));
     vertexShader.code = null;
-    const fragment = rendererByLayer.get(layer).device.createShaderModule((fragmentShader.code = shaders.fragment, fragmentShader));
+    const fragment = device.createShaderModule((fragmentShader.code = shaders.fragment, fragmentShader));
     fragmentShader.code = null;
     reportCompilation(
       layer,
@@ -4867,15 +4902,15 @@
       ]
     );
     if (material.instanced) vertexBuffers.push(instanceLayout);
-    const bindGroupLayout = createProgramLayout(rendererByLayer.get(layer).device, shaders);
-    const pipelineLayout2 = rendererByLayer.get(layer).device.createPipelineLayout((pipelineLayout.bindGroupLayouts[0] = bindGroupLayout, pipelineLayout.bindGroupLayouts[1] = rendererByLayer.get(layer).sunlight.layout, pipelineLayout));
+    const bindGroupLayout = createProgramLayout(device, shaders);
+    const pipelineLayout2 = device.createPipelineLayout((pipelineLayout.bindGroupLayouts[0] = bindGroupLayout, pipelineLayout.bindGroupLayouts[1] = renderer.sunlight.layout, pipelineLayout));
     pipelineLayout.bindGroupLayouts[0] = null;
     pipelineLayout.bindGroupLayouts[1] = null;
     const uniforms = createProgramUniforms(material);
     return (
       /* alloc */
       {
-        device: rendererByLayer.get(layer).device,
+        device,
         vertex,
         fragment,
         bindings: shaders.bindings,
@@ -5101,6 +5136,28 @@
     return positions;
   }
 
+  // src/native/syncGridTile.js
+  function syncGridTile(state, key, tile, opacity) {
+    const retained = state.textures.get(key), mesh = state.meshes.get(key);
+    if (mesh && !mesh._terrainRequest && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
+      retained.used = true;
+      styleNativeMesh(state, mesh, coreWhite, opacity);
+      return mesh;
+    }
+    const [nw, se] = state.source._tileCoordsToNwSe(tile.coords);
+    return quadNativeMesh(
+      state,
+      key,
+      tile.el,
+      boundsQuad(
+        state,
+        /* alloc */
+        new L.LatLngBounds(nw, se)
+      ),
+      opacity
+    );
+  }
+
   // src/native/getGridTerrainTile.js
   async function getGridTerrainTile(state, z, x, y) {
     const limit = 2 ** z;
@@ -5245,74 +5302,62 @@
     return mesh;
   }
 
+  // src/native/syncTerrainGridTile.js
+  function syncTerrainGridTile(state, key, tile, opacity) {
+    const retained = state.textures.get(key), mesh = state.meshes.get(key);
+    let request = state.terrainRequests.get(key);
+    if (!request || request.tile !== tile) {
+      request = /* alloc */
+      { tile, stream: state.terrainStream };
+      state.terrainRequests.set(key, request);
+      loadGridTerrain(state, key, tile, request);
+    }
+    if (!request.tiles) {
+      if (mesh && retained?.image === tile.el) {
+        retained.used = true;
+        styleNativeMesh(state, mesh, coreWhite, opacity);
+      }
+      return null;
+    }
+    if (mesh && mesh._terrainRequest === request && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
+      retained.used = true;
+      styleNativeMesh(state, mesh, coreWhite, opacity);
+      return mesh;
+    }
+    return terrainGridMesh(state, key, tile, request, opacity);
+  }
+
+  // src/native/retainGridTerrain.js
+  function retainGridTerrain(state) {
+    let key, mesh, retained;
+    for ([key, mesh] of state.meshes) {
+      if (state.source._tiles[key] || !mesh._terrainRequest) continue;
+      retained = state.textures.get(key);
+      if (!retained) continue;
+      retained.used = true;
+      mesh._nativeUsed = true;
+    }
+  }
+
   // src/native/syncGridLayer.js
   function syncGridLayer(state) {
-    const { source, textures, meshes } = state;
-    const stream = streamTerrainByMap.get(state.map);
-    if (state.terrainStream !== stream) {
-      state.terrainStream = stream;
-      state.terrainRequests = stream ? (
-        /* alloc */
-        /* @__PURE__ */ new Map()
-      ) : null;
-    }
-    let key, tile, opacity, retained, mesh, nw, se, request, pending = false;
-    if (state.terrainRequests) {
-      for (key of state.terrainRequests.keys()) {
-        if (!source._tiles[key]) state.terrainRequests.delete(key);
-      }
-    }
+    const { source } = state;
+    const stream = prepareGridTerrainRequests(state);
+    let key, tile, opacity, mesh, pending = false;
     for (key in source._tiles) {
       if (!Object.hasOwn(source._tiles, key)) continue;
       tile = source._tiles[key];
       if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) {
-        if (stream) pending = true;
+        pending = Boolean(stream);
         continue;
       }
       opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
-      retained = textures.get(key);
-      mesh = meshes.get(key);
-      if (state.terrainRequests) {
-        request = state.terrainRequests.get(key);
-        if (!request || request.tile !== tile) {
-          request = /* alloc */
-          { tile, stream };
-          state.terrainRequests.set(key, request);
-          loadGridTerrain(state, key, tile, request);
-        }
-        if (!request.tiles) {
-          pending = true;
-          if (mesh && retained?.image === tile.el) {
-            retained.used = true;
-            styleNativeMesh(state, mesh, coreWhite, opacity);
-          }
-          continue;
-        }
-        if (mesh && mesh._terrainRequest === request && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
-          retained.used = true;
-          styleNativeMesh(state, mesh, coreWhite, opacity);
-        } else mesh = terrainGridMesh(state, key, tile, request, opacity);
-      } else if (mesh && !mesh._terrainRequest && retained?.image === tile.el && retained.url === (tile.el.currentSrc || tile.el.src)) {
-        retained.used = true;
-        styleNativeMesh(state, mesh, coreWhite, opacity);
-      } else {
-        [nw, se] = source._tileCoordsToNwSe(tile.coords);
-        mesh = quadNativeMesh(state, key, tile.el, boundsQuad(
-          state,
-          /* alloc */
-          new L.LatLngBounds(nw, se)
-        ), opacity);
-      }
+      mesh = state.terrainRequests ? syncTerrainGridTile(state, key, tile, opacity) : syncGridTile(state, key, tile, opacity);
+      if (state.terrainRequests && !state.terrainRequests.get(key).tiles) pending = true;
       if (mesh) mesh.renderOrder += tile.coords.z / 100;
     }
     if (stream && (pending || !Object.keys(source._tiles).length)) {
-      for ([key, mesh] of meshes) {
-        if (source._tiles[key] || !mesh._terrainRequest) continue;
-        retained = textures.get(key);
-        if (!retained) continue;
-        retained.used = true;
-        mesh._nativeUsed = true;
-      }
+      retainGridTerrain(state);
     }
   }
 
@@ -7595,7 +7640,7 @@
   function mapTryAnimatedPan(center, options) {
     const offset = this._getCenterOffset(center)._trunc();
     if (options?.animate !== true && !this.getSize().contains(offset)) return false;
-    mapMethods.value.panBy.call(this, offset, options);
+    (mapMethods.value._panBy || mapMethods.value.panBy).call(this, offset, options);
     return true;
   }
 
@@ -7946,23 +7991,14 @@
   init_L();
   init_mapGetBearing();
   init_mapGetPitch();
+
+  // src/core/extendTerrainPixelBounds.js
   init_radians();
-  function gridlayerGetTiledPixelBounds(center) {
-    const map = this._map, stream = streamTerrainByMap.get(map);
-    if (!stream && !mapGetBearing(map) && !mapGetPitch(map)) return tiledBounds.value.call(this, center);
-    const bounds = map.getBounds();
-    const result = (
-      /* alloc */
-      new L.Bounds(
-        map.project(bounds.getNorthWest(), this._tileZoom),
-        map.project(bounds.getSouthEast(), this._tileZoom)
-      )
-    );
-    const shared = renderers.get(map), origin = shared && sceneOriginByLayer.get(shared);
-    if (!stream || !origin) return result;
+  function extendTerrainPixelBounds(layer, result, stream, origin) {
+    const map = layer._map;
     let minimum = Infinity, maximum = -Infinity, key, entry;
     for ([key, entry] of stream.terrainCache) {
-      if (!key.startsWith(`${this._tileZoom}/`) || !entry.range) continue;
+      if (!key.startsWith(`${layer._tileZoom}/`) || !entry.range) continue;
       minimum = Math.min(minimum, entry.range[0]);
       maximum = Math.max(maximum, entry.range[1]);
     }
@@ -7976,10 +8012,27 @@
       for (j = 0; j < 2; j++) {
         point = j ? footprint.max : footprint.min;
         raw = mapMethods.value.containerPointToLayerPoint.call(map, animationPoint(map, point, true));
-        result.extend(map.project(map.layerPointToLatLng(raw), this._tileZoom));
+        result.extend(map.project(map.layerPointToLatLng(raw), layer._tileZoom));
       }
     }
     return result;
+  }
+
+  // src/core/gridlayerGetTiledPixelBounds.js
+  function gridlayerGetTiledPixelBounds(center) {
+    const map = this._map, stream = streamTerrainByMap.get(map);
+    if (!stream && !mapGetBearing(map) && !mapGetPitch(map)) return tiledBounds.value.call(this, center);
+    const bounds = map.getBounds();
+    const result = (
+      /* alloc */
+      new L.Bounds(
+        map.project(bounds.getNorthWest(), this._tileZoom),
+        map.project(bounds.getSouthEast(), this._tileZoom)
+      )
+    );
+    const shared = renderers.get(map), origin = shared && sceneOriginByLayer.get(shared);
+    if (!stream || !origin) return result;
+    return extendTerrainPixelBounds(this, result, stream, origin);
   }
 
   // src/camera/mapCamera.js
@@ -8472,7 +8525,7 @@
 
   // src/globals/layerControlAddItem.js
   init_L();
-  var layerControlAddItem = L.LayersControl?.prototype._addItem;
+  var layerControlAddItem = L?.LayersControl?.prototype._addItem;
 
   // src/layer-controls/layerControlInputId.js
   if (layerControlAddItem && !L.Control.Layers) L.LayersControl.prototype._addItem = addLayerControlInputId;
@@ -10208,6 +10261,7 @@
 
   // src/gpu/initializeRendererResources.js
   function initializeRendererResources(layer, device) {
+    const renderer = rendererByLayer.get(layer);
     const layout = device.createBindGroupLayout(
       /* alloc */
       {
@@ -10238,26 +10292,26 @@
         )
       }
     );
-    const buffer = rendererByLayer.get(layer).device.createBuffer(
+    const buffer = device.createBuffer(
       /* alloc */
       { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }
     );
-    const sampler = rendererByLayer.get(layer).device.createSampler(
+    const sampler = device.createSampler(
       /* alloc */
       { compare: "less-equal", minFilter: "linear", magFilter: "linear" }
     );
-    const lights = rendererByLayer.get(layer).device.createBuffer(
+    const lights = device.createBuffer(
       /* alloc */
       { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }
     );
-    rendererByLayer.get(layer).sunlight = /* alloc */
+    renderer.sunlight = /* alloc */
     { layout, buffer, sampler, lights, size: 0 };
-    rendererByLayer.get(layer).device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
+    device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
     resizeSunlight(layer, 1);
     const emptyImage = document.createElement("canvas");
     emptyImage.width = 1;
     emptyImage.height = 1;
-    rendererByLayer.get(layer).roofFallbackTexture = /* alloc */
+    renderer.roofFallbackTexture = /* alloc */
     {
       device,
       texture: device.createTexture(
@@ -14519,16 +14573,21 @@
     return candidates.sort(compareVectorLabelPriority);
   }
 
+  // src/vector-tiles/updateVectorLabelStyle.js
+  function updateVectorLabelStyle(label, zoom) {
+    label.size = evaluateStyle(label.entry.layout?.["text-size"] ?? 12, label.properties, zoom);
+    label.color = evaluateStyle(label.entry.paint?.["text-color"] ?? "#000", label.properties, zoom);
+    label.halo = evaluateStyle(label.entry.paint?.["text-halo-color"] ?? "#fff", label.properties, zoom);
+    label.haloWidth = evaluateStyle(label.entry.paint?.["text-halo-width"] ?? 0, label.properties, zoom);
+  }
+
   // src/vector-tiles/vectorLabelCells.js
   function vectorLabelCells(layer, label, size) {
     const map = layer._map, zoom = vectorStyleZoom(layer);
     if (!visibleStyle(label.entry, label.properties, zoom)) return null;
-    label.size = evaluateStyle(label.entry.layout?.["text-size"] ?? 12, label.properties, zoom);
+    updateVectorLabelStyle(label, zoom);
     if (!(label.size > 0)) return null;
     if (label.icon && !vectorTileOptionsByLayer.get(layer).spriteSheet?.index[label.icon]) return null;
-    label.color = evaluateStyle(label.entry.paint?.["text-color"] ?? "#000", label.properties, zoom);
-    label.halo = evaluateStyle(label.entry.paint?.["text-halo-color"] ?? "#fff", label.properties, zoom);
-    label.haloWidth = evaluateStyle(label.entry.paint?.["text-halo-width"] ?? 0, label.properties, zoom);
     if (label.along && label.pixelBase * 2 ** map.getZoom() < label.text.length * label.size * 0.6) return null;
     const point = map.latLngToContainerPoint(label.latlng);
     if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y) return null;
@@ -14604,7 +14663,10 @@
   function vectorLabelIcon(label, sheet) {
     if (label.icon) return vectorSpriteIcon(label, sheet);
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    const lines = label.along ? [label.text] : wrapVectorLabel(label.text);
+    const lines = label.along ? (
+      /* alloc */
+      [label.text]
+    ) : wrapVectorLabel(label.text);
     let longest = 0, line2, key, text, index;
     for (line2 of lines) longest = Math.max(longest, Array.from(line2).length);
     const width = Math.max(40, longest * label.size * 0.65 + 12);
@@ -16668,7 +16730,7 @@
   }
 
   // src/scene/initializerFor.js
-  function initializerFor(type, options = {}) {
+  function initializerFor(type, options = sceneEmptyOptions) {
     switch (type) {
       case "raster":
         return options.asset !== void 0 || /\.tiff?(?:[?#]|$)/i.test(options.url) ? initCog : initRaster;
@@ -16736,7 +16798,7 @@
     if (type === "vector") {
       if (isVectorTileSource(settings)) {
         initVectorTiles(this, settings);
-      } else if (settings.data !== void 0 || settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
+      } else if (settings.data !== void 0 || settings.style !== void 0 && !settings.url || settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
         initializeGeoJSON(this, settings);
       } else {
         init3D(this, settings);
@@ -16961,7 +17023,7 @@
 
   // src/globals/leafletLayer.js
   init_L();
-  var leafletLayer = L.Layer;
+  var leafletLayer = L?.Layer;
 
   // src/core/constructLayer.js
   function constructLayer(options) {

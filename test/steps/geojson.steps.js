@@ -333,7 +333,7 @@ Then('a touch device can enable and immediately disable the lens', { timeout: 60
     const page = await context.newPage();
     await page.goto(this.baseUrl);
     await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><div id="map" style="width:375px;height:600px"></div>');
-    const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.2' : '1.9.4';
+    const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.3' : '1.9.4';
     const script = version === '1.9.4' ? 'leaflet-src.js' : 'leaflet-global.js';
     await page.addStyleTag({ url: `https://unpkg.com/leaflet@${version}/dist/leaflet.css` });
     await page.addScriptTag({ url: `https://unpkg.com/leaflet@${version}/dist/${script}` });
@@ -478,6 +478,15 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
           tile.done && performance.now() - tile.loadedAt >= tile.mesh.fadeDuration)) &&
       globals.sceneByLayer.get(lights).renderer.frameMeshes.every(mesh =>
         mesh._appearance === undefined || mesh._appearance === 1);
+  }).catch(async error => {
+    const state = await this.page.evaluate(() => Object.values(map._layers).map(layer => {
+      const state = globals.sceneByLayer.get(layer);
+      return { type: state._type, nightLight: layer.options.nightLight,
+        area: state._areas?.get('geojson')?.done, terrain: state._terrainReady,
+        tiles: state._rasterTiles?.size, loading: state._loadingTiles };
+    }));
+    error.message += `\nLayer state: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
+    throw error;
   });
   const data = await (await this.context.request.get(`${this.baseUrl}/examples/data/colosseum-lights.json`)).json();
   assert.equal(data.type, 'FeatureCollection');

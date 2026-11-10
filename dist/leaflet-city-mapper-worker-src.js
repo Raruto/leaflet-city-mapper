@@ -1681,22 +1681,6 @@
     return zoom;
   }
 
-  // src/vector-tiles/projectVectorPoint.js
-  function projectVectorPoint(point, coords, extent) {
-    const size = 2 ** coords.z;
-    const x = (coords.x + point[0] / extent) / size;
-    const y = (coords.y + point[1] / extent) / size;
-    return (
-      /* alloc */
-      [Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI, x * 360 - 180]
-    );
-  }
-
-  // src/vector-tiles/vectorLabelProperty.js
-  function vectorLabelProperty(properties, match, key) {
-    return properties[key] ?? "";
-  }
-
   // src/vector-tiles/vectorStyleValue.js
   function vectorStyleValue(object, key, fallback, properties, zoom) {
     return object?.[key] === void 0 ? fallback : evaluateStyle(object[key], properties, zoom);
@@ -1754,16 +1738,74 @@
     return anchors;
   }
 
-  // src/vector-tiles/prepareVectorLabel.js
-  function prepareVectorLabel(job, layer, entry, feature, order) {
+  // src/vector-tiles/vectorLabelProperty.js
+  function vectorLabelProperty(properties, match, key) {
+    return properties[key] ?? "";
+  }
+
+  // src/vector-tiles/vectorLabelText.js
+  function vectorLabelText(entry, properties, zoom) {
     let text = entry.layout?.["text-field"];
-    const { properties } = feature, { zoom } = job;
-    const icon = entry.layout?.["symbol-placement"] === "line" ? null : evaluateStyle(entry.layout?.["icon-image"], properties, zoom);
     if (Array.isArray(text)) text = evaluateStyle(text, properties, zoom);
     if (typeof text !== "string") text = "";
     text = text.replace(/\{([^}]+)\}/g, vectorLabelProperty.bind(null, properties));
+    return entry.layout?.["text-transform"] === "uppercase" ? text.toUpperCase() : text;
+  }
+
+  // src/vector-tiles/projectVectorPoint.js
+  function projectVectorPoint(point, coords, extent) {
+    const size = 2 ** coords.z;
+    const x = (coords.x + point[0] / extent) / size;
+    const y = (coords.y + point[1] / extent) / size;
+    return (
+      /* alloc */
+      [Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI, x * 360 - 180]
+    );
+  }
+
+  // src/vector-tiles/createVectorLabel.js
+  function createVectorLabel(job, layer, entry, properties, order, text, icon, anchor, size) {
+    return (
+      /* alloc */
+      {
+        text,
+        latlng: projectVectorPoint(anchor.point, job.coords, layer.extent),
+        order,
+        entry,
+        properties,
+        size,
+        pixelBase: anchor.length * 256 / layer.extent / 2 ** job.coords.z,
+        along: anchor.a ? (
+          /* alloc */
+          [
+            projectVectorPoint(anchor.a, job.coords, layer.extent),
+            projectVectorPoint(anchor.b, job.coords, layer.extent)
+          ]
+        ) : null,
+        icon: text.trim() ? null : icon,
+        iconOffset: evaluateStyle(entry.layout?.["icon-offset"], properties, job.zoom) || /* alloc */
+        [0, 0],
+        allowOverlap: entry.layout?.["icon-allow-overlap"] === true,
+        color: vectorStyleValue(entry.paint, "text-color", "#000", properties, job.zoom),
+        halo: vectorStyleValue(entry.paint, "text-halo-color", "#fff", properties, job.zoom),
+        haloWidth: vectorStyleValue(entry.paint, "text-halo-width", 0, properties, job.zoom),
+        priority: (
+          /* alloc */
+          ["place_labels", "place"].includes(entry["source-layer"]) ? 0 : (
+            /* alloc */
+            ["street_labels", "transportation_name"].includes(entry["source-layer"]) ? 1 : 2
+          )
+        )
+      }
+    );
+  }
+
+  // src/vector-tiles/prepareVectorLabel.js
+  function prepareVectorLabel(job, layer, entry, feature, order) {
+    const { properties } = feature, { zoom } = job;
+    const text = vectorLabelText(entry, properties, zoom);
+    const icon = entry.layout?.["symbol-placement"] === "line" ? null : evaluateStyle(entry.layout?.["icon-image"], properties, zoom);
     if (!text.trim() && typeof icon !== "string") return;
-    if (entry.layout?.["text-transform"] === "uppercase") text = text.toUpperCase();
     const size = vectorStyleValue(entry.layout, "text-size", 12, properties, zoom), line = feature.type === 2 && text.trim();
     const spacing = layer.extent / 16, anchors = (
       /* alloc */
@@ -1780,39 +1822,7 @@
     }
     for (anchor of anchors) {
       if (anchor.point[0] < 0 || anchor.point[0] >= layer.extent || anchor.point[1] < 0 || anchor.point[1] >= layer.extent) continue;
-      job.labels.push(
-        /* alloc */
-        {
-          text,
-          latlng: projectVectorPoint(anchor.point, job.coords, layer.extent),
-          order,
-          entry,
-          properties,
-          size,
-          pixelBase: anchor.length * 256 / layer.extent / 2 ** job.coords.z,
-          along: anchor.a ? (
-            /* alloc */
-            [
-              projectVectorPoint(anchor.a, job.coords, layer.extent),
-              projectVectorPoint(anchor.b, job.coords, layer.extent)
-            ]
-          ) : null,
-          icon: text.trim() ? null : icon,
-          iconOffset: evaluateStyle(entry.layout?.["icon-offset"], properties, zoom) || /* alloc */
-          [0, 0],
-          allowOverlap: entry.layout?.["icon-allow-overlap"] === true,
-          color: vectorStyleValue(entry.paint, "text-color", "#000", properties, zoom),
-          halo: vectorStyleValue(entry.paint, "text-halo-color", "#fff", properties, zoom),
-          haloWidth: vectorStyleValue(entry.paint, "text-halo-width", 0, properties, zoom),
-          priority: (
-            /* alloc */
-            ["place_labels", "place"].includes(entry["source-layer"]) ? 0 : (
-              /* alloc */
-              ["street_labels", "transportation_name"].includes(entry["source-layer"]) ? 1 : 2
-            )
-          )
-        }
-      );
+      job.labels.push(createVectorLabel(job, layer, entry, properties, order, text, icon, anchor, size));
     }
   }
 

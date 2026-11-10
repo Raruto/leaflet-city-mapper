@@ -4,6 +4,7 @@ import { sceneSunlightUniforms } from '../globals/sceneSunlightUniforms.js';
 import { resizeSunlight } from '../shadows/resizeSunlight.js';
 
 export function initializeRendererResources(layer, device) {
+  const renderer = rendererByLayer.get(layer);
   const layout = device.createBindGroupLayout(/* alloc */ {
     entries: /* alloc */ [
       /* alloc */ { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: /* alloc */ { type: 'uniform' } },
@@ -12,16 +13,16 @@ export function initializeRendererResources(layer, device) {
       /* alloc */ { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: /* alloc */ { type: 'read-only-storage' } },
     ]
   });
-  const buffer = rendererByLayer.get(layer).device.createBuffer(/* alloc */ { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  const sampler = rendererByLayer.get(layer).device.createSampler(/* alloc */ { compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
-  const lights = rendererByLayer.get(layer).device.createBuffer(/* alloc */ { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-  rendererByLayer.get(layer).sunlight = /* alloc */ { layout, buffer, sampler, lights, size: 0 };
-  rendererByLayer.get(layer).device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
+  const buffer = device.createBuffer(/* alloc */ { size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const sampler = device.createSampler(/* alloc */ { compare: 'less-equal', minFilter: 'linear', magFilter: 'linear' });
+  const lights = device.createBuffer(/* alloc */ { size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  renderer.sunlight = /* alloc */ { layout, buffer, sampler, lights, size: 0 };
+  device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
   resizeSunlight(layer, 1);
   const emptyImage = document.createElement('canvas');
   emptyImage.width = 1;
   emptyImage.height = 1;
-  rendererByLayer.get(layer).roofFallbackTexture = /* alloc */ {
+  renderer.roofFallbackTexture = /* alloc */ {
     device,
     texture: device.createTexture(/* alloc */ {
       size: /* alloc */ [1, 1],

@@ -36,7 +36,7 @@ export function layerInitialize(options = sceneEmptyOptions) {
   if (type === 'vector') {
     if (isVectorTileSource(settings)) {
       initVectorTiles(this, settings);
-    } else if (settings.data !== undefined ||
+    } else if (settings.data !== undefined || settings.style !== undefined && !settings.url ||
         settings.url && !/\.(?:pmtiles|glb|gltf)(?:[?#]|$)/i.test(settings.url)) {
       initializeGeoJSON(this, settings);
     } else {

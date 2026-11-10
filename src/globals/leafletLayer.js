@@ -1,3 +1,3 @@
 import { L } from './L.js';
 
-export const leafletLayer = L.Layer;
+export const leafletLayer = L?.Layer;

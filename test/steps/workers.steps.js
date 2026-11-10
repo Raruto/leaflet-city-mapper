@@ -54,7 +54,7 @@ Then('the shared worker dispatches geometry and vector tiles with isolated respo
     assert.equal(geometry.data.positions.length, 0);
     assert.equal(geometry.transfers.length, 4);
     const input = {
-      type: 'vector', id: 7, buffer: tile([feature(2, [9, 0, 0, 10, 20, 20])]),
+      type: 'vector', id: 7, buffer: tile([feature(2, [9, 0, 0, 10, 200, 200])]),
       coords: { z: 0, x: 0, y: 0 }, zoom: 0,
       style: [{ id: 'line', type: 'line', 'source-layer': 'test', paint: { 'line-width': 2 } }],
     };
@@ -448,7 +448,7 @@ Then('cross-origin vector tile workers preserve results and release blob URLs on
       await this.page.goto(this.baseUrl);
       const origin = `http://127.0.0.1:${server.address().port}`;
       await this.page.addScriptTag({ url: `${origin}/plugin.js` });
-      const bytes = [...tile([feature(2, [9, 0, 0, 10, 20, 20])])];
+      const bytes = [...tile([feature(2, [9, 0, 0, 10, 200, 200])])];
       const result = await this.page.evaluate(async ({ origin, bytes }) => {
         const { onVectorTileAdd, onVectorTileRemove, vectorTileOptionsByLayer } = vectorWorkerTest;
         const created = [], revoked = [];

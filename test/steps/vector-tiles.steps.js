@@ -3,6 +3,7 @@ import { Then } from '@cucumber/cucumber';
 import { field, feature, tile } from '../fixtures/vector-tile.js';
 import { prepare3DChecks } from './3d.steps.js';
 import { build } from 'esbuild';
+import { decodeVectorTile } from '../../src/mvt/decodeVectorTile.js';
 
 Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
   { timeout: 90000 }, async function () {
@@ -34,14 +35,14 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
       ]),
     }));
     await this.context.route('https://opentopomap.org/vector/otm_layers.json', route => route.fulfill({
-      body: JSON.stringify([
+      body: `const otm_layers = ${JSON.stringify([
         { id: 'buildings', type: 'fill', source: 'opentopomap-vector', 'source-layer': 'buildings',
           paint: { 'fill-color': '#888' } },
         { id: 'roads', type: 'line', source: 'opentopomap-vector', 'source-layer': 'streets',
           paint: { 'line-color': '#fff', 'line-width': 3 } },
         { id: 'place', type: 'symbol', source: 'opentopomap-vector', 'source-layer': 'place_labels',
           layout: { 'text-field': '{name}', 'text-size': 12 } },
-      ]),
+      ])};`,
     }));
     const building = tile([feature(3, [
       9, 512, 512, 26, 3072, 0, 0, 3072, 3071, 0, 15,
@@ -163,7 +164,8 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
       assert.ok(snapshot.elapsed < 150, `Dense-tile view update exceeds 150 ms: ${JSON.stringify(snapshot)}`);
     }
     assert.ok(downloads.length > 0);
-    assert.ok(downloads.every(url => /\/14\//.test(url)), 'Overzoom never requests unsupported tiles');
+    assert.ok(downloads.every(url => Number(new URL(url).pathname.split('/')[2]) <= 14),
+      'Overzoom never requests unsupported tiles');
     assert.deepEqual(result.failure, []);
     await this.page.evaluate(() => {
       globalThis.originalVectorTiles = Object.values(map._layers).find(layer => layer.tiles);
@@ -217,8 +219,7 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
       error.message += `\nVector sources: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
       throw error;
     });
-    const decoder = await this.page.evaluate(bytes =>
-      L.Util.decodeVectorTile(new Uint8Array(bytes)).map(layer => layer.name), [...body]);
+    const decoder = decodeVectorTile(body).map(layer => layer.name);
     assert.deepEqual(decoder, ['buildings', 'streets', 'place_labels']);
     assert.deepEqual(libraryRequests, [], 'MVT support is bundled without runtime library or source imports');
     assert.deepEqual(errors, []);

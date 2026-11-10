@@ -47,6 +47,9 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
+GeoJSON sources require `data` or a `url`. Providing only a `style` emits an
+`error` event; `{ source: { type: 'vector' } }` remains a valid empty scene.
+
 ### Time and walk controls
 
 The walk camera follows vertical ascent and descent as well as horizontal
@@ -135,4 +138,4 @@ src/
 ```
 
 **Compatibile with:**
-[![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--beta.2-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)
+[![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--beta.3-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)

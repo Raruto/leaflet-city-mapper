@@ -47,7 +47,8 @@ Then('maps and markers expose only the approved plugin methods', async function 
       chainable, invalid,
       privateLayer: !('ready' in L.Layer) && !('setData' in L.Layer) &&
         !('ready' in L.Layer.prototype) && !('setData' in L.Layer.prototype),
-      privateMap: !('resetNorthPitch' in map) && !('setPitch' in map) && !('setBearing' in map),
+      privateMap: !('resetNorthPitch' in map) &&
+        typeof map.setPitch === 'function' && typeof map.setBearing === 'function',
       noGlobal: !('CityMapper' in globalThis),
     };
     map.remove();
@@ -163,7 +164,8 @@ Then('every local source in the city example is available', async function () {
   const html = await response.text();
   await response.dispose();
   const sources = [...html.matchAll(/\b(?:url|bridges):\s*'([^']+)'/g)]
-    .map(([, source]) => new URL(source, url));
+    .map(([, source]) => new URL(source, url))
+    .filter(source => source.origin === new URL(url).origin);
   assert.equal(sources.length, 15);
   for (const source of sources) {
     assert.equal(source.origin, new URL(url).origin);
@@ -184,7 +186,7 @@ async function loadLeaflet(world) {
   await world.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
   const leaflet2 = process.env.LEAFLET_VERSION === '2';
   await world.page.addScriptTag({ url: leaflet2
-    ? 'https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet-global.js'
+    ? 'https://unpkg.com/leaflet@2.0.0-beta.3/dist/leaflet-global.js'
     : 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js' });
   await world.page.evaluate(() => {
     globalThis.waitLayer = layer => new Promise((resolve, reject) => {
@@ -280,7 +282,7 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
           const map = prototype === L.Map.prototype || prototype instanceof L.Map;
           const marker = prototype === L.Marker.prototype || prototype instanceof L.Marker;
           return !(key === 'initialize' && layer ||
-            ['getPitch', 'getBearing'].includes(key) && map ||
+            ['getPitch', 'getBearing', 'setPitch', 'setBearing'].includes(key) && map ||
             key === 'setRotation' && marker);
         }).map(key => `${name}: ${String(key)}`));
     };

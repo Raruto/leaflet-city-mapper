@@ -8,25 +8,26 @@ import { colorTexture as sharedColorTexture } from '../globals/colorTexture.js';
 import { destroyTexture } from '../textures/destroyTexture.js';
 
 export function resizeRenderer(layer, size) {
+  const renderer = rendererByLayer.get(layer);
   if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {
-    rendererByLayer.get(layer).width = size.x;
-    rendererByLayer.get(layer).height = size.y;
-    rendererByLayer.get(layer).canvas.width = Math.round(size.x * rendererByLayer.get(layer).dpr);
-    rendererByLayer.get(layer).canvas.height = Math.round(size.y * rendererByLayer.get(layer).dpr);
-    rendererByLayer.get(layer).canvas.style.width = `${size.x}px`;
-    rendererByLayer.get(layer).canvas.style.height = `${size.y}px`;
-    if (rendererByLayer.get(layer).depthTexture) destroyTexture(layer, rendererByLayer.get(layer).depthTexture);
-    rendererByLayer.get(layer).colorTexture?.destroy();
-    rendererByLayer.get(layer).colorTexture = rendererByLayer.get(layer).device.createTexture((
-      sharedColorTexture.size[0] = rendererByLayer.get(layer).canvas.width,
-      sharedColorTexture.size[1] = rendererByLayer.get(layer).canvas.height,
-      sharedColorTexture.format = rendererByLayer.get(layer).format,
+    renderer.width = size.x;
+    renderer.height = size.y;
+    renderer.canvas.width = Math.round(size.x * renderer.dpr);
+    renderer.canvas.height = Math.round(size.y * renderer.dpr);
+    renderer.canvas.style.width = `${size.x}px`;
+    renderer.canvas.style.height = `${size.y}px`;
+    if (renderer.depthTexture) destroyTexture(layer, renderer.depthTexture);
+    renderer.colorTexture?.destroy();
+    renderer.colorTexture = renderer.device.createTexture((
+      sharedColorTexture.size[0] = renderer.canvas.width,
+      sharedColorTexture.size[1] = renderer.canvas.height,
+      sharedColorTexture.format = renderer.format,
       sharedColorTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT,
       sharedColorTexture
     ));
-    rendererByLayer.get(layer).depthTexture = rendererByLayer.get(layer).device.createTexture((
-      sharedDepthTexture.size[0] = rendererByLayer.get(layer).canvas.width,
-      sharedDepthTexture.size[1] = rendererByLayer.get(layer).canvas.height,
+    renderer.depthTexture = renderer.device.createTexture((
+      sharedDepthTexture.size[0] = renderer.canvas.width,
+      sharedDepthTexture.size[1] = renderer.canvas.height,
       sharedDepthTexture.usage = GPUTextureUsage.RENDER_ATTACHMENT,
       sharedDepthTexture
     ));
