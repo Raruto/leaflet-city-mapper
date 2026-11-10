@@ -18,7 +18,7 @@ Feature: Visible solar time control
     And a solar control is added to the map
     Then solar control toggles and invalid dates clear lighting and recover
 
-  Scenario Outline: Solar depth, shadows and night lighting are checked independently
+  Scenario Outline: Solar lighting preserves <effect>
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Time"
     Then solar lighting preserves "<effect>"
 

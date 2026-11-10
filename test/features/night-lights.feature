@@ -4,7 +4,7 @@ Feature: Indicative Paris night lighting
     Given the offline Paris example loads only "Streetlights, Eiffel Tower, Time"
     Then the real streetlight inventory has valid geometry, supports and tooltips
 
-  Scenario Outline: Real lighting renders one effect at a time
+  Scenario Outline: Real lighting renders <effect>
     Given the offline Paris example loads only "<layers>"
     Then real night lighting preserves "<effect>"
 

@@ -259,22 +259,10 @@ Then('solar lighting preserves {string}', { timeout: 30000 }, async function (ch
         return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size,
           dayLight: renderer.uniformData[51], covered };
       }
-      renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
       const capture = async disabled => {
         const altitude = globals.cameraByMap.get(map)._sunlight.altitude;
         if (disabled) globals.cameraByMap.get(map)._sunlight.altitude = 2;
-        nativeChecks.render.render(owner);
-        const width = renderer.canvas.width, height = renderer.canvas.height;
-        const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
-        const buffer = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        const encoder = device.createCommandEncoder();
-        encoder.copyTextureToBuffer({ texture: renderer.context.getCurrentTexture() },
-          { buffer, bytesPerRow }, [width, height]);
-        device.queue.submit([encoder.finish()]);
-        await buffer.mapAsync(GPUMapMode.READ);
-        const pixels = new Uint8Array(buffer.getMappedRange()).slice();
-        buffer.unmap(); buffer.destroy();
+        const pixels = await nativeChecks.pixels(owner);
         globals.cameraByMap.get(map)._sunlight.altitude = altitude;
         return pixels;
       };

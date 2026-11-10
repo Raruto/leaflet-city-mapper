@@ -139,12 +139,19 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
     error.message += `\nScene state: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
     throw error;
   });
+  await this.page.waitForFunction(() => {
+    let settled = true;
+    nativeChecks.graph.traverse(globals.sceneByLayer.get(globals.renderers.get(map)).scene, mesh => {
+      if (mesh.visible && mesh._visibleInFrame && mesh._appearance !== undefined && mesh._appearance !== 1) settled = false;
+    });
+    return settled;
+  });
   await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
   let result;
   try {
     result =   await this.page.evaluate(async check => {
       const layer = streetlights, owner = globals.renderers.get(map);
-      const { device, context, canvas, format } = globals.sceneByLayer.get(owner).renderer;
+      const { device } = globals.sceneByLayer.get(owner).renderer;
       const gpuErrors = [];
       device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
       const date = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
@@ -152,24 +159,8 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
       const select = minute => {
         date.value = '2026-06-21'; slider.value = String(minute);
         slider.dispatchEvent(new Event('input', { bubbles: true }));
-        nativeChecks.render.render(owner);
       };
-      context.configure({ device, format, alphaMode: 'premultiplied',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
-      const capture = async () => {
-        nativeChecks.render.render(owner);
-        const bytesPerRow = Math.ceil(canvas.width * 4 / 256) * 256;
-        const buffer = device.createBuffer({ size: bytesPerRow * canvas.height,
-          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        const encoder = device.createCommandEncoder();
-        encoder.copyTextureToBuffer({ texture: context.getCurrentTexture() }, { buffer, bytesPerRow },
-          [canvas.width, canvas.height]);
-        device.queue.submit([encoder.finish()]);
-        await buffer.mapAsync(GPUMapMode.READ);
-        const pixels = new Uint8Array(buffer.getMappedRange()).slice();
-        buffer.unmap(); buffer.destroy();
-        return pixels;
-      };
+      const capture = () => nativeChecks.pixels(owner);
       const brighter = (a, b) => {
         let count = 0;
         for (let i = 0; i < a.length; i += 4) {
@@ -181,14 +172,14 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
       const nightStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
       if (check === 'daylight poles and disabled lighting') {
         select(720);
-        const dayStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
         const dayLit = await capture();
+        const dayStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
         globals.sceneByLayer.get(layer).root.visible = false;
         const dayWithoutLamps = await capture();
         globals.sceneByLayer.get(layer).root.visible = true;
         select(0);
         map.removeLayer(sunlightOverlay);
-        nativeChecks.render.render(owner);
+        await nativeChecks.pixels(owner, 0, 0, 1, 1);
         const disabledStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
         map.addLayer(sunlightOverlay);
         return { nightStrength, dayStrength, disabledStrength,
