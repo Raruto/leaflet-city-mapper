@@ -121,7 +121,12 @@ async function getBrowser() {
         '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'],
     }
     // Windows needs a window for WebGPU; avoid launching and closing a headless browser first.
-    : { ...options, headless: process.platform !== 'win32' };
+    : {
+      ...options, headless: process.platform !== 'win32',
+      // The auxiliary DX12 diagnostic process can stall Chromium shutdown on Windows.
+      args: process.platform === 'win32' && engine === chromium
+        ? ['--disable-gpu-process-for-dx12-info-collection'] : undefined,
+    };
   browser = await engine.launch(launchOptions);
   // Headless Firefox (and some GPUs/drivers) expose no WebGPU adapter: retry with a window when one can open.
   // Without any adapter the @coverage scenarios fail instead of being skipped.
