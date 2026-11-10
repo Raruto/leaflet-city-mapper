@@ -47,9 +47,6 @@ const buildings = new L.Layer({
 }).addTo(map);
 ```
 
-GeoJSON sources require `data` or a `url`. Providing only a `style` emits an
-`error` event; `{ source: { type: 'vector' } }` remains a valid empty scene.
-
 ### Time and walk controls
 
 The walk camera follows vertical ascent and descent as well as horizontal
