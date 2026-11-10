@@ -1,5 +1,5 @@
 import * as globals from '../fixtures/globals.js';
-import { dependencyFile } from '../fixtures/dependencies.js';
+import { createTestContext, createTestPage } from '../fixtures/browser-environment.js';
 
 
 import assert from 'node:assert/strict';
@@ -323,14 +323,12 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
 });
 
 Then('a touch device can enable and immediately disable the lens', { timeout: 60000 }, async function () {
-  const context = await this.context.browser().newContext({
+  const context = await createTestContext(this.context.browser(), this.unexpectedRequests, {
     viewport: { width: 375, height: 667 },
     isMobile: this.context.browser().browserType().name() !== 'firefox', hasTouch: true,
   });
   try {
-    await context.route('https://unpkg.com/leaflet@*/dist/*', route =>
-      route.fulfill({ path: dependencyFile(route.request().url()) }));
-    const page = await context.newPage();
+    const page = await createTestPage(context);
     await page.goto(this.baseUrl);
     await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><div id="map" style="width:375px;height:600px"></div>');
     const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.3' : '1.9.4';
@@ -483,9 +481,15 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
       const state = globals.sceneByLayer.get(layer);
       return { type: state._type, nightLight: layer.options.nightLight,
         area: state._areas?.get('geojson')?.done, terrain: state._terrainReady,
-        tiles: state._rasterTiles?.size, loading: state._loadingTiles };
+        tiles: state._rasterTiles?.size, loading: state._loadingTiles,
+        pending: state._rasterTiles && [...state._rasterTiles.values()]
+          .filter(tile => !tile.done).slice(0, 5).map(tile => ({
+            coords: tile.coords, started: tile.started, aborted: tile.request?.signal.aborted, error: tile.error,
+          })) };
     }));
-    error.message += `\nLayer state: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
+    const workers = await this.page.evaluate(() => [...testWeakmaps.geometryWorkersByMap.get(map).entries]
+      .map(entry => ({ input: entry.task?.input, aborted: entry.task?.signal.aborted })));
+    error.message += `\nLayer state: ${JSON.stringify(state)}\nWorkers: ${JSON.stringify(workers)}\nPage errors: ${JSON.stringify(errors)}`;
     throw error;
   });
   const data = await (await this.context.request.get(`${this.baseUrl}/examples/data/colosseum-lights.json`)).json();
@@ -509,6 +513,7 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     assert.ok(feature.geometry.coordinates[1] > 41.885 && feature.geometry.coordinates[1] < 41.894);
     assert.ok(feature.properties.height > 0 && feature.properties.radius > 0 && feature.properties.flux > 0);
   }
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
   const result = await this.page.evaluate(async () => {
     const lights = Object.values(map._layers).find(layer => layer.options.nightLight);
     const state = globals.sceneByLayer.get(lights);
@@ -542,7 +547,7 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     return { count, removed, nightPixels: brighter(night, dark),
       dayPixels: brighter(day, dayWithout), generatedLights: meshLights.length,
       warm: meshLights.every(light => light.color[0] > light.color[1] && light.color[1] > light.color[2]) };
-  });
+  }).finally(() => this.page.clock.resume());
   assert.equal(result.count, data.features.length);
   assert.equal(result.generatedLights, data.features.length);
   assert.equal(result.removed, 0);

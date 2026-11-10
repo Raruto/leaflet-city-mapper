@@ -120,7 +120,7 @@ Then('the tint is continuous around -18, -6, 0, 10 and 25 degrees', function () 
 
 const invalid = {
   'the sun with an empty date': () => solarPosition('', 48, 2),
-  'the sun with latitude 91': () => solarPosition(new Date(), 91, 2),
+  'the sun with latitude 91': () => solarPosition(new Date('2026-06-21T12:00:00Z'), 91, 2),
   'the moon with "invalid" date': () => moonPosition('invalid', 48, 2),
   'the atmosphere with NaN altitude': () => atmosphere(NaN),
 };

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const cache = new URL('../../node_modules/.cache/browser-test-dependencies/', import.meta.url);
@@ -14,19 +14,24 @@ for (const version of ['1.9.4', '2.0.0-beta.3']) {
 for (const file of ['dist/ol.js', 'ol.css']) {
   files.set(`https://cdn.jsdelivr.net/npm/ol@10.6.1/${file}`, new URL(`ol-10.6.1/${file}`, cache));
 }
+for (const file of ['maplibre-gl.js', 'maplibre-gl.css']) {
+  files.set(`https://unpkg.com/maplibre-gl@5.24.0/dist/${file}`, new URL(`maplibre-gl-5.24.0/${file}`, cache));
+}
 
 export function dependencyFile(url) {
   const file = files.get(url.replace('leaflet@1.9/', 'leaflet@1.9.4/'));
   return file && fileURLToPath(file);
 }
 
-export async function prepareDependencies() {
+export async function prepareDependencies({ download = false } = {}) {
   for (const [url, file] of files) {
     try {
-      if ((await readFile(file)).length) continue;
+      const cached = await stat(file);
+      if (cached.isFile() && cached.size) continue;
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
+    if (!download) throw new Error(`Missing cached test dependency: ${url}. Run npm test to prepare the cache automatically.`);
     console.log(`Downloading test dependency: ${url}`);
     const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
     if (!response.ok) throw new Error(`Test dependency ${url}: HTTP ${response.status}`);

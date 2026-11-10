@@ -5,6 +5,7 @@ import { Script } from 'node:vm';
 import { build } from 'esbuild';
 import { Then } from '@cucumber/cucumber';
 import { mockLeaflet } from '../fixtures/leaflet.js';
+import { createTestContext, createTestPage } from '../fixtures/browser-environment.js';
 import { buildAreaFeature } from '../../src/sources/buildAreaFeature.js';
 import { assembleAreaGeometry } from '../../src/geometry/assembleAreaGeometry.js';
 import { instanceAreaGeometry } from '../../src/geometry/instanceAreaGeometry.js';
@@ -282,9 +283,9 @@ Then('geometry worker tasks transfer results and terminate on every exit', async
 });
 
 Then('native and bundled geometry workers preserve results without blocking animation frames', { timeout: 60000 }, async function () {
-  const context = await this.context.browser().newContext();
+  const context = await createTestContext(this.context.browser(), this.unexpectedRequests);
   try {
-    const page = await context.newPage();
+    const page = await createTestPage(context);
     await page.goto(this.baseUrl);
     const result = await page.evaluate(async () => {
       const { assembleAreaGeometry } = await import('/src/geometry/assembleAreaGeometry.js');

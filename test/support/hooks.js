@@ -5,7 +5,8 @@ import { chromium, firefox } from 'playwright';
 import { build } from 'esbuild';
 import { startServer } from '../../build/server.js';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
-import { dependencyFile, prepareDependencies } from '../fixtures/dependencies.js';
+import { prepareDependencies } from '../fixtures/dependencies.js';
+import { createTestContext, createTestPage, fetchLocal, resetTestContext } from '../fixtures/browser-environment.js';
 
 setDefaultTimeout(10000);
 
@@ -46,10 +47,14 @@ AfterAll(function () {
 
 let server;
 let browser;
+let context;
+const unexpectedRequests = [];
 let baseUrl;
 let pluginBundle;
+const fetchNode = globalThis.fetch;
 
 BeforeAll({ timeout: 900000 }, async () => {
+  globalThis.fetch = fetchLocal;
   await prepareDependencies();
   const result = await build({
     entryPoints: ['test/fixtures/plugin.js'],
@@ -109,10 +114,13 @@ AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => 
   try {
     await browser?.close();
   } finally {
-    await new Promise((resolve, reject) => {
-      server.close(error => error ? reject(error) : resolve());
-      server.closeAllConnections();
-    });
+    globalThis.fetch = fetchNode;
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close(error => error ? reject(error) : resolve());
+        server.closeAllConnections();
+      });
+    }
   }
 });
 
@@ -120,14 +128,13 @@ AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => 
 Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 60000 }, async function () {
   await getBrowser();
   this.baseUrl = baseUrl;
-  this.context = await browser.newContext();
+  if (context) await resetTestContext(context, unexpectedRequests);
+  else context = await createTestContext(browser, unexpectedRequests);
+  this.unexpectedRequests = unexpectedRequests;
+  this.context = context;
   await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
-  await this.context.route(/^https:\/\/(?:unpkg\.com\/leaflet@|cdn\.jsdelivr\.net\/npm\/ol@)/, route => {
-    const path = dependencyFile(route.request().url());
-    if (!path) throw new Error(`Unprepared test dependency: ${route.request().url()}`);
-    return route.fulfill({ path });
-  });
   await this.context.route('**/libs/leaflet.js', async route => {
+    if (new URL(route.request().url()).origin !== baseUrl) return route.fallback();
     const response = await route.fetch();
     let body = (await response.text())
       .replace(/https:\/\/unpkg\.com\/leaflet-city-mapper(?:@[^/\s"'<>]+)?\//g, `${baseUrl}/`);
@@ -141,6 +148,7 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     await route.fulfill({ response, body });
   });
   await this.context.route(/\.html(?:\?.*)?$/, async route => {
+    if (new URL(route.request().url()).origin !== baseUrl) return route.fallback();
     const response = await route.fetch();
     const version = process.env.LEAFLET_VERSION;
     let body = (await response.text())
@@ -201,6 +209,7 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   this.pluginBundle = pluginBundle;
   // Source-level checks and the instrumented bundle share each global's identity.
   await this.context.route(/\/src\/(?:globals|weakmaps)\/[^/]+\.js$/, async route => {
+    if (new URL(route.request().url()).origin !== baseUrl) return route.fallback();
     if (!await this.page.evaluate(() => Boolean(globalThis.globals))) return route.continue();
     const parts = new URL(route.request().url()).pathname.split('/');
     const name = parts.pop().slice(0, -3);
@@ -211,7 +220,7 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     });
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
-  this.page = await this.context.newPage();
+  this.page = await createTestPage(this.context);
   this.browserErrors = [];
   this.page.on('pageerror', error => this.browserErrors.push(error.message));
   this.page.on('console', message => {
@@ -223,7 +232,10 @@ After({ tags: 'not @unit' }, async function ({ result }) {
   if (result?.status === Status.FAILED && this.browserErrors?.length) {
     console.error('Browser errors:', this.browserErrors.join('\n'));
   }
-  await this.context?.close();
+  if (this.context) {
+    for (const page of this.context.pages()) await page.close();
+  }
+  assert.deepEqual(this.unexpectedRequests, [], 'External requests must have local fixtures');
 });
 
 // Firefox may take several seconds to create its first WebGPU adapter.

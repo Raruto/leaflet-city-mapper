@@ -4,6 +4,7 @@ import { field, feature, tile } from '../fixtures/vector-tile.js';
 import { prepare3DChecks } from './3d.steps.js';
 import { build } from 'esbuild';
 import { decodeVectorTile } from '../../src/mvt/decodeVectorTile.js';
+import { PNG } from 'pngjs';
 
 Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
   { timeout: 90000 }, async function () {
@@ -44,6 +45,13 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
           layout: { 'text-field': '{name}', 'text-size': 12 } },
       ])};`,
     }));
+    await this.context.route(/https:\/\/opentopomap\.org\/vector\/otm_sprite(?:@2x)?\.json$/, route =>
+      route.fulfill({ json: {} }));
+    const sprite = PNG.sync.write(new PNG({ width: 1, height: 1 }));
+    await this.context.route(/https:\/\/opentopomap\.org\/vector\/otm_sprite(?:@2x)?\.png$/, route =>
+      route.fulfill({ contentType: 'image/png', body: sprite }));
+    await this.context.route('https://fonts.undpgeohub.org/fonts/**', route =>
+      route.fulfill({ contentType: 'application/x-protobuf', body: Buffer.alloc(0) }));
     const building = tile([feature(3, [
       9, 512, 512, 26, 3072, 0, 0, 3072, 3071, 0, 15,
       9, 0, 3071, 26, 512, 1024, 512, 1023, 1023, 0, 15,

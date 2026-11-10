@@ -1,6 +1,47 @@
 import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
+import { createTestContext, createTestPage, resetTestContext, testTime } from '../fixtures/browser-environment.js';
+import { PNG } from 'pngjs';
+
+Then('unmocked Node downloads fail without reaching the network', async function () {
+  await assert.rejects(fetch('https://fixture.invalid/unmocked'), /External Node request must have a local fixture/);
+});
+
+Then('browser fixtures fix time across navigation and reject unmocked external requests', { timeout: 30000 }, async function () {
+  const unexpected = [];
+  const context = await createTestContext(this.context.browser(), unexpected);
+  try {
+    const page = await createTestPage(context);
+    await page.clock.pauseAt(Date.parse(testTime) + 1000);
+    for (let i = 0; i < 2; i++) {
+      await page.goto(this.baseUrl);
+      assert.deepEqual(await page.evaluate(() => ({
+        now: new Date().toISOString(), zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })), { now: '2026-06-21T12:00:01.000Z', zone: 'UTC' });
+    }
+    await context.route('https://fixture.invalid/mocked', route => route.fulfill({ body: 'local fixture' }));
+    const result = await page.evaluate(async () => ({
+      mocked: await (await fetch('https://fixture.invalid/mocked')).text(),
+      blocked: await fetch('https://fixture.invalid/unmocked').then(() => false, () => true),
+    }));
+    assert.deepEqual(result, { mocked: 'local fixture', blocked: true });
+    assert.deepEqual(unexpected, ['https://fixture.invalid/unmocked']);
+    await page.clock.runFor(2000);
+    assert.equal(await page.evaluate(() => new Date().toISOString()), '2026-06-21T12:00:03.000Z');
+    await context.addCookies([{ name: 'previous-scenario', value: '1', url: this.baseUrl }]);
+    await resetTestContext(context, unexpected);
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(await context.cookies(), []);
+    assert.deepEqual(unexpected, []);
+    const next = await createTestPage(context);
+    await next.goto(this.baseUrl);
+    assert.equal(await next.evaluate(() => fetch('https://fixture.invalid/mocked').then(() => false, () => true)), true);
+    assert.deepEqual(unexpected, ['https://fixture.invalid/mocked']);
+  } finally {
+    await context.close();
+  }
+});
 
 Given('the example {string} is loaded without the package CDN', { timeout: 30000 }, async function (example) {
   this.exampleErrors = [];
@@ -10,6 +51,13 @@ Given('the example {string} is loaded without the package CDN', { timeout: 30000
     this.packageRequests.push(route.request().url());
     return route.abort();
   });
+  if (example === 'leaflet-city-mapper-native') {
+    const image = new PNG({ width: 256, height: 256 });
+    image.data.fill(255);
+    const body = PNG.sync.write(image);
+    await this.context.route(/^https:\/\/(?:tile\.openstreetmap\.org|ows\.terrestris\.de)\//,
+      route => route.fulfill({ contentType: 'image/png', body }));
+  }
   await this.page.goto(`${this.baseUrl}/examples/${example}.html`, { waitUntil: 'load' });
 });
 

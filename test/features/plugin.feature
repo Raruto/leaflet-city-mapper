@@ -1,4 +1,11 @@
 Feature: Separate plugin integration
+  @unit
+  Scenario: Node tests reject external network access
+    Then unmocked Node downloads fail without reaching the network
+
+  Scenario: Browser tests isolate time and network access
+    Then browser fixtures fix time across navigation and reject unmocked external requests
+
   Scenario: Only the approved convenience methods are exposed on Leaflet
     Given the city mapper plugin is loaded after Leaflet alone
     Then maps and markers expose only the approved plugin methods

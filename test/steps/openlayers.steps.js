@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Given, Then } from '@cucumber/cucumber';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
+import { dependencyFile } from '../fixtures/dependencies.js';
 
 async function assertEngineControl(page, openlayers) {
   const control = page.locator('.map-engine-control');
@@ -188,7 +189,6 @@ Given('the shared example can load OpenLayers', { timeout: 60000 }, async functi
     if (/\/leaflet@[^/]+\/dist\/.*\.(js|css)/.test(request.url())) this.leafletRequests.push(request.url());
   });
   await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
-  await this.page.clock.install();
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html?engine=openlayers`, { waitUntil: 'domcontentloaded' });
   assert.deepEqual(this.openlayersErrors, []);
   await this.page.waitForFunction(() => globalThis.map && document.querySelector('.ol-city-rotate'));
@@ -270,7 +270,7 @@ Then('OpenLayers drives the source layers and camera without Leaflet JavaScript'
 });
 
 Then('OpenLayers animates wheel and button zoom without restarting each frame', { timeout: 30000 }, async function () {
-  await this.page.clock.pauseAt(new Date(Date.now() + 1000));
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
   const initial = await this.page.evaluate(() => ({ center: map.getCenter(), zoom: map.getZoom() }));
   try {
     for (const kind of ['wheel', 'button', 'out']) {
@@ -332,7 +332,7 @@ Then('OpenLayers animates wheel and button zoom without restarting each frame', 
 });
 
 Then('OpenLayers wheel steps match Leaflet', { timeout: 60000 }, async function () {
-  const leaflet = await readFile(new URL('../../node_modules/leaflet/dist/leaflet-src.js', import.meta.url), 'utf8');
+  const leaflet = await readFile(dependencyFile('https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js'), 'utf8');
   await this.page.evaluate(source => {
     const frame = window.zoomReference = document.createElement('iframe');
     frame.style.cssText = 'position:absolute;left:-10000px;width:800px;height:600px';
