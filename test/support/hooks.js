@@ -120,7 +120,8 @@ async function getBrowser() {
         '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader',
         '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'],
     }
-    : options;
+    // Windows needs a window for WebGPU; avoid launching and closing a headless browser first.
+    : { ...options, headless: process.platform !== 'win32' };
   browser = await engine.launch(launchOptions);
   // Headless Firefox (and some GPUs/drivers) expose no WebGPU adapter: retry with a window when one can open.
   // Without any adapter the @coverage scenarios fail instead of being skipped.
@@ -155,7 +156,7 @@ async function getBrowser() {
   });
   await page.close();
   if (webgpu) return;
-  if (process.env.CI) {
+  if (process.env.CI || launchOptions.headless === false) {
     if (engine === chromium) {
       const session = await browser.newBrowserCDPSession();
       const { gpu } = await session.send('SystemInfo.getInfo');
@@ -283,9 +284,11 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     const namespace = parts.pop() === 'weakmaps' ? 'testWeakmaps' : 'globals';
     await route.fulfill({
       contentType: 'text/javascript',
-      body: `export const ${name} = globalThis.globals
+      // Top-level await would let workers receive messages before their listeners exist.
+      body: `import { ${name} as original } from ${JSON.stringify(`${pathname}?unbundled`)};
+        export const ${name} = globalThis.globals
         ? globalThis.${namespace}.${name}
-        : (await import(${JSON.stringify(`${pathname}?unbundled`)})).${name};`,
+        : original;`,
     });
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
