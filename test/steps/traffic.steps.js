@@ -96,7 +96,8 @@ Then('traffic counts wrap together and clean up across layer toggles', async fun
     const modes = ['car', 'bus', 'boat', 'bicycle', 'pedestrian', 'tram', 'metro'];
     const traffic = modes.map(vehicle => new L.Layer({ source: { type: 'traffic', url, vehicle } }));
     const group = new L.LayerGroup(traffic);
-    const control = new L.Control.Layers({}, { Traffic: group }, { collapsed: false }).addTo(map);
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    const control = new LayersControl({}, { Traffic: group }, { collapsed: false }).addTo(map);
     group.addTo(map);
     await Promise.all(traffic.map(layer => nativeChecks.ready(layer)));
     const deadline = performance.now() + 5000;

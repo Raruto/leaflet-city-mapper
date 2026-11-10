@@ -37,36 +37,40 @@ import { cleanupCameraTouch } from './cleanupCameraTouch.js';
 import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { addCameraHandler } from './addCameraHandler.js';
 
-Compass.value = L.Handler.extend({
-  addHooks: compassAddHooks,
-  removeHooks: compassRemoveHooks,
-});
+class CompassHandler extends L.Handler {}
+Object.assign(CompassHandler.prototype, { addHooks: compassAddHooks, removeHooks: compassRemoveHooks });
+Compass.value = CompassHandler;
 
-ContainerResize.value = L.Handler.extend({
-  addHooks: containerResizeAddHooks,
-  removeHooks: containerResizeRemoveHooks,
+class ContainerResizeHandler extends L.Handler {}
+Object.assign(ContainerResizeHandler.prototype, {
+  addHooks: containerResizeAddHooks, removeHooks: containerResizeRemoveHooks,
 });
+ContainerResize.value = ContainerResizeHandler;
 
-PitchDrag.value = L.Handler.extend({
-  addHooks: pitchDragAddHooks,
-  removeHooks: pitchDragRemoveHooks,
-});
+class PitchDragHandler extends L.Handler {}
+Object.assign(PitchDragHandler.prototype, { addHooks: pitchDragAddHooks, removeHooks: pitchDragRemoveHooks });
+PitchDrag.value = PitchDragHandler;
 
-ShiftRotate.value = L.Handler.extend({
-  addHooks: shiftRotateAddHooks,
-  removeHooks: shiftRotateRemoveHooks,
+class ShiftRotateHandler extends L.Handler {}
+Object.assign(ShiftRotateHandler.prototype, {
+  addHooks: shiftRotateAddHooks, removeHooks: shiftRotateRemoveHooks,
 });
+ShiftRotate.value = ShiftRotateHandler;
 
-TouchMode.value = L.Handler.extend({
-  addHooks: notifyCameraTouchChange,
-  removeHooks: notifyCameraTouchChange,
+class TouchModeHandler extends L.Handler {}
+Object.assign(TouchModeHandler.prototype, {
+  addHooks: notifyCameraTouchChange, removeHooks: notifyCameraTouchChange,
 });
+TouchMode.value = TouchModeHandler;
 
-L.Control.Rotate = L.Control.extend({
-  options: { position: 'topleft', closeOnZeroBearing: true, visualizePitch: true },
-  onAdd: rotateOnAdd,
-  onRemove: rotateOnRemove,
-});
+class RotateControl extends L.Control {
+  static defaultOptions = { position: 'topleft', closeOnZeroBearing: true, visualizePitch: true };
+}
+Object.assign(RotateControl.prototype, { onAdd: rotateOnAdd, onRemove: rotateOnRemove });
+if (L.version.startsWith('1.')) {
+  RotateControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), RotateControl.defaultOptions);
+}
+L.Control.Rotate = RotateControl;
 
 if (L.control) L.control.rotate = rotateControl;
 

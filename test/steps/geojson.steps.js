@@ -333,8 +333,8 @@ Then('a touch device can enable and immediately disable the lens', { timeout: 60
     const page = await context.newPage();
     await page.goto(this.baseUrl);
     await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><div id="map" style="width:375px;height:600px"></div>');
-    const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-alpha.1' : '1.9.4';
-    const script = version === '1.9.4' ? 'leaflet-src.js' : 'leaflet-global-src.js';
+    const version = process.env.LEAFLET_VERSION === '2' ? '2.0.0-beta.2' : '1.9.4';
+    const script = version === '1.9.4' ? 'leaflet-src.js' : 'leaflet-global.js';
     await page.addStyleTag({ url: `https://unpkg.com/leaflet@${version}/dist/leaflet.css` });
     await page.addScriptTag({ url: `https://unpkg.com/leaflet@${version}/dist/${script}` });
     await page.evaluate(() => { globalThis.L ||= globalThis.leaflet; });

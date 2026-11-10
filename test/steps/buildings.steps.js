@@ -16,7 +16,8 @@ Then('layer counts report loaded elements and survive toggling and failures', { 
         coordinates: [[[2.292, 48.85], [2.293, 48.85], [2.293, 48.851], [2.292, 48.85]]] } },
     ] };
     const layer = new L.Layer({ source: { type: 'vector', data, style: () => ({ top: 8 }) } });
-    const control = new L.Control.Layers({}, { Buildings: layer }, { collapsed: false }).addTo(map);
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    const control = new LayersControl({}, { Buildings: layer }, { collapsed: false }).addTo(map);
     layer.addTo(map);
     await nativeChecks.ready(layer);
     const deadline = performance.now() + 10000;

@@ -1309,6 +1309,7 @@
     }
     map.once("unload", cleanupCameraTouch, map);
   }
+  var CompassHandler, ContainerResizeHandler, PitchDragHandler, ShiftRotateHandler, TouchModeHandler, RotateControl;
   var init_cameraControls = __esm({
     "src/controls/cameraControls.js"() {
       init_cameraTouchStateByMap();
@@ -1345,31 +1346,43 @@
       init_cleanupCameraTouch();
       init_endAllCameraTouches();
       init_addCameraHandler();
-      Compass.value = L.Handler.extend({
-        addHooks: compassAddHooks,
-        removeHooks: compassRemoveHooks
-      });
-      ContainerResize.value = L.Handler.extend({
+      CompassHandler = class extends L.Handler {
+      };
+      Object.assign(CompassHandler.prototype, { addHooks: compassAddHooks, removeHooks: compassRemoveHooks });
+      Compass.value = CompassHandler;
+      ContainerResizeHandler = class extends L.Handler {
+      };
+      Object.assign(ContainerResizeHandler.prototype, {
         addHooks: containerResizeAddHooks,
         removeHooks: containerResizeRemoveHooks
       });
-      PitchDrag.value = L.Handler.extend({
-        addHooks: pitchDragAddHooks,
-        removeHooks: pitchDragRemoveHooks
-      });
-      ShiftRotate.value = L.Handler.extend({
+      ContainerResize.value = ContainerResizeHandler;
+      PitchDragHandler = class extends L.Handler {
+      };
+      Object.assign(PitchDragHandler.prototype, { addHooks: pitchDragAddHooks, removeHooks: pitchDragRemoveHooks });
+      PitchDrag.value = PitchDragHandler;
+      ShiftRotateHandler = class extends L.Handler {
+      };
+      Object.assign(ShiftRotateHandler.prototype, {
         addHooks: shiftRotateAddHooks,
         removeHooks: shiftRotateRemoveHooks
       });
-      TouchMode.value = L.Handler.extend({
+      ShiftRotate.value = ShiftRotateHandler;
+      TouchModeHandler = class extends L.Handler {
+      };
+      Object.assign(TouchModeHandler.prototype, {
         addHooks: notifyCameraTouchChange,
         removeHooks: notifyCameraTouchChange
       });
-      L.Control.Rotate = L.Control.extend({
-        options: { position: "topleft", closeOnZeroBearing: true, visualizePitch: true },
-        onAdd: rotateOnAdd,
-        onRemove: rotateOnRemove
-      });
+      TouchMode.value = TouchModeHandler;
+      RotateControl = class extends L.Control {
+        static defaultOptions = { position: "topleft", closeOnZeroBearing: true, visualizePitch: true };
+      };
+      Object.assign(RotateControl.prototype, { onAdd: rotateOnAdd, onRemove: rotateOnRemove });
+      if (L.version.startsWith("1.")) {
+        RotateControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), RotateControl.defaultOptions);
+      }
+      L.Control.Rotate = RotateControl;
       if (L.control) L.control.rotate = rotateControl;
     }
   });
@@ -1379,9 +1392,6 @@
 
   // src/globals/layerProto.js
   var layerProto = { value: void 0 };
-
-  // src/globals/layerCallInitHooks.js
-  var layerCallInitHooks = { value: void 0 };
 
   // src/globals/removeLayer.js
   var removeLayer = { value: void 0 };
@@ -3997,9 +4007,18 @@
 
   // src/textures/uploadCanvasTexture.js
   async function uploadCanvasTexture(state, key, texture, image, device, width, height) {
-    let bitmap;
+    let bitmap, source = image;
     try {
-      bitmap = await createImageBitmap(image);
+      if (image instanceof HTMLImageElement) {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Unable to rasterize SVG image");
+        context.drawImage(image, 0, 0, width, height);
+        source = canvas;
+      }
+      bitmap = await createImageBitmap(source);
       if (!current(state) || state.textures.get(key) !== texture) return;
       device.queue.copyExternalImageToTexture(
         /* alloc */
@@ -4054,6 +4073,7 @@
     const { backend: layer, textures, meshes } = state;
     let texture = textures.get(key);
     const url = image.currentSrc || image.src;
+    const svg = image instanceof HTMLImageElement && url.startsWith("data:image/svg+xml");
     if (!texture || texture.image !== image || texture.url !== url) {
       if (texture) {
         const mesh = meshes.get(key);
@@ -4086,7 +4106,7 @@
         sampler: device.createSampler(coreSampler)
       };
       textures.set(key, texture);
-      if (image instanceof HTMLCanvasElement) {
+      if (image instanceof HTMLCanvasElement || svg) {
         texture.pending = true;
         uploadCanvasTexture(state, key, texture, image, device, width, height);
       } else {
@@ -6056,6 +6076,7 @@
     const center = map.project(source.getLatLng());
     let radius = source.getRadius(), radiusY = radius, index, i;
     if (source instanceof L.Circle) {
+      if (!source._renderer) source._renderer = map.getRenderer(source);
       source._project();
       const projected = source._point.add(map.getPixelOrigin());
       center.x = projected.x;
@@ -7935,7 +7956,7 @@
     touchPitch: false,
     compassBearing: false
   });
-  L.Map.include({
+  Object.assign(L.Map.prototype, {
     layerPointToContainerPoint: mapLayerPointToContainerPoint,
     containerPointToLayerPoint: mapContainerPointToLayerPoint,
     _getCenterLayerPoint: mapGetCenterLayerPoint,
@@ -7952,7 +7973,7 @@
   L.Map.addInitHook(initializeCameraMap);
   markerMethods.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
   L.Marker.mergeOptions({ rotation: 0, rotateWithView: false, keepUpright: false, scale: 1 });
-  L.Marker.include({
+  Object.assign(L.Marker.prototype, {
     setIcon: markerSetIcon,
     getEvents: markerGetEvents,
     _setPos: markerSetPos,
@@ -7960,26 +7981,26 @@
     _initInteraction: markerInitInteraction
   });
   popupEvents.value = L.Popup.prototype.getEvents;
-  L.Popup.include({
+  Object.assign(L.Popup.prototype, {
     getEvents: popupGetEvents
   });
   tooltipEvents.value = L.Tooltip.prototype.getEvents;
-  L.Tooltip.include({
+  Object.assign(L.Tooltip.prototype, {
     getEvents: tooltipGetEvents
   });
   popupPosition.value = L.Popup.prototype._updatePosition;
   popupPan.value = L.Popup.prototype._adjustPan;
-  L.Popup.include({
+  Object.assign(L.Popup.prototype, {
     _adjustPan: popupAdjustPan,
     _updatePosition: popupUpdatePosition
   });
   tooltipPosition.value = L.Tooltip.prototype._setPosition;
-  L.Tooltip.include({
+  Object.assign(L.Tooltip.prototype, {
     _setPosition: tooltipSetPosition
   });
   tiledBounds.value = L.GridLayer.prototype._getTiledPixelBounds;
   gridEvents.value = L.GridLayer.prototype.getEvents;
-  L.GridLayer.include({
+  Object.assign(L.GridLayer.prototype, {
     getEvents: gridlayerGetEvents,
     _getTiledPixelBounds: gridlayerGetTiledPixelBounds
   });
@@ -8405,6 +8426,16 @@
     } else label.after(element);
   }
 
+  // src/layer-controls/layerControlInputId.js
+  init_L();
+  var addItem = L.LayersControl?.prototype._addItem;
+  if (addItem && !L.Control.Layers) L.LayersControl.prototype._addItem = addLayerControlInputId;
+  function addLayerControlInputId(entry) {
+    const label = addItem.call(this, entry);
+    label.querySelector(".leaflet-control-layers-selector").layerId = L.Util.stamp(entry.layer);
+    return label;
+  }
+
   // src/layer-controls/placeEntry.js
   function placeEntry(map, layer, element) {
     let input, entry;
@@ -8553,14 +8584,19 @@
   }
 
   // src/sunlight/initSunlight.js
-  L.Control.Time = L.Control.extend({
-    options: { position: "bottomright" },
-    initialize,
-    onAdd,
-    onRemove: onRemoveSun,
-    addTo,
-    remove
-  });
+  var TimeControl = class extends L.Control {
+    static defaultOptions = { position: "bottomright" };
+    constructor(options) {
+      super(options);
+      if (L.version.startsWith("2.")) initialize.call(this, options);
+    }
+  };
+  Object.assign(TimeControl.prototype, { onAdd, onRemove: onRemoveSun, addTo, remove });
+  if (L.version.startsWith("1.")) {
+    TimeControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), TimeControl.defaultOptions);
+    TimeControl.prototype.initialize = initialize;
+  }
+  L.Control.Time = TimeControl;
 
   // src/walk/initWalk.js
   init_L();
@@ -11945,12 +11981,19 @@
   }
 
   // src/walk/initWalk.js
-  L.Control.Walk = L.Control.extend({
-    options: { position: "bottomright", speed: 70, distance: 20 },
-    initialize: initialize2,
-    onAdd: onAdd2,
-    onRemove
-  });
+  var WalkControl = class extends L.Control {
+    static defaultOptions = { position: "bottomright", speed: 70, distance: 20 };
+    constructor(options) {
+      super(options);
+      if (L.version.startsWith("2.")) initialize2.call(this, options);
+    }
+  };
+  Object.assign(WalkControl.prototype, { onAdd: onAdd2, onRemove });
+  if (L.version.startsWith("1.")) {
+    WalkControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), WalkControl.defaultOptions);
+    WalkControl.prototype.initialize = initialize2;
+  }
+  L.Control.Walk = WalkControl;
 
   // src/weakmaps/eventMapByLayer.js
   var eventMapByLayer = /* @__PURE__ */ new WeakMap();
@@ -16722,6 +16765,9 @@
     return markerSetRotation(this, rotation);
   }
 
+  // src/core/layerCallInitHooks.js
+  init_L();
+
   // src/core/initializeNativeLayer.js
   init_L();
 
@@ -16848,25 +16894,37 @@
   }
 
   // src/core/layerCallInitHooks.js
-  function layerCallInitHooks2() {
-    if (!sceneLayers.has(this)) {
-      sceneLayers.add(this);
-    }
+  function layerCallInitHooks() {
     const initialized = this._initHooksCalled;
-    layerCallInitHooks.value.call(this);
-    if (!initialized) initializeNativeLayer.call(this);
+    if (!L.version.startsWith("2.")) layerProto.value.callInitHooks.call(this);
+    if (L.version.startsWith("2.") || !initialized) {
+      sceneLayers.add(this);
+      initializeNativeLayer.call(this);
+    }
   }
 
   // src/index.js
-  layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
-  layerCallInitHooks.value = L.Layer.prototype.callInitHooks;
-  L.Layer.include({
-    initialize: layerInitialize,
-    _layerAdd: layerLayerAdd,
-    callInitHooks: layerCallInitHooks2
-  });
+  var leafletLayer = L.Layer;
+  layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(leafletLayer.prototype));
+  layerProto.value._layerAdd = leafletLayer.prototype._layerAdd;
+  if (L.version.startsWith("2.")) {
+    L.Layer = new Proxy(leafletLayer, {
+      construct(target, args, newTarget) {
+        const layer = Reflect.construct(target, args, newTarget);
+        layerInitialize.apply(layer, args);
+        return layer;
+      }
+    });
+    leafletLayer.prototype.constructor = L.Layer;
+    leafletLayer.addInitHook(layerCallInitHooks);
+    L.Layer.addInitHook(layerCallInitHooks);
+  } else {
+    leafletLayer.prototype.initialize = layerInitialize;
+    leafletLayer.prototype.callInitHooks = layerCallInitHooks;
+  }
+  Object.assign(leafletLayer.prototype, { _layerAdd: layerLayerAdd });
   removeLayer.value = L.Map.prototype.removeLayer;
-  L.Map.include({ removeLayer: removeLayer2, getPitch, getBearing, setPitch, setBearing });
-  L.Marker.include({ setRotation });
+  Object.assign(L.Map.prototype, { removeLayer: removeLayer2, getPitch, getBearing, setPitch, setBearing });
+  Object.assign(L.Marker.prototype, { setRotation });
 })();
 //# sourceMappingURL=leaflet-city-mapper-src.js.map

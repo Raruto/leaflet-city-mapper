@@ -13,10 +13,11 @@
 <body>
   <div id="map" aria-label="Gallery of native Leaflet layers rendered with WebGPU"></div>
   <script>
-    const map = new L.Map('map', {
-      center: [48.8583, 2.2945], zoom: 15, rotate: true,
-      preferCanvas: new URLSearchParams(location.search).has('canvas'),
-    });
+    const mapOptions = { center: [48.8583, 2.2945], zoom: 15, rotate: true };
+    if (new URLSearchParams(location.search).has('canvas')) {
+      mapOptions.renderer = L.Canvas ? new L.Canvas() : L.canvas();
+    }
+    const map = new L.Map('map', mapOptions);
     const image = (color, text) => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 128;
@@ -32,7 +33,7 @@
     const icon = new L.Icon({
       iconUrl: image('#c02050', 'Marker'), iconSize: [48, 48], iconAnchor: [24, 48],
     });
-    const CanvasGrid = L.GridLayer.extend({
+    class CanvasGrid extends L.GridLayer {
       createTile(coords) {
         const canvas = document.createElement('canvas'), size = this.getTileSize();
         canvas.width = size.x; canvas.height = size.y;
@@ -43,14 +44,16 @@
         context.font = '16px sans-serif';
         context.fillText(`${coords.z}/${coords.x}/${coords.y}`, 12, 24);
         return canvas;
-      },
-    });
+      }
+    }
+    const WMSTileLayer = L.WMSTileLayer || L.TileLayer.WMS;
+    const LayersControl = L.LayersControl || L.Control.Layers;
     const layers = {
       'TileLayer': new L.TileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
       }),
-      'TileLayer.WMS': new L.TileLayer.WMS('https://ows.terrestris.de/osm/service', {
+      'TileLayer.WMS': new WMSTileLayer('https://ows.terrestris.de/osm/service', {
         layers: 'OSM-WMS',
         format: 'image/png',
         transparent: true,
@@ -135,7 +138,7 @@
       layer.bindTooltip(name);
       layer.addTo(map);
     }
-    new L.Control.Layers({}, {
+    new LayersControl({}, {
       ...layers,
       'DivIcon (DOM)': new L.Marker([48.8583, 2.310], {
         icon: new L.DivIcon({

@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resize.observe(footer);
     map.once('unload', () => { resize.disconnect(); footer.remove(); });
   }
-  const EngineControl = L.Control.extend({
+  class EngineControl extends L.Control {
     onAdd() {
       const container = L.DomUtil.create('div', 'leaflet-bar map-engine-control');
       L.DomEvent.disableClickPropagation(container);
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         location.assign(url.href);
       });
       return container;
-    },
-  });
+    }
+  }
   new EngineControl({ position: 'bottomleft' }).addTo(map);
 });

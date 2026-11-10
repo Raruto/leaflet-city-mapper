@@ -89,7 +89,8 @@ Given('the native WebGPU gallery uses the {string} renderer preference', { timeo
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._nativeGPU)
     .every(layer => globals.sceneByLayer.get(layer)._nativeGPU.meshes?.size > 0) &&
-    globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes?.has('shadow'));
+    globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes?.has(
+      L.version.startsWith('2') ? 'icon' : 'shadow'));
 });
 
 Then('the native method registry restores own and inherited methods after removal', async function () {

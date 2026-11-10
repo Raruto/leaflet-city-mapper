@@ -100,7 +100,6 @@ export { headlight } from '../../src/globals/headlight.js';
 export { hull } from '../../src/globals/hull.js';
 export { imageStates } from '../../src/weakmaps/imageStates.js';
 export { instanceLayout } from '../../src/globals/instanceLayout.js';
-export { layerCallInitHooks } from '../../src/globals/layerCallInitHooks.js';
 export { layerProto } from '../../src/globals/layerProto.js';
 export { limbs } from '../../src/globals/limbs.js';
 export { loading } from '../../src/globals/loading.js';

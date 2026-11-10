@@ -7,11 +7,17 @@ import { addTo } from './addTimeControlToMap.js';
 import { remove } from './removeTimeControl.js';
 import { onRemoveSun } from './onRemoveSun.js';
 
-L.Control.Time = L.Control.extend({
-  options: { position: 'bottomright' },
-  initialize,
-  onAdd,
-  onRemove: onRemoveSun,
-  addTo,
-  remove,
-});
+class TimeControl extends L.Control {
+  static defaultOptions = { position: 'bottomright' };
+
+  constructor(options) {
+    super(options);
+    if (L.version.startsWith('2.')) initialize.call(this, options);
+  }
+}
+Object.assign(TimeControl.prototype, { onAdd, onRemove: onRemoveSun, addTo, remove });
+if (L.version.startsWith('1.')) {
+  TimeControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), TimeControl.defaultOptions);
+  TimeControl.prototype.initialize = initialize;
+}
+L.Control.Time = TimeControl;

@@ -126,7 +126,8 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
 When('I add and remove independent 3D layers', { timeout: 60000 }, async function () {
   this.shared3d = await this.page.evaluate(async () => {
     const { map } = test3d;
-    const control = new L.Control.Layers().addTo(map);
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    const control = new LayersControl().addTo(map);
     const pending = new L.Layer({ source: { type: 'vector', center: [map.getCenter().lat, map.getCenter().lng] } }).addTo(map);
     pending.remove();
     await nativeChecks.ready(pending);

@@ -35,7 +35,7 @@
 				center: [48.8582601, 2.29449985],
 				zoom: 17,
 				minZoom: 14,
-				preferCanvas: true,
+				renderer: L.Canvas ? new L.Canvas() : L.canvas(),
 				rotate: true,
 				rotateControl: { closeOnZeroBearing: false },
 				bearing: 30,
@@ -43,7 +43,8 @@
 				touchRotate: true,
 				touchPitch: true
 			});
-			const layers = new L.Control.Layers({
+			const LayersControl = L.LayersControl || L.Control.Layers;
+			const layers = new LayersControl({
 				'Empty': new L.LayerGroup(),
 				// TODO:
 				// 'OTM (vector)': new L.Layer({

@@ -15,6 +15,7 @@ export function textureFor(state, key, image) {
   const { backend: layer, textures, meshes } = state;
   let texture = textures.get(key);
   const url = image.currentSrc || image.src;
+  const svg = image instanceof HTMLImageElement && url.startsWith('data:image/svg+xml');
   if (!texture || texture.image !== image || texture.url !== url) {
     if (texture) {
       const mesh = meshes.get(key);
@@ -35,7 +36,7 @@ export function textureFor(state, key, image) {
       sampler: device.createSampler(coreSampler),
     };
     textures.set(key, texture);
-    if (image instanceof HTMLCanvasElement) {
+    if (image instanceof HTMLCanvasElement || svg) {
       texture.pending = true;
       uploadCanvasTexture(state, key, texture, image, device, width, height);
     } else {

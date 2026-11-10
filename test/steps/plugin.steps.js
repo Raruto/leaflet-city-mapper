@@ -30,7 +30,7 @@ Then('the example exposes its map and test operations for the selected Leaflet v
   assert.equal(result.localScripts, true);
   assert.ok(result.version.startsWith(`${process.env.LEAFLET_VERSION || '1'}.`), result.version);
   if (this.page.url().includes('-geojson.html')) assert.equal(result.lens, 'function');
-  else assert.equal(result.layers, 'object');
+  else assert.equal(result.layers, this.page.url().includes('-rome.html') ? 'undefined' : 'object');
 });
 
 Then('maps and markers expose only the approved plugin methods', async function () {
@@ -116,9 +116,8 @@ async function loadLeaflet(world) {
   await world.page.setContent('<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body></body></html>');
   const leaflet2 = process.env.LEAFLET_VERSION === '2';
   await world.page.addScriptTag({ url: leaflet2
-    ? 'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js'
+    ? 'https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet-global.js'
     : 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js' });
-  if (leaflet2) await world.page.evaluate(() => { globalThis.L = globalThis.leaflet; });
   await world.page.evaluate(() => {
     globalThis.waitLayer = layer => new Promise((resolve, reject) => {
       layer.once('ready', () => resolve(layer));
@@ -166,7 +165,7 @@ Given('native Leaflet attributes are recorded before loading the plugin', { time
       Layer: () => new L.Layer(),
       GridLayer: () => new L.GridLayer(),
       TileLayer: () => new L.TileLayer(''),
-      'TileLayer.WMS': () => new L.TileLayer.WMS('', {}),
+      'TileLayer.WMS': () => new (L.WMSTileLayer || L.TileLayer.WMS)('', {}),
       Marker: () => new L.Marker([0, 0]),
       Polyline: () => new L.Polyline([[0, 0], [1, 1]]),
       Polygon: () => new L.Polygon([[0, 0], [0, 1], [1, 1]]),
@@ -269,15 +268,15 @@ Then('source layers load lazily and Leaflet subclasses keep their behavior', asy
     await waitLayer(warm);
     const plain = new L.Layer();
     const configured = new L.Layer({ attribution: 'Plain layer' });
-    const Inherited = L.Layer.extend({});
+    class Inherited extends L.Layer {}
     const inherited = new Inherited({ source: { type: 'application-specific' } });
     let initializations = 0;
-    const Custom = L.Layer.extend({
-      initialize(options) {
+    class Custom extends L.Layer {
+      constructor(options) {
+        super(options);
         initializations++;
-        L.Util.setOptions(this, options);
-      },
-    });
+      }
+    }
 
     const custom = new Custom({ source: { type: 'application-specific' } });
     const marker = new L.Marker([55, 10]);

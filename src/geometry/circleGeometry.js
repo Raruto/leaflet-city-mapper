@@ -9,6 +9,7 @@ export function circleGeometry(source, context) {
   const center = map.project(source.getLatLng());
   let radius = source.getRadius(), radiusY = radius, index, i;
   if (source instanceof L.Circle) {
+    if (!source._renderer) source._renderer = map.getRenderer(source);
     source._project();
     const projected = source._point.add(map.getPixelOrigin());
     center.x = projected.x;

@@ -189,7 +189,8 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
     time.remove();
     const timeRemoved = !globals.cameraByMap.get(map)._sunlight && !time.getContainer().isConnected && trafficNow(traffic).live;
     time.layer.addTo(map);
-    const layers = new L.Control.Layers({}, { Shadows: time.layer }).addTo(map);
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    const layers = new LayersControl({}, { Shadows: time.layer }).addTo(map);
     await new Promise(resolve => queueMicrotask(resolve));
     const nested = layers.getContainer().contains(time.getContainer()) &&
       !time.getContainer().classList.contains('leaflet-control') && time.time.getTime() === selected;

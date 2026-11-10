@@ -3,23 +3,32 @@
   const L = globalThis.L || globalThis.leaflet;
   if (!L?.Control) throw new Error('Leaflet must be loaded before leaflet-lens.js');
 
-  L.Control.Lens = L.Control.extend({
-    options: { position: 'topright', radius: 150, enabled: true },
+  function initializeLens(outerLayer, innerLayer, options) {
+    L.Util.setOptions(this, options);
+    if (options?.enabled === undefined) {
+      this.options.enabled = !matchMedia('(hover: none) and (pointer: coarse)').matches;
+    }
+    if (!outerLayer?.options || !innerLayer?.options || outerLayer === innerLayer) {
+      throw new TypeError('Lens requires two distinct raster layers');
+    }
+    if (!Number.isFinite(this.options.radius) || this.options.radius <= 0) {
+      throw new RangeError('Lens radius must be positive and finite in CSS pixels');
+    }
+    if (typeof this.options.enabled !== 'boolean') throw new TypeError('Lens enabled must be boolean');
+    this._layers = [outerLayer, innerLayer];
+  }
 
-    initialize(outerLayer, innerLayer, options) {
-      L.Util.setOptions(this, options);
-      if (options?.enabled === undefined) {
-        this.options.enabled = !matchMedia('(hover: none) and (pointer: coarse)').matches;
+  class LensControl extends L.Control {
+    static defaultOptions = { position: 'topright', radius: 150, enabled: true };
+
+    constructor(outerLayer, innerLayer, options) {
+      if (L.version.startsWith('2.')) {
+        super(options);
+        initializeLens.call(this, outerLayer, innerLayer, options);
+      } else {
+        super(outerLayer, innerLayer, options);
       }
-      if (!outerLayer?.options || !innerLayer?.options || outerLayer === innerLayer) {
-        throw new TypeError('Lens requires two distinct raster layers');
-      }
-      if (!Number.isFinite(this.options.radius) || this.options.radius <= 0) {
-        throw new RangeError('Lens radius must be positive and finite in CSS pixels');
-      }
-      if (typeof this.options.enabled !== 'boolean') throw new TypeError('Lens enabled must be boolean');
-      this._layers = [outerLayer, innerLayer];
-    },
+    }
 
     onAdd(map) {
       for (const layer of this._layers) {
@@ -59,7 +68,7 @@
       }
       this.setEnabled(this.options.enabled);
       return container;
-    },
+    }
 
     onRemove(map) {
       for (const [type, handler] of Object.entries(this._events)) {
@@ -75,7 +84,7 @@
       }
       this._lens = this._button = this._masks = this._originalCutouts = this._events = null;
       map.fire('move');
-    },
+    }
 
     setEnabled(enabled) {
       if (typeof enabled !== 'boolean') throw new TypeError('Lens enabled must be boolean');
@@ -83,11 +92,11 @@
       if (this._button) this._button.setAttribute('aria-pressed', String(enabled));
       if (this._lens) this._hide();
       return this;
-    },
+    }
 
     _toggle() {
       this.setEnabled(!this.options.enabled);
-    },
+    }
 
     _show(point) {
       if (!this.options.enabled) return;
@@ -98,13 +107,13 @@
       this._lens.style.top = `${point.y}px`;
       this._lens.hidden = false;
       this._map.fire('move');
-    },
+    }
 
     _hide() {
       for (const mask of this._masks) mask.radius = 0;
       this._lens.hidden = true;
       this._map.fire('move');
-    },
+    }
 
     _onPointerMove(event) {
       if (event.target.closest('.leaflet-control')) return this._hide();
@@ -113,22 +122,28 @@
         x: (event.clientX - bounds.left) * container.offsetWidth / bounds.width - container.clientLeft,
         y: (event.clientY - bounds.top) * container.offsetHeight / bounds.height - container.clientTop,
       });
-    },
+    }
 
     _onPointerDown(event) {
       if (event.pointerType === 'touch') this._onPointerMove(event);
-    },
+    }
 
     _onPointerLeave(event) {
       if (event.pointerType !== 'touch') this._hide();
-    },
+    }
 
     _onFocus() {
       if (this._lens.hidden) this._show(this._map.getSize().divideBy(2));
-    },
+    }
 
     _onKeyDown(event) {
       if (event.key === 'Escape') this._hide();
-    },
-  });
+    }
+  }
+
+  if (L.version.startsWith('1.')) {
+    LensControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), LensControl.defaultOptions);
+    LensControl.prototype.initialize = initializeLens;
+  }
+  L.Control.Lens = LensControl;
 })();

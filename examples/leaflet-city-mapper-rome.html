@@ -58,7 +58,8 @@
       maxZoom: 19,
       attribution: 'Ortofoto CGR 2002/03 &mdash; <a href="https://geoportale.regione.lazio.it/catalogue/#/dataset/765" title="Cropped and reprojected for this demo">Regione Lazio</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)',
     }).addTo(map);
-    new L.Control.Layers({}, {
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    new LayersControl({}, {
       'Colosseum (3D)': new L.Layer({
         source: {
           data: {

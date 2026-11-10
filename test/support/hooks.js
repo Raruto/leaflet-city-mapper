@@ -134,13 +134,9 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     if (process.env.LEAFLET_VERSION === '2') {
       body = body
         .replace('https://unpkg.com/leaflet@1.9/dist/leaflet-src.js',
-          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js')
+          'https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet-global.js')
         .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css',
-          'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet.css')
-        .replace(
-        'document.addEventListener', String.raw`if (!openlayers) document.write('<script>globalThis.L = globalThis.leaflet;<\/script>');
-document.addEventListener`
-        );
+          'https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet.css');
     }
     await route.fulfill({ response, body });
   });
@@ -155,13 +151,13 @@ document.addEventListener`
       body = body
         .replace(
           '<script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"></script>',
-          '<script src="https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js"></script><script>globalThis.L = globalThis.leaflet;</script>'
+          '<script src="https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet-global.js"></script>'
         )
         .replace(
           '"leaflet": "https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"',
-          '"leaflet": "https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet-global-src.js"'
+          '"leaflet": "https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet-global.js"'
         )
-        .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css', 'https://unpkg.com/leaflet@2.0.0-alpha.1/dist/leaflet.css');
+        .replace('https://unpkg.com/leaflet@1.9/dist/leaflet.css', 'https://unpkg.com/leaflet@2.0.0-beta.2/dist/leaflet.css');
     }
     await route.fulfill({ response, body, headers: response.headers() });
   });

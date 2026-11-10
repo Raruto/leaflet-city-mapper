@@ -1,6 +1,5 @@
 import { L } from './globals/L.js';
 import { layerProto } from './globals/layerProto.js';
-import { layerCallInitHooks as sharedLayerCallInitHooks } from './globals/layerCallInitHooks.js';
 import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';
 
 import './camera/mapCamera.js';
@@ -16,6 +15,8 @@ import { setPitch } from './camera/setPitch.js';
 import { setBearing } from './camera/setBearing.js';
 import { setRotation } from './core/setRotation.js';
 import { layerCallInitHooks } from './core/layerCallInitHooks.js';
+
+const leafletLayer = L.Layer;
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -37,8 +38,26 @@ import { layerCallInitHooks } from './core/layerCallInitHooks.js';
  * When `type` is omitted, *.pmtiles and *.tif/*.tiff URLs use 'raster'; other sources use 'vector'.
  */
 
-layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Layer.prototype));
-sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
+layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(leafletLayer.prototype));
+layerProto.value._layerAdd = leafletLayer.prototype._layerAdd;
+
+if (L.version.startsWith('2.')) {
+  L.Layer = new Proxy(leafletLayer, {
+    construct(target, args, newTarget) {
+      const layer = Reflect.construct(target, args, newTarget);
+      layerInitialize.apply(layer, args);
+      return layer;
+    },
+  });
+  leafletLayer.prototype.constructor = L.Layer;
+  leafletLayer.addInitHook(layerCallInitHooks);
+  L.Layer.addInitHook(layerCallInitHooks);
+} else {
+  leafletLayer.prototype.initialize = layerInitialize;
+  leafletLayer.prototype.callInitHooks = layerCallInitHooks;
+}
+
+Object.assign(leafletLayer.prototype, { _layerAdd: layerLayerAdd });
 
 /**
  * The 'vector' layer type: native WebGPU scene synchronized with the map camera.
@@ -95,12 +114,6 @@ sharedLayerCallInitHooks.value = L.Layer.prototype.callInitHooks;
  * @param {Layer3DOptions} [options] World origin comes from center or the first map centre.
  */
 
-L.Layer.include({
-  initialize: layerInitialize,
-  _layerAdd: layerLayerAdd,
-  callInitHooks: layerCallInitHooks,
-});
-
 sharedRemoveLayer.value = L.Map.prototype.removeLayer;
-L.Map.include({ removeLayer, getPitch, getBearing, setPitch, setBearing });
-L.Marker.include({ setRotation });
+Object.assign(L.Map.prototype, { removeLayer, getPitch, getBearing, setPitch, setBearing });
+Object.assign(L.Marker.prototype, { setRotation });

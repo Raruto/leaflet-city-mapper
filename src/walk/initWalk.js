@@ -11,9 +11,17 @@ import { onRemove } from './onRemoveWalkControl.js';
  * Options: `speed` (m/s, default 70), `distance` (camera distance in metres, default 20), `position` (button corner, default 'bottomright').
  * Buildings, trees, models, streetlights and traffic block movement; the walker is moved out of newly loaded obstacles.
  */
-L.Control.Walk = L.Control.extend({
-  options: { position: 'bottomright', speed: 70, distance: 20 },
-  initialize,
-  onAdd,
-  onRemove,
-});
+class WalkControl extends L.Control {
+  static defaultOptions = { position: 'bottomright', speed: 70, distance: 20 };
+
+  constructor(options) {
+    super(options);
+    if (L.version.startsWith('2.')) initialize.call(this, options);
+  }
+}
+Object.assign(WalkControl.prototype, { onAdd, onRemove });
+if (L.version.startsWith('1.')) {
+  WalkControl.prototype.options = Object.assign(Object.create(L.Control.prototype.options), WalkControl.defaultOptions);
+  WalkControl.prototype.initialize = initialize;
+}
+L.Control.Walk = WalkControl;

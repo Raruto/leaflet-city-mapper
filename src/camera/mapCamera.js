@@ -47,7 +47,7 @@ L.Map.mergeOptions({
 
 // Ground coordinates only: the GPU camera handles elevated geometry, never CSS transforms.
 
-L.Map.include({
+Object.assign(L.Map.prototype, {
   layerPointToContainerPoint: mapLayerPointToContainerPoint,
   containerPointToLayerPoint: mapContainerPointToLayerPoint,
   _getCenterLayerPoint: mapGetCenterLayerPoint,
@@ -66,7 +66,7 @@ L.Map.addInitHook(initializeCameraMap);
 
 markerMethods.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(L.Marker.prototype));
 L.Marker.mergeOptions({ rotation: 0, rotateWithView: false, keepUpright: false, scale: 1 });
-L.Marker.include({
+Object.assign(L.Marker.prototype, {
   setIcon: markerSetIcon,
   getEvents: markerGetEvents,
   _setPos: markerSetPos,
@@ -77,27 +77,27 @@ L.Marker.include({
 // Keep Leaflet's focusable marker and its drag events; only translate its screen position back to ground.
 
 popupEvents.value = L.Popup.prototype.getEvents;
-L.Popup.include({
+Object.assign(L.Popup.prototype, {
   getEvents: popupGetEvents,
 });
 tooltipEvents.value = L.Tooltip.prototype.getEvents;
-L.Tooltip.include({
+Object.assign(L.Tooltip.prototype, {
   getEvents: tooltipGetEvents,
 });
 popupPosition.value = L.Popup.prototype._updatePosition;
 popupPan.value = L.Popup.prototype._adjustPan;
-L.Popup.include({
+Object.assign(L.Popup.prototype, {
   _adjustPan: popupAdjustPan,
   _updatePosition: popupUpdatePosition,
 });
 tooltipPosition.value = L.Tooltip.prototype._setPosition;
-L.Tooltip.include({
+Object.assign(L.Tooltip.prototype, {
   _setPosition: tooltipSetPosition,
 });
 
 tiledBounds.value = L.GridLayer.prototype._getTiledPixelBounds;
 gridEvents.value = L.GridLayer.prototype.getEvents;
-L.GridLayer.include({
+Object.assign(L.GridLayer.prototype, {
   getEvents: gridlayerGetEvents,
   _getTiledPixelBounds: gridlayerGetTiledPixelBounds,
 });
