@@ -189,7 +189,7 @@ Given('the shared example can load OpenLayers', { timeout: 60000 }, async functi
   });
   await this.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
   await this.page.clock.install();
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html?engine=openlayers`);
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html?engine=openlayers`, { waitUntil: 'domcontentloaded' });
   assert.deepEqual(this.openlayersErrors, []);
   await this.page.waitForFunction(() => globalThis.map && document.querySelector('.ol-city-rotate'));
   for (const source of [bindings, minifiedBindings]) {

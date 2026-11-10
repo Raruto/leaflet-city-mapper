@@ -2,6 +2,7 @@ import { L } from '../globals/L.js';
 import { initialize } from './initializeWalkControl.js';
 import { onAdd } from './onAddWalkControl.js';
 import { onRemove } from './onRemoveWalkControl.js';
+import { extendLeafletClass } from '../core/extendLeafletClass.js';
 
 /**
  * Third-person walk mode, toggled by a map button (and Esc): a pedestrian at the map centre runs with W/S (or ↑/↓) and
@@ -11,12 +12,16 @@ import { onRemove } from './onRemoveWalkControl.js';
  * Options: `speed` (m/s, default 70), `distance` (camera distance in metres, default 20), `position` (button corner, default 'bottomright').
  * Buildings, trees, models, streetlights and traffic block movement; the walker is moved out of newly loaded obstacles.
  */
-class WalkControl extends L.Control {
+class WalkControl extends extendLeafletClass(L.Control) {
+  static initHooks = true;
   static defaultOptions = { position: 'bottomright', speed: 70, distance: 20 };
 
   constructor(options) {
     super(options);
-    if (L.version.startsWith('2.')) initialize.call(this, options);
+    if (L.version.startsWith('2.')) {
+      initialize.call(this, options);
+      this.callInitHooks();
+    }
   }
 }
 Object.assign(WalkControl.prototype, { onAdd, onRemove });

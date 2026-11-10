@@ -9,7 +9,7 @@ export async function uploadCanvasTexture(state, key, texture, image, device, wi
       canvas.width = width;
       canvas.height = height;
       const context = canvas.getContext('2d');
-      if (!context) throw new Error('Unable to rasterize SVG image');
+      if (!context) throw /* alloc */ new Error('Unable to rasterize SVG image');
       context.drawImage(image, 0, 0, width, height);
       source = canvas;
     }

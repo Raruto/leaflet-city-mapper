@@ -1269,6 +1269,19 @@
     }
   });
 
+  // src/core/extendLeafletClass.js
+  function extendLeafletClass(parent) {
+    return L.version.startsWith("2.") ? parent : parent.extend(
+      /* alloc */
+      {}
+    );
+  }
+  var init_extendLeafletClass = __esm({
+    "src/core/extendLeafletClass.js"() {
+      init_L();
+    }
+  });
+
   // src/controls/cameraControls.js
   var cameraControls_exports = {};
   __export(cameraControls_exports, {
@@ -1346,36 +1359,37 @@
       init_cleanupCameraTouch();
       init_endAllCameraTouches();
       init_addCameraHandler();
-      CompassHandler = class extends L.Handler {
+      init_extendLeafletClass();
+      CompassHandler = class extends extendLeafletClass(L.Handler) {
       };
       Object.assign(CompassHandler.prototype, { addHooks: compassAddHooks, removeHooks: compassRemoveHooks });
       Compass.value = CompassHandler;
-      ContainerResizeHandler = class extends L.Handler {
+      ContainerResizeHandler = class extends extendLeafletClass(L.Handler) {
       };
       Object.assign(ContainerResizeHandler.prototype, {
         addHooks: containerResizeAddHooks,
         removeHooks: containerResizeRemoveHooks
       });
       ContainerResize.value = ContainerResizeHandler;
-      PitchDragHandler = class extends L.Handler {
+      PitchDragHandler = class extends extendLeafletClass(L.Handler) {
       };
       Object.assign(PitchDragHandler.prototype, { addHooks: pitchDragAddHooks, removeHooks: pitchDragRemoveHooks });
       PitchDrag.value = PitchDragHandler;
-      ShiftRotateHandler = class extends L.Handler {
+      ShiftRotateHandler = class extends extendLeafletClass(L.Handler) {
       };
       Object.assign(ShiftRotateHandler.prototype, {
         addHooks: shiftRotateAddHooks,
         removeHooks: shiftRotateRemoveHooks
       });
       ShiftRotate.value = ShiftRotateHandler;
-      TouchModeHandler = class extends L.Handler {
+      TouchModeHandler = class extends extendLeafletClass(L.Handler) {
       };
       Object.assign(TouchModeHandler.prototype, {
         addHooks: notifyCameraTouchChange,
         removeHooks: notifyCameraTouchChange
       });
       TouchMode.value = TouchModeHandler;
-      RotateControl = class extends L.Control {
+      RotateControl = class extends extendLeafletClass(L.Control) {
         static defaultOptions = { position: "topleft", closeOnZeroBearing: true, visualizePitch: true };
       };
       Object.assign(RotateControl.prototype, { onAdd: rotateOnAdd, onRemove: rotateOnRemove });
@@ -4014,7 +4028,10 @@
         canvas.width = width;
         canvas.height = height;
         const context = canvas.getContext("2d");
-        if (!context) throw new Error("Unable to rasterize SVG image");
+        if (!context) throw (
+          /* alloc */
+          new Error("Unable to rasterize SVG image")
+        );
         context.drawImage(image, 0, 0, width, height);
         source = canvas;
       }
@@ -4073,11 +4090,9 @@
     const { backend: layer, textures, meshes } = state;
     let texture = textures.get(key);
     const url = image.currentSrc || image.src;
-    const svg = image instanceof HTMLImageElement && url.startsWith("data:image/svg+xml");
     if (!texture || texture.image !== image || texture.url !== url) {
       if (texture) {
-        const mesh = meshes.get(key);
-        if (mesh) disposeMesh(layer, mesh);
+        disposeMesh(layer, meshes.get(key));
         meshes.delete(key);
         destroyTexture(layer, texture.texture);
         textures.delete(key);
@@ -4106,7 +4121,7 @@
         sampler: device.createSampler(coreSampler)
       };
       textures.set(key, texture);
-      if (image instanceof HTMLCanvasElement || svg) {
+      if (image instanceof HTMLCanvasElement || url.startsWith("data:image/svg+xml")) {
         texture.pending = true;
         uploadCanvasTexture(state, key, texture, image, device, width, height);
       } else {
@@ -6070,19 +6085,45 @@
     );
   }
 
+  // src/core/projectNativePath.js
+  init_L();
+
+  // src/weakmaps/pathProjectionByMap.js
+  var pathProjectionByMap = /* @__PURE__ */ new WeakMap();
+
+  // src/core/projectNativePath.js
+  function projectNativePath(source) {
+    if (!L.version.startsWith("2.")) return source._project();
+    const map = source._map, renderer = source._renderer;
+    let projection = pathProjectionByMap.get(map);
+    if (!projection) {
+      projection = Object.create(L.Renderer.prototype);
+      projection._map = map;
+      pathProjectionByMap.set(map, projection);
+    }
+    projection._pathZoom = map.getZoom();
+    projection._pathOrigin = map.getPixelOrigin();
+    source._renderer = projection;
+    try {
+      source._project();
+    } finally {
+      if (renderer) source._renderer = renderer;
+      else delete source._renderer;
+    }
+  }
+
   // src/geometry/circleGeometry.js
   function circleGeometry(source, context) {
     const { map, point, fill, stroke, options, dash, width } = context;
     const center = map.project(source.getLatLng());
     let radius = source.getRadius(), radiusY = radius, index, i;
     if (source instanceof L.Circle) {
-      if (!source._renderer) source._renderer = map.getRenderer(source);
-      source._project();
+      projectNativePath(source);
       const projected = source._point.add(map.getPixelOrigin());
       center.x = projected.x;
       center.y = projected.y;
-      radius = source._radius;
-      radiusY = source._radiusY || radius;
+      radius = source._pxRadius ?? source._radius;
+      radiusY = source._pxRadiusY ?? source._radiusY ?? radius;
     }
     if (options.fill) disk(point, center, radius, fill, radiusY);
     const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(Math.max(radius, radiusY)))));
@@ -8428,10 +8469,15 @@
 
   // src/layer-controls/layerControlInputId.js
   init_L();
-  var addItem = L.LayersControl?.prototype._addItem;
-  if (addItem && !L.Control.Layers) L.LayersControl.prototype._addItem = addLayerControlInputId;
+
+  // src/globals/layerControlAddItem.js
+  init_L();
+  var layerControlAddItem = L.LayersControl?.prototype._addItem;
+
+  // src/layer-controls/layerControlInputId.js
+  if (layerControlAddItem && !L.Control.Layers) L.LayersControl.prototype._addItem = addLayerControlInputId;
   function addLayerControlInputId(entry) {
-    const label = addItem.call(this, entry);
+    const label = layerControlAddItem.call(this, entry);
     label.querySelector(".leaflet-control-layers-selector").layerId = L.Util.stamp(entry.layer);
     return label;
   }
@@ -8584,11 +8630,16 @@
   }
 
   // src/sunlight/initSunlight.js
-  var TimeControl = class extends L.Control {
+  init_extendLeafletClass();
+  var TimeControl = class extends extendLeafletClass(L.Control) {
+    static initHooks = true;
     static defaultOptions = { position: "bottomright" };
     constructor(options) {
       super(options);
-      if (L.version.startsWith("2.")) initialize.call(this, options);
+      if (L.version.startsWith("2.")) {
+        initialize.call(this, options);
+        this.callInitHooks();
+      }
     }
   };
   Object.assign(TimeControl.prototype, { onAdd, onRemove: onRemoveSun, addTo, remove });
@@ -11981,11 +12032,16 @@
   }
 
   // src/walk/initWalk.js
-  var WalkControl = class extends L.Control {
+  init_extendLeafletClass();
+  var WalkControl = class extends extendLeafletClass(L.Control) {
+    static initHooks = true;
     static defaultOptions = { position: "bottomright", speed: 70, distance: 20 };
     constructor(options) {
       super(options);
-      if (L.version.startsWith("2.")) initialize2.call(this, options);
+      if (L.version.startsWith("2.")) {
+        initialize2.call(this, options);
+        this.callInitHooks();
+      }
     }
   };
   Object.assign(WalkControl.prototype, { onAdd: onAdd2, onRemove });
@@ -16782,14 +16838,14 @@
 
   // src/core/closestCameraLayerPoint.js
   function closestCameraLayerPoint(point) {
-    this._project();
+    projectNativePath(this);
     this._parts = this._rings;
     return closestMethods.get(this).call(this, point);
   }
 
   // src/core/cameraCircleBounds.js
   function cameraCircleBounds() {
-    this._project();
+    if (this._map) projectNativePath(this);
     return boundsMethods.get(this).call(this);
   }
 
@@ -16903,21 +16959,50 @@
     }
   }
 
-  // src/index.js
+  // src/globals/leafletLayer.js
+  init_L();
   var leafletLayer = L.Layer;
+
+  // src/core/constructLayer.js
+  function constructLayer(options) {
+    const layer = Reflect.construct(
+      leafletLayer,
+      /* alloc */
+      [],
+      new.target
+    );
+    layerInitialize.call(layer, options);
+    layer.callInitHooks();
+    return layer;
+  }
+
+  // src/core/layerAddInitHook.js
+  init_L();
+  function layerAddInitHook() {
+    leafletLayer.addInitHook.apply(this === L.Layer ? leafletLayer : this, arguments);
+    return this;
+  }
+
+  // src/core/layerMergeOptions.js
+  init_L();
+  function layerMergeOptions(options) {
+    leafletLayer.mergeOptions.call(this === L.Layer ? leafletLayer : this, options);
+    return this;
+  }
+
+  // src/index.js
   layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(leafletLayer.prototype));
   layerProto.value._layerAdd = leafletLayer.prototype._layerAdd;
+  layerProto.value.callInitHooks = leafletLayer.prototype.callInitHooks;
   if (L.version.startsWith("2.")) {
-    L.Layer = new Proxy(leafletLayer, {
-      construct(target, args, newTarget) {
-        const layer = Reflect.construct(target, args, newTarget);
-        layerInitialize.apply(layer, args);
-        return layer;
-      }
-    });
+    Object.setPrototypeOf(constructLayer, leafletLayer);
+    constructLayer.prototype = leafletLayer.prototype;
+    constructLayer.initHooks = true;
+    constructLayer.addInitHook = layerAddInitHook;
+    constructLayer.mergeOptions = layerMergeOptions;
+    L.Layer = constructLayer;
     leafletLayer.prototype.constructor = L.Layer;
     leafletLayer.addInitHook(layerCallInitHooks);
-    L.Layer.addInitHook(layerCallInitHooks);
   } else {
     leafletLayer.prototype.initialize = layerInitialize;
     leafletLayer.prototype.callInitHooks = layerCallInitHooks;

@@ -1118,8 +1118,9 @@
     },
   });
   L.Map.addInitHook(function () {
+    const mapPane = this.createPane('mapPane');
     for (const [name, order] of [['tilePane', 200], ['overlayPane', 400], ['markerPane', 600]]) {
-      this.createPane(name).style.zIndex = order;
+      this.createPane(name, mapPane).style.zIndex = order;
     }
     const handler = event => this._fireDOMEvent(event);
     L.DomEvent.on(this.getContainer(), 'click mousemove mouseout mouseover', handler);

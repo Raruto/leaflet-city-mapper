@@ -19,6 +19,10 @@ Feature: Separate plugin integration
     Given the city mapper plugin is loaded after Leaflet alone
     Then each source initializes from the single bundle
 
+  Scenario: Leaflet initialization hooks retain their lifecycle
+    Given the city mapper plugin is loaded after Leaflet alone
+    Then layer and control hooks run once after initialization without leaking
+
   Scenario: Invalid source types report errors without blocking subsequent layers
     Given the city mapper plugin is loaded after Leaflet alone
     Then an unknown source rejects readiness and subsequent sources still initialize

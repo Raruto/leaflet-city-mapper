@@ -36,3 +36,7 @@ Feature: Native Leaflet layers rendered automatically with WebGPU
   Scenario: Native mutations preserve Leaflet utility methods and stacking
     Given the native WebGPU gallery uses the "SVG" renderer preference
     Then native icon transitions, hover stacking and closest path points remain available
+
+  Scenario: Native geographic paths preserve projection without DOM renderers
+    Given the native WebGPU gallery uses the "SVG" renderer preference
+    Then circle geometry scales with zoom and path queries work immediately

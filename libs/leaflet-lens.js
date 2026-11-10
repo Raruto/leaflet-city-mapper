@@ -18,13 +18,15 @@
     this._layers = [outerLayer, innerLayer];
   }
 
-  class LensControl extends L.Control {
+  class LensControl extends (L.version.startsWith('2.') ? L.Control : L.Control.extend({})) {
+    static initHooks = true;
     static defaultOptions = { position: 'topright', radius: 150, enabled: true };
 
     constructor(outerLayer, innerLayer, options) {
       if (L.version.startsWith('2.')) {
         super(options);
         initializeLens.call(this, outerLayer, innerLayer, options);
+        this.callInitHooks();
       } else {
         super(outerLayer, innerLayer, options);
       }

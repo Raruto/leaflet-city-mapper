@@ -162,9 +162,9 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
     await route.fulfill({ response, body, headers: response.headers() });
   });
   // Deterministic PMTiles: tests answer tiles through the exposed `pmtilesTile(url, z, x, y)` binding.
-  const pmtilesMock = `const initialize = L.Layer.prototype.initialize;
-    if (initialize && !initialize._testArchive) {
-      L.Layer.prototype.initialize = Object.assign(function (options = {}) {
+  const pmtilesMock = `{
+      const Layer = L.Layer, initialize = Layer.prototype.initialize;
+      const withArchive = function (options = {}) {
         const source = options.source;
         if (source?.url && source.type !== 'raster' && source.type !== 'terrain' &&
           !/\\.(glb|gltf|tif|tiff)(?:[?#]|$)/i.test(source.url) && !source.archive) {
@@ -180,8 +180,20 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
             },
           } } };
         }
-        return initialize.call(this, options);
-      }, initialize, { _testArchive: true });
+        return options;
+      };
+      if (L.version.startsWith('2.')) {
+        L.Layer = new Proxy(Layer, {
+          construct(target, args, newTarget) {
+            return Reflect.construct(target, [withArchive(args[0]), ...args.slice(1)], newTarget);
+          },
+        });
+        L.Layer.prototype.constructor = L.Layer;
+      } else {
+        L.Layer.prototype.initialize = function (options) {
+          return initialize.call(this, withArchive(options));
+        };
+      }
     }`;
   const mockPMTiles = async route => {
     await route.fulfill({ contentType: 'text/javascript', body: `${pluginBundle}\n${pmtilesMock}` });

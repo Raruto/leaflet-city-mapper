@@ -14,8 +14,8 @@
   <div id="map" aria-label="Gallery of native Leaflet layers rendered with WebGPU"></div>
   <script>
     const mapOptions = { center: [48.8583, 2.2945], zoom: 15, rotate: true };
-    if (new URLSearchParams(location.search).has('canvas')) {
-      mapOptions.renderer = L.Canvas ? new L.Canvas() : L.canvas();
+    if (L.Canvas && new URLSearchParams(location.search).has('canvas')) {
+      mapOptions.renderer = new L.Canvas();
     }
     const map = new L.Map('map', mapOptions);
     const image = (color, text) => {

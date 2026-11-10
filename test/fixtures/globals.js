@@ -9,6 +9,8 @@ export { Compass } from '../../src/globals/Compass.js';
 export { ContainerResize } from '../../src/globals/ContainerResize.js';
 export { HEIGHT } from '../../src/globals/HEIGHT.js';
 export { L } from '../../src/globals/L.js';
+export { leafletLayer } from '../../src/globals/leafletLayer.js';
+export { layerControlAddItem } from '../../src/globals/layerControlAddItem.js';
 export { geometryWorkerUrl } from '../../src/globals/geometryWorkerUrl.js';
 export { walkByMap } from '../../src/weakmaps/walkByMap.js';
 export { sunByMap } from '../../src/weakmaps/sunByMap.js';

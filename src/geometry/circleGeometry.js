@@ -3,19 +3,19 @@ import { disk } from './disk.js';
 import { circleAt } from './circleAt.js';
 import { line } from './line.js';
 import { triangle } from './appendNativeTriangle.js';
+import { projectNativePath } from '../core/projectNativePath.js';
 
 export function circleGeometry(source, context) {
   const { map, point, fill, stroke, options, dash, width } = context;
   const center = map.project(source.getLatLng());
   let radius = source.getRadius(), radiusY = radius, index, i;
   if (source instanceof L.Circle) {
-    if (!source._renderer) source._renderer = map.getRenderer(source);
-    source._project();
+    projectNativePath(source);
     const projected = source._point.add(map.getPixelOrigin());
     center.x = projected.x;
     center.y = projected.y;
-    radius = source._radius;
-    radiusY = source._radiusY || radius;
+    radius = source._pxRadius ?? source._radius;
+    radiusY = source._pxRadiusY ?? source._radiusY ?? radius;
   }
   if (options.fill) disk(point, center, radius, fill, radiusY);
   const count = Math.max(12, Math.min(128, Math.ceil(Math.PI * Math.sqrt(Math.max(radius, radiusY)))));

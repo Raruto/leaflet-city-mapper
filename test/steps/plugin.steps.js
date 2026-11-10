@@ -60,6 +60,74 @@ Then('maps and markers expose only the approved plugin methods', async function 
   });
 });
 
+Then('layer and control hooks run once after initialization without leaking', async function () {
+  await this.page.addScriptTag({ url: `${this.baseUrl}/libs/leaflet-lens.js` });
+  await this.page.evaluate(() => {
+    globalThis.hookMap = new L.Map(document.body.appendChild(document.createElement('div')), {
+      rotateControl: false,
+    });
+  });
+  await this.page.waitForFunction(() => typeof L.Control.Rotate === 'function');
+  const result = await this.page.evaluate(() => {
+    const calls = [];
+    L.Layer.addInitHook(function () {
+      if (this.options.attribution === 'Hook attribution') calls.push('layer');
+      if (this.options.attribution === 'Source hook attribution') calls.push('source');
+    });
+    L.Control.Time.addInitHook(function () {
+      if (!this.layer || this.live !== true) throw new Error('Time hook ran before initialization');
+      calls.push('time');
+    });
+    L.Control.Walk.addInitHook(function () {
+      if (!this._walk) throw new Error('Walk hook ran before initialization');
+      calls.push('walk');
+    });
+    L.Control.Lens.addInitHook(function () {
+      if (this._layers?.length !== 2) throw new Error('Lens hook ran before initialization');
+      calls.push('lens');
+    });
+    const layer = new L.Layer({ attribution: 'Hook attribution' });
+    new L.Layer({ attribution: 'Source hook attribution',
+      source: { type: 'vector', data: { type: 'FeatureCollection', features: [] } } });
+    L.Layer.mergeOptions({ attribution: 'Hook attribution' });
+    new L.Marker([0, 0]);
+    L.Layer.mergeOptions({ attribution: null });
+    const time = new L.Control.Time(), walk = new L.Control.Walk();
+    const lens = new L.Control.Lens(new L.Layer(), new L.Layer());
+    const zoom = new (L.ZoomControl || L.Control.Zoom)();
+    const rotate = new L.Control.Rotate();
+    const Child = L.version.startsWith('2.')
+      ? class extends L.Control.Time {} : L.Control.Time.extend({});
+    const child = new Child();
+    const ChildLayer = L.version.startsWith('2.')
+      ? class extends L.Layer {
+        static initHooks = true;
+        constructor(options) {
+          super(options);
+          this.prepared = true;
+          this.callInitHooks();
+        }
+      } : L.Layer.extend({
+        initialize(options) {
+          L.Layer.prototype.initialize.call(this, options);
+          this.prepared = true;
+        },
+      });
+    ChildLayer.addInitHook(function () {
+      if (!this.prepared) throw new Error('Subclass hook ran before initialization');
+      calls.push('child');
+    });
+    const childLayer = new ChildLayer();
+    new L.Layer();
+    hookMap.remove();
+    return { calls, instances: [layer instanceof L.Layer, time instanceof L.Control,
+      walk instanceof L.Control, lens instanceof L.Control, zoom instanceof L.Control,
+      rotate instanceof L.Control, child instanceof L.Control.Time, childLayer instanceof L.Layer] };
+  });
+  assert.deepEqual(result.calls, ['layer', 'source', 'layer', 'time', 'walk', 'lens', 'time', 'child']);
+  assert.deepEqual(result.instances, Array(8).fill(true));
+});
+
 Then('native instance data is isolated in explicit feature associations', async function () {
   const result = await this.page.evaluate(async () => {
     const layers = [];

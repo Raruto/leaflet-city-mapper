@@ -15,8 +15,10 @@ import { setPitch } from './camera/setPitch.js';
 import { setBearing } from './camera/setBearing.js';
 import { setRotation } from './core/setRotation.js';
 import { layerCallInitHooks } from './core/layerCallInitHooks.js';
-
-const leafletLayer = L.Layer;
+import { leafletLayer } from './globals/leafletLayer.js';
+import { constructLayer } from './core/constructLayer.js';
+import { layerAddInitHook } from './core/layerAddInitHook.js';
+import { layerMergeOptions } from './core/layerMergeOptions.js';
 
 /**
  * `new L.Layer({ source: { type, url, ...settings }, pane, attribution })`: layers with a `source`
@@ -40,18 +42,18 @@ const leafletLayer = L.Layer;
 
 layerProto.value = Object.defineProperties({}, Object.getOwnPropertyDescriptors(leafletLayer.prototype));
 layerProto.value._layerAdd = leafletLayer.prototype._layerAdd;
+layerProto.value.callInitHooks = leafletLayer.prototype.callInitHooks;
 
 if (L.version.startsWith('2.')) {
-  L.Layer = new Proxy(leafletLayer, {
-    construct(target, args, newTarget) {
-      const layer = Reflect.construct(target, args, newTarget);
-      layerInitialize.apply(layer, args);
-      return layer;
-    },
-  });
+  // Keep the native prototype and instanceof contract, but finish options before init hooks.
+  Object.setPrototypeOf(constructLayer, leafletLayer);
+  constructLayer.prototype = leafletLayer.prototype;
+  constructLayer.initHooks = true;
+  constructLayer.addInitHook = layerAddInitHook;
+  constructLayer.mergeOptions = layerMergeOptions;
+  L.Layer = constructLayer;
   leafletLayer.prototype.constructor = L.Layer;
   leafletLayer.addInitHook(layerCallInitHooks);
-  L.Layer.addInitHook(layerCallInitHooks);
 } else {
   leafletLayer.prototype.initialize = layerInitialize;
   leafletLayer.prototype.callInitHooks = layerCallInitHooks;

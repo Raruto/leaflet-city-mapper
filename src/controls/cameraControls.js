@@ -36,34 +36,35 @@ import { changeCameraTouch } from './changeCameraTouch.js';
 import { cleanupCameraTouch } from './cleanupCameraTouch.js';
 import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { addCameraHandler } from './addCameraHandler.js';
+import { extendLeafletClass } from '../core/extendLeafletClass.js';
 
-class CompassHandler extends L.Handler {}
+class CompassHandler extends extendLeafletClass(L.Handler) {}
 Object.assign(CompassHandler.prototype, { addHooks: compassAddHooks, removeHooks: compassRemoveHooks });
 Compass.value = CompassHandler;
 
-class ContainerResizeHandler extends L.Handler {}
+class ContainerResizeHandler extends extendLeafletClass(L.Handler) {}
 Object.assign(ContainerResizeHandler.prototype, {
   addHooks: containerResizeAddHooks, removeHooks: containerResizeRemoveHooks,
 });
 ContainerResize.value = ContainerResizeHandler;
 
-class PitchDragHandler extends L.Handler {}
+class PitchDragHandler extends extendLeafletClass(L.Handler) {}
 Object.assign(PitchDragHandler.prototype, { addHooks: pitchDragAddHooks, removeHooks: pitchDragRemoveHooks });
 PitchDrag.value = PitchDragHandler;
 
-class ShiftRotateHandler extends L.Handler {}
+class ShiftRotateHandler extends extendLeafletClass(L.Handler) {}
 Object.assign(ShiftRotateHandler.prototype, {
   addHooks: shiftRotateAddHooks, removeHooks: shiftRotateRemoveHooks,
 });
 ShiftRotate.value = ShiftRotateHandler;
 
-class TouchModeHandler extends L.Handler {}
+class TouchModeHandler extends extendLeafletClass(L.Handler) {}
 Object.assign(TouchModeHandler.prototype, {
   addHooks: notifyCameraTouchChange, removeHooks: notifyCameraTouchChange,
 });
 TouchMode.value = TouchModeHandler;
 
-class RotateControl extends L.Control {
+class RotateControl extends extendLeafletClass(L.Control) {
   static defaultOptions = { position: 'topleft', closeOnZeroBearing: true, visualizePitch: true };
 }
 Object.assign(RotateControl.prototype, { onAdd: rotateOnAdd, onRemove: rotateOnRemove });

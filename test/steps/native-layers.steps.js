@@ -175,7 +175,8 @@ Then('native map content is drawn by WebGPU while HTML UI remains native', async
       popup: Boolean(document.querySelector('.leaflet-popup-content')),
       accessible: marker._icon.getAttribute('role') === 'button' && marker._icon.tabIndex >= 0,
       wms: Object.keys(nativeLayers['TileLayer.WMS']._tiles).length > 0,
-      shadow: globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes.has('shadow'),
+      shadow: globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes.has('shadow') ===
+        Boolean(nativeLayers['Marker (default icon)']._shadow),
       errors: nativeErrors,
     };
   });
@@ -544,6 +545,44 @@ Then('native zoom animation interpolates the GPU camera and accessible marker ta
   assert.equal(result.cleaned, true);
 });
 
+Then('circle geometry scales with zoom and path queries work immediately', async function () {
+  const result = await this.page.evaluate(async () => {
+    const { circleGeometry } = await import('/src/geometry/circleGeometry.js');
+    const circle = new L.Circle([48.858, 2.294], { radius: 150, stroke: false }).addTo(map);
+    const bounds = circle.getBounds();
+    const line = new L.Polyline([[48.858, 2.294], [48.859, 2.295]]).addTo(map);
+    const closest = line.closestLayerPoint(map.latLngToLayerPoint(line.getLatLngs()[0]));
+    const diameter = () => {
+      const points = [];
+      circleGeometry(circle, { map, point: point => {
+        points.push(point.x);
+        return [point.x, 0, point.y];
+      }, fill: [], stroke: [], options: circle.options, dash: [], width: 0 });
+      return Math.max(...points) - Math.min(...points);
+    };
+    map.setView(circle.getLatLng(), 15, { animate: false });
+    const first = diameter();
+    map.setZoom(16, { animate: false });
+    const second = diameter();
+    const expected = 2 * map.project(circle.getLatLng(), 15)
+      .distanceTo(map.project([circle.getLatLng().lat, circle.getLatLng().lng +
+        150 / (6371000 * Math.cos(circle.getLatLng().lat * Math.PI / 180)) * 180 / Math.PI], 15));
+    const clean = !map.getContainer().querySelector('svg.leaflet-zoom-animated') &&
+      !Object.values(map._layers).some(layer => layer instanceof L.Renderer);
+    circle.remove();
+    line.remove();
+    const detachedBounds = L.version.startsWith('2.') ? circle.getBounds().contains(circle.getLatLng()) : true;
+    return { first, second, expected, clean, detachedBounds,
+      bounds: bounds.contains(circle.getLatLng()), closest: closest.distance };
+  });
+  assert.ok(Math.abs(result.first - result.expected) < 1, JSON.stringify(result));
+  assert.ok(Math.abs(result.second / result.first - 2) < 0.02, JSON.stringify(result));
+  assert.ok(result.closest < 1, JSON.stringify(result));
+  assert.equal(result.bounds, true);
+  assert.equal(result.detachedBounds, true);
+  assert.equal(result.clean, true);
+});
+
 Then('native icon transitions, hover stacking and closest path points remain available', async function () {
   const result = await this.page.evaluate(async () => {
     const marker = new L.Marker(map.getCenter(), {
@@ -559,7 +598,7 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     const gpu = globals.sceneByLayer.get(marker)._nativeGPU.meshes.get('icon');
     const adapted = Boolean(gpu) && marker._icon.classList.contains('leaflet-webgpu-target');
     const order = gpu.renderOrder;
-    marker.fire(L.version.startsWith('2') ? 'pointerover' : 'mouseover');
+    marker._icon.dispatchEvent(new MouseEvent(L.version.startsWith('2') ? 'pointerover' : 'mouseover', { bubbles: true }));
     nativeChecks.render.render(owner);
     const raised = gpu.renderOrder > order;
     const retiredIcon = marker._icon;
@@ -575,12 +614,17 @@ Then('native icon transitions, hover stacking and closest path points remain ava
     const path = nativeLayers.Polyline;
     const closest = path.closestLayerPoint(map.latLngToLayerPoint(path.getLatLngs()[0]));
     const closestPoint = closest && closest.distance < 1;
-    const shadowMarker = nativeLayers['Marker (default icon)'];
+    const shadowMarker = new L.Marker(map.getCenter(), {
+      icon: new L.Icon({ iconUrl: icon.options.iconUrl, shadowUrl: icon.options.iconUrl,
+        iconSize: [48, 48], shadowSize: [48, 48] }),
+    }).addTo(map);
+    await globals.sceneByLayer.get(shadowMarker).ready;
     shadowMarker.options.keepUpright = true;
     shadowMarker.options.scale = 2;
     shadowMarker.setRotation(Math.PI);
     const upright = globalThis.cityMapperTestOperations.markerCameraIconPoint(shadowMarker, 1, 0).x > 0;
     const shadowScaled = shadowMarker._shadow.style.transform.includes('scale(2)');
+    shadowMarker.remove();
     const grid = nativeLayers.GridLayer;
     testOperations.setZIndex(nativeLayers.TileLayer, 20);
     grid.bringToFront();

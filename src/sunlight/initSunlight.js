@@ -6,13 +6,18 @@ import { onAdd } from './onAddTimeControl.js';
 import { addTo } from './addTimeControlToMap.js';
 import { remove } from './removeTimeControl.js';
 import { onRemoveSun } from './onRemoveSun.js';
+import { extendLeafletClass } from '../core/extendLeafletClass.js';
 
-class TimeControl extends L.Control {
+class TimeControl extends extendLeafletClass(L.Control) {
+  static initHooks = true;
   static defaultOptions = { position: 'bottomright' };
 
   constructor(options) {
     super(options);
-    if (L.version.startsWith('2.')) initialize.call(this, options);
+    if (L.version.startsWith('2.')) {
+      initialize.call(this, options);
+      this.callInitHooks();
+    }
   }
 }
 Object.assign(TimeControl.prototype, { onAdd, onRemove: onRemoveSun, addTo, remove });
