@@ -31,36 +31,36 @@
       return canvas.toDataURL();
     };
     const icon = new L.Icon({
-      iconUrl: image('#c02050', 'Marker'), iconSize: [48, 48], iconAnchor: [24, 48],
+      iconUrl: image('#c02050', 'Marker'),
+      iconSize: [48, 48],
+      iconAnchor: [24, 48],
     });
-    class CanvasGrid extends L.GridLayer {
-      createTile(coords) {
-        const canvas = document.createElement('canvas'), size = this.getTileSize();
-        canvas.width = size.x; canvas.height = size.y;
-        const context = canvas.getContext('2d');
-        context.strokeStyle = '#555';
-        context.strokeRect(1, 1, size.x - 2, size.y - 2);
-        context.fillStyle = '#333';
-        context.font = '16px sans-serif';
-        context.fillText(`${coords.z}/${coords.x}/${coords.y}`, 12, 24);
-        return canvas;
-      }
-    }
-    const WMSTileLayer = L.WMSTileLayer || L.TileLayer.WMS;
-    const LayersControl = L.LayersControl || L.Control.Layers;
+    
     const layers = {
       'TileLayer': new L.TileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
       }),
-      'TileLayer.WMS': new WMSTileLayer('https://ows.terrestris.de/osm/service', {
+      'TileLayer.WMS': new (L.WMSTileLayer || L.TileLayer.WMS)('https://ows.terrestris.de/osm/service', {
         layers: 'OSM-WMS',
         format: 'image/png',
         transparent: true,
         opacity: 0.15,
         attribution: 'WMS: terrestris / OpenStreetMap',
       }),
-      'GridLayer': new CanvasGrid({ opacity: 0.5 }),
+      'GridLayer': new (class extends L.GridLayer {
+        createTile(coords) {
+          const canvas = document.createElement('canvas'), size = this.getTileSize();
+          canvas.width = size.x; canvas.height = size.y;
+          const context = canvas.getContext('2d');
+          context.strokeStyle = '#555';
+          context.strokeRect(1, 1, size.x - 2, size.y - 2);
+          context.fillStyle = '#333';
+          context.font = '16px sans-serif';
+          context.fillText(`${coords.z}/${coords.x}/${coords.y}`, 12, 24);
+          return canvas;
+        }
+      })({ opacity: 0.5 }),
       'ImageOverlay': new L.ImageOverlay(image('#168080', 'ImageOverlay'),
         [[48.855, 2.282], [48.858, 2.287]], {
           opacity: 0.8,
@@ -138,7 +138,7 @@
       layer.bindTooltip(name);
       layer.addTo(map);
     }
-    new LayersControl({}, {
+    new (L.LayersControl || L.Control.Layers)({}, {
       ...layers,
       'DivIcon (DOM)': new L.Marker([48.8583, 2.310], {
         icon: new L.DivIcon({

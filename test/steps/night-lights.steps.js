@@ -114,10 +114,12 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   this.page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await waitForStreetlights(this.page);
+  if (check !== 'Eiffel Tower sparkle') await waitForStreetlights(this.page);
   await this.page.waitForFunction(() => {
     const owner = globals.renderers.get(map);
-    return globals.sceneByLayer.get(owner)?._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
+    const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
+    return (!map.hasLayer(buildings) || globals.sceneByLayer.get(owner)?._roofRaster) &&
+      globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
       !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
         ? testOperations.isLoading(layer) : layer.isLoading?.()) &&
       [...globals.sceneByLayer.get(owner)._layers].every(layer => !globals.sceneByLayer.get(layer)._3d || !globals.sceneByLayer.get(layer).url || (globals.sceneByLayer.get(layer)._inflight === 0 &&

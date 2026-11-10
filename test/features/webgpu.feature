@@ -18,7 +18,7 @@ Feature: Shared WebGPU renderer
       | animated zoom     |
 
   Scenario: The roof atlas is composed on the GPU from raster tile textures
-    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Time"
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Time"
     When I rebuild the WebGPU roof atlas
     Then the roof atlas matches its raster tiles without uploading a canvas
 

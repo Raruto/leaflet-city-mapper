@@ -116,12 +116,13 @@ Then('WebGPU matrices match DOMMatrix and frame resources are reused', function 
 });
 
 // Settled scene: terrain meshes exist, the roof atlas was built and no raster layer is still loading.
-const waitForWebGPUScene = page => page.waitForFunction(() => {
+const waitForWebGPUScene = (page, requireRoof = true) => page.waitForFunction(requireRoof => {
   const owner = globals.renderers.get(map);
-  return globals.sceneByLayer.get(owner)?.renderer?.device && globals.sceneByLayer.get(owner)._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
+  return globals.sceneByLayer.get(owner)?.renderer?.device && (!requireRoof || globals.sceneByLayer.get(owner)._roofRaster) &&
+    globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
     !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
       ? testOperations.isLoading(layer) : layer.isLoading?.());
-}, null, { timeout: 30000 });
+}, requireRoof, { timeout: 30000 });
 
 When('I measure WebGPU {string}', { timeout: 30000 }, async function (check) {
   assert.ok(['frame scheduling', 'panning uniforms', 'shader highlights', 'animated zoom'].includes(check), check);
@@ -435,7 +436,7 @@ When('I inspect the WebGPU terrain tiles', { timeout: 30000 }, async function ()
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
   try {
-    await waitForWebGPUScene(this.page);
+    await waitForWebGPUScene(this.page, false);
     this.webgpuTerrain = await this.page.evaluate(async () => {
       const owner = globals.renderers.get(map);
       const terrain = globals.cameraByMap.get(map)._terrain3D;
