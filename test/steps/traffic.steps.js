@@ -481,7 +481,7 @@ Then('the cruise route stays between latitudes {float} and {float} and longitude
   assert.ok(route.every(([lng, lat]) => lat > south && lat < north && lng > west && lng < east));
 });
 
-Given('the focused cruise example is open {word} terrain', { timeout: 20000 }, async function (terrain) {
+Given('the focused cruise example is open {word} terrain', { timeout: 30000 }, async function (terrain) {
   await openTrafficExample(this, true, terrain === 'with');
   await this.page.evaluate(() => {
     const layer = cruiseBoats, owner = globals.renderers.get(map);

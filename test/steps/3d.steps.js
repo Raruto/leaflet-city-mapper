@@ -330,6 +330,10 @@ Given('the Eiffel Tower example page is open with its offline archives', { timeo
 
 Given('the offline Paris example loads only {string}', { timeout: 30000 }, async function (names) {
   this.focusedParisLayers = names.split(', ');
+  // Night fixtures avoid building daytime shadow maps while their sources load.
+  if (this.focusedParisLayers.includes('Streetlights')) {
+    await this.page.clock.setSystemTime(new Date('2026-06-21T00:00:00.000Z'));
+  }
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await openEiffelExample.call(this);

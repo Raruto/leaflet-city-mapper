@@ -113,7 +113,7 @@ Then('Matterhorn elevation samples, camera height and viewport coverage match th
     assert.ok(coverage < 2, `terrain tile bounds miss viewport rays by ${coverage}px`);
 });
 
-Then('Matterhorn terrain survives cache eviction and is independent of tile draw order', { timeout: 30000 }, async function () {
+Then('Matterhorn terrain survives cache eviction', { timeout: 30000 }, async function () {
     await this.page.waitForFunction(() => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU, z = map.getZoom();
@@ -146,6 +146,9 @@ Then('Matterhorn terrain survives cache eviction and is independent of tile draw
       await globals.sceneByLayer.get(owner).renderer.device.queue.onSubmittedWorkDone();
     });
     assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after cache eviction');
+});
+
+Then('Matterhorn depth ordering is independent of tile draw order', { timeout: 30000 }, async function () {
     await this.page.evaluate(() => cityMapperTestOperations.mapSetPitchAndBearing(map, 60, 210));
     await waitForTerrain(this.page);
     await this.page.evaluate(async () => {

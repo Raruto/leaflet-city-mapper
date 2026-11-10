@@ -5,15 +5,15 @@ Feature: Indicative Paris night lighting
     Then the real streetlight inventory has valid geometry, supports and tooltips
 
   Scenario Outline: Real lighting renders one effect at a time
-    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Streetlights, Eiffel Tower, Time"
+    Given the offline Paris example loads only "<layers>"
     Then real night lighting preserves "<effect>"
 
     Examples:
-      | effect                                  |
-      | streetlight ground illumination         |
-      | Eiffel Tower sparkle                    |
-      | illumination on 3D surfaces              |
-      | daylight poles and disabled lighting    |
+      | effect                               | layers                                                           |
+      | streetlight ground illumination      | Orthophoto IGN, Terrain (3D), Streetlights, Time                   |
+      | Eiffel Tower sparkle                 | Orthophoto IGN, Terrain (3D), Eiffel Tower, Time                   |
+      | illumination on 3D surfaces           | Orthophoto IGN, Terrain (3D), Buildings, Streetlights, Eiffel Tower, Time |
+      | daylight poles and disabled lighting | Orthophoto IGN, Terrain (3D), Streetlights, Time                   |
 
   Scenario: Streetlight toggles rebuild the inventory without stale meshes
     Given the offline Paris example loads only "Streetlights, Time"

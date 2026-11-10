@@ -6,8 +6,11 @@ Feature: Mapterhorn terrain example
   Scenario: Matterhorn samples and camera follow the elevation grid
     Then Matterhorn elevation samples, camera height and viewport coverage match the DEM
 
-  Scenario: Matterhorn cache eviction preserves terrain and depth ordering
-    Then Matterhorn terrain survives cache eviction and is independent of tile draw order
+  Scenario: Matterhorn cache eviction preserves visible terrain
+    Then Matterhorn terrain survives cache eviction
+
+  Scenario: Matterhorn depth ordering is independent of tile draw order
+    Then Matterhorn depth ordering is independent of tile draw order
 
   Scenario: Matterhorn zoom preserves terrain and marker alignment
     Then Matterhorn zoom keeps coarse terrain visible and aligns the marker and popup
