@@ -10,8 +10,16 @@ const NESTING = new Set([...LOOPS, 'IfStatement', 'SwitchStatement', 'CatchClaus
 const LIMITS = { lines: 60, complexity: 15, nesting: 3 };
 
 function children(node) {
-  return Object.values(node).flatMap(value => Array.isArray(value) ? value : [value])
-    .filter(value => value && typeof value.type === 'string');
+  const result = [];
+  for (const key in node) {
+    const value = node[key];
+    if (Array.isArray(value)) {
+      for (const child of value) if (child && typeof child.type === 'string') result.push(child);
+    } else if (value && typeof value.type === 'string') {
+      result.push(value);
+    }
+  }
+  return result;
 }
 
 function inspectFunction(node, tokens) {

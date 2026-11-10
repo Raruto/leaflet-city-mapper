@@ -12,6 +12,25 @@ setDefaultTimeout(10000);
 
 // Shared by the 3D scenarios when COVERAGE_3D is enabled.
 const coveredFunctions = new Map();
+const scenarioTimings = [];
+
+Before(function () {
+  this.scenarioStarted = performance.now();
+});
+
+After(function ({ pickle, result }) {
+  scenarioTimings.push({
+    name: pickle.name, status: result.status,
+    seconds: (performance.now() - this.scenarioStarted) / 1000,
+  });
+});
+
+AfterAll(function () {
+  console.log('\nSlowest scenarios (including setup and cleanup):');
+  for (const timing of scenarioTimings.sort((a, b) => b.seconds - a.seconds).slice(0, 10)) {
+    console.log(`${timing.seconds.toFixed(2)}s [${timing.status}] ${timing.name}`);
+  }
+});
 
 Before({ tags: '@coverage and not @unit' }, async function () {
   if (process.env.COVERAGE_3D) {
@@ -47,6 +66,7 @@ AfterAll(function () {
 
 let server;
 let browser;
+let webgpu;
 let context;
 const unexpectedRequests = [];
 let baseUrl;
@@ -99,13 +119,17 @@ async function getBrowser() {
   // Without any adapter the @coverage scenarios fail instead of being skipped.
   const page = await browser.newPage();
   await page.goto(baseUrl);
-  const webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
+  webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
   await page.close();
   if (webgpu) return;
   const headed = await engine.launch({ ...launchOptions, headless: false }).catch(() => null);
   if (headed) {
     await browser.close();
     browser = headed;
+    const page = await browser.newPage();
+    await page.goto(baseUrl);
+    webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
+    await page.close();
   }
 }
 
@@ -238,10 +262,7 @@ After({ tags: 'not @unit' }, async function ({ result }) {
   assert.deepEqual(this.unexpectedRequests, [], 'External requests must have local fixtures');
 });
 
-// Firefox may take several seconds to create its first WebGPU adapter.
 Before({ tags: '@coverage and not @unit', timeout: 30000 }, async function () {
+  assert.ok(webgpu, 'WebGPU adapter unavailable: 3D scenarios need a GPU-backed browser');
   await this.page.goto(baseUrl);
-  const supported = await this.page.evaluate(async () =>
-    Boolean(navigator.gpu && await navigator.gpu.requestAdapter()));
-  assert.ok(supported, 'WebGPU adapter unavailable: 3D scenarios need a GPU-backed browser');
 });

@@ -131,22 +131,28 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
         tile.loaded && (tile._gpuOpacity ?? 1) === 1 && state.terrainRequests.get(key)?.tiles &&
         state.meshes.get(key)?._terrainRequest === state.terrainRequests.get(key));
     }, null, { timeout: 45000 });
-    await this.page.waitForTimeout(1500);
-    await this.page.evaluate(() => {
+    await this.page.waitForFunction(() => {
+      const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
+      const state = globals.sceneByLayer.get(layer)._nativeGPU;
+      return [...state.meshes.values()].every(mesh => mesh._appearance === undefined || mesh._appearance === 1);
+    });
+    await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
       for (const mesh of state.meshes.values()) mesh.renderOrder = mesh.id;
       map.fire('pitch');
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await globals.sceneByLayer.get(state.backend).renderer.device.queue.onSubmittedWorkDone();
     });
-    await this.page.waitForTimeout(300);
     const forward = PNG.sync.read(await this.page.screenshot());
-    await this.page.evaluate(() => {
+    await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
       for (const mesh of state.meshes.values()) mesh.renderOrder = -mesh.id;
       map.fire('pitch');
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await globals.sceneByLayer.get(state.backend).renderer.device.queue.onSubmittedWorkDone();
     });
-    await this.page.waitForTimeout(300);
     const reverse = PNG.sync.read(await this.page.screenshot());
     let changed = 0;
     for (let i = 0; i < forward.data.length; i += 4) {
@@ -182,7 +188,8 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
       const point = map.project(marker.getLatLng(), z);
       return state.terrainRequests.get(`${Math.floor(point.x / 256)}:${Math.floor(point.y / 256)}:${z}`)?.tiles;
     }, null, { timeout: 45000 });
-    await this.page.waitForTimeout(1000);
+    await this.page.evaluate(() => new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const alignment = await this.page.evaluate(() => {
       const marker = Object.values(map._layers).find(item => item instanceof L.Marker);
       const state = globals.sceneByLayer.get(marker)._nativeGPU, backend = state.backend;
