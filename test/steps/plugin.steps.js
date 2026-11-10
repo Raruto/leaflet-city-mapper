@@ -24,9 +24,10 @@ Then('browser fixtures fix time across navigation and reject unmocked external r
     const result = await page.evaluate(async () => ({
       mocked: await (await fetch('https://fixture.invalid/mocked')).text(),
       blocked: await fetch('https://fixture.invalid/unmocked').then(() => false, () => true),
+      lookalike: await fetch('http://localhost.invalid/unmocked').then(() => false, () => true),
     }));
-    assert.deepEqual(result, { mocked: 'local fixture', blocked: true });
-    assert.deepEqual(unexpected, ['https://fixture.invalid/unmocked']);
+    assert.deepEqual(result, { mocked: 'local fixture', blocked: true, lookalike: true });
+    assert.deepEqual(unexpected, ['https://fixture.invalid/unmocked', 'http://localhost.invalid/unmocked']);
     await page.clock.runFor(2000);
     assert.equal(await page.evaluate(() => new Date().toISOString()), '2026-06-21T12:00:03.000Z');
     await context.addCookies([{ name: 'previous-scenario', value: '1', url: this.baseUrl }]);

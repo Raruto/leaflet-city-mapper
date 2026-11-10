@@ -26,9 +26,9 @@ export async function resetTestContext(context, unexpectedRequests) {
   await context.clearCookies();
   await context.clearPermissions();
   unexpectedRequests.length = 0;
-  await context.route(/^https?:\/\//, async route => {
+  // Keep local byte-range requests out of the Node routing callback.
+  await context.route(/^https?:\/\/(?!(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?(?:\/|$))/i, async route => {
     const url = new URL(route.request().url());
-    if (localHosts.includes(url.hostname)) return route.continue();
     const path = dependencyFile(url.href);
     if (path) return route.fulfill({ path });
     if ([
