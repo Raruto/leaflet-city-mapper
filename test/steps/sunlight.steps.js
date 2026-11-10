@@ -233,62 +233,62 @@ Then('solar lighting preserves {string}', { timeout: 30000 }, async function (ch
   await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
   let result;
   try {
-  result = await this.page.evaluate(async check => {
-    const owner = globals.renderers.get(map), renderer = globals.sceneByLayer.get(owner).renderer;
-    nativeChecks.render.render(owner);
-    await renderer.device.queue.onSubmittedWorkDone();
-    const { device, sunlight } = renderer;
-    if (check === 'night without direct light') {
-      const input = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
-      input.value = '0';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+    result =   await this.page.evaluate(async check => {
+      const owner = globals.renderers.get(map), renderer = globals.sceneByLayer.get(owner).renderer;
       nativeChecks.render.render(owner);
-      return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, nightLight: renderer.uniformData[51] };
-    }
-    if (check === 'depth map') {
-    const depth = device.createBuffer({ size: sunlight.size ** 2 * 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-    const encoder = device.createCommandEncoder();
-    encoder.copyTextureToBuffer({ texture: sunlight.texture, aspect: 'depth-only' },
-      { buffer: depth, bytesPerRow: sunlight.size * 4 }, [sunlight.size, sunlight.size]);
-    device.queue.submit([encoder.finish()]);
-    await depth.mapAsync(GPUMapMode.READ);
-    const depths = new Float32Array(depth.getMappedRange());
-    const covered = depths.reduce((sum, value) => sum + Number(value > 0 && value < 1), 0);
-    depth.unmap(); depth.destroy();
-    return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size,
-      dayLight: renderer.uniformData[51], covered };
-    }
-    renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
-    const capture = async disabled => {
-      const altitude = globals.cameraByMap.get(map)._sunlight.altitude;
-      if (disabled) globals.cameraByMap.get(map)._sunlight.altitude = 2;
-      nativeChecks.render.render(owner);
-      const width = renderer.canvas.width, height = renderer.canvas.height;
-      const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
-      const buffer = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-      const encoder = device.createCommandEncoder();
-      encoder.copyTextureToBuffer({ texture: renderer.context.getCurrentTexture() },
-        { buffer, bytesPerRow }, [width, height]);
-      device.queue.submit([encoder.finish()]);
-      await buffer.mapAsync(GPUMapMode.READ);
-      const pixels = new Uint8Array(buffer.getMappedRange()).slice();
-      buffer.unmap(); buffer.destroy();
-      globals.cameraByMap.get(map)._sunlight.altitude = altitude;
-      return pixels;
-    };
-    let darker = 0;
-    const shadowed = await capture(false), unshadowed = await capture(true);
-    for (let i = 0; i < shadowed.length; i += 4) {
-      if (shadowed[i] + shadowed[i + 1] + shadowed[i + 2] + 10 <
-        unshadowed[i] + unshadowed[i + 1] + unshadowed[i + 2]) darker++;
-    }
-    return {
-      altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
-      darker,
-    };
-  }, check);
+      await renderer.device.queue.onSubmittedWorkDone();
+      const { device, sunlight } = renderer;
+      if (check === 'night without direct light') {
+        const input = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
+        input.value = '0';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        nativeChecks.render.render(owner);
+        return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, nightLight: renderer.uniformData[51] };
+      }
+      if (check === 'depth map') {
+        const depth = device.createBuffer({ size: sunlight.size ** 2 * 4,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const encoder = device.createCommandEncoder();
+        encoder.copyTextureToBuffer({ texture: sunlight.texture, aspect: 'depth-only' },
+          { buffer: depth, bytesPerRow: sunlight.size * 4 }, [sunlight.size, sunlight.size]);
+        device.queue.submit([encoder.finish()]);
+        await depth.mapAsync(GPUMapMode.READ);
+        const depths = new Float32Array(depth.getMappedRange());
+        const covered = depths.reduce((sum, value) => sum + Number(value > 0 && value < 1), 0);
+        depth.unmap(); depth.destroy();
+        return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size,
+          dayLight: renderer.uniformData[51], covered };
+      }
+      renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+      const capture = async disabled => {
+        const altitude = globals.cameraByMap.get(map)._sunlight.altitude;
+        if (disabled) globals.cameraByMap.get(map)._sunlight.altitude = 2;
+        nativeChecks.render.render(owner);
+        const width = renderer.canvas.width, height = renderer.canvas.height;
+        const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
+        const buffer = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const encoder = device.createCommandEncoder();
+        encoder.copyTextureToBuffer({ texture: renderer.context.getCurrentTexture() },
+          { buffer, bytesPerRow }, [width, height]);
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const pixels = new Uint8Array(buffer.getMappedRange()).slice();
+        buffer.unmap(); buffer.destroy();
+        globals.cameraByMap.get(map)._sunlight.altitude = altitude;
+        return pixels;
+      };
+      let darker = 0;
+      const shadowed = await capture(false), unshadowed = await capture(true);
+      for (let i = 0; i < shadowed.length; i += 4) {
+        if (shadowed[i] + shadowed[i + 1] + shadowed[i + 2] + 10 <
+          unshadowed[i] + unshadowed[i + 1] + unshadowed[i + 2]) darker++;
+      }
+      return {
+        altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
+        darker,
+      };
+    }, check);
   } finally {
     await this.page.clock.resume();
   }
@@ -296,14 +296,14 @@ Then('solar lighting preserves {string}', { timeout: 30000 }, async function (ch
     assert.ok(result.altitude < 0);
     assert.equal(result.nightLight, 0);
   } else {
-  assert.ok(result.altitude > 64 && result.altitude < 65);
-  assert.equal(result.size, 2048);
-  assert.equal(result.dayLight, 1);
-  if (check === 'depth map') {
-  assert.ok(result.covered > 100, `Depth map coverage: ${result.covered}`);
-  } else {
-  assert.ok(result.darker > 20, `Pixels receiving actual shadows: ${result.darker}`);
-  }
+    assert.ok(result.altitude > 64 && result.altitude < 65);
+    assert.equal(result.size, 2048);
+    assert.equal(result.dayLight, 1);
+    if (check === 'depth map') {
+      assert.ok(result.covered > 100, `Depth map coverage: ${result.covered}`);
+    } else {
+      assert.ok(result.darker > 20, `Pixels receiving actual shadows: ${result.darker}`);
+    }
   }
   assert.deepEqual(gpuErrors, []);
 });

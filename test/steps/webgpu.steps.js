@@ -123,13 +123,18 @@ const waitForWebGPUScene = page => page.waitForFunction(() => {
       ? testOperations.isLoading(layer) : layer.isLoading?.());
 }, null, { timeout: 30000 });
 
-When('I drive the shared WebGPU renderer with map events', { timeout: 30000 }, async function () {
+When('I measure WebGPU {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['frame scheduling', 'panning uniforms', 'shader highlights', 'animated zoom'].includes(check), check);
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
   try {
     await waitForWebGPUScene(this.page);
-    this.webgpuPacing = await this.page.evaluate(async () => {
+    if (check === 'shader highlights') {
+      await this.page.waitForFunction(() => [...globals.sceneByLayer.get(globals.renderers.get(map))._layers]
+        .some(layer => globals.sceneByLayer.get(layer).group?.children.some(mesh => mesh.extras?.featureFaces?.length)));
+    }
+    this.webgpuPacing = await this.page.evaluate(async check => {
       const owner = globals.renderers.get(map);
       const { device } = globals.sceneByLayer.get(owner).renderer;
       const frame = () => new Promise(requestAnimationFrame);
@@ -163,64 +168,74 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 30000 }, a
         const deferredRenders = renders;
         await frame();
         const frameRenders = renders;
+        if (check === 'frame scheduling') {
+          return { synchronousRenders, sameTickRenders, deferredRenders, frameRenders, gpuErrors };
+        }
 
         // Continuous panning: every frame renders immediately (no GPU completion gate) and uploads uniforms once.
-        await frame();
-        renders = 0;
-        uniformWrites = 0;
-        const panRenders = [], panDurations = [];
-        for (let i = 0; i < 20; i++) {
-          const before = renders;
-          const started = performance.now();
-          map.panBy([6, -3], { animate: false });
-          panDurations.push(performance.now() - started);
-          await Promise.resolve();
-          panRenders.push(renders - before);
+        if (check === 'panning uniforms') {
           await frame();
-        }
-        const panTotals = { renders, uniformWrites };
-        const sortedPanDurations = [...panDurations].sort((a, b) => a - b);
-        const gpuDrainStarted = performance.now();
-        await device.queue.onSubmittedWorkDone();
-        const performanceMetrics = {
-          panRenderCpuMs: {
-            p50: sortedPanDurations[Math.floor(sortedPanDurations.length * 0.5)],
-            p95: sortedPanDurations[Math.ceil(sortedPanDurations.length * 0.95) - 1],
-            max: sortedPanDurations.at(-1),
-          },
-          gpuDrainMs: performance.now() - gpuDrainStarted,
-          samples: panDurations.length,
-        };
+          renders = 0;
+          uniformWrites = 0;
+          const panRenders = [], panDurations = [];
+          for (let i = 0; i < 20; i++) {
+            const before = renders;
+            const started = performance.now();
+            map.panBy([6, -3], { animate: false });
+            panDurations.push(performance.now() - started);
+            await Promise.resolve();
+            panRenders.push(renders - before);
+            await frame();
+          }
+          const panTotals = { renders, uniformWrites };
+          const sortedPanDurations = [...panDurations].sort((a, b) => a - b);
+          const gpuDrainStarted = performance.now();
+          await device.queue.onSubmittedWorkDone();
+          const performanceMetrics = {
+            panRenderCpuMs: {
+              p50: sortedPanDurations[Math.floor(sortedPanDurations.length * 0.5)],
+              p95: sortedPanDurations[Math.ceil(sortedPanDurations.length * 0.95) - 1],
+              max: sortedPanDurations.at(-1),
+            },
+            gpuDrainMs: performance.now() - gpuDrainStarted,
+            samples: panDurations.length,
+          };
 
-        let drawn = 0, totalMeshes = 0, sharedBindings = 0, ownBuffers = 0;
-        nativeChecks.graph.traverse(globals.sceneByLayer.get(owner).scene, mesh => {
-          if (!mesh.geometry) return;
-          totalMeshes++;
-          if (mesh.uniformBuffer) ownBuffers++;
-          if (!mesh.visible || !mesh._visibleInFrame || mesh._appearance === 0) return;
-          drawn++;
-          if (mesh.boundBuffer === globals.sceneByLayer.get(owner).renderer.uniformBuffer) sharedBindings++;
-        });
-        const uniformSlots = globals.sceneByLayer.get(owner).renderer.uniformSlot;
-        const uniformCapacity = globals.sceneByLayer.get(owner).renderer.uniformBuffer.size / 256;
-        performanceMetrics.sceneMeshes = {
-          drawn, total: totalMeshes, shadowCasters: globals.sceneByLayer.get(owner)._shadowMeshes?.length || 0,
-        };
+          let drawn = 0, totalMeshes = 0, sharedBindings = 0, ownBuffers = 0;
+          nativeChecks.graph.traverse(globals.sceneByLayer.get(owner).scene, mesh => {
+            if (!mesh.geometry) return;
+            totalMeshes++;
+            if (mesh.uniformBuffer) ownBuffers++;
+            if (!mesh.visible || !mesh._visibleInFrame || mesh._appearance === 0) return;
+            drawn++;
+            if (mesh.boundBuffer === globals.sceneByLayer.get(owner).renderer.uniformBuffer) sharedBindings++;
+          });
+          const uniformSlots = globals.sceneByLayer.get(owner).renderer.uniformSlot;
+          const uniformCapacity = globals.sceneByLayer.get(owner).renderer.uniformBuffer.size / 256;
+          performanceMetrics.sceneMeshes = {
+            drawn, total: totalMeshes, shadowCasters: globals.sceneByLayer.get(owner)._shadowMeshes?.length || 0,
+          };
+          return { panRenders, panTotals, performanceMetrics,
+            drawn, sharedBindings, ownBuffers, uniformSlots, uniformCapacity, gpuErrors };
+        }
 
         // Hover highlight is a shader vertex range: no vertex color re-upload.
-        const buildings = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer).group?.children.some(mesh => mesh.extras?.featureFaces?.length));
-        const target = globals.sceneByLayer.get(buildings).group.children.find(mesh => mesh.extras?.featureFaces?.length);
-        const feature = target.extras.featureFaces[0];
-        await frame();
-        otherWrites = 0;
-        buffers = new Set(Object.values(target.geometry.attributes).map(attribute => attribute.buffer));
-        nativeChecks.picking.setHighlight(buildings, { mesh: target, ...feature });
-        await frame();
-        const highlight = { range: target.highlight, expected: [feature.vertexStart, feature.vertexEnd] };
-        nativeChecks.picking.setHighlight(buildings, null);
-        await frame();
-        highlight.cleared = target.highlight;
-        highlight.writes = otherWrites;
+        if (check === 'shader highlights') {
+          const buildings = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer).group?.children.some(mesh => mesh.extras?.featureFaces?.length));
+          const target = globals.sceneByLayer.get(buildings).group.children.find(mesh => mesh.extras?.featureFaces?.length);
+          const feature = target.extras.featureFaces[0];
+          await frame();
+          otherWrites = 0;
+          buffers = new Set(Object.values(target.geometry.attributes).map(attribute => attribute.buffer));
+          nativeChecks.picking.setHighlight(buildings, { mesh: target, ...feature });
+          await frame();
+          const highlight = { range: target.highlight, expected: [feature.vertexStart, feature.vertexEnd] };
+          nativeChecks.picking.setHighlight(buildings, null);
+          await frame();
+          highlight.cleared = target.highlight;
+          highlight.writes = otherWrites;
+          return { highlight, gpuErrors };
+        }
 
         // During zoom animations map events wait for the frame that also advances the CSS transitions.
         await frame();
@@ -239,44 +254,48 @@ When('I drive the shared WebGPU renderer with map events', { timeout: 30000 }, a
         await frame();
         await device.queue.onSubmittedWorkDone();
         return {
-          synchronousRenders, sameTickRenders, deferredRenders, frameRenders, panRenders, panTotals, performanceMetrics,
-          drawn, sharedBindings, ownBuffers, uniformSlots, uniformCapacity, highlight,
           animating, zoomTickRenders, zoomFrameRenders, gpuErrors,
         };
       } finally {
         delete device.queue.writeBuffer;
         device.removeEventListener('uncapturederror', onGpuError);
       }
-    });
+    }, check);
   } finally {
     this.page.off('pageerror', onPageError);
   }
   this.webgpuPacing.pageErrors = pageErrors;
 });
 
-Then('map events render in the same tick, updates share one animation frame and each frame writes uniforms once', function () {
+Then('WebGPU {string} preserves its rendering invariants', function (check) {
+  assert.ok(['frame scheduling', 'panning uniforms', 'shader highlights', 'animated zoom'].includes(check), check);
   const result = this.webgpuPacing;
   const details = JSON.stringify(result);
-  console.log(`PERF Paris WebGPU pan: ${JSON.stringify(result.performanceMetrics)}`);
-  this.attach(JSON.stringify(result.performanceMetrics, null, 2), 'application/json');
-  assert.equal(result.synchronousRenders, 0, details);
-  assert.equal(result.sameTickRenders, 1, details);
-  assert.equal(result.deferredRenders, 0, details);
-  assert.equal(result.frameRenders, 1, details);
-  assert.deepEqual(result.panRenders, Array(20).fill(1), details);
-  assert.equal(result.panTotals.uniformWrites, result.panTotals.renders, details);
-  assert.equal(result.performanceMetrics.samples, 20, details);
-  assert.ok(result.performanceMetrics.panRenderCpuMs.p50 < 100, details);
-  assert.ok(result.drawn > 1, details);
-  assert.equal(result.sharedBindings, result.drawn, details);
-  assert.equal(result.ownBuffers, 0, details);
-  assert.ok(result.uniformSlots > result.drawn && result.uniformSlots <= result.uniformCapacity, details);
-  assert.deepEqual(result.highlight.range, result.highlight.expected, details);
-  assert.equal(result.highlight.cleared, null, details);
-  assert.equal(result.highlight.writes, 0, details);
-  assert.equal(result.animating, true, details);
-  assert.equal(result.zoomTickRenders, 0, details);
-  assert.equal(result.zoomFrameRenders, 1, details);
+  if (check === 'frame scheduling') {
+    assert.equal(result.synchronousRenders, 0, details);
+    assert.equal(result.sameTickRenders, 1, details);
+    assert.equal(result.deferredRenders, 0, details);
+    assert.equal(result.frameRenders, 1, details);
+  } else if (check === 'panning uniforms') {
+    console.log(`PERF Paris WebGPU pan: ${JSON.stringify(result.performanceMetrics)}`);
+    this.attach(JSON.stringify(result.performanceMetrics, null, 2), 'application/json');
+    assert.deepEqual(result.panRenders, Array(20).fill(1), details);
+    assert.equal(result.panTotals.uniformWrites, result.panTotals.renders, details);
+    assert.equal(result.performanceMetrics.samples, 20, details);
+    assert.ok(result.performanceMetrics.panRenderCpuMs.p50 < 100, details);
+    assert.ok(result.drawn > 1, details);
+    assert.equal(result.sharedBindings, result.drawn, details);
+    assert.equal(result.ownBuffers, 0, details);
+    assert.ok(result.uniformSlots > result.drawn && result.uniformSlots <= result.uniformCapacity, details);
+  } else if (check === 'shader highlights') {
+    assert.deepEqual(result.highlight.range, result.highlight.expected, details);
+    assert.equal(result.highlight.cleared, null, details);
+    assert.equal(result.highlight.writes, 0, details);
+  } else {
+    assert.equal(result.animating, true, details);
+    assert.equal(result.zoomTickRenders, 0, details);
+    assert.equal(result.zoomFrameRenders, 1, details);
+  }
   assert.deepEqual(result.gpuErrors, [], details);
   assert.deepEqual(result.pageErrors, [], details);
 });

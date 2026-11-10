@@ -10,6 +10,10 @@ Feature: Offline Cloud Optimized GeoTIFF sources
   Scenario: COG worker requests share the geometry pool without retaining TIFF parsing on the main thread
     Then COG workers preserve ranges, cache ownership, missing tiles and errors
 
+  Scenario: Colosseum imagery archives share their exact square footprint
+    Given the instrumented city mapper plugin is loaded after Leaflet alone
+    Then the offline Colosseum imagery archives share the exact centered square extent
+
   @coverage
   Scenario: The local Colosseum COGs render aerial and archaeological imagery on real relief
     Given the instrumented city mapper plugin is loaded after Leaflet alone

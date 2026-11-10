@@ -142,96 +142,96 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
   await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
   let result;
   try {
-  result = await this.page.evaluate(async check => {
-    const layer = streetlights, owner = globals.renderers.get(map);
-    const { device, context, canvas, format } = globals.sceneByLayer.get(owner).renderer;
-    const gpuErrors = [];
-    device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
-    const date = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
-    const slider = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
-    const select = minute => {
-      date.value = '2026-06-21'; slider.value = String(minute);
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
-      nativeChecks.render.render(owner);
-    };
-    context.configure({ device, format, alphaMode: 'premultiplied',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
-    const capture = async () => {
-      nativeChecks.render.render(owner);
-      const bytesPerRow = Math.ceil(canvas.width * 4 / 256) * 256;
-      const buffer = device.createBuffer({ size: bytesPerRow * canvas.height,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-      const encoder = device.createCommandEncoder();
-      encoder.copyTextureToBuffer({ texture: context.getCurrentTexture() }, { buffer, bytesPerRow },
-        [canvas.width, canvas.height]);
-      device.queue.submit([encoder.finish()]);
-      await buffer.mapAsync(GPUMapMode.READ);
-      const pixels = new Uint8Array(buffer.getMappedRange()).slice();
-      buffer.unmap(); buffer.destroy();
-      return pixels;
-    };
-    const brighter = (a, b) => {
-      let count = 0;
-      for (let i = 0; i < a.length; i += 4) {
-        if (a[i] + a[i + 1] + a[i + 2] > b[i] + b[i + 1] + b[i + 2] + 15) count++;
-      }
-      return count;
-    };
-    select(0);
-    const nightStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
-    if (check === 'daylight poles and disabled lighting') {
-      select(720);
-      const dayStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
-      const dayLit = await capture();
-      globals.sceneByLayer.get(layer).root.visible = false;
-      const dayWithoutLamps = await capture();
-      globals.sceneByLayer.get(layer).root.visible = true;
+    result =   await this.page.evaluate(async check => {
+      const layer = streetlights, owner = globals.renderers.get(map);
+      const { device, context, canvas, format } = globals.sceneByLayer.get(owner).renderer;
+      const gpuErrors = [];
+      device.addEventListener('uncapturederror', event => gpuErrors.push(event.error.message));
+      const date = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=date]');
+      const slider = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
+      const select = minute => {
+        date.value = '2026-06-21'; slider.value = String(minute);
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        nativeChecks.render.render(owner);
+      };
+      context.configure({ device, format, alphaMode: 'premultiplied',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+      const capture = async () => {
+        nativeChecks.render.render(owner);
+        const bytesPerRow = Math.ceil(canvas.width * 4 / 256) * 256;
+        const buffer = device.createBuffer({ size: bytesPerRow * canvas.height,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const encoder = device.createCommandEncoder();
+        encoder.copyTextureToBuffer({ texture: context.getCurrentTexture() }, { buffer, bytesPerRow },
+          [canvas.width, canvas.height]);
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const pixels = new Uint8Array(buffer.getMappedRange()).slice();
+        buffer.unmap(); buffer.destroy();
+        return pixels;
+      };
+      const brighter = (a, b) => {
+        let count = 0;
+        for (let i = 0; i < a.length; i += 4) {
+          if (a[i] + a[i + 1] + a[i + 2] > b[i] + b[i + 1] + b[i + 2] + 15) count++;
+        }
+        return count;
+      };
       select(0);
-      map.removeLayer(sunlightOverlay);
-      nativeChecks.render.render(owner);
-      const disabledStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
-      map.addLayer(sunlightOverlay);
-      return { nightStrength, dayStrength, disabledStrength,
-        dayLampPixels: brighter(dayLit, dayWithoutLamps) + brighter(dayWithoutLamps, dayLit), gpuErrors };
-    }
-    if (check === 'illumination on 3D surfaces') {
-      const terrain = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer)._type === 'terrain');
-      globals.sceneByLayer.get(terrain).root.visible = false;
-      const ranges = globals.sceneByLayer.get(layer).root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
-      for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;
-      const objectsLit = await capture();
-      globals.sceneByLayer.get(layer).root.visible = false;
-      const objectsUnlit = await capture();
-      globals.sceneByLayer.get(layer).root.visible = true;
-      globals.sceneByLayer.get(terrain).root.visible = true;
-      for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
-      return { objectPixels: brighter(objectsLit, objectsUnlit), gpuErrors };
-    }
-    const lit = await capture();
-    if (check === 'streetlight ground illumination') {
-    globals.sceneByLayer.get(layer).root.visible = false;
-    const unlit = await capture();
-    globals.sceneByLayer.get(layer).root.visible = true;
-    const lampPixels = brighter(lit, unlit);
-    return { lampPixels, gpuErrors };
-    }
-    const tower = layers._layers.find(entry => entry.name === 'Eiffel Tower').layer;
-    const programs = new Set();
-    nativeChecks.graph.traverse(globals.sceneByLayer.get(tower).root, mesh => { if (mesh.program) programs.add(mesh.program); });
-    for (const program of programs) program.nightSparkle = false;
-    const darkTower = await capture();
-    globals.sceneByLayer.get(tower).root.visible = false;
-    const withoutTower = await capture();
-    globals.sceneByLayer.get(tower).root.visible = true;
-    let towerSurfacePixels = 0;
-    for (let i = 0; i < darkTower.length; i += 4) {
-      if (Math.abs(darkTower[i] - withoutTower[i]) + Math.abs(darkTower[i + 1] - withoutTower[i + 1]) +
-        Math.abs(darkTower[i + 2] - withoutTower[i + 2]) > 3) towerSurfacePixels++;
-    }
-    for (const program of programs) program.nightSparkle = true;
-    const towerPixels = brighter(lit, darkTower);
-    return { towerPixels, towerSurfacePixels, gpuErrors };
-  }, check);
+      const nightStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
+      if (check === 'daylight poles and disabled lighting') {
+        select(720);
+        const dayStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
+        const dayLit = await capture();
+        globals.sceneByLayer.get(layer).root.visible = false;
+        const dayWithoutLamps = await capture();
+        globals.sceneByLayer.get(layer).root.visible = true;
+        select(0);
+        map.removeLayer(sunlightOverlay);
+        nativeChecks.render.render(owner);
+        const disabledStrength = globals.sceneByLayer.get(owner).renderer.uniformData[55];
+        map.addLayer(sunlightOverlay);
+        return { nightStrength, dayStrength, disabledStrength,
+          dayLampPixels: brighter(dayLit, dayWithoutLamps) + brighter(dayWithoutLamps, dayLit), gpuErrors };
+      }
+      if (check === 'illumination on 3D surfaces') {
+        const terrain = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer)._type === 'terrain');
+        globals.sceneByLayer.get(terrain).root.visible = false;
+        const ranges = globals.sceneByLayer.get(layer).root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
+        for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;
+        const objectsLit = await capture();
+        globals.sceneByLayer.get(layer).root.visible = false;
+        const objectsUnlit = await capture();
+        globals.sceneByLayer.get(layer).root.visible = true;
+        globals.sceneByLayer.get(terrain).root.visible = true;
+        for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
+        return { objectPixels: brighter(objectsLit, objectsUnlit), gpuErrors };
+      }
+      const lit = await capture();
+      if (check === 'streetlight ground illumination') {
+        globals.sceneByLayer.get(layer).root.visible = false;
+        const unlit = await capture();
+        globals.sceneByLayer.get(layer).root.visible = true;
+        const lampPixels = brighter(lit, unlit);
+        return { lampPixels, gpuErrors };
+      }
+      const tower = layers._layers.find(entry => entry.name === 'Eiffel Tower').layer;
+      const programs = new Set();
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(tower).root, mesh => { if (mesh.program) programs.add(mesh.program); });
+      for (const program of programs) program.nightSparkle = false;
+      const darkTower = await capture();
+      globals.sceneByLayer.get(tower).root.visible = false;
+      const withoutTower = await capture();
+      globals.sceneByLayer.get(tower).root.visible = true;
+      let towerSurfacePixels = 0;
+      for (let i = 0; i < darkTower.length; i += 4) {
+        if (Math.abs(darkTower[i] - withoutTower[i]) + Math.abs(darkTower[i + 1] - withoutTower[i + 1]) +
+          Math.abs(darkTower[i + 2] - withoutTower[i + 2]) > 3) towerSurfacePixels++;
+      }
+      for (const program of programs) program.nightSparkle = true;
+      const towerPixels = brighter(lit, darkTower);
+      return { towerPixels, towerSurfacePixels, gpuErrors };
+    }, check);
   } finally {
     await this.page.clock.resume();
   }
@@ -240,15 +240,15 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
   if (check === 'streetlight ground illumination') {
     assert.ok(result.lampPixels > 100, `Actual lamp light pixels: ${JSON.stringify(result)}`);
   } else if (check === 'Eiffel Tower sparkle') {
-  assert.ok(result.towerPixels > 20, `Actual tower point-light pixels: ${result.towerPixels}`);
-  assert.ok(result.towerPixels < result.towerSurfacePixels * 0.35, `Tower must not glow uniformly: ${JSON.stringify(result)}`);
+    assert.ok(result.towerPixels > 20, `Actual tower point-light pixels: ${result.towerPixels}`);
+    assert.ok(result.towerPixels < result.towerSurfacePixels * 0.35, `Tower must not glow uniformly: ${JSON.stringify(result)}`);
   } else if (check === 'illumination on 3D surfaces') {
-  assert.ok(result.objectPixels > 50, `Lamp illumination on 3D objects, excluding terrain and sprites: ${result.objectPixels}`);
+    assert.ok(result.objectPixels > 50, `Lamp illumination on 3D objects, excluding terrain and sprites: ${result.objectPixels}`);
   } else {
-  assert.equal(result.nightStrength, 1);
-  assert.equal(result.dayStrength, 0);
-  assert.equal(result.disabledStrength, 0);
-  assert.ok(result.dayLampPixels > 50, `Solid poles must remain visible in daylight: ${JSON.stringify(result)}`);
+    assert.equal(result.nightStrength, 1);
+    assert.equal(result.dayStrength, 0);
+    assert.equal(result.disabledStrength, 0);
+    assert.ok(result.dayLampPixels > 50, `Solid poles must remain visible in daylight: ${JSON.stringify(result)}`);
   }
 });
 

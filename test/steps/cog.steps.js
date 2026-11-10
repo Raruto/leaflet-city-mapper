@@ -188,18 +188,11 @@ Then('COG workers preserve ranges, cache ownership, missing tiles and errors', {
     'The pooled worker retains the TIFF directory across geometry tasks and interleaved COG sources');
 });
 
-Then('local archaeological COGs load by range and displace the ground', { timeout: 30000 }, async function () {
+Then('the offline Colosseum imagery archives share the exact centered square extent', { timeout: 30000 }, async function () {
   const info = await stat(new URL('../../examples/data/colosseum.pmtiles', import.meta.url));
   assert.ok(info.size > 0 && info.size <= 25000000, `colosseum.pmtiles: ${info.size} bytes`);
   assert.equal((await readdir(new URL('../../examples/data/', import.meta.url))).some(name =>
     /^colosseum-.*\.tiff?$/.test(name)), false, 'Legacy TIFFs must not remain in the demo directory');
-  const requests = [], remote = [], errors = [];
-  this.page.on('request', request => {
-    if (/colosseum\.pmtiles$/.test(request.url())) requests.push(request.headers().range);
-    if (/arcgisonline\.com|archeositarproject\.it|geoportale\.regione\.lazio\.it|elevation-tiles-prod/.test(request.url())) remote.push(request.url());
-  });
-  this.page.on('pageerror', error => errors.push(error.message));
-  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   const imagery = await openCog(`${this.baseUrl}/examples/data/colosseum.pmtiles`, 'archaeology');
   const header = await imagery.getHeader();
   const orthophoto = await openCog(`${this.baseUrl}/examples/data/colosseum.pmtiles`, 'orthophoto');
@@ -213,6 +206,16 @@ Then('local archaeological COGs load by range and displace the ground', { timeou
     Math.asinh(Math.tan(41.89021 * Math.PI / 180)) / Math.PI * half) < 1e-6, 'Exact Colosseum latitude');
   assert.ok(Math.abs(east - west - (north - south)) < 1e-6, 'Square projected extent');
   assert.ok(Math.abs(east - west + resolution - 2048 * resolution) < 1e-6, '2048-pixel square');
+});
+
+Then('local archaeological COGs load by range and displace the ground', { timeout: 30000 }, async function () {
+  const requests = [], remote = [], errors = [];
+  this.page.on('request', request => {
+    if (/colosseum\.pmtiles$/.test(request.url())) requests.push(request.headers().range);
+    if (/arcgisonline\.com|archeositarproject\.it|geoportale\.regione\.lazio\.it|elevation-tiles-prod/.test(request.url())) remote.push(request.url());
+  });
+  this.page.on('pageerror', error => errors.push(error.message));
+  await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
     globals.sceneByLayer.get(layer)._geojson &&
     [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5)));

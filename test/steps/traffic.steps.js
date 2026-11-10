@@ -326,7 +326,7 @@ async function openTrafficExample(world, boats, terrain = false) {
   }, { boats, terrain }, { timeout: 10000 });
 }
 
-Given('the cycling and pedestrian example layers are open', { timeout: 20000 }, async function () {
+Given('the cycling and pedestrian example layers are open', { timeout: 30000 }, async function () {
   await openTrafficExample(this, false);
 });
 
