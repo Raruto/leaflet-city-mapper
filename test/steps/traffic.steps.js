@@ -286,7 +286,7 @@ Then('mobility paths are clipped, deduplicated and validated without inventing p
 async function openTrafficExample(world, boats, terrain = false) {
   world.trafficErrors = [];
   world.page.on('pageerror', error => world.trafficErrors.push(error.message));
-  await world.page.setViewportSize({ width: 1024, height: 600 });
+  await world.page.setViewportSize({ width: 640, height: 480 });
   await world.context.route('**/api/explore/v2.1/catalog/datasets/**', fulfillTrafficRoute);
   if (terrain) await world.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: world.pluginBundle }));
@@ -603,9 +603,8 @@ Then('cruise boats clear stale highlights and recover from invalid dates', { tim
 
 Then('the cruise route and boats remain visible above the offline river terrain', { timeout: 10000 }, async function () {
   const result = await this.page.evaluate(async () => {
-    const { boats } = cruiseChecks;
+    const { boats, select } = cruiseChecks;
     const layer = cruiseBoats, owner = globals.renderers.get(map);
-    const route = globals.sceneByLayer.get(layer).root.children[0];
     const [{ along }, { scheduledTrips }] = await Promise.all([
       import('/src/geometry/interpolateRoute.js'), import('/src/traffic/scheduledTrips.js'),
     ]);
@@ -615,10 +614,14 @@ Then('the cruise route and boats remain visible above the offline river terrain'
     cruiseLengths.forEach((length, i) => { if (i) cruiseLengths[i] += cruiseLengths[i - 1]; });
     const cruiseDistance = cruiseLengths.at(-1);
     const cruisePosition = progress => { const { x, z } = along(cruiseRoute, cruiseLengths, progress * cruiseDistance); return [x, z]; };
+    select('2026-11-02', 600);
     const renderer = globals.sceneByLayer.get(owner).renderer, { device } = renderer;
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
-    const capture = async () => {
+    const capture = async (routeVisible = true, boatsVisible = true) => {
+      // Terrain updates can replace the outline while earlier GPU readbacks await.
+      globals.trafficByLayer.get(layer).route.visible = routeVisible;
+      boats().visible = boatsVisible;
       nativeChecks.render.render(owner);
       const width = renderer.canvas.width, height = renderer.canvas.height;
       const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
@@ -643,20 +646,16 @@ Then('the cruise route and boats remain visible above the offline river terrain'
     const riverCoverage = covered / cruiseDistance;
     testOperations.setPitch(map, 0); testOperations.setBearing(map, 0); map.fitBounds(cruiseRoute, { animate: false });
     const overview = await capture();
-    route.visible = false;
-    const overviewNoRoute = await capture();
+    const overviewNoRoute = await capture(false);
     let overviewRoutePixels = 0;
     for (let i = 0; i < overview.length; i += 4) {
       if (Math.abs(overview[i] - overviewNoRoute[i]) + Math.abs(overview[i + 1] - overviewNoRoute[i + 1]) +
         Math.abs(overview[i + 2] - overviewNoRoute[i + 2]) > 15) overviewRoutePixels++;
     }
-    route.visible = true;
     testOperations.setPitch(map, 45); testOperations.setBearing(map, 25); map.setView(cruisePosition(scheduledTrips('2026-11-02T10:00:00Z', cruise.properties.timetable)[0].progress), 19, { animate: false });
     const visible = await capture();
-    boats().visible = false;
-    const noBoats = await capture();
-    route.visible = false;
-    const noRoute = await capture();
+    const noBoats = await capture(true, false);
+    const noRoute = await capture(false, false);
     let boatPixels = 0, routePixels = 0;
     for (let i = 0; i < visible.length; i += 4) {
       if (Math.abs(visible[i] - noBoats[i]) + Math.abs(visible[i + 1] - noBoats[i + 1]) +

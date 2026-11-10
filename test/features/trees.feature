@@ -5,7 +5,7 @@ Feature: Paris trees
     Then tree points preserve dimensions, terrain elevation, picking and validation
 
   Scenario: The Paris tree inventory controls styles and safe tooltips
-    Given the Eiffel Tower example page is open
+    Given the offline Paris example loads only "Trees, Time"
     Then tree inventory attributes control dimensions, crowns and tooltip estimates
 
   Scenario: Real tree PMTiles render alongside the other Paris overlays

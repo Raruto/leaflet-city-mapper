@@ -3,6 +3,7 @@ import * as globals from '../fixtures/globals.js';
 
 import assert from 'node:assert/strict';
 import { Given } from '@cucumber/cucumber';
+import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
 export async function prepare3DChecks(page) {
   await page.evaluate(async () => {
@@ -268,7 +269,8 @@ Given('a leaflet map', { timeout: 30000 }, async function () {
 });
 
 const openEiffelExample = async function () {
-  await this.page.setViewportSize({ width: 1024, height: 600 });
+  await this.page.setViewportSize(this.focusedParisLayers
+    ? { width: 640, height: 480 } : { width: 1024, height: 600 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.waitForFunction(() => window.map && typeof testOperations.getPitch === 'function');
@@ -337,4 +339,5 @@ Given('the offline Paris example loads only {string}', { timeout: 30000 }, async
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await openEiffelExample.call(this);
+  await expandLayerControl(this.page);
 });
