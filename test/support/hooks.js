@@ -117,7 +117,8 @@ async function getBrowser() {
       channel: options.channel || 'chromium',
       // Use Chromium's bundled software adapters, not the runner's GPU drivers.
       args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
-        '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader'],
+        '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader',
+        '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'],
     }
     : options;
   browser = await engine.launch(launchOptions);
@@ -125,7 +126,33 @@ async function getBrowser() {
   // Without any adapter the @coverage scenarios fail instead of being skipped.
   const page = await browser.newPage();
   await page.goto(baseUrl);
-  webgpu = await page.evaluate(async () => Boolean(await navigator.gpu?.requestAdapter()));
+  webgpu = await page.evaluate(async () => {
+    const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter) return false;
+    const device = await adapter.requestDevice();
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('webgpu');
+    try {
+      if (!context) throw new Error('Unable to create the WebGPU test canvas');
+      context.configure({ device, format: navigator.gpu.getPreferredCanvasFormat() });
+      device.pushErrorScope('validation');
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({ colorAttachments: [{
+        view: context.getCurrentTexture().createView(),
+        clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store',
+      }] });
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      await device.queue.onSubmittedWorkDone();
+      const error = await device.popErrorScope();
+      if (error) throw new Error(`WebGPU test rendering failed: ${error.message}`);
+      return true;
+    } finally {
+      context?.unconfigure();
+      device.destroy();
+    }
+  });
   await page.close();
   if (webgpu) return;
   if (process.env.CI) {
