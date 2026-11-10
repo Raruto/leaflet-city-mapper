@@ -166,9 +166,12 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(selected.live, false);
   assert.match(selected.output, /00:01 UTC/);
   assert.ok(selected.altitude < 0);
+  const beforeNow = await this.page.evaluate(() => Date.now());
   await this.page.getByRole('button', { name: 'Now', exact: true }).click();
-  assert.equal(await this.page.evaluate(() =>
-    globals.sceneByLayer.get(sunlightOverlay).control.live && Math.abs(globals.sceneByLayer.get(sunlightOverlay).control.time.getTime() - Date.now()) < 5000), true);
+  assert.equal(await this.page.evaluate(beforeNow => {
+    const control = globals.sceneByLayer.get(sunlightOverlay).control;
+    return control.live && control.time.getTime() >= beforeNow && control.time.getTime() <= Date.now();
+  }, beforeNow), true);
   await this.page.getByLabel('Time', { exact: true }).uncheck();
   assert.equal(await this.page.evaluate(() => globals.cameraByMap.get(map)._sunlight === undefined), true);
   await this.page.getByLabel('Time', { exact: true }).check();
