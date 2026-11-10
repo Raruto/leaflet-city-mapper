@@ -1,5 +1,9 @@
 @coverage
 Feature: Building volumes from PMTiles
+  @unit
+  Scenario: Source queues wait for shared renderer initialization
+    Then source queues tolerate a shared renderer that is still initializing
+
   Scenario: Layer counts follow loaded geometry and control rebuilds
     Given a leaflet map
     Then layer counts report loaded elements and survive toggling and failures

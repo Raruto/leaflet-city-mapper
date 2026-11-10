@@ -5,6 +5,26 @@ import assert from 'node:assert/strict';
 import { Given, Then, When } from '@cucumber/cucumber';
 import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 import { prepare3DChecks } from './3d.steps.js';
+import { pump } from '../../src/sources/pumpSourceAreas.js';
+import { renderers } from '../../src/weakmaps/renderers.js';
+import { layersByLayer } from '../../src/weakmaps/layersByLayer.js';
+
+Then('source queues tolerate a shared renderer that is still initializing', function () {
+  const map = {}, layer = { _map: map };
+  try {
+    assert.doesNotThrow(() => pump(layer));
+    renderers.set(map, layer);
+    assert.doesNotThrow(() => pump(layer));
+    layersByLayer.set(layer, new Set());
+    assert.doesNotThrow(() => pump(layer));
+    layersByLayer.delete(layer);
+    renderers.delete(map);
+    assert.doesNotThrow(() => pump(layer));
+  } finally {
+    layersByLayer.delete(layer);
+    renderers.delete(map);
+  }
+});
 
 Then('layer counts report loaded elements and survive toggling and failures', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {

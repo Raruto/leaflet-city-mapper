@@ -261,7 +261,7 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);
   this.page = await createTestPage(this.context);
   this.browserErrors = [];
-  this.page.on('pageerror', error => this.browserErrors.push(error.message));
+  this.page.on('pageerror', error => this.browserErrors.push(error.stack || error.message));
   this.page.on('console', message => {
     if (message.type() === 'error') this.browserErrors.push(message.text());
   });

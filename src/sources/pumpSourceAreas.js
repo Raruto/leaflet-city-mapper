@@ -16,7 +16,7 @@ import { pendingSourceAreas } from './pendingSourceAreas.js';
 /** Share four load/build slots across source layers, nearest ground blocks first. */
 export function pump(layer, map = layer._map) {
   const shared = map && renderers.get(map);
-  if (!shared) return;
+  if (!shared || !layersByLayer.has(shared)) return;
   const layers = /* alloc */ [];
   let sourceLayer, area, areaBackend;
   for (sourceLayer of layersByLayer.get(shared)) {
