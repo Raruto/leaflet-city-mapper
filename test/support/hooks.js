@@ -151,6 +151,7 @@ async function getBrowser() {
 // GPU-process shutdown on Windows can take about a minute even after all pages close.
 AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => {
   try {
+    await context?.close();
     await browser?.close();
   } finally {
     globalThis.fetch = fetchNode;
@@ -249,13 +250,15 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   // Source-level checks and the instrumented bundle share each global's identity.
   await this.context.route(/\/src\/(?:globals|weakmaps)\/[^/]+\.js$/, async route => {
     if (new URL(route.request().url()).origin !== baseUrl) return route.fallback();
-    if (!await this.page.evaluate(() => Boolean(globalThis.globals))) return route.continue();
-    const parts = new URL(route.request().url()).pathname.split('/');
+    const pathname = new URL(route.request().url()).pathname;
+    const parts = pathname.split('/');
     const name = parts.pop().slice(0, -3);
     const namespace = parts.pop() === 'weakmaps' ? 'testWeakmaps' : 'globals';
     await route.fulfill({
       contentType: 'text/javascript',
-      body: `export const ${name} = globalThis.${namespace}.${name};`,
+      body: `export const ${name} = globalThis.globals
+        ? globalThis.${namespace}.${name}
+        : (await import(${JSON.stringify(`${pathname}?unbundled`)})).${name};`,
     });
   });
   await this.context.route('**/dist/leaflet-city-mapper.js', mockPMTiles);

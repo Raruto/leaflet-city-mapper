@@ -19,9 +19,6 @@ export function initializeRendererResources(layer, device) {
   renderer.sunlight = /* alloc */ { layout, buffer, sampler, lights, size: 0 };
   device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
   resizeSunlight(layer, 1);
-  const emptyImage = document.createElement('canvas');
-  emptyImage.width = 1;
-  emptyImage.height = 1;
   renderer.roofFallbackTexture = /* alloc */ {
     device,
     texture: device.createTexture(/* alloc */ {
@@ -32,6 +29,6 @@ export function initializeRendererResources(layer, device) {
     sampler: device.createSampler(/* alloc */ {
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
     }),
-    image: emptyImage, format: 'rgba8unorm', srgb: false, uploaded: null,
+    image: null, format: 'rgba8unorm', srgb: false, uploaded: null,
   };
 }

@@ -10308,9 +10308,6 @@
     { layout, buffer, sampler, lights, size: 0 };
     device.queue.writeBuffer(buffer, 0, sceneSunlightUniforms);
     resizeSunlight(layer, 1);
-    const emptyImage = document.createElement("canvas");
-    emptyImage.width = 1;
-    emptyImage.height = 1;
     renderer.roofFallbackTexture = /* alloc */
     {
       device,
@@ -10332,7 +10329,7 @@
           addressModeV: "clamp-to-edge"
         }
       ),
-      image: emptyImage,
+      image: null,
       format: "rgba8unorm",
       srgb: false,
       uploaded: null

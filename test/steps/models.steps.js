@@ -60,7 +60,11 @@ Then('configured models preserve external assets and can be detached and reattac
     mesh.geometry.attributes.position.data[0] = 123;
     const retainedGeometry = meshes[1].geometry.attributes.position.data[0] === secondX;
     mesh.geometry.attributes.position.data[0] = secondX;
-    const style = mesh.program._layerMaterial, device = globals.sceneByLayer.get(layer).renderer.device;
+    const renderer = globals.sceneByLayer.get(layer).renderer;
+    const style = mesh.program._layerMaterial, device = renderer.device;
+    const fallback = renderer.roofFallbackTexture;
+    const fallbackNeedsNoImage = fallback.image === null && fallback.uploaded === null &&
+      fallback.texture.width === 1 && fallback.texture.height === 1;
     const attached = model.parent === globals.sceneByLayer.get(layer).root && !('ready' in layer);
     const maps = style.baseTexture.format === 'rgba8unorm-srgb' &&
       style.metalTexture.format === 'rgba8unorm' &&
@@ -82,7 +86,8 @@ Then('configured models preserve external assets and can be detached and reattac
     nativeChecks.render.update(layer);
     const reattached = model.parent === globals.sceneByLayer.get(layer).root;
     layer.remove();
-    return { waitsForMap, attached, maps, factors, normals, independent, retainedGeometry, uploaded, retained, reattached };
+    return { waitsForMap, attached, maps, factors, normals, independent, retainedGeometry,
+      fallbackNeedsNoImage, uploaded, retained, reattached };
   });
   for (const [name, value] of Object.entries(result)) {
     assert.equal(value, true, name);
