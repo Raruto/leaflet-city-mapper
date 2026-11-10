@@ -293,13 +293,16 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   this.browserErrors = [];
   this.page.on('pageerror', error => this.browserErrors.push(error.stack || error.message));
   this.page.on('console', message => {
-    if (message.type() === 'error') this.browserErrors.push(message.text());
+    if (message.type() === 'error') {
+      const { url, lineNumber } = message.location();
+      this.browserErrors.push(`${message.text()}${url ? ` (${url}:${lineNumber + 1})` : ''}`);
+    }
   });
 });
 
-After({ tags: 'not @unit' }, async function ({ result }) {
+After({ tags: 'not @unit' }, async function ({ pickle, result }) {
   if (result?.status === Status.FAILED && this.browserErrors?.length) {
-    console.error('Browser errors:', this.browserErrors.join('\n'));
+    console.error(`Browser errors [${pickle.name}]:`, this.browserErrors.join('\n'));
   }
   if (this.context) {
     for (const page of this.context.pages()) await page.close();
