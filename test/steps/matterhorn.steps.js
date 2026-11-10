@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Then } from '@cucumber/cucumber';
+import { Given, Then } from '@cucumber/cucumber';
 import { PNG } from 'pngjs';
 
 function whiteFraction(buffer) {
@@ -11,16 +11,18 @@ function whiteFraction(buffer) {
   return white / (image.width * image.height);
 }
 
-Then('the Matterhorn example streams elevations for its satellite tiles while navigating',
-  { timeout: 90000 }, async function () {
-    const waitForTerrain = () => this.page.waitForFunction(() => {
+async function waitForTerrain(page) {
+    await page.waitForFunction(() => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
       return Object.keys(layer._tiles).length > 0 && Object.entries(layer._tiles).every(([key, tile]) =>
         tile.loaded && (tile._gpuOpacity ?? 1) === 1 && state.terrainRequests.get(key)?.tiles &&
         state.meshes.get(key)?._terrainRequest === state.terrainRequests.get(key)) &&
         [...state.meshes.values()].every(mesh => mesh._appearance === undefined || mesh._appearance === 1);
-    }, null, { timeout: 45000 });
+    });
+}
+
+Given('the Matterhorn example is open with offline elevation and satellite tiles', { timeout: 30000 }, async function () {
     const terrain = new PNG({ width: 512, height: 512 });
     for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
       terrain.data.set([128 + Math.floor(x / 256) + 2 * Math.floor(y / 256), 10, 128, 255], (y * 512 + x) * 4);
@@ -33,11 +35,12 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
       ground.data[(y * 256 + x) * 4 + 1] = Math.floor(x / 32) * 32;
     }
     const terrainImage = PNG.sync.write(terrain), groundImage = PNG.sync.write(ground), requests = [];
-    let delayDetail = false;
+    this.matterhornRequests = requests;
+    this.matterhornDetail = { delayed: false };
     await this.page.route('https://tiles.mapterhorn.com/**', async route => {
       requests.push(route.request().url());
       if (route.request().url().endsWith('/0/0/0.webp')) return route.fulfill({ status: 503 });
-      if (delayDetail && /\/14\/\d+\/\d+\.webp$/.test(route.request().url())) {
+      if (this.matterhornDetail.delayed && /\/14\/\d+\/\d+\.webp$/.test(route.request().url())) {
         await new Promise(resolve => setTimeout(resolve, 3500));
       }
       return route.fulfill({ contentType: 'image/png', body: terrainImage, headers: { 'Access-Control-Allow-Origin': '*' } });
@@ -51,7 +54,11 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
       const camera = state && globals.sceneByLayer.get(state.backend).camera;
       return state?.meshes?.size > 0 && camera?.target[1] > 0 &&
         [...state.meshes.values()].some(mesh => mesh._terrainRequest);
-    }, null, { timeout: 45000 });
+    }, null, { timeout: 30000 });
+});
+
+Then('Matterhorn elevation samples, camera height and viewport coverage match the DEM', { timeout: 30000 }, async function () {
+    const requests = this.matterhornRequests;
     const initial = await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
@@ -104,12 +111,15 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
       return Math.max(...misses);
     });
     assert.ok(coverage < 2, `terrain tile bounds miss viewport rays by ${coverage}px`);
+});
+
+Then('Matterhorn terrain survives cache eviction and is independent of tile draw order', { timeout: 30000 }, async function () {
     await this.page.waitForFunction(() => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU, z = map.getZoom();
       const point = map.project(map.getCenter(), z);
       return state.terrainRequests.get(`${Math.floor(point.x / 256)}:${Math.floor(point.y / 256)}:${z}`)?.tiles;
-    }, null, { timeout: 45000 });
+    }, null, { timeout: 30000 });
     const evicted = await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU, stream = testWeakmaps.streamTerrainByMap.get(map);
@@ -130,14 +140,14 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
     assert.equal(evicted.cached, false, 'center elevation should be evicted from the bounded cache');
     assert.ok(Math.abs(evicted.target - evicted.expected) < 1,
       `camera lost visible terrain elevation after eviction: ${JSON.stringify(evicted)}`);
-    await waitForTerrain();
+    await waitForTerrain(this.page);
     await this.page.evaluate(async () => {
       const owner = globals.renderers.get(map);
       await globals.sceneByLayer.get(owner).renderer.device.queue.onSubmittedWorkDone();
     });
     assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after cache eviction');
     await this.page.evaluate(() => cityMapperTestOperations.mapSetPitchAndBearing(map, 60, 210));
-    await waitForTerrain();
+    await waitForTerrain(this.page);
     await this.page.evaluate(async () => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
@@ -164,6 +174,9 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
     }
     assert.ok(changed < forward.width * forward.height * 0.002,
       `terrain appearance changed with tile draw order: ${changed} pixels`);
+});
+
+Then('Matterhorn zoom keeps coarse terrain visible and aligns the marker and popup', { timeout: 30000 }, async function () {
     await this.page.evaluate(() => {
       const marker = Object.values(map._layers).find(item => item instanceof L.Marker);
       marker.getPopup().options.autoPan = false;
@@ -174,7 +187,7 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
     await this.page.mouse.down();
     await this.page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2 + 60, { steps: 6 });
     await this.page.mouse.up();
-    delayDetail = true;
+    this.matterhornDetail.delayed = true;
     await this.page.locator('.leaflet-control-zoom-in').click();
     await this.page.evaluate(() => testOperations.setBearing(map, 70));
     await this.page.waitForFunction(() => {
@@ -189,7 +202,7 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
       const state = globals.sceneByLayer.get(layer)._nativeGPU, z = map.getZoom();
       const point = map.project(marker.getLatLng(), z);
       return state.terrainRequests.get(`${Math.floor(point.x / 256)}:${Math.floor(point.y / 256)}:${z}`)?.tiles;
-    }, null, { timeout: 45000 });
+    }, null, { timeout: 30000 });
     await this.page.evaluate(() => new Promise(resolve =>
       requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const alignment = await this.page.evaluate(() => {
@@ -223,14 +236,18 @@ Then('the Matterhorn example streams elevations for its satellite tiles while na
     assert.ok(alignment.marker < 3, `marker drift after navigation: ${alignment.marker}px`);
     assert.ok(alignment.popup < 3, `popup drift after navigation: ${alignment.popup}px`);
     assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after zoom');
+});
+
+Then('Matterhorn streams a new region and releases and restores its elevation layer', { timeout: 30000 }, async function () {
+    const initialKeys = await this.page.evaluate(() => [...testWeakmaps.streamTerrainByMap.get(map).terrainCache.keys()]);
     await this.page.evaluate(() => map.setView([46.5, 8.5], 14, { animate: false }));
     await this.page.waitForFunction(initialKeys => {
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
       const state = globals.sceneByLayer.get(layer)._nativeGPU;
       return [...state.meshes.values()].some(mesh => mesh._terrainRequest &&
         !initialKeys.includes(`14/${mesh._terrainRequest.tile.coords.x}/${mesh._terrainRequest.tile.coords.y}`));
-    }, initial.initialKeys, { timeout: 45000 });
-    assert.ok(requests.some(url => /\/13\/\d+\/\d+\.webp$/.test(url)));
+    }, initialKeys, { timeout: 30000 });
+    assert.ok(this.matterhornRequests.some(url => /\/13\/\d+\/\d+\.webp$/.test(url)));
     await this.page.evaluate(() => {
       window.elevationLayer = Object.values(map._layers).find(item => typeof item.options?.getTile === 'function');
       elevationLayer.remove();

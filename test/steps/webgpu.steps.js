@@ -121,9 +121,9 @@ const waitForWebGPUScene = page => page.waitForFunction(() => {
   return globals.sceneByLayer.get(owner)?.renderer?.device && globals.sceneByLayer.get(owner)._roofRaster && globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
     !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
       ? testOperations.isLoading(layer) : layer.isLoading?.());
-}, null, { timeout: 50000 });
+}, null, { timeout: 30000 });
 
-When('I drive the shared WebGPU renderer with map events', { timeout: 60000 }, async function () {
+When('I drive the shared WebGPU renderer with map events', { timeout: 30000 }, async function () {
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
@@ -281,7 +281,7 @@ Then('map events render in the same tick, updates share one animation frame and 
   assert.deepEqual(result.pageErrors, [], details);
 });
 
-When('I rebuild the WebGPU roof atlas', { timeout: 60000 }, async function () {
+When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);
@@ -411,7 +411,7 @@ Then('the roof atlas matches its raster tiles without uploading a canvas', funct
   assert.deepEqual(result.pageErrors, [], details);
 });
 
-When('I inspect the WebGPU terrain tiles', { timeout: 60000 }, async function () {
+When('I inspect the WebGPU terrain tiles', { timeout: 30000 }, async function () {
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);

@@ -46,7 +46,7 @@ Then('pressed buttons, map dragging and zoom animation suspend hover picking', f
   }
 });
 
-Then('dragging keeps GPU traffic animated without hover picking or lane requests', { timeout: 60000 }, async function () {
+Then('dragging keeps GPU traffic animated without hover picking or lane requests', { timeout: 30000 }, async function () {
   let requests = 0;
   await this.context.route('**/drag-lanes.geojson', route => {
     requests++;
@@ -148,7 +148,7 @@ Then('DOM tooltip content stays inside the map without interpreting text as HTML
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
 
-Then('3D click reports the picked object without changing the map view', { timeout: 60000 }, async function () {
+Then('3D click reports the picked object without changing the map view', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     map.options.zoomAnimation = false;
@@ -227,7 +227,7 @@ Then('3D click reports the picked object without changing the map view', { timeo
   for (const [name, value] of Object.entries(result.checks)) assert.equal(value, true, `${name}: ${JSON.stringify(result.diagnostic)}`);
 });
 
-Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 60000 }, async function () {
+Then('a 3D layer creates and cleans up its own hover tooltip', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const layer = new L.Layer({ source: { type: 'vector',

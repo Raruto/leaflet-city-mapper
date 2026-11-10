@@ -28,9 +28,13 @@ async function assertEngineControl(page, openlayers) {
   }), true, 'Engine control must not be covered by attribution or status text');
   const overlap = await page.evaluate(async () => {
     const container = map.getContainer(), width = container.style.width;
-    const settle = () => new Promise(resolve => {
+    const settle = () => new Promise((resolve, reject) => {
       // The test clock's animation frames do not flush native ResizeObserver callbacks.
-      const observer = new ResizeObserver(() => { observer.disconnect(); resolve(); });
+      const timer = setTimeout(() => {
+        observer.disconnect();
+        reject(new Error('Attribution footer did not settle'));
+      }, 5000);
+      const observer = new ResizeObserver(() => { clearTimeout(timer); observer.disconnect(); resolve(); });
       observer.observe(container.querySelector('.map-attribution-footer'));
     });
     const check = () => {
@@ -72,7 +76,9 @@ async function assertParisAttributions(page) {
   assert.equal(await footer.getByRole('link', { name: 'Ville de Paris', exact: true }).count(), 2);
 }
 
-Given('the comparison page {string} is open', { timeout: 60000 }, async function (example) {
+Given('the comparison page {string} is open on {word}', { timeout: 30000 }, async function (example, engine) {
+  this.page.setDefaultTimeout(10000);
+  this.page.setDefaultNavigationTimeout(15000);
   this.comparisonErrors = [];
   this.comparisonLeafletRequests = [];
   this.comparisonExample = example;
@@ -92,13 +98,14 @@ Given('the comparison page {string} is open', { timeout: 60000 }, async function
   await this.context.route('https://tile.openstreetmap.org/**', tile);
   await this.context.route('https://server.arcgisonline.com/**', tile);
   await this.context.route('https://ows.terrestris.de/**', tile);
-  await this.page.goto(`${this.baseUrl}/examples/${example}?canvas&compare=1#scene`);
-  await this.page.waitForFunction(() => globalThis.map && !map.ol);
+  const query = engine === 'OpenLayers' ? '&engine=openlayers' : '';
+  await this.page.goto(`${this.baseUrl}/examples/${example}?canvas&compare=1${query}#scene`, { waitUntil: 'domcontentloaded' });
+  await this.page.waitForFunction(openlayers => globalThis.map && Boolean(map.ol) === openlayers &&
+    document.querySelector(openlayers ? '.ol-city-rotate' : 'canvas.leaflet-3d'), engine === 'OpenLayers');
   assert.deepEqual(this.comparisonErrors, []);
 });
 
-Then('its button reloads the same scene on OpenLayers and back to Leaflet', { timeout: 120000 }, async function () {
-  await this.page.waitForFunction(() => document.querySelector('canvas.leaflet-3d'));
+Then('its button reloads the same scene on OpenLayers', { timeout: 30000 }, async function () {
   await assertEngineControl(this.page, false);
   if (this.comparisonExample === 'leaflet-city-mapper.html') await assertParisAttributions(this.page);
   this.comparisonLeafletRequests.length = 0;
@@ -112,6 +119,13 @@ Then('its button reloads the same scene on OpenLayers and back to Leaflet', { ti
   assert.equal(url.searchParams.has('canvas'), true);
   assert.equal(url.searchParams.get('compare'), '1');
   assert.equal(url.hash, '#scene');
+  assert.deepEqual(this.comparisonLeafletRequests, []);
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('the OpenLayers comparison scene renders its layers', { timeout: 30000 }, async function () {
+  await assertEngineControl(this.page, true);
+  if (this.comparisonExample === 'leaflet-city-mapper.html') await assertParisAttributions(this.page);
   assert.deepEqual(this.comparisonLeafletRequests, []);
   await this.page.waitForFunction(() => {
     const layers = Object.values(map._layers);
@@ -132,49 +146,67 @@ Then('its button reloads the same scene on OpenLayers and back to Leaflet', { ti
     await this.page.locator('#map').dispatchEvent('pointerleave');
     assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
   }
-  if (this.comparisonExample.includes('-native')) {
-    const counts = await this.page.evaluate(() => {
-      const native = Object.values(map._layers).map(layer => globals.sceneByLayer.get(layer)?._nativeGPU).filter(Boolean);
-      return { count: native.length, shadow: globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes.has('shadow') };
-    });
-    assert.ok(counts.count >= 16, JSON.stringify(counts));
-    assert.equal(counts.shadow, true);
-    await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).uncheck();
-    await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).check();
-    await this.page.waitForFunction(() => globals.sceneByLayer.get(nativeLayers.CircleMarker)._nativeGPU.meshes?.size > 0);
-    const circle = await this.page.evaluate(() => {
-      const pixel = map.latLngToContainerPoint(nativeLayers.CircleMarker.getLatLng());
-      const rect = map.getContainer().getBoundingClientRect();
-      return { x: rect.left + pixel.x, y: rect.top + pixel.y };
-    });
-    await this.page.mouse.move(circle.x, circle.y);
-    await this.page.locator('.ol-city-tooltip').waitFor();
-    assert.equal(await this.page.locator('.ol-city-tooltip').textContent(), 'CircleMarker');
-    await this.page.mouse.click(circle.x, circle.y);
-    assert.equal(await this.page.getByRole('dialog').isVisible(), true);
-    await this.page.getByRole('button', { name: 'Close popup' }).click();
-    await this.page.evaluate(() => nativeLayers.Rectangle.openPopup());
-    assert.equal(await this.page.getByRole('dialog').isVisible(), true);
-    await this.page.getByRole('button', { name: 'Close popup' }).click();
-    for (const title of ['Default icon and shadow', 'Marker']) {
-      await this.page.getByRole('button', { name: title, exact: true }).last().click();
-      assert.equal(await this.page.getByRole('dialog').isVisible(), true);
-      await this.page.getByRole('button', { name: 'Close popup' }).click();
-    }
-    const marker = this.page.getByRole('button', { name: 'Drag this GPU marker' });
-    const before = await this.page.evaluate(() => nativeLayers.Marker.getLatLng());
-    const rect = await marker.boundingBox();
-    await this.page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
-    await this.page.mouse.down();
-    await this.page.mouse.move(rect.x + rect.width / 2 + 40, rect.y + rect.height / 2 + 20, { steps: 4 });
-    await this.page.mouse.up();
-    assert.equal(await this.page.evaluate(value => !nativeLayers.Marker.getLatLng().equals(value), before), true);
-    await marker.focus();
-    await this.page.keyboard.press('Enter');
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('the OpenLayers native scene renders icons and shadows', { timeout: 30000 }, async function () {
+  await this.page.waitForFunction(() => {
+    const native = Object.values(map._layers).map(layer => globals.sceneByLayer.get(layer)?._nativeGPU).filter(Boolean);
+    return native.length >= 16 && native.every(renderer => renderer.meshes?.size > 0);
+  });
+  const counts = await this.page.evaluate(() => {
+    const native = Object.values(map._layers).map(layer => globals.sceneByLayer.get(layer)?._nativeGPU).filter(Boolean);
+    return { count: native.length, shadow: globals.sceneByLayer.get(nativeLayers['Marker (default icon)'])._nativeGPU.meshes.has('shadow') };
+  });
+  assert.ok(counts.count >= 16, JSON.stringify(counts));
+  assert.equal(counts.shadow, true);
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('the OpenLayers native shapes retain tooltips and popups', { timeout: 30000 }, async function () {
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(nativeLayers.CircleMarker)?._nativeGPU?.meshes?.size > 0);
+  await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).uncheck();
+  await this.page.getByRole('checkbox', { name: 'CircleMarker', exact: true }).check();
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(nativeLayers.CircleMarker)._nativeGPU.meshes?.size > 0);
+  const circle = await this.page.evaluate(() => {
+    const pixel = map.latLngToContainerPoint(nativeLayers.CircleMarker.getLatLng());
+    const rect = map.getContainer().getBoundingClientRect();
+    return { x: rect.left + pixel.x, y: rect.top + pixel.y };
+  });
+  await this.page.mouse.move(circle.x, circle.y);
+  await this.page.locator('.ol-city-tooltip').waitFor();
+  assert.equal(await this.page.locator('.ol-city-tooltip').textContent(), 'CircleMarker');
+  await this.page.mouse.click(circle.x, circle.y);
+  assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+  await this.page.getByRole('button', { name: 'Close popup' }).click();
+  await this.page.evaluate(() => nativeLayers.Rectangle.openPopup());
+  assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+  await this.page.getByRole('button', { name: 'Close popup' }).click();
+  assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('the OpenLayers native markers retain popups and dragging', { timeout: 30000 }, async function () {
+  for (const title of ['Default icon and shadow', 'Marker']) {
+    await this.page.getByRole('button', { name: title, exact: true }).last().click();
     assert.equal(await this.page.getByRole('dialog').isVisible(), true);
     await this.page.getByRole('button', { name: 'Close popup' }).click();
   }
+  const marker = this.page.getByRole('button', { name: 'Drag this GPU marker' });
+  const before = await this.page.evaluate(() => nativeLayers.Marker.getLatLng());
+  const rect = await marker.boundingBox();
+  await this.page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await this.page.mouse.down();
+  await this.page.mouse.move(rect.x + rect.width / 2 + 40, rect.y + rect.height / 2 + 20, { steps: 4 });
+  await this.page.mouse.up();
+  assert.equal(await this.page.evaluate(value => !nativeLayers.Marker.getLatLng().equals(value), before), true);
+  await marker.focus();
+  await this.page.keyboard.press('Enter');
+  assert.equal(await this.page.getByRole('dialog').isVisible(), true);
+  await this.page.getByRole('button', { name: 'Close popup' }).click();
   assert.deepEqual(this.comparisonErrors, []);
+});
+
+Then('its button reloads the same scene on Leaflet', { timeout: 30000 }, async function () {
   await this.page.getByRole('button', { name: 'Try it with Leaflet', exact: true }).click();
   await this.page.waitForFunction(() => globalThis.map && !map.ol && document.querySelector('canvas.leaflet-3d'));
   const restored = new URL(this.page.url());
@@ -185,13 +217,9 @@ Then('its button reloads the same scene on OpenLayers and back to Leaflet', { ti
   assert.deepEqual(this.comparisonErrors, []);
 });
 
-Given('the shared example can load OpenLayers', { timeout: 60000 }, async function () {
-  const [bindings, minifiedBindings, ...examples] = await Promise.all([
-    'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
-    'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-rome.html',
-    'examples/leaflet-city-mapper-native.html',
-  ].map(name => readFile(new URL(`../../${name}`, import.meta.url), 'utf8')));
-  for (const example of examples) assert.match(example, /<script src="https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/libs\/leaflet\.js"><\/script>/);
+Given('the shared example can load OpenLayers', { timeout: 30000 }, async function () {
+  this.page.setDefaultTimeout(10000);
+  this.page.setDefaultNavigationTimeout(15000);
   this.openlayersErrors = [];
   this.leafletRequests = [];
   this.page.on('pageerror', error => this.openlayersErrors.push(error.message));
@@ -202,6 +230,15 @@ Given('the shared example can load OpenLayers', { timeout: 60000 }, async functi
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html?engine=openlayers`, { waitUntil: 'domcontentloaded' });
   assert.deepEqual(this.openlayersErrors, []);
   await this.page.waitForFunction(() => globalThis.map && document.querySelector('.ol-city-rotate'));
+});
+
+Then('the shared OpenLayers bindings load standalone without extra stylesheets', { timeout: 30000 }, async function () {
+  const [bindings, minifiedBindings, ...examples] = await Promise.all([
+    'libs/openlayers-bindings.js', 'libs/openlayers-bindings.min.js',
+    'examples/leaflet-city-mapper.html', 'examples/leaflet-city-mapper-rome.html',
+    'examples/leaflet-city-mapper-native.html',
+  ].map(name => readFile(new URL(`../../${name}`, import.meta.url), 'utf8')));
+  for (const example of examples) assert.match(example, /<script src="https:\/\/unpkg\.com\/leaflet-city-mapper@[^/]+\/libs\/leaflet\.js"><\/script>/);
   for (const source of [bindings, minifiedBindings]) {
     const standalone = await this.page.evaluate(source => {
       const frame = document.createElement('iframe');
@@ -228,14 +265,15 @@ Given('the shared example can load OpenLayers', { timeout: 60000 }, async functi
   }
   assert.equal(await this.page.locator('link[href*="openlayers-bindings"][href$=".css"]').count(), 0);
   assert.equal(await this.page.locator('style[data-openlayers-bindings]').count(), 1);
+  assert.deepEqual(this.openlayersErrors, []);
 });
 
-Then('OpenLayers drives the source layers and camera without Leaflet JavaScript', { timeout: 120000 }, async function () {
+Then('OpenLayers drives the source layers and camera without Leaflet JavaScript', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const wait = (promise, layer) => {
       let timer;
       return Promise.race([promise, new Promise((resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`Layer did not become ready: ${layer.options.url || globals.sceneByLayer.get(layer)?._type}`)), 60000);
+        timer = setTimeout(() => reject(new Error(`Layer did not become ready: ${layer.options.url || globals.sceneByLayer.get(layer)?._type}`)), 10000);
       })]).finally(() => clearTimeout(timer));
     };
     await Promise.all(Object.values(map._layers).map(layer => wait(globals.sceneByLayer.get(layer)?.ready, layer)));
@@ -337,11 +375,13 @@ Then('OpenLayers animates wheel and button zoom without restarting each frame', 
     }
   } finally {
     await this.page.evaluate(initial => map.setView(initial.center, initial.zoom), initial);
+    await this.page.clock.resume();
   }
   assert.deepEqual(this.openlayersErrors, []);
 });
 
-Then('OpenLayers wheel steps match Leaflet', { timeout: 60000 }, async function () {
+Then('OpenLayers wheel steps match Leaflet', { timeout: 30000 }, async function () {
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
   const leaflet = await readFile(dependencyFile('https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js'), 'utf8');
   await this.page.evaluate(source => {
     const frame = window.zoomReference = document.createElement('iframe');
@@ -426,7 +466,7 @@ Then('the OpenLayers compass preserves the plugin appearance and gestures', { ti
   assert.deepEqual(this.openlayersErrors, []);
 });
 
-Then('the OpenLayers example preserves map and layer control interactions', { timeout: 60000 }, async function () {
+Then('the OpenLayers example preserves layer control interactions', { timeout: 30000 }, async function () {
   const traffic = this.page.getByRole('checkbox', { name: 'Traffic', exact: true });
   const shadows = this.page.getByRole('checkbox', { name: 'Time', exact: true });
   const trees = this.page.getByRole('checkbox', { name: 'Trees', exact: true });
@@ -438,6 +478,10 @@ Then('the OpenLayers example preserves map and layer control interactions', { ti
   }
   await this.page.getByRole('radio', { name: 'Plan IGN', exact: true }).check();
   await this.page.getByRole('radio', { name: 'Orthophoto IGN', exact: true }).check();
+  assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('the OpenLayers example preserves mouse navigation', { timeout: 30000 }, async function () {
   const beforeButton = await this.page.evaluate(() => map.getZoom());
   await this.page.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await this.page.waitForFunction(zoom => map.getZoom() > zoom && !map.ol.getView().getAnimating(), beforeButton);
@@ -450,6 +494,10 @@ Then('the OpenLayers example preserves map and layer control interactions', { ti
   assert.equal(await this.page.evaluate(value => !map.getCenter().equals(value), initial), true);
   await this.page.mouse.wheel(0, -100);
   await this.page.waitForFunction(zoom => map.getZoom() > zoom, initial.zoom);
+  assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('the OpenLayers example preserves touch navigation', { timeout: 30000 }, async function () {
   const touched = await this.page.evaluate(() => {
     const before = { bearing: map.getBearing(), pitch: map.getPitch(), zoom: map.getZoom() };
     const element = map.getContainer(), rect = element.getBoundingClientRect();
@@ -469,15 +517,24 @@ Then('the OpenLayers example preserves map and layer control interactions', { ti
   await this.page.getByRole('button', { name: 'Reset bearing and pitch' }).click();
   await this.page.waitForFunction(() => map.getPitch() < 1e-8 &&
     Math.min(map.getBearing(), 360 - map.getBearing()) < 1e-8);
+  assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('the OpenLayers example enters and exits walk mode', { timeout: 30000 }, async function () {
   const walk = this.page.getByRole('button', { name: /walk/i });
   await walk.click();
   assert.equal(await walk.getAttribute('aria-pressed'), 'true');
   await this.page.keyboard.press('Escape');
   assert.equal(await walk.getAttribute('aria-pressed'), 'false');
   assert.deepEqual(this.openlayersErrors, []);
+});
+
+Then('the OpenLayers example removes its renderer and map target', { timeout: 30000 }, async function () {
+  await this.page.waitForFunction(() => document.querySelector('canvas.leaflet-3d'));
   const cleanup = await this.page.evaluate(() => {
     map.remove();
     return !map._loaded && !document.querySelector('.leaflet-3d') && map.ol.getTarget() == null;
   });
   assert.equal(cleanup, true);
+  assert.deepEqual(this.openlayersErrors, []);
 });

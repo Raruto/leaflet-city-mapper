@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { After, AfterAll, Before, BeforeAll, Status, setDefaultTimeout } from '@cucumber/cucumber';
+import { After, AfterAll, Before, BeforeAll, Status, setDefaultTimeout, setDefinitionFunctionWrapper } from '@cucumber/cucumber';
 import { chromium, firefox } from 'playwright';
 import { build } from 'esbuild';
 import { startServer } from '../../build/server.js';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 import { prepareDependencies } from '../fixtures/dependencies.js';
 import { createTestContext, createTestPage, fetchLocal, resetTestContext } from '../fixtures/browser-environment.js';
+import { withScenarioBudget } from './scenario-budget.js';
 
 setDefaultTimeout(10000);
+setDefinitionFunctionWrapper(withScenarioBudget);
 
 // Shared by the 3D scenarios when COVERAGE_3D is enabled.
 const coveredFunctions = new Map();
@@ -18,7 +20,7 @@ Before(function () {
   this.scenarioStarted = performance.now();
 });
 
-After(function ({ pickle, result }) {
+After({ wrapperOptions: { cleanup: true } }, function ({ pickle, result }) {
   scenarioTimings.push({
     name: pickle.name, status: result.status,
     seconds: (performance.now() - this.scenarioStarted) / 1000,
@@ -38,7 +40,7 @@ Before({ tags: '@coverage and not @unit' }, async function () {
   }
 });
 
-After({ tags: '@coverage and not @unit' }, async function () {
+After({ tags: '@coverage and not @unit', wrapperOptions: { cleanup: true } }, async function () {
   if (!process.env.COVERAGE_3D) return;
   const entries = await this.page.coverage.stopJSCoverage();
   for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
@@ -198,7 +200,7 @@ AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => 
 });
 
 // @unit scenarios run in Node only and need no browser page.
-Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 60000 }, async function () {
+Before({ tags: 'not @unit', timeout: 30000 }, async function () {
   await getBrowser();
   this.baseUrl = baseUrl;
   if (context) await resetTestContext(context, unexpectedRequests);
@@ -308,7 +310,7 @@ Before({ tags: 'not @unit', timeout: process.platform === 'win32' ? 120000 : 600
   });
 });
 
-After({ tags: 'not @unit' }, async function ({ pickle, result }) {
+After({ tags: 'not @unit', wrapperOptions: { cleanup: true } }, async function ({ pickle, result }) {
   if (result?.status === Status.FAILED && this.browserErrors?.length) {
     console.error(`Browser errors [${pickle.name}]:`, this.browserErrors.join('\n'));
   }

@@ -1,8 +1,23 @@
 @coverage
 Feature: Indicative Paris night lighting
-  Scenario: Real lamp inventory lights the ground at night and the Eiffel Tower glows
+  Scenario: Real lamp inventory preserves supports, geometry and safe tooltips
     Given the Eiffel Tower example page is open with its offline archives
-    Then streetlights and the Eiffel Tower emit light only during simulated night
+    Then the real streetlight inventory has valid geometry, supports and tooltips
+
+  Scenario Outline: Real lighting renders one effect at a time
+    Given the Eiffel Tower example page is open with its offline archives
+    Then real night lighting preserves "<effect>"
+
+    Examples:
+      | effect                                  |
+      | streetlight ground illumination         |
+      | Eiffel Tower sparkle                    |
+      | illumination on 3D surfaces              |
+      | daylight poles and disabled lighting    |
+
+  Scenario: Streetlight toggles rebuild the inventory without stale meshes
+    Given the Eiffel Tower example page is open with its offline archives
+    Then streetlight toggles release areas and rebuild fresh meshes
 
   Scenario: Lamp styles follow the recorded inventory with documented fallbacks
     Given the Eiffel Tower example page is open

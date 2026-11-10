@@ -10,4 +10,8 @@ Feature: Paris trees
 
   Scenario: Real tree PMTiles render alongside the other Paris overlays
     Given the Eiffel Tower example page is open with its offline archives
-    Then the offline Paris trees render and recover after toggling
+    Then the offline Paris trees preserve "inventory and shared rendering"
+
+  Scenario: Real tree PMTiles rebuild fresh meshes after toggling
+    Given the Eiffel Tower example page is open with its offline archives
+    Then the offline Paris trees preserve "fresh meshes after toggling"

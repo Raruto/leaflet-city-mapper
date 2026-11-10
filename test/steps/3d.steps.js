@@ -315,10 +315,10 @@ const openEiffelExample = async function () {
   assert.match(layout.orthophotoUrl, /\/examples\/data\/paris-orthophotos\.pmtiles$/);
 };
 
-Given('the Eiffel Tower example page is open', { timeout: 60000 }, openEiffelExample);
+Given('the Eiffel Tower example page is open', { timeout: 30000 }, openEiffelExample);
 
 // Real offline archives: terrain and orthophoto tiles exercise the GPU upload paths.
-Given('the Eiffel Tower example page is open with its offline archives', { timeout: 60000 }, async function () {
+Given('the Eiffel Tower example page is open with its offline archives', { timeout: 30000 }, async function () {
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await openEiffelExample.call(this);

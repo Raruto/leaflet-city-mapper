@@ -90,7 +90,7 @@ Then('layer-owned objects preserve values and visibility without engine classes'
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
 
-Then('3D layers without a location keep their first map origin', { timeout: 60000 }, async function () {
+Then('3D layers without a location keep their first map origin', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const initial = map.getCenter();
@@ -123,7 +123,7 @@ Then('3D layers without a location keep their first map origin', { timeout: 6000
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
 
-When('I add and remove independent 3D layers', { timeout: 60000 }, async function () {
+When('I add and remove independent 3D layers', { timeout: 30000 }, async function () {
   this.shared3d = await this.page.evaluate(async () => {
     const { map } = test3d;
     const LayersControl = L.LayersControl || L.Control.Layers;
@@ -294,7 +294,7 @@ Then('only the {string} background is active and the 3D scene is unchanged', asy
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
 
-When('I disable and restore the 3D overlays through the layer control', { timeout: 60000 }, async function () {
+When('I disable and restore the 3D overlays through the layer control', { timeout: 30000 }, async function () {
   const towerControl = this.page.getByRole('checkbox', { name: 'Eiffel Tower', exact: true });
   const buildingsControl = this.page.getByRole('checkbox', { name: 'Buildings', exact: true });
   const treesControl = this.page.getByRole('checkbox', { name: 'Trees', exact: true });

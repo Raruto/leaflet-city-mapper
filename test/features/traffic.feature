@@ -32,14 +32,44 @@ Feature: Traffic lanes, flows and timetables
     Then mobility paths are clipped, deduplicated and validated without inventing pedestrian roads
 
   @coverage @mobility
-  Scenario: One traffic toggle controls all six HTTP-driven modes
+  Scenario: All six HTTP-driven mobility modes preserve clock motion and GPU picking
     Given the cycling and pedestrian example layers are open
-    Then bicycles and pedestrians move with the clock and can be disabled and restored
+    Then all six mobility modes move with the clock and match their GPU picking poses
 
-  @coverage
-  Scenario: Tourist boats follow the simulation clock and seasonal Paris timetable
-    Given the Eiffel Tower example page is open with its offline archives
-    Then cruise boats move along the river on scheduled trips and clean up when disabled
+  @coverage @mobility
+  Scenario: One traffic toggle disables and restores all six HTTP-driven modes
+    Given the cycling and pedestrian example layers are open
+    Then the Traffic toggle disables and restores all six mobility modes
+
+  @coverage @cruises
+  Scenario: Tourist boats follow manual and live clocks and close for the night
+    Given the focused cruise example is open without terrain
+    Then cruise departures follow manual and live clocks and close for the night
+
+  @coverage @cruises
+  Scenario: Tourist boat poses preserve water heights and picking metadata
+    Given the focused cruise example is open with terrain
+    Then cruise boats share terrain rendering and preserve water heights and picking metadata
+
+  @coverage @cruises
+  Scenario: Tourist boats recover from invalid dates and clear stale highlights
+    Given the focused cruise example is open without terrain
+    Then cruise boats clear stale highlights and recover from invalid dates
+
+  @coverage @cruises
+  Scenario: Tourist boats and their route stay visible above the offline river terrain
+    Given the focused cruise example is open with terrain
+    Then the cruise route and boats remain visible above the offline river terrain
+
+  @coverage @cruises
+  Scenario: Tourist boat toggles release buffers and restore fresh geometry
+    Given the focused cruise example is open without terrain
+    Then the Traffic toggle releases cruise buffers and restores fresh boats
+
+  @coverage @cruises
+  Scenario: Tourist boats use the current timetable without a time control
+    Given the focused cruise example is open without terrain
+    Then cruise boats use the current timetable when the time control is removed
 
   @unit
   Scenario Outline: Vehicle count follows the measured flow

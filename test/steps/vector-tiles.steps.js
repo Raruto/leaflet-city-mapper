@@ -7,7 +7,7 @@ import { decodeVectorTile } from '../../src/mvt/decodeVectorTile.js';
 import { PNG } from 'pngjs';
 
 Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
-  { timeout: 90000 }, async function () {
+  { timeout: 30000 }, async function () {
     const errors = [], downloads = [], libraryRequests = [];
     this.page.on('request', request => {
       if (/\/(?:libs\/vector-tile(?:-layer|-style|-worker)?\.js$|src\/(?:mvt|vector-style|vector-tiles)\/)/.test(

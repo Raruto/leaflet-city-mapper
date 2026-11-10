@@ -317,7 +317,7 @@ const ring = (west, south, size = 0.0004) => [
   [west, south + size], [west, south]
 ];
 
-Given('the Paris buildings example is open with sample volumes', { timeout: 60000 }, async function () {
+Given('the Paris buildings example is open with sample volumes', { timeout: 30000 }, async function () {
   this.buildingRequests = [];
   this.buildingConcurrency = 0;
   this.maxBuildingConcurrency = 0;
@@ -373,7 +373,7 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 6000
     return buildings && globals.sceneByLayer.get(buildings)._inflight === 0 && globals.sceneByLayer.get(buildings)._areas.size > 0 &&
       [...globals.sceneByLayer.get(buildings)._areas.values()].reduce((sum, area) => sum + (area.buildings || 0), 0) === 2;
   },
-  null, { timeout: 45000 });
+  null, { timeout: 30000 });
 });
 
 Then('the building volumes preserve courtyards and elevated floors', async function () {
@@ -529,7 +529,7 @@ Then('the building volumes preserve courtyards and elevated floors', async funct
   assert.ok(events.some(event => event.type === 'featureclick' && event.id));
 });
 
-When('I move and toggle the Paris building volumes', { timeout: 60000 }, async function () {
+When('I move and toggle the Paris building volumes', { timeout: 30000 }, async function () {
   const status = text => this.page.waitForFunction(text => {
     const buildings = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._3d &&
       !(globals.sceneByLayer.get(entry.layer)._type === 'terrain') && globals.sceneByLayer.get(entry.layer).url).layer;

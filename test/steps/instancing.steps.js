@@ -72,7 +72,7 @@ Then('source instancing preserves vertex data and falls back for incompatible fe
   }
 });
 
-Then('instanced sources preserve rendered pixels, shadows, picking and resource lifetime', { timeout: 60000 }, async function () {
+Then('instanced sources preserve rendered pixels, shadows, picking and resource lifetime', { timeout: 30000 }, async function () {
   await this.page.goto(this.baseUrl);
   const result = await this.page.evaluate(async () => {
     const { attachAreaMesh } = await import('/src/sources/attachAreaMesh.js');

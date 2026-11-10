@@ -282,7 +282,7 @@ Then('geometry worker tasks transfer results and terminate on every exit', async
   }
 });
 
-Then('native and bundled geometry workers preserve results without blocking animation frames', { timeout: 60000 }, async function () {
+Then('native and bundled geometry workers preserve results without blocking animation frames', { timeout: 30000 }, async function () {
   const context = await createTestContext(this.context.browser(), this.unexpectedRequests);
   try {
     const page = await createTestPage(context);
@@ -343,7 +343,7 @@ Then('native and bundled geometry workers preserve results without blocking anim
   }
 });
 
-Then('cross-origin geometry workers preserve results, report failures and release blob URLs', { timeout: 60000 }, async function () {
+Then('cross-origin geometry workers preserve results, report failures and release blob URLs', { timeout: 30000 }, async function () {
   const bundle = await readFile('dist/leaflet-city-mapper-worker.js');
   const plugin = await build({
     stdin: {
@@ -421,7 +421,7 @@ Then('cross-origin geometry workers preserve results, report failures and releas
 });
 
 Then('cross-origin vector tile workers preserve results and release blob URLs on every exit',
-  { timeout: 60000 }, async function () {
+  { timeout: 30000 }, async function () {
     const bundle = await readFile('dist/leaflet-city-mapper-worker.js');
     const plugin = await build({
       stdin: {
@@ -526,7 +526,7 @@ Then('cross-origin vector tile workers preserve results and release blob URLs on
     }
   });
 
-Then('all GeoJSON blocks use workers and preserve replacement and cancellation', { timeout: 60000 }, async function () {
+Then('all GeoJSON blocks use workers and preserve replacement and cancellation', { timeout: 30000 }, async function () {
   let workers = 0;
   const onWorker = () => workers++;
   this.page.on('worker', onWorker);

@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
-Then('the offline Paris trees render and recover after toggling', { timeout: 180000 }, async function () {
+Then('the offline Paris trees preserve {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['inventory and shared rendering', 'fresh meshes after toggling'].includes(check), check);
   const loaded = () => this.page.waitForFunction(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
     const error = [...globals.sceneByLayer.get(tree)._areas.values()].find(area => area.error);
     if (error) throw new Error(error.error);
     return globals.sceneByLayer.get(tree)._inflight === 0 && [...globals.sceneByLayer.get(tree)._areas.values()].some(area => area.buildings > 0);
-  }, null, { timeout: 90000 });
+  }, null, { timeout: 30000 });
   await loaded();
   const result = await this.page.evaluate(() => {
     const tree = layers._layers.find(entry => entry.name === 'Trees').layer;
@@ -29,6 +30,7 @@ Then('the offline Paris trees render and recover after toggling', { timeout: 180
   assert.equal(result.inventory, true);
   assert.equal(result.vertices, true);
   assert.equal(result.shared, true);
+  if (check === 'inventory and shared rendering') return;
   const control = this.page.getByRole('checkbox', { name: 'Trees', exact: true });
   await expandLayerControl(this.page);
   await control.uncheck();

@@ -418,7 +418,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
   assert.deepEqual(errors, [], 'Keyboard movement must not throw during collision checks');
 });
 
-Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls and Esc restores the map', { timeout: 90000 }, async function () {
+Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls and Esc restores the map', { timeout: 30000 }, async function () {
   await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._bridgeMesh, null, { timeout: 30000 });
   await this.page.evaluate(() => {
     for (const { name, overlay, layer } of layers._layers) {

@@ -189,7 +189,7 @@ Then('native triangulation and glTF decoding preserve geometry without library r
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
 });
 
-Then('a configured 3D model loads with its transforms and attribution', { timeout: 60000 }, async function () {
+Then('a configured 3D model loads with its transforms and attribution', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
     const map = test3d.map;
     const layer = new L.Layer({ source: { type: 'vector',
@@ -410,7 +410,7 @@ Then('the failed model has no attached geometry', function () {
   assert.equal(this.invalid3d.noGeometry, true);
 });
 
-When('I hover and click the Eiffel Tower in the 3D example', { timeout: 60000 }, async function () {
+When('I hover and click the Eiffel Tower in the 3D example', { timeout: 30000 }, async function () {
   const target = await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer).model).layer;
     nativeChecks.render.render(globals.sceneByLayer.get(tower)._shared);
@@ -502,11 +502,11 @@ Then('the tower information is shown without moving the map or pinning the toolt
   assert.equal(zoom.canvases, 1);
 });
 
-When('I visit and inspect the Eiffel Tower 3D model', { timeout: 60000 }, async function () {
+When('I visit and inspect the Eiffel Tower 3D model', { timeout: 30000 }, async function () {
   await this.page.evaluate(() => map.setZoom(15, { animate: false }));
   await this.page.waitForFunction(() =>
     Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer).model && globals.sceneByLayer.get(layer).renderer),
-  null, { timeout: 45000 });
+  null, { timeout: 30000 });
   await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._terrainReady);
   await this.page.waitForFunction(() => map.getZoom() === 15 && Math.abs(testOperations.getPitch(map) - 45) < 0.01);
   this.eiffel = await this.page.evaluate(async () => {

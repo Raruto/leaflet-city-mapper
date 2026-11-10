@@ -118,7 +118,7 @@ Then('complexity metrics distinguish decisions, nesting and independent function
   assert.equal(violations(measure('function depth(a) { if (a) { for (;;) { while (a) { if (a) break; } } } }')).length, 1);
 });
 
-Then('production functions stay within strict complexity limits', { timeout: 60000 }, async function () {
+Then('production functions stay within strict complexity limits', { timeout: 30000 }, async function () {
   const failures = [];
   let functions = 0;
   const entries = await readdir('src', { recursive: true, withFileTypes: true });

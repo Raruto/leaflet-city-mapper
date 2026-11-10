@@ -188,7 +188,7 @@ Then('COG workers preserve ranges, cache ownership, missing tiles and errors', {
     'The pooled worker retains the TIFF directory across geometry tasks and interleaved COG sources');
 });
 
-Then('local archaeological COGs load by range and displace the ground', { timeout: 60000 }, async function () {
+Then('local archaeological COGs load by range and displace the ground', { timeout: 30000 }, async function () {
   const info = await stat(new URL('../../examples/data/colosseum.pmtiles', import.meta.url));
   assert.ok(info.size > 0 && info.size <= 25000000, `colosseum.pmtiles: ${info.size} bytes`);
   assert.equal((await readdir(new URL('../../examples/data/', import.meta.url))).some(name =>

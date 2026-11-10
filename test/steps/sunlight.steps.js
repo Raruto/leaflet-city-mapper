@@ -2,7 +2,19 @@ import * as globals from '../fixtures/globals.js';
 
 
 import assert from 'node:assert/strict';
-import { Then } from '@cucumber/cucumber';
+import { Given, Then } from '@cucumber/cucumber';
+
+Given('a solar control is added to the map', async function () {
+  await this.page.evaluate(async () => {
+    window.map = test3d.map;
+    const layer = new L.Layer({ source: { type: 'vector' } }).addTo(map);
+    await nativeChecks.ready(layer);
+    window.sunlightOverlay = new L.Control.Time().layer.addTo(map);
+    const LayersControl = L.LayersControl || L.Control.Layers;
+    window.layers = new LayersControl({}, { Time: sunlightOverlay }, { collapsed: false }).addTo(map);
+  });
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
+});
 
 Then('shadow maps are reused until geometry, appearance or sunlight changes', { timeout: 30000 }, async function () {
   const result = await this.page.evaluate(async () => {
@@ -48,7 +60,7 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
   assert.deepEqual(result, {first:1,pan:0,moved:1,geometry:1,stable:0,fading:1,sun:1,disabled:true,restored:1});
 });
 
-Then('sky and terrain change from day to night and celestial bodies follow the camera', { timeout: 90000 }, async function () {
+Then('sky and terrain change from day to night and restore after removal', { timeout: 30000 }, async function () {
   await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
   const result = await this.page.evaluate(async () => {
     const owner = globals.renderers.get(map), { device } = globals.sceneByLayer.get(owner).renderer;
@@ -90,6 +102,31 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     const nightTint = Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59));
     testOperations.setPitch(map, 85);
     const skyApplied = getComputedStyle(globals.cameraByMap.get(map)._pitchSky).backgroundImage === nightSky;
+    map.removeLayer(sunlightOverlay);
+    nativeChecks.render.render(owner);
+    return { day, night, daySky, nightSky, nightTint, skyApplied,
+      restored: Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59)),
+      skyRestored: !map.getContainer().style.getPropertyValue('--leaflet-sky-background'),
+      removed: !map.getContainer().querySelector('.sunlight-sun, .sunlight-moon') };
+  });
+  assert.ok(result.day.count > 10000);
+  assert.ok(result.night.average < result.day.average * 0.6, JSON.stringify(result));
+  assert.notEqual(result.daySky, result.nightSky);
+  assert.ok(result.nightTint[2] > result.nightTint[0]);
+  for (const key of ['skyApplied', 'skyRestored', 'removed']) assert.equal(result[key], true, key);
+  assert.deepEqual(result.restored, [1, 1, 1]);
+});
+
+Then('the sun and moon follow the selected time and viewing direction', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(() => {
+    const control = globals.sceneByLayer.get(sunlightOverlay).control.getContainer();
+    control.querySelector('input[type=date]').value = '2026-06-21';
+    const input = control.querySelector('input[type=range]');
+    const select = minute => {
+      input.value = String(minute);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    testOperations.setPitch(map, 85);
     select(300);
     testOperations.setBearing(map, -globals.cameraByMap.get(map)._sunlight.azimuth);
     const sun = globals.cameraByMap.get(map)._pitchSky.querySelector('.sunlight-sun');
@@ -114,25 +151,14 @@ Then('sky and terrain change from day to night and celestial bodies follow the c
     const moonMoved = moon.style.left !== moonPosition[0] || moon.style.top !== moonPosition[1];
     testOperations.setPitch(map, 0);
     const hiddenAtZeroPitch = sun.hidden && moon.hidden;
-    map.removeLayer(sunlightOverlay);
-    nativeChecks.render.render(owner);
-    const restored = Array.from(globals.sceneByLayer.get(owner).renderer.uniformData.slice(56, 59));
-    const skyRestored = !map.getContainer().style.getPropertyValue('--leaflet-sky-background');
-    return { day, night, daySky, nightSky, nightTint, sunVisible, sunMoved, sunBehind,
-      moonVisible, moonMoved, hiddenAtZeroPitch, restored, skyRestored, skyApplied,
-      removed: !map.getContainer().querySelector('.sunlight-sun, .sunlight-moon') };
+    return { sunVisible, sunMoved, sunBehind, moonVisible, moonMoved, hiddenAtZeroPitch };
   });
-  assert.ok(result.day.count > 10000);
-  assert.ok(result.night.average < result.day.average * 0.6, JSON.stringify(result));
-  assert.notEqual(result.daySky, result.nightSky);
-  assert.ok(result.nightTint[2] > result.nightTint[0]);
-  for (const key of ['skyApplied', 'sunVisible', 'sunMoved', 'sunBehind', 'moonVisible', 'moonMoved', 'hiddenAtZeroPitch', 'skyRestored', 'removed']) {
+  for (const key of ['sunVisible', 'sunMoved', 'sunBehind', 'moonVisible', 'moonMoved', 'hiddenAtZeroPitch']) {
     assert.equal(result[key], true, `${key}: ${JSON.stringify(result)}`);
   }
-  assert.deepEqual(result.restored, [1, 1, 1]);
 });
 
-Then('the solar control starts at current time and its slider controls the sunlight', { timeout: 60000 }, async function () {
+Then('the solar control starts at current time inside the layer control', { timeout: 30000 }, async function () {
   await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
   const initial = await this.page.evaluate(() => ({
     current: Math.abs(globals.sceneByLayer.get(sunlightOverlay).control.time.getTime() - Date.now()) < 65000 && globals.sceneByLayer.get(sunlightOverlay).control.live,
@@ -152,6 +178,9 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(initial.nestedStyle, true);
   assert.deepEqual(initial.overlays, ['Terrain (3D)', 'Buildings', 'Trees', 'Eiffel Tower',
     'Streetlights', 'Traffic', 'Time']);
+});
+
+Then('the solar slider selects a UTC minute and Now restores live time', { timeout: 30000 }, async function () {
   await this.page.getByLabel('Solar date (UTC)').fill('2026-06-21');
   const slider = this.page.getByRole('slider', { name: 'Time of day (UTC)' });
   await slider.focus();
@@ -172,6 +201,9 @@ Then('the solar control starts at current time and its slider controls the sunli
     const control = globals.sceneByLayer.get(sunlightOverlay).control;
     return control.live && control.time.getTime() >= beforeNow && control.time.getTime() <= Date.now();
   }, beforeNow), true);
+});
+
+Then('solar control toggles and invalid dates clear lighting and recover', { timeout: 30000 }, async function () {
   await this.page.getByLabel('Time', { exact: true }).uncheck();
   assert.equal(await this.page.evaluate(() => globals.cameraByMap.get(map)._sunlight === undefined), true);
   await this.page.getByLabel('Time', { exact: true }).check();
@@ -185,7 +217,8 @@ Then('the solar control starts at current time and its slider controls the sunli
   assert.equal(await this.page.evaluate(() => !globals.cameraByMap.get(map)._sunlight && !document.querySelector('.sunlight-control')), true);
 });
 
-Then('solar lighting and depth shadows follow the time slider', { timeout: 90000 }, async function () {
+Then('solar lighting preserves {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['depth map', 'visible shadows', 'night without direct light'].includes(check), check);
   await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control);
   const gpuErrors = [];
   this.page.on('console', message => { if (message.type() === 'error') gpuErrors.push(message.text()); });
@@ -197,11 +230,22 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     const renderer = globals.sceneByLayer.get(globals.renderers.get(map)).renderer;
     return globals.cameraByMap.get(map)._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
   });
-  const result = await this.page.evaluate(async () => {
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+  let result;
+  try {
+  result = await this.page.evaluate(async check => {
     const owner = globals.renderers.get(map), renderer = globals.sceneByLayer.get(owner).renderer;
     nativeChecks.render.render(owner);
     await renderer.device.queue.onSubmittedWorkDone();
     const { device, sunlight } = renderer;
+    if (check === 'night without direct light') {
+      const input = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
+      input.value = '0';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      nativeChecks.render.render(owner);
+      return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, nightLight: renderer.uniformData[51] };
+    }
+    if (check === 'depth map') {
     const depth = device.createBuffer({ size: sunlight.size ** 2 * 4,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const encoder = device.createCommandEncoder();
@@ -212,6 +256,9 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     const depths = new Float32Array(depth.getMappedRange());
     const covered = depths.reduce((sum, value) => sum + Number(value > 0 && value < 1), 0);
     depth.unmap(); depth.destroy();
+    return { altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size,
+      dayLight: renderer.uniformData[51], covered };
+    }
     renderer.context.configure({ device, format: renderer.format, alphaMode: 'premultiplied',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const capture = async disabled => {
@@ -239,22 +286,24 @@ Then('solar lighting and depth shadows follow the time slider', { timeout: 90000
     }
     return {
       altitude: globals.cameraByMap.get(map)._sunlight.altitude, size: sunlight.size, dayLight: renderer.uniformData[51],
-      covered, darker,
+      darker,
     };
-  });
+  }, check);
+  } finally {
+    await this.page.clock.resume();
+  }
+  if (check === 'night without direct light') {
+    assert.ok(result.altitude < 0);
+    assert.equal(result.nightLight, 0);
+  } else {
   assert.ok(result.altitude > 64 && result.altitude < 65);
   assert.equal(result.size, 2048);
   assert.equal(result.dayLight, 1);
+  if (check === 'depth map') {
   assert.ok(result.covered > 100, `Depth map coverage: ${result.covered}`);
+  } else {
   assert.ok(result.darker > 20, `Pixels receiving actual shadows: ${result.darker}`);
-  await this.page.getByRole('slider', { name: 'Time of day (UTC)' }).evaluate(input => {
-    input.value = '0'; input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await this.page.waitForFunction(() => globals.cameraByMap.get(map)._sunlight.altitude < 0);
-  assert.equal(await this.page.evaluate(() => {
-    const owner = globals.renderers.get(map);
-    nativeChecks.render.render(owner);
-    return globals.sceneByLayer.get(owner).renderer.uniformData[51];
-  }), 0);
+  }
+  }
   assert.deepEqual(gpuErrors, []);
 });

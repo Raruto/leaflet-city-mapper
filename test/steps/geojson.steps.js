@@ -150,7 +150,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
   assert.deepEqual(result.errors, []);
 });
 
-Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 60000 }, async function () {
+Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('**/libs/leaflet-lens.js', async route => {
@@ -322,7 +322,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   assert.deepEqual(errors, []);
 });
 
-Then('a touch device can enable and immediately disable the lens', { timeout: 60000 }, async function () {
+Then('a touch device can enable and immediately disable the lens', { timeout: 30000 }, async function () {
   const context = await createTestContext(this.context.browser(), this.unexpectedRequests, {
     viewport: { width: 375, height: 667 },
     isMobile: this.context.browser().browserType().name() !== 'firefox', hasTouch: true,
@@ -456,7 +456,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
   });
 });
 
-Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 60000 }, async function () {
+Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 30000 }, async function () {
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });

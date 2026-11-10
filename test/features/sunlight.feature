@@ -4,14 +4,35 @@ Feature: Visible solar time control
     Given a leaflet map
     Then shadow maps are reused until geometry, appearance or sunlight changes
 
-  Scenario: Current time is the default and the slider previews the selected UTC day
+  Scenario: Solar control initially shows current UTC time
     Given the Eiffel Tower example page is open with its offline archives
-    Then the solar control starts at current time and its slider controls the sunlight
+    Then the solar control starts at current time inside the layer control
 
-  Scenario: Daytime casts actual shadows and night removes direct lighting
-    Given the Eiffel Tower example page is open with its offline archives
-    Then solar lighting and depth shadows follow the time slider
+  Scenario: Solar slider selects UTC time and Now resumes the clock
+    Given a leaflet map
+    And a solar control is added to the map
+    Then the solar slider selects a UTC minute and Now restores live time
 
-  Scenario: Sky, terrain, sun and moon follow the selected time and viewing direction
+  Scenario: Solar control recovers after toggles and invalid dates
+    Given a leaflet map
+    And a solar control is added to the map
+    Then solar control toggles and invalid dates clear lighting and recover
+
+  Scenario Outline: Solar depth, shadows and night lighting are checked independently
     Given the Eiffel Tower example page is open with its offline archives
-    Then sky and terrain change from day to night and celestial bodies follow the camera
+    Then solar lighting preserves "<effect>"
+
+    Examples:
+      | effect                     |
+      | depth map                  |
+      | visible shadows            |
+      | night without direct light |
+
+  Scenario: Sky and terrain change from day to night
+    Given the Eiffel Tower example page is open with its offline archives
+    Then sky and terrain change from day to night and restore after removal
+
+  Scenario: Sun and moon follow time and viewing direction
+    Given a leaflet map
+    And a solar control is added to the map
+    Then the sun and moon follow the selected time and viewing direction
