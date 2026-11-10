@@ -2,16 +2,41 @@ import * as globals from '../fixtures/globals.js';
 
 
 import assert from 'node:assert/strict';
-import { Then } from '@cucumber/cucumber';
+import { readFile } from 'node:fs/promises';
+import { parse } from 'acorn';
+import { Given, Then } from '@cucumber/cucumber';
 import { expandLayerControl } from '../fixtures/expandLayerControl.js';
 
-// The lamp style lives in the example page, as the Streetlights layer style.
-const lamp = (page, properties = {}) =>
-  page.evaluate(properties => streetlights.options.style({ properties }), properties);
+Given('the real example streetlight style is loaded without a browser', async function () {
+  const html = await readFile(new URL('../../examples/leaflet-city-mapper.html', import.meta.url), 'utf8');
+  for (const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
+    const source = script[1], pending = [parse(source, { ecmaVersion: 'latest' })];
+    while (pending.length) {
+      const node = pending.pop();
+      if (node.type === 'Property' && node.key.value === 'Streetlights') {
+        const constructor = node.value.type === 'CallExpression' ? node.value.callee.object : node.value;
+        assert.equal(constructor.type, 'NewExpression', 'Streetlights must construct a real layer');
+        const options = constructor.arguments[0];
+        const config = options.properties.find(property => property.key.name === 'source').value;
+        const style = config.properties.find(property => property.key.name === 'style').value;
+        // Execute the actual standalone style, not a copied test implementation.
+        this.lampStyle = new Function(`return function ${source.slice(style.start, style.end)}`)();
+        return;
+      }
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) pending.push(...value.filter(item => item?.type));
+        else if (value?.type) pending.push(value);
+      }
+    }
+  }
+  assert.fail('Streetlights style is missing from the example');
+});
+
+const lamp = (world, properties = {}) => world.lampStyle({ properties });
 
 Then('a lamp {int} m high with {int} lm at {int} K is {int} m high, lights {float} m scaled by the flux and is warm white',
   async function (height, flux, kelvin, top, radius) {
-    const style = await lamp(this.page, { support_hauteur: `${height}.0`, lampe_flux: `${flux}.0`, lampe_temperature_couleur: `${kelvin}.0` });
+    const style = lamp(this, { support_hauteur: `${height}.0`, lampe_flux: `${flux}.0`, lampe_temperature_couleur: `${kelvin}.0` });
     assert.equal(style.top, top);
     assert.ok(Math.abs(style.lightRadius - radius * Math.sqrt(flux / 10000)) < 1e-10);
     assert.equal(style.color.r, 1);
@@ -19,32 +44,32 @@ Then('a lamp {int} m high with {int} lm at {int} K is {int} m high, lights {floa
   });
 
 Then('a lamp without valid records uses the default {int} m height', async function (top) {
-  const defaults = await lamp(this.page);
+  const defaults = lamp(this);
   assert.equal(defaults.top, top);
-  assert.deepEqual(await lamp(this.page, { support_hauteur: 'None', lampe_flux: '-10', lampe_temperature_couleur: '' }), defaults);
+  assert.deepEqual(lamp(this, { support_hauteur: 'None', lampe_flux: '-10', lampe_temperature_couleur: '' }), defaults);
 });
 
 Then('sodium lamps are warmer than the default and 6500 K lamps are bluish', async function () {
-  const defaults = await lamp(this.page), sodium = await lamp(this.page, { lampe_famille: 'Lampe sodium haute pression' });
+  const defaults = lamp(this), sodium = lamp(this, { lampe_famille: 'Lampe sodium haute pression' });
   assert.ok(sodium.color.b < defaults.color.b);
-  const white = await lamp(this.page, { lampe_temperature_couleur: '6500' });
+  const white = lamp(this, { lampe_temperature_couleur: '6500' });
   assert.ok(white.color.b > white.color.r);
 });
 
 Then('the light radius stays between {int} and {int} m', async function (low, high) {
-  assert.equal((await lamp(this.page, { support_hauteur: 40, lampe_flux: 500000 })).lightRadius, high);
-  assert.equal((await lamp(this.page, { support_hauteur: 1, lampe_flux: 10 })).lightRadius, low);
+  assert.equal(lamp(this, { support_hauteur: 40, lampe_flux: 500000 }).lightRadius, high);
+  assert.equal(lamp(this, { support_hauteur: 1, lampe_flux: 10 }).lightRadius, low);
 });
 
 Then(/^lamps on "(.+)" have (?:a ([\d.]+) m|no) pole$/, async function (supports, radius) {
   for (const lib_ouvrag of supports.split(', ')) {
-    assert.equal((await lamp(this.page, { lib_ouvrag })).poleRadius, Number(radius ?? 0), lib_ouvrag);
+    assert.equal(lamp(this, { lib_ouvrag }).poleRadius, Number(radius ?? 0), lib_ouvrag);
   }
 });
 
 Then('underground lamps are excluded:', async function (table) {
   for (const { property, value, shown } of table.hashes()) {
-    assert.equal(Boolean(await lamp(this.page, { [property]: value })), shown === 'yes', `${property}: ${value}`);
+    assert.equal(Boolean(lamp(this, { [property]: value })), shown === 'yes', `${property}: ${value}`);
   }
 });
 

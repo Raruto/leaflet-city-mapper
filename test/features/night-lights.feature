@@ -19,8 +19,9 @@ Feature: Indicative Paris night lighting
     Given the offline Paris example loads only "Streetlights, Time"
     Then streetlight toggles release areas and rebuild fresh meshes
 
+  @unit
   Scenario: Lamp styles follow the recorded inventory with documented fallbacks
-    Given the offline Paris example loads only "Streetlights, Time"
+    Given the real example streetlight style is loaded without a browser
     Then a lamp 7 m high with 13165 lm at 2700 K is 7 m high, lights 10.5 m scaled by the flux and is warm white
     And a lamp without valid records uses the default 6 m height
     And sodium lamps are warmer than the default and 6500 K lamps are bluish
