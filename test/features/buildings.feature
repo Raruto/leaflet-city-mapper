@@ -35,6 +35,9 @@ Feature: Building volumes from PMTiles
   Scenario: Building volumes render with holes, storey heights, and interaction
     Given the Paris buildings example is open with sample volumes
     Then the building volumes preserve courtyards and elevated floors
+
+  Scenario: Building coverage releases distant volumes and recovers from failures
+    Given the Paris buildings example is open with sample volumes
     When I move and toggle the Paris building volumes
     Then 3D coverage follows the viewport, releases distant volumes, and recovers from failures
 

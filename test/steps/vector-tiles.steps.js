@@ -8,6 +8,7 @@ import { PNG } from 'pngjs';
 
 Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
   { timeout: 30000 }, async function () {
+    await this.page.setViewportSize({ width: 640, height: 480 });
     const errors = [], downloads = [], libraryRequests = [];
     this.page.on('request', request => {
       if (/\/(?:libs\/vector-tile(?:-layer|-style|-worker)?\.js$|src\/(?:mvt|vector-style|vector-tiles)\/)/.test(

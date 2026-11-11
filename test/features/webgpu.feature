@@ -1,7 +1,7 @@
 @coverage
 Feature: Shared WebGPU renderer
   Scenario: Panning reuses WebGPU frame resources and keeps frustum culling
-    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Time"
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Eiffel Tower, Time"
     When I pan the shared WebGPU renderer
     Then WebGPU matrices match DOMMatrix and frame resources are reused
 

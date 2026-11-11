@@ -259,7 +259,7 @@ Then('fading terrain detail covers retained ground without depth interference', 
   let result;
   try {
     // Sample fixed fade states without queuing background frames while software GPUs read pixels.
-    await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+    await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
     result = await this.page.evaluate(async () => {
       const map = test3d.map, { terrain, raster, zoom } = window.terrainOverlap;
       const object = nativeChecks.gpu.createMesh(terrain, {

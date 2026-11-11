@@ -318,6 +318,7 @@ const ring = (west, south, size = 0.0004) => [
 ];
 
 Given('the Paris buildings example is open with sample volumes', { timeout: 30000 }, async function () {
+  this.focusedParisLayers = ['Buildings', 'Eiffel Tower'];
   this.buildingRequests = [];
   this.buildingConcurrency = 0;
   this.maxBuildingConcurrency = 0;
@@ -353,11 +354,11 @@ Given('the Paris buildings example is open with sample volumes', { timeout: 3000
       this.buildingConcurrency--;
     }
   });
-  await this.page.setViewportSize({ width: 1024, height: 600 });
+  await this.page.setViewportSize({ width: 640, height: 480 });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.evaluate(() => {
-    const terrain = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer)._type === 'terrain').layer;
+    const terrain = layers._layers.find(entry => entry.name === 'Terrain (3D)').layer;
     terrain.remove();
   });
   await this.page.evaluate(() => Promise.all(layers._layers.map(({ layer }) => globals.sceneByLayer.get(layer).ready)));

@@ -74,22 +74,17 @@ Then('source instancing preserves vertex data and falls back for incompatible fe
 
 Then('instanced sources preserve rendered pixels, shadows, picking and resource lifetime', { timeout: 30000 }, async function () {
   await this.page.goto(this.baseUrl);
+  await this.page.addScriptTag({ url: process.env.LEAFLET_VERSION === '2'
+    ? 'https://unpkg.com/leaflet@2.0.0-beta.3/dist/leaflet-global.js'
+    : 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js' });
+  await this.page.evaluate(() => { globalThis.L = globalThis.leaflet || globalThis.L; });
+  await this.page.addScriptTag({ url: `${this.baseUrl}/dist/leaflet-city-mapper.js` });
   const result = await this.page.evaluate(async () => {
-    const { attachAreaMesh } = await import('/src/sources/attachAreaMesh.js');
-    const { instanceAreaGeometry } = await import('/src/geometry/instanceAreaGeometry.js');
-    const { emptyNode } = await import('/src/scene/createSceneNode.js');
-    const globals = await import('/test/fixtures/globals.js');
-    const { updateWorldMatrix } = await import('/src/transforms/updateWorldMatrix.js');
-    const { prepareFrameUniforms } = await import('/src/rendering/prepareFrameUniforms.js');
-    const { drawSceneMeshes } = await import('/src/rendering/drawSceneMeshes.js');
-    const { ensureShadowPipeline } = await import('/src/shadows/ensureShadowPipeline.js');
-    const { drawShadowMeshes } = await import('/src/shadows/drawShadowMeshes.js');
-    const { bindSunlight } = await import('/src/shadows/bindSunlight.js');
-    const { intersectMeshes } = await import('/src/collision/intersectMeshes.js');
-    const { setHighlight } = await import('/src/picking/setHighlight.js');
-    const { releaseArea } = await import('/src/sources/releaseArea.js');
-    const { restoreObject } = await import('/src/scene/restoreObject.js');
-    const { computeBounds } = await import('/src/geometry/computeBounds.js');
+    const {
+      attachAreaMesh, instanceAreaGeometry, emptyNode, updateWorldMatrix,
+      prepareFrameUniforms, drawSceneMeshes, ensureShadowPipeline, drawShadowMeshes,
+      bindSunlight, intersectMeshes, setHighlight, releaseArea, restoreObject, computeBounds,
+    } = nativeCheckModules.instancing;
     const adapter = await navigator.gpu.requestAdapter();
     const device = await adapter.requestDevice();
     const otherAdapter = await navigator.gpu.requestAdapter();

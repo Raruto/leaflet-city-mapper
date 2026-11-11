@@ -26,44 +26,44 @@ async function assertEngineControl(page, openlayers) {
     const rect = element.getBoundingClientRect();
     return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
   }), true, 'Engine control must not be covered by attribution or status text');
-  const overlap = await page.evaluate(async () => {
-    const container = map.getContainer(), width = container.style.width;
-    const settle = () => new Promise((resolve, reject) => {
-      // The test clock's animation frames do not flush native ResizeObserver callbacks.
-      const timer = setTimeout(() => {
-        observer.disconnect();
-        reject(new Error('Attribution footer did not settle'));
-      }, 5000);
-      const observer = new ResizeObserver(() => { clearTimeout(timer); observer.disconnect(); resolve(); });
-      observer.observe(container.querySelector('.map-attribution-footer'));
-    });
-    const check = () => {
-      const control = container.querySelector('.map-engine-control').getBoundingClientRect();
-      const attribution = container.querySelector('.leaflet-control-attribution,.ol-attribution')?.getBoundingClientRect();
-      if (!attribution) return false;
-      const ribbon = document.querySelector('.view-on-github')?.getBoundingClientRect();
-      const status = document.querySelector('#status')?.getBoundingClientRect();
-      if (control.bottom + 5 > attribution.top ||
-        ribbon && ribbon.bottom > attribution.top || status && status.bottom > attribution.top) {
-        return { width: container.getBoundingClientRect().width, control: control.toJSON(),
-          attribution: attribution.toJSON(), ribbon: ribbon?.toJSON(), status: status?.toJSON(),
-          footerHeight: container.style.getPropertyValue('--map-attribution-height') };
-      }
-      return null;
-    };
-    try {
-      await settle();
-      const full = check();
-      container.style.width = '280px';
-      map.invalidateSize();
-      await settle();
-      return full || check();
-    } finally {
-      container.style.width = width;
-      map.invalidateSize();
-      await settle();
-    }
+  const width = await page.evaluate(() => map.getContainer().style.width);
+  const settle = () => page.waitForFunction(() => {
+    const container = map.getContainer();
+    return parseFloat(container.style.getPropertyValue('--map-attribution-height')) ===
+      container.querySelector('.map-attribution-footer').getBoundingClientRect().height;
   });
+  const check = () => page.evaluate(() => {
+    const container = map.getContainer();
+    const control = container.querySelector('.map-engine-control').getBoundingClientRect();
+    const attribution = container.querySelector('.leaflet-control-attribution,.ol-attribution')?.getBoundingClientRect();
+    if (!attribution) return false;
+    const ribbon = document.querySelector('.view-on-github')?.getBoundingClientRect();
+    const status = document.querySelector('#status')?.getBoundingClientRect();
+    if (control.bottom + 5 > attribution.top ||
+      ribbon && ribbon.bottom > attribution.top || status && status.bottom > attribution.top) {
+      return { width: container.getBoundingClientRect().width, control: control.toJSON(),
+        attribution: attribution.toJSON(), ribbon: ribbon?.toJSON(), status: status?.toJSON(),
+        footerHeight: container.style.getPropertyValue('--map-attribution-height') };
+    }
+    return null;
+  });
+  let overlap;
+  try {
+    await settle();
+    const full = await check();
+    await page.evaluate(() => {
+      map.getContainer().style.width = '280px';
+      map.invalidateSize();
+    });
+    await settle();
+    overlap = full || await check();
+  } finally {
+    await page.evaluate(width => {
+      map.getContainer().style.width = width;
+      map.invalidateSize();
+    }, width);
+    await settle();
+  }
   assert.equal(Boolean(overlap), false,
     `Controls, GitHub link and status must stay above attribution, including in narrow maps: ${JSON.stringify(overlap)}`);
 }
@@ -71,8 +71,10 @@ async function assertEngineControl(page, openlayers) {
 async function assertParisAttributions(page) {
   const footer = page.locator('.map-attribution-footer');
   for (const name of ['IGN', 'Etalab 2.0', 'Transit routes: IDFM', 'OpenStreetMap contributors']) {
+    await footer.getByRole('link', { name, exact: true }).waitFor();
     assert.equal(await footer.getByRole('link', { name, exact: true }).count(), 1, name);
   }
+  await footer.getByRole('link', { name: 'Ville de Paris', exact: true }).nth(1).waitFor();
   assert.equal(await footer.getByRole('link', { name: 'Ville de Paris', exact: true }).count(), 2);
 }
 

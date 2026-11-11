@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { Given, Then } from '@cucumber/cucumber';
 import { PNG } from 'pngjs';
+import { prepare3DChecks } from './3d.steps.js';
 
-function whiteFraction(buffer) {
-  const image = PNG.sync.read(buffer);
-  let white = 0;
-  for (let i = 0; i < image.data.length; i += 4) {
-    if (image.data[i] > 245 && image.data[i + 1] > 245 && image.data[i + 2] > 245) white++;
-  }
-  return white / (image.width * image.height);
+async function whiteFraction(page) {
+  return page.evaluate(async () => {
+    const pixels = await nativeChecks.pixels(globals.renderers.get(map));
+    let white = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245 && pixels[i + 3] > 0) white++;
+    }
+    return white / (pixels.length / 4);
+  });
 }
 
 async function waitForTerrain(page) {
@@ -23,6 +26,7 @@ async function waitForTerrain(page) {
 }
 
 Given('the Matterhorn example is open with offline elevation and satellite tiles', { timeout: 30000 }, async function () {
+    await this.page.setViewportSize({ width: 640, height: 480 });
     const terrain = new PNG({ width: 512, height: 512 });
     for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
       terrain.data.set([128 + Math.floor(x / 256) + 2 * Math.floor(y / 256), 10, 128, 255], (y * 512 + x) * 4);
@@ -55,6 +59,7 @@ Given('the Matterhorn example is open with offline elevation and satellite tiles
       return state?.meshes?.size > 0 && camera?.target[1] > 0 &&
         [...state.meshes.values()].some(mesh => mesh._terrainRequest);
     }, null, { timeout: 30000 });
+    await prepare3DChecks(this.page);
 });
 
 Then('Matterhorn elevation samples, camera height and viewport coverage match the DEM', { timeout: 30000 }, async function () {
@@ -145,7 +150,7 @@ Then('Matterhorn terrain survives cache eviction', { timeout: 30000 }, async fun
       const owner = globals.renderers.get(map);
       await globals.sceneByLayer.get(owner).renderer.device.queue.onSubmittedWorkDone();
     });
-    assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after cache eviction');
+    assert.ok(await whiteFraction(this.page) > 0.1, 'terrain disappeared after cache eviction');
 });
 
 Then('Matterhorn depth ordering is independent of tile draw order', { timeout: 30000 }, async function () {
@@ -198,7 +203,7 @@ Then('Matterhorn zoom keeps coarse terrain visible and aligns the marker and pop
       const requests = globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests;
       return map.getZoom() === 15 && [...requests.values()].some(request => request.tile.coords.z === 15 && !request.tiles);
     }, null, { timeout: 15000 });
-    assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared while zoom detail loaded');
+    assert.ok(await whiteFraction(this.page) > 0.1, 'terrain disappeared while zoom detail loaded');
     await this.page.waitForFunction(() => {
       const marker = Object.values(map._layers).find(item => item instanceof L.Marker);
       const layer = Object.values(map._layers).find(item => item instanceof L.TileLayer);
@@ -238,7 +243,7 @@ Then('Matterhorn zoom keeps coarse terrain visible and aligns the marker and pop
     assert.equal(alignment.bearing, 70);
     assert.ok(alignment.marker < 3, `marker drift after navigation: ${alignment.marker}px`);
     assert.ok(alignment.popup < 3, `popup drift after navigation: ${alignment.popup}px`);
-    assert.ok(whiteFraction(await this.page.screenshot()) > 0.1, 'terrain disappeared after zoom');
+    assert.ok(await whiteFraction(this.page) > 0.1, 'terrain disappeared after zoom');
 });
 
 Then('Matterhorn streams a new region and releases and restores its elevation layer', { timeout: 30000 }, async function () {

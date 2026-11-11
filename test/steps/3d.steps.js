@@ -11,73 +11,12 @@ export async function prepare3DChecks(page) {
     if (rendererByLayer !== globalThis.testWeakmaps.rendererByLayer) {
       throw new Error('Source checks and the test bundle must share WeakMap state');
     }
-    const [createMesh, createProgram, destroyTexture, disposeMesh,
-      findFeature, raycast, onClick, onPointerLeave, setHighlight, showFeature,
-      renderModule, update, compareMeshes, pump, releaseArea, emptyNode, setParent, traverse,
-      updateWorldMatrix, updateCamera, parseColor, triangulate, lampPostGeometry, lightGeometry, getElevation] = await Promise.all([
-      import('/src/rendering/createMesh.js'),
-      import('/src/materials/createProgram.js'),
-      import('/src/textures/destroyTexture.js'),
-      import('/src/rendering/disposeMesh.js'),
-      import('/src/picking/findFeature.js'),
-      import('/src/picking/raycast.js'),
-      import('/src/picking/onClick.js'),
-      import('/src/picking/onPointerLeave.js'),
-      import('/src/picking/setHighlight.js'),
-      import('/src/picking/showFeature.js'),
-      import('/src/rendering/render.js'),
-      import('/src/scene/scheduleSceneUpdate.js'),
-      import('/src/rendering/compareMeshes.js'),
-      import('/src/sources/pumpSourceAreas.js'),
-      import('/src/sources/releaseArea.js'),
-      import('/src/scene/createSceneNode.js'),
-      import('/src/scene/setParent.js'),
-      import('/src/scene/traverse.js'),
-      import('/src/transforms/updateWorldMatrix.js'),
-      import('/src/camera/updateSceneCamera.js'),
-      import('/src/colors/parseColor.js'),
-      import('/src/triangulation/triangulate.js'),
-      import('/src/geometry/lampPostGeometry.js'),
-      import('/src/geometry/lightGeometry.js'),
-      import('/src/terrain/getElevation.js'),
-    ]);
-    const graph = {
-      emptyNode: emptyNode.emptyNode,
-      setParent: setParent.setParent,
-      traverse: traverse.traverse,
-      updateWorldMatrix: updateWorldMatrix.updateWorldMatrix,
-      updateCamera: updateCamera.updateCamera,
-    };
-    const gpu = {
-      createMesh: createMesh.createMesh,
-      createProgram: createProgram.createProgram,
-      destroyTexture: destroyTexture.destroyTexture,
-      disposeMesh: disposeMesh.disposeMesh,
-    };
-    const picking = {
-      findFeature: findFeature.findFeature,
-      raycast: raycast.raycast,
-      onClick: onClick.onClick,
-      onPointerLeave: onPointerLeave.onPointerLeave,
-      setHighlight: setHighlight.setHighlight,
-      showFeature: showFeature.showFeature,
-    };
-    const render = {
-      render: renderModule.render,
-      update: update.update,
-      compareMeshes: compareMeshes.compareMeshes,
-    };
-    const sources = { pump: pump.pump, releaseArea: releaseArea.releaseArea };
+    const { graph, gpu, picking, render, sources, geometry, getElevation } = nativeCheckModules;
     window.nativeChecks = {
       gpu, picking, render, sources,
       graph,
-      getElevation: getElevation.getElevation,
-      geometry: {
-        parseColor: parseColor.parseColor,
-        triangulate: triangulate.triangulate,
-        lampPostGeometry: lampPostGeometry.lampPostGeometry,
-        lightGeometry: lightGeometry.lightGeometry,
-      },
+      getElevation,
+      geometry,
       group() {
         return graph.emptyNode();
       },
@@ -285,7 +224,9 @@ const openEiffelExample = async function () {
       streetlights: named('Streetlights'),
     });
   });
-  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control);
+  if (!this.focusedParisLayers || this.focusedParisLayers.includes('Time')) {
+    await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control);
+  }
   await this.page.waitForFunction(() => layers._layers.every(({ layer }) =>
     !(globals.sceneByLayer.get(layer)._3d) || (globals.sceneByLayer.get(layer).root && (!globals.sceneByLayer.get(layer).modelUrl || globals.sceneByLayer.get(layer).model) &&
       (!globals.sceneByLayer.get(layer).url || globals.sceneByLayer.get(layer).header))));

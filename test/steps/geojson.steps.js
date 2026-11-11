@@ -151,6 +151,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
 });
 
 Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
+  await this.page.setViewportSize({ width: 640, height: 480 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('**/libs/leaflet-lens.js', async route => {
@@ -166,6 +167,9 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     }
   });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
+  await this.page.evaluate(() => {
+    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
+  });
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
       [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
@@ -457,8 +461,10 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 });
 
 Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 30000 }, async function () {
+  await this.page.setViewportSize({ width: 640, height: 480 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
+  await this.page.clock.setSystemTime(new Date('2026-06-21T00:00:00.000Z'));
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await prepare3DChecks(this.page);
   await this.page.locator('#map').dispatchEvent('pointerleave');
@@ -518,6 +524,9 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     const lights = Object.values(map._layers).find(layer => layer.options.nightLight);
     const state = globals.sceneByLayer.get(lights);
     const owner = globals.renderers.get(map);
+    // Measure illumination on receiving surfaces, not the emitter discs.
+    const ranges = state.root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
+    for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;
     const select = minute => {
       document.querySelector('input[type=date]').value = '2026-06-21';
       const slider = document.querySelector('input[type=range]');
@@ -544,6 +553,7 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     state.root.visible = false;
     const dayWithout = await nativeChecks.pixels(owner);
     state.root.visible = true;
+    for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
     return { count, removed, nightPixels: brighter(night, dark),
       dayPixels: brighter(day, dayWithout), generatedLights: meshLights.length,
       warm: meshLights.every(light => light.color[0] > light.color[1] && light.color[1] > light.color[2]) };
