@@ -1,19 +1,21 @@
 import assert from 'node:assert/strict';
-import { mockLeaflet } from './fixtures/leaflet.js';
-import { decodeVectorTile } from '../src/mvt/decodeVectorTile.js';
-import { triangulateVectorRings } from '../src/mvt/triangulateVectorRings.js';
-import { parseVectorStyle } from '../src/vector-style/parseVectorStyle.js';
-import { evaluateStyle } from '../src/vector-style/evaluateStyle.js';
-import { vectorPaint } from '../src/vector-style/vectorPaint.js';
-import { visibleStyle } from '../src/vector-style/visibleStyle.js';
-import { prepareVectorTile } from '../src/vector-tiles/prepareVectorTile.js';
-import { dashedSegment } from '../src/geometry/dashedSegment.js';
-import { collectVisibleMesh } from '../src/rendering/collectVisibleMesh.js';
-import { refreshNativeEvent } from '../src/native/refreshNativeEvent.js';
-import { configureVectorTileLayer } from '../src/vector-tiles/configureVectorTileLayer.js';
-import { isVectorTileSource } from '../src/sources/isVectorTileSource.js';
-import { varint, field, feature, tile } from './fixtures/vector-tile.js';
+import { Then } from '@cucumber/cucumber';
+import { mockLeaflet } from '../fixtures/leaflet.js';
+import { decodeVectorTile } from '../../src/mvt/decodeVectorTile.js';
+import { triangulateVectorRings } from '../../src/mvt/triangulateVectorRings.js';
+import { parseVectorStyle } from '../../src/vector-style/parseVectorStyle.js';
+import { evaluateStyle } from '../../src/vector-style/evaluateStyle.js';
+import { vectorPaint } from '../../src/vector-style/vectorPaint.js';
+import { visibleStyle } from '../../src/vector-style/visibleStyle.js';
+import { prepareVectorTile } from '../../src/vector-tiles/prepareVectorTile.js';
+import { dashedSegment } from '../../src/geometry/dashedSegment.js';
+import { collectVisibleMesh } from '../../src/rendering/collectVisibleMesh.js';
+import { refreshNativeEvent } from '../../src/native/refreshNativeEvent.js';
+import { configureVectorTileLayer } from '../../src/vector-tiles/configureVectorTileLayer.js';
+import { isVectorTileSource } from '../../src/sources/isVectorTileSource.js';
+import { varint, field, feature, tile } from '../fixtures/vector-tile.js';
 
+Then('vector tile decoding, styling, geometry and source validation work', async function () {
 function float(value, size) {
   const bytes = new Uint8Array(size), view = new DataView(bytes.buffer);
   if (size === 4) view.setFloat32(0, value, true);
@@ -235,3 +237,4 @@ for (const url of ['data.geojson', 'model.glb', 'buildings.pmtiles', 'data.json'
   assert.equal(isVectorTileSource({ url }), false);
 }
 console.log('Vector tile API: invalid options, templates, zoom limits and styles reject explicitly OK');
+});
