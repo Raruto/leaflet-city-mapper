@@ -234,6 +234,11 @@ Before({ tags: 'not @unit', timeout: 30000 }, async function () {
     if (this.focusedParisLayers && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper.html') {
       body = focusParisLayers(body, this.focusedParisLayers);
     }
+    if (this.focusedRomeGeometry && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper-rome.html') {
+      body = body.replace("url: 'data/colosseum-lights.json',",
+        "data: { type: 'FeatureCollection', features: [] },")
+        .replace('new L.Control.Time().layer.addTo(map);', '');
+    }
     if (version === '2') {
       body = body
         .replace(

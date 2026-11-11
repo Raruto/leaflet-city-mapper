@@ -152,6 +152,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
 
 Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async function (check) {
   assert.ok(['raster clipping', 'lens interactions'].includes(check), check);
+  this.focusedRomeGeometry = true;
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await this.page.setViewportSize({ width: 480, height: 320 });
@@ -170,9 +171,6 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
     }
   });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
-  await this.page.evaluate(() => {
-    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
-  });
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
       [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
