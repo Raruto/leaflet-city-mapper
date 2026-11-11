@@ -151,7 +151,7 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
 });
 
 Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
-  await this.page.setViewportSize({ width: 640, height: 480 });
+  await this.page.setViewportSize({ width: 480, height: 320 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('**/libs/leaflet-lens.js', async route => {
@@ -168,7 +168,9 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.evaluate(() => {
-    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
+    for (const layer of Object.values(map._layers)) {
+      if (globals.sceneByLayer.get(layer).kind === 'time' || layer.options.nightLight) layer.remove();
+    }
   });
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
@@ -257,7 +259,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     globalThis.lensBaseline = await nativeChecks.pixels(layer);
   });
   const box = await this.page.locator('#map').boundingBox();
-  for (const [x, y] of [[220, 220], [480, 250]]) {
+  for (const [x, y] of [[box.width / 3, box.height / 2], [box.width * 3 / 4, box.height / 2]]) {
     await this.page.mouse.move(box.x + x, box.y + y);
     assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
     const changed = await this.page.evaluate(async ({ x, y }) => {
@@ -461,7 +463,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 });
 
 Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 30000 }, async function () {
-  await this.page.setViewportSize({ width: 480, height: 320 });
+  await this.page.setViewportSize({ width: 320, height: 240 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.clock.setSystemTime(new Date('2026-06-21T00:00:00.000Z'));

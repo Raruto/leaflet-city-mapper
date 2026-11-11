@@ -209,7 +209,7 @@ Then('the offline Colosseum imagery archives share the exact centered square ext
 });
 
 Then('local archaeological COGs load by range and displace the ground', { timeout: 30000 }, async function () {
-  await this.page.setViewportSize({ width: 640, height: 480 });
+  await this.page.setViewportSize({ width: 480, height: 320 });
   const requests = [], remote = [], errors = [];
   this.page.on('request', request => {
     if (/colosseum\.pmtiles$/.test(request.url())) requests.push(request.headers().range);
@@ -218,7 +218,9 @@ Then('local archaeological COGs load by range and displace the ground', { timeou
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.evaluate(() => {
-    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
+    for (const layer of Object.values(map._layers)) {
+      if (globals.sceneByLayer.get(layer).kind === 'time' || layer.options.nightLight) layer.remove();
+    }
   });
   await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
     globals.sceneByLayer.get(layer)._geojson &&

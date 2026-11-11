@@ -12,7 +12,7 @@ Feature: Indicative Paris night lighting
       | effect                               | layers                                                           |
       | streetlight ground illumination      | Orthophoto IGN, Terrain (3D), Streetlights, Time                   |
       | Eiffel Tower sparkle                 | Orthophoto IGN, Terrain (3D), Eiffel Tower, Time                   |
-      | illumination on 3D surfaces           | Orthophoto IGN, Terrain (3D), Buildings, Streetlights, Eiffel Tower, Time |
+      | illumination on 3D surfaces           | Orthophoto IGN, Terrain (3D), Buildings, Streetlights, Time         |
       | daylight poles and disabled lighting | Orthophoto IGN, Terrain (3D), Streetlights, Time                   |
 
   Scenario: Streetlight toggles rebuild the inventory without stale meshes

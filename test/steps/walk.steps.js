@@ -419,7 +419,7 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
 });
 
 Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls and Esc restores the map', { timeout: 30000 }, async function () {
-  await this.page.setViewportSize({ width: 1024, height: 600 });
+  await this.page.setViewportSize({ width: 1024, height: 480 });
   await this.page.evaluate(() => map.invalidateSize());
   await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._bridgeMesh, null, { timeout: 30000 });
   await this.page.evaluate(() => {

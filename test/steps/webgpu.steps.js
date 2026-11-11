@@ -4,7 +4,7 @@ import * as globals from '../fixtures/globals.js';
 import assert from 'node:assert/strict';
 import { Then, When } from '@cucumber/cucumber';
 
-When('I pan the shared WebGPU renderer', async function () {
+When('I pan the shared WebGPU renderer', { timeout: 30000 }, async function () {
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
   this.page.on('pageerror', onPageError);

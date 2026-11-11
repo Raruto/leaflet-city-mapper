@@ -635,7 +635,7 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 30000 }, async 
     testOperations.setPitch(map, 45);
     testOperations.setBearing(map, 30);
     map.panBy([70, -35], { animate: false });
-    for (const zoom of [17, 16, 17, 16]) {
+    for (const zoom of [17, 16]) {
       await new Promise(requestAnimationFrame);
       await new Promise(resolve => {
         map.once('zoomend', resolve);

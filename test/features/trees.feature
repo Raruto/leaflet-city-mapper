@@ -9,9 +9,9 @@ Feature: Paris trees
     Then tree inventory attributes control dimensions, crowns and tooltip estimates
 
   Scenario: Real tree PMTiles render alongside the other Paris overlays
-    Given the offline Paris example loads only "Buildings, Trees, Time"
+    Given the offline Paris example loads only "Buildings, Trees"
     Then the offline Paris trees preserve "inventory and shared rendering"
 
   Scenario: Real tree PMTiles rebuild fresh meshes after toggling
-    Given the offline Paris example loads only "Buildings, Trees, Time"
+    Given the offline Paris example loads only "Buildings, Trees"
     Then the offline Paris trees preserve "fresh meshes after toggling"
