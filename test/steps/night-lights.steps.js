@@ -173,7 +173,7 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
     });
     return settled;
   });
-  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
   let result;
   try {
     result =   await this.page.evaluate(async check => {

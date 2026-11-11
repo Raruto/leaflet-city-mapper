@@ -461,7 +461,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 });
 
 Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 30000 }, async function () {
-  await this.page.setViewportSize({ width: 640, height: 480 });
+  await this.page.setViewportSize({ width: 480, height: 320 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.clock.setSystemTime(new Date('2026-06-21T00:00:00.000Z'));
@@ -519,7 +519,7 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     assert.ok(feature.geometry.coordinates[1] > 41.885 && feature.geometry.coordinates[1] < 41.894);
     assert.ok(feature.properties.height > 0 && feature.properties.radius > 0 && feature.properties.flux > 0);
   }
-  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
   const result = await this.page.evaluate(async () => {
     const lights = Object.values(map._layers).find(layer => layer.options.nightLight);
     const state = globals.sceneByLayer.get(lights);

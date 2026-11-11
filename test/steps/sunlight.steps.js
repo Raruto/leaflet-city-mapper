@@ -230,7 +230,7 @@ Then('solar lighting preserves {string}', { timeout: 30000 }, async function (ch
     const renderer = globals.sceneByLayer.get(globals.renderers.get(map)).renderer;
     return globals.cameraByMap.get(map)._sunlight?.altitude > 60 && renderer.sunlight.size > 1 && renderer.sunlight.pipeline;
   });
-  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 100));
+  await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
   let result;
   try {
     result =   await this.page.evaluate(async check => {

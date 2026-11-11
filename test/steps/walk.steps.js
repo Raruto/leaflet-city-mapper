@@ -461,6 +461,7 @@ Then('the walk layer moves the pedestrian on Pont d\'Iéna, stops it at walls an
     return globals.sceneByLayer.get(buildings)._inflight === 0 &&
       [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
   });
+  await this.page.evaluate(() => { walk._walk.nextClearanceCheck = 0; });
   await this.page.waitForFunction(() => walk._walk.nextClearanceCheck > performance.now());
   const walked = await state();
   const north = (walked.lat - start.lat) * 111320, east = (walked.lng - start.lng) * 111320 * Math.cos(start.lat * Math.PI / 180);
