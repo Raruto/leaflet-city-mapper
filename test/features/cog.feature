@@ -16,7 +16,6 @@ Feature: Offline Cloud Optimized GeoTIFF sources
 
   @coverage
   Scenario: The local Colosseum COGs render aerial and archaeological imagery on real relief
-    Given the instrumented city mapper plugin is loaded after Leaflet alone
     Then local archaeological COGs load by range and displace the ground
 
   Scenario: Shifted COG imagery preserves source registration and transparent edges

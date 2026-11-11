@@ -150,7 +150,8 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
   assert.deepEqual(result.errors, []);
 });
 
-Then('the minimal GeoJSON example renders the Colosseum at different heights', { timeout: 30000 }, async function () {
+Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['raster clipping', 'lens interactions'].includes(check), check);
   await this.page.setViewportSize({ width: 480, height: 320 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
@@ -168,9 +169,7 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
   });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.evaluate(() => {
-    for (const layer of Object.values(map._layers)) {
-      if (globals.sceneByLayer.get(layer).kind === 'time' || layer.options.nightLight) layer.remove();
-    }
+    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
   });
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
@@ -259,7 +258,9 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     globalThis.lensBaseline = await nativeChecks.pixels(layer);
   });
   const box = await this.page.locator('#map').boundingBox();
-  for (const [x, y] of [[box.width / 3, box.height / 2], [box.width * 3 / 4, box.height / 2]]) {
+  const points = check === 'raster clipping'
+    ? [[box.width / 3, box.height / 2], [box.width * 3 / 4, box.height / 2]] : [];
+  for (const [x, y] of points) {
     await this.page.mouse.move(box.x + x, box.y + y);
     assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
     const changed = await this.page.evaluate(async ({ x, y }) => {
@@ -284,6 +285,10 @@ Then('the minimal GeoJSON example renders the Colosseum at different heights', {
     }, { x, y });
     assert.ok(changed.inside > 1000, `Archaeology must visibly replace the orthophoto inside the lens: ${JSON.stringify(changed)}`);
     assert.equal(changed.outside, 0, `Orthophoto must remain unchanged outside the circular lens: ${JSON.stringify(changed)}`);
+  }
+  if (check === 'raster clipping') {
+    assert.deepEqual(errors, []);
+    return;
   }
   const toggle = this.page.getByRole('button', { name: 'Toggle lens', exact: true });
   await toggle.click();
@@ -462,7 +467,8 @@ Then('lens controls preserve clipping options and remove their handlers', async 
   });
 });
 
-Then('the Colosseum lighting JSON illuminates the facade and main roads only at night', { timeout: 30000 }, async function () {
+Then('the Colosseum lighting JSON preserves {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['night illumination', 'daylight suppression'].includes(check), check);
   await this.page.setViewportSize({ width: 320, height: 240 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
@@ -522,7 +528,7 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
     assert.ok(feature.properties.height > 0 && feature.properties.radius > 0 && feature.properties.flux > 0);
   }
   await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
-  const result = await this.page.evaluate(async () => {
+  const result = await this.page.evaluate(async check => {
     const lights = Object.values(map._layers).find(layer => layer.options.nightLight);
     const state = globals.sceneByLayer.get(lights);
     const owner = globals.renderers.get(map);
@@ -542,30 +548,28 @@ Then('the Colosseum lighting JSON illuminates the facade and main roads only at 
       }
       return count;
     };
-    select(0);
-    const night = await nativeChecks.pixels(owner);
+    select(check === 'night illumination' ? 0 : 720);
+    const lit = await nativeChecks.pixels(owner);
     const count = state.renderer.sunlight.lightCount;
     const meshLights = state.root.children.flatMap(mesh => mesh.extras.lights || []);
     state.root.visible = false;
     const dark = await nativeChecks.pixels(owner);
     const removed = state.renderer.sunlight.lightCount;
     state.root.visible = true;
-    select(720);
-    const day = await nativeChecks.pixels(owner);
-    state.root.visible = false;
-    const dayWithout = await nativeChecks.pixels(owner);
-    state.root.visible = true;
     for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
-    return { count, removed, nightPixels: brighter(night, dark),
-      dayPixels: brighter(day, dayWithout), generatedLights: meshLights.length,
+    return { count, removed, pixels: brighter(lit, dark), generatedLights: meshLights.length,
       warm: meshLights.every(light => light.color[0] > light.color[1] && light.color[1] > light.color[2]) };
-  }).finally(() => this.page.clock.resume());
-  assert.equal(result.count, data.features.length);
+  }, check).finally(() => this.page.clock.resume());
   assert.equal(result.generatedLights, data.features.length);
-  assert.equal(result.removed, 0);
   assert.equal(result.warm, true);
-  assert.ok(result.nightPixels > 100, `Night lights must visibly illuminate the scene: ${JSON.stringify(result)}`);
-  assert.equal(result.dayPixels, 0, 'Artificial lights must not alter daylight rendering');
+  if (check === 'daylight suppression') {
+    assert.equal(result.pixels, 0, 'Artificial lights must not alter daylight rendering');
+    assert.deepEqual(errors, []);
+    return;
+  }
+  assert.equal(result.count, data.features.length);
+  assert.equal(result.removed, 0);
+  assert.ok(result.pixels > 100, `Night lights must visibly illuminate the scene: ${JSON.stringify(result)}`);
   assert.equal(await this.page.evaluate(() => {
     const lights = Object.values(map._layers).find(layer => layer.options.nightLight);
     map.removeLayer(lights);

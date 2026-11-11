@@ -218,9 +218,7 @@ Then('local archaeological COGs load by range and displace the ground', { timeou
   this.page.on('pageerror', error => errors.push(error.message));
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
   await this.page.evaluate(() => {
-    for (const layer of Object.values(map._layers)) {
-      if (globals.sceneByLayer.get(layer).kind === 'time' || layer.options.nightLight) layer.remove();
-    }
+    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer).kind === 'time').remove();
   });
   await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
     globals.sceneByLayer.get(layer)._geojson &&

@@ -36,8 +36,10 @@ export async function resetTestContext(context, unexpectedRequests) {
       'https://leafletjs.com/docs/images/favicon.svg',
       'https://openlayers.org/theme/img/logo-dark.svg',
     ].includes(url.href)) {
+      const [width, height] = url.href === 'https://raruto.github.io/img/view-on-github.png'
+        ? [791, 163] : [1, 1];
       return route.fulfill({ contentType: 'image/svg+xml',
-        body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>' });
+        body: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"/>` });
     }
     unexpectedRequests.push(url.href);
     await route.abort('blockedbyclient');
