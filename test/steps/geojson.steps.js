@@ -152,6 +152,8 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
 
 Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async function (check) {
   assert.ok(['raster clipping', 'lens interactions'].includes(check), check);
+  await this.context.route('**/dist/leaflet-city-mapper.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await this.page.setViewportSize({ width: 480, height: 320 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
@@ -469,6 +471,8 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 
 Then('the Colosseum lighting JSON preserves {string}', { timeout: 30000 }, async function (check) {
   assert.ok(['night illumination', 'daylight suppression'].includes(check), check);
+  await this.context.route('**/dist/leaflet-city-mapper.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await this.page.setViewportSize({ width: 320, height: 240 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));

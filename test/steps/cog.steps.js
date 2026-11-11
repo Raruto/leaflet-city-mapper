@@ -209,6 +209,8 @@ Then('the offline Colosseum imagery archives share the exact centered square ext
 });
 
 Then('local archaeological COGs load by range and displace the ground', { timeout: 30000 }, async function () {
+  await this.context.route('**/dist/leaflet-city-mapper.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await this.page.setViewportSize({ width: 480, height: 320 });
   const requests = [], remote = [], errors = [];
   this.page.on('request', request => {
