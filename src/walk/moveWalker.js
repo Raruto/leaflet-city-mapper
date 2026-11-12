@@ -15,9 +15,17 @@ export function moveWalker(forward, dt) {
   // World x is east, z south; keep 0.3 m from walls and slide along them.
   const wall = blocked.call(this, east, north, feet);
   if (wall) {
-    const into = east * wall[0] - north * wall[1];
+    const fraction = Math.max(0, Math.min(1, (this.hitData.best - 0.3) / Math.hypot(east, north)));
+    const movedEast = east * fraction, movedNorth = north * fraction;
+    feet[0] += movedEast; feet[2] -= movedNorth;
+    east -= movedEast; north -= movedNorth;
+    const into = Math.min(0, east * wall[0] - north * wall[1]);
     east -= into * wall[0]; north += into * wall[1];
-    if (blocked.call(this, east, north, feet)) east = north = 0;
+    if (blocked.call(this, east, north, feet)) {
+      const slide = Math.max(0, Math.min(1, (this.hitData.best - 0.3) / Math.hypot(east, north)));
+      east *= slide; north *= slide;
+    }
+    east += movedEast; north += movedNorth;
   }
   this.state.latlng = /* alloc */ new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));
   this.state.phase += Math.hypot(east, north) / 1.6 * Math.PI;

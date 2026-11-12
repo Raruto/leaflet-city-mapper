@@ -5,9 +5,15 @@ import { vertexCount } from './vertexCount.js';
 
 
 export function collider(mesh) {
-  let c = colliders.get(mesh.geometry);
-  if (c) return c;
-  const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+  const m = mesh.worldMatrix;
+  let c = colliders.get(mesh), i;
+  if (c && c.geometry === mesh.geometry) {
+    for (i = 0; i < 12; i++) {
+      if (i % 4 !== 3 && c.matrix[i] !== m[i]) break;
+    }
+    if (i === 12) return c;
+  }
+  const { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
 
   const vertices = vertexCount(position, index);
   const count = vertices * (instanceOffset?.count ?? 1);
@@ -17,7 +23,7 @@ export function collider(mesh) {
   const a = /* alloc */ [0, 0, 0], b = /* alloc */ [0, 0, 0], d = /* alloc */ [0, 0, 0];
   const v = /* alloc */ [];
 
-  let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
+  let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
   for (i = 0; i < count; i += 3) {
     first = index ? index.data[i % vertices] : i % vertices;
     // Streetlight halos (uv.x <= 2, see scene/picking.js) are light, not matter.
@@ -64,8 +70,10 @@ export function collider(mesh) {
     nrm: Float32Array.from(nrm),
     cells,
     maxX,
+    geometry: mesh.geometry,
+    matrix: /* alloc */ Array.from(m),
     origin: /* alloc */ [m[12], m[13], m[14]]
   };
-  colliders.set(mesh.geometry, c);
+  colliders.set(mesh, c);
   return c;
 }

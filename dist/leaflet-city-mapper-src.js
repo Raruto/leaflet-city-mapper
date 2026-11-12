@@ -4573,14 +4573,10 @@
       skyDirection: vec4<f32>,
       atmosphereTint: vec4<f32>,
     };
-    @group(0) @binding(0) var<uniform> u: Mesh;
-    @group(0) @binding(1) var<uniform> frame: Frame;
-    struct Solar { matrix: mat4x4<f32>, params: vec4<f32> };
-    @group(1) @binding(0) var<uniform> solar: Solar;
-    ${hasTerrain ? (
-        /* wgsl */
-        `@group(0) @binding(2) var dem: texture_2d<f32>;${elevationWGSL2}`
-      ) : ""}
+    struct Solar {
+      matrix: mat4x4<f32>,
+      params: vec4<f32>
+    };
     struct VertexInput {
       @location(0) position: vec3<f32>,
       @location(1) normal: vec3<f32>,
@@ -4599,6 +4595,13 @@
       ${textured ? "@location(3) uv: vec2<f32>," : ""}
       ${hasRoof ? "@location(4) roofUv: vec2<f32>, @location(5) roof: f32," : ""}
     };
+    @group(0) @binding(0) var<uniform> u: Mesh;
+    @group(0) @binding(1) var<uniform> frame: Frame;
+    @group(1) @binding(0) var<uniform> solar: Solar;
+    ${hasTerrain ? (
+        /* wgsl */
+        `@group(0) @binding(2) var dem: texture_2d<f32>;${elevationWGSL2}`
+      ) : ""}
     @vertex fn vertexMain(input: VertexInput, @builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
       var output: VertexOutput;
       var position = input.position${instanceOffset};
@@ -4610,8 +4613,7 @@
       // Inverse-transpose from cofactors; the camera view matrix is orthonormal.
       let m = mat3x3<f32>(u.worldMatrix[0].xyz, u.worldMatrix[1].xyz, u.worldMatrix[2].xyz);
       ${stroke.normal}
-      let normal = (cross(m[1], m[2]) * sourceNormal.x + cross(m[2], m[0]) * sourceNormal.y +
-        cross(m[0], m[1]) * sourceNormal.z) / determinant(m);
+      let normal = (cross(m[1], m[2]) * sourceNormal.x + cross(m[2], m[0]) * sourceNormal.y + cross(m[0], m[1]) * sourceNormal.z) / determinant(m);
       output.normal = (frame.viewMatrix * vec4<f32>(normal, 0.0)).xyz;
       let world = u.worldMatrix * vec4<f32>(position, 1.0);
       output.shadowPosition = solar.matrix * world;
@@ -11405,9 +11407,15 @@
 
   // src/collision/collider.js
   function collider(mesh) {
-    let c = colliders.get(mesh.geometry);
-    if (c) return c;
-    const m = mesh.worldMatrix, { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
+    const m = mesh.worldMatrix;
+    let c = colliders.get(mesh), i;
+    if (c && c.geometry === mesh.geometry) {
+      for (i = 0; i < 12; i++) {
+        if (i % 4 !== 3 && c.matrix[i] !== m[i]) break;
+      }
+      if (i === 12) return c;
+    }
+    const { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
     const vertices = vertexCount(position, index);
     const count = vertices * (instanceOffset?.count ?? 1);
     const tri = (
@@ -11436,7 +11444,7 @@
       /* alloc */
       []
     );
-    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
+    let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
     for (i = 0; i < count; i += 3) {
       first = index ? index.data[i % vertices] : i % vertices;
       if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
@@ -11477,12 +11485,17 @@
       nrm: Float32Array.from(nrm),
       cells,
       maxX,
+      geometry: mesh.geometry,
+      matrix: (
+        /* alloc */
+        Array.from(m)
+      ),
       origin: (
         /* alloc */
         [m[12], m[13], m[14]]
       )
     };
-    colliders.set(mesh.geometry, c);
+    colliders.set(mesh, c);
     return c;
   }
 
@@ -11549,6 +11562,9 @@
     );
     if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
     const shape = collider(mesh);
+    x += shape.origin[0] - world[12];
+    y += shape.origin[1] - world[13];
+    z += shape.origin[2] - world[14];
     const end = Math.floor(shape.maxX / CELL);
     if (x >= shape.maxX) return false;
     const iz = Math.floor(z / CELL);
@@ -11559,17 +11575,6 @@
     return countCrossings(hits) % 2 === 1;
   }
 
-  // src/collision/setTrafficNormal.js
-  function setTrafficNormal(data, x, z, distance, dx, dz) {
-    if (distance < 1e-6) {
-      data.normal[0] = -dx;
-      data.normal[1] = -dz;
-    } else {
-      data.normal[0] = x / distance;
-      data.normal[1] = z / distance;
-    }
-  }
-
   // src/collision/trafficCollision.js
   function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
     const state = trafficByLayer.get(layer);
@@ -11577,48 +11582,89 @@
     let bounds = state.collisionBounds;
     if (!bounds) {
       bounds = state.collisionBounds = /* alloc */
-      { radius: 0, minY: Infinity, maxY: -Infinity };
+      {
+        minX: Infinity,
+        maxX: -Infinity,
+        minY: Infinity,
+        maxY: -Infinity,
+        minZ: Infinity,
+        maxZ: -Infinity
+      };
       let i, px2, py, pz2;
       for (i = 0; i < state.template.position.length; i += 3) {
         px2 = state.template.position[i];
         py = state.template.position[i + 1];
         pz2 = state.template.position[i + 2];
-        bounds.radius = Math.max(bounds.radius, Math.hypot(px2, pz2));
+        bounds.minX = Math.min(bounds.minX, px2);
+        bounds.maxX = Math.max(bounds.maxX, px2);
         bounds.minY = Math.min(bounds.minY, py);
         bounds.maxY = Math.max(bounds.maxY, py);
+        bounds.minZ = Math.min(bounds.minZ, pz2);
+        bounds.maxZ = Math.max(bounds.maxZ, pz2);
       }
     }
     const root = rootByLayer.get(layer), position = state.position ||= /* alloc */
     {};
     const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
-    const radius = bounds.radius * scale + 0.35;
-    let trip, projection, closest, rx, rz, perpendicular, entry, distance, bottom, top, px, pz;
+    const margin = 0.35 / scale;
+    let trip, bottom, top, px, pz, rx, rz, ox, oz, ux, uz, nearX, farX, nearZ, farZ;
+    let entry, exit, nx, nz, normalLength, worldX, worldZ, nearest;
     for (trip of state.trips) {
       ({ x: px, y: bottom, z: pz } = locateTraffic(state, trip, position));
       bottom = root.position[1] + (bottom + bounds.minY) * root.scale[1];
       top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
       if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) continue;
-      px = root.position[0] + px * root.scale[0];
-      pz = root.position[2] + pz * root.scale[2];
-      projection = (px - x) * dx + (pz - z) * dz;
-      closest = Math.max(0, Math.min(reach, projection));
-      rx = x + closest * dx - px;
-      rz = z + closest * dz - pz;
-      perpendicular = rx * rx + rz * rz;
-      if (perpendicular >= radius * radius) continue;
-      if (reach === 0) {
+      rx = (x - root.position[0]) / root.scale[0] - px;
+      rz = (z - root.position[2]) / root.scale[2] - pz;
+      ox = -rx * position.dz + rz * position.dx;
+      oz = -rx * position.dx - rz * position.dz;
+      ux = -dx / root.scale[0] * position.dz + dz / root.scale[2] * position.dx;
+      uz = -dx / root.scale[0] * position.dx - dz / root.scale[2] * position.dz;
+      if (!ux && (ox <= bounds.minX - margin || ox >= bounds.maxX + margin) || !uz && (oz <= bounds.minZ - margin || oz >= bounds.maxZ + margin)) continue;
+      nearX = ux ? ((ux > 0 ? bounds.minX - margin : bounds.maxX + margin) - ox) / ux : -Infinity;
+      farX = ux ? ((ux > 0 ? bounds.maxX + margin : bounds.minX - margin) - ox) / ux : Infinity;
+      nearZ = uz ? ((uz > 0 ? bounds.minZ - margin : bounds.maxZ + margin) - oz) / uz : -Infinity;
+      farZ = uz ? ((uz > 0 ? bounds.maxZ + margin : bounds.minZ - margin) - oz) / uz : Infinity;
+      entry = Math.max(nearX, nearZ);
+      exit = Math.min(farX, farZ);
+      if (entry > exit || exit < 0 || entry > reach || reach && Math.max(0, entry) >= data.best) continue;
+      if (!reach) {
         data.found = true;
-        distance = Math.hypot(x - px, z - pz);
-        data.normal[0] = distance ? (x - px) / distance : 0;
-        data.normal[1] = distance ? (z - pz) / distance : 0;
-        continue;
+        return true;
       }
-      entry = Math.max(0, projection - Math.sqrt(radius * radius - perpendicular));
-      if (entry > reach || entry >= data.best) continue;
+      if (entry < 0) {
+        nearest = ox - (bounds.minX - margin);
+        nx = -1;
+        nz = 0;
+        if (bounds.maxX + margin - ox < nearest) {
+          nearest = bounds.maxX + margin - ox;
+          nx = 1;
+        }
+        if (oz - (bounds.minZ - margin) < nearest) {
+          nearest = oz - (bounds.minZ - margin);
+          nx = 0;
+          nz = -1;
+        }
+        if (bounds.maxZ + margin - oz < nearest) {
+          nx = 0;
+          nz = 1;
+        }
+      } else if (nearX > nearZ) {
+        nx = -Math.sign(ux);
+        nz = 0;
+      } else {
+        nx = 0;
+        nz = -Math.sign(uz);
+      }
+      worldX = (-nx * position.dz - nz * position.dx) / root.scale[0];
+      worldZ = (nx * position.dx - nz * position.dz) / root.scale[2];
+      normalLength = Math.hypot(worldX, worldZ);
+      if (entry < 0 && dx * worldX + dz * worldZ >= 0) continue;
+      entry = Math.max(0, entry);
       data.best = entry;
       data.found = true;
-      distance = Math.hypot(x + entry * dx - px, z + entry * dz - pz);
-      setTrafficNormal(data, x + entry * dx - px, z + entry * dz - pz, distance, dx, dz);
+      data.normal[0] = worldX / normalLength;
+      data.normal[1] = worldZ / normalLength;
     }
     return data.found;
   }
@@ -11806,10 +11852,22 @@
     for (i = 0; i < feet.length; i++) feet[i] = position[i] + scale[i] * feet[i];
     const wall = blocked.call(this, east, north, feet);
     if (wall) {
-      const into = east * wall[0] - north * wall[1];
+      const fraction = Math.max(0, Math.min(1, (this.hitData.best - 0.3) / Math.hypot(east, north)));
+      const movedEast = east * fraction, movedNorth = north * fraction;
+      feet[0] += movedEast;
+      feet[2] -= movedNorth;
+      east -= movedEast;
+      north -= movedNorth;
+      const into = Math.min(0, east * wall[0] - north * wall[1]);
       east -= into * wall[0];
       north += into * wall[1];
-      if (blocked.call(this, east, north, feet)) east = north = 0;
+      if (blocked.call(this, east, north, feet)) {
+        const slide = Math.max(0, Math.min(1, (this.hitData.best - 0.3) / Math.hypot(east, north)));
+        east *= slide;
+        north *= slide;
+      }
+      east += movedEast;
+      north += movedNorth;
     }
     this.state.latlng = /* alloc */
     new L.LatLng(lat + north / 111320, lng + east / (111320 * Math.cos(lat * radians)));

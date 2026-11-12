@@ -10,6 +10,8 @@ import { onAdd as addWalk } from '../../src/walk/onAddWalkControl.js';
 import { onRemove as removeWalk } from '../../src/walk/onRemoveWalkControl.js';
 import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
 import { trafficByLayer } from '../../src/weakmaps/trafficByLayer.js';
+import { boatModel } from '../../src/vehicles/boatModel.js';
+import { build } from '../../src/geometry/buildGeometryParts.js';
 
 Then('walk collision detects enclosed instances and moving traffic', function () {
   const positions = new Float32Array([
@@ -31,6 +33,15 @@ Then('walk collision detects enclosed instances and moving traffic', function ()
   const seen = new Set(), intersections = [];
   assert.equal(insideMesh(mesh, 5, 1, 0, seen, intersections), true);
   assert.equal(insideMesh(mesh, 8, 1, 0, seen, intersections), false);
+  mesh.worldMatrix = [...identity];
+  mesh.worldMatrix[12] = 100;
+  assert.equal(insideMesh(mesh, 105, 1, 0, seen, intersections), true, 'Translated cached collider follows the mesh');
+  assert.equal(insideMesh(mesh, 5, 1, 0, seen, intersections), false);
+  const rotated = { ...mesh, worldMatrix: [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1] };
+  assert.equal(insideMesh(rotated, 0, 1, -5, seen, intersections), true, 'Shared geometry uses its own transform');
+  rotated.worldMatrix[0] = 1; rotated.worldMatrix[2] = 0;
+  rotated.worldMatrix[8] = 0; rotated.worldMatrix[10] = 1;
+  assert.equal(insideMesh(rotated, 5, 1, 0, seen, intersections), true, 'Changed rotation rebuilds the collider');
 
   const traffic = {}, lane = { points: [[5, 0, 0], [15, 0, 0]], lengths: [0, 10], length: 10 };
   rootByLayer.set(traffic, { position: [0, 0, 0], scale: [1, 1, 1] });
@@ -45,6 +56,22 @@ Then('walk collision detects enclosed instances and moving traffic', function ()
   data.best = 10;
   data.found = false;
   assert.equal(trafficCollision(traffic, 0, -10, 0, 1, 0, 10, data), false);
+
+  const state = trafficByLayer.get(traffic);
+  state.template = build(boatModel());
+  state.collisionBounds = null;
+  data.best = 0; data.found = false;
+  assert.equal(trafficCollision(traffic, 5, 0, 20, 0, 0, 0, data), false, 'A boat does not block far to its side');
+  assert.equal(trafficCollision(traffic, 5, 0, 4, 0, 0, 0, data), true, 'The boat still blocks its hull');
+  data.best = 10; data.found = false;
+  assert.equal(trafficCollision(traffic, 5, 0, 8, 0, -1, 10, data), true);
+  assert.ok(Math.abs(data.best - 2.15) < 1e-6);
+  assert.ok(data.normal[1] > 0.99, 'The collision normal faces away from the hull');
+  data.best = 10; data.found = false;
+  assert.equal(trafficCollision(traffic, 5, 0, 5.7, 0, 1, 10, data), false, 'An overlapping walker can move away');
+  data.best = 10; data.found = false;
+  assert.equal(trafficCollision(traffic, 5, 0, 5.7, 0, -1, 10, data), true, 'An overlapping walker cannot move deeper inside');
+  assert.equal(data.best, 0);
 });
 
 Then('Walk scratch stays map-owned across control replacement', function () {
@@ -236,6 +263,42 @@ Then('Time and Walk controls clean up and can be added again', { timeout: 30000 
       restoredStandalone, walking, walkRemoved, restarted, duplicateRejected, ownerUnchanged, scratchReused, replacementReused };
   });
   for (const [name, value] of Object.entries(result)) assert.equal(value, true, name);
+});
+
+Then('a long walking step reaches a nearby wall and can move away', { timeout: 30000 }, async function () {
+  const result = await this.page.evaluate(async () => {
+    const map = test3d.map;
+    testOperations.setBearing(map, 0);
+    const wall = new L.Layer({ source: { type: 'vector' } }).addTo(map);
+    await nativeChecks.ready(wall);
+    nativeChecks.gpu.createMesh(wall, {
+      position: [-10, 0, -4, 10, 0, -4, 10, 4, -4, -10, 0, -4, 10, 4, -4, -10, 4, -4],
+      normal: Array(6).fill([0, 0, 1]).flat(),
+      color: Array(18).fill(0.5),
+    });
+    const control = new L.Control.Walk({ speed: 70 }).addTo(map);
+    await nativeChecks.ready(control._walk.layer);
+    control.getContainer().querySelector('button').click();
+    const walk = control._walk, start = walk.state.latlng.lat;
+    cancelAnimationFrame(walk.frame);
+    walk.nextClearanceCheck = Infinity;
+    let now = performance.now();
+    walk.last = now;
+    walk.keys.add('KeyW');
+    walk.step(now += 100);
+    cancelAnimationFrame(walk.frame);
+    const forward = (walk.state.latlng.lat - start) * 111320;
+    walk.keys.clear();
+    walk.keys.add('KeyS');
+    walk.step(now += 100);
+    cancelAnimationFrame(walk.frame);
+    const backward = (walk.state.latlng.lat - start) * 111320;
+    control.remove();
+    wall.remove();
+    return { forward, backward };
+  });
+  assert.ok(Math.abs(result.forward - 3.7) < 0.05, JSON.stringify(result));
+  assert.ok(result.backward < result.forward - 6, JSON.stringify(result));
 });
 
 Then('keyboard walking moves toward a wall, stops at it and can move away', { timeout: 30000 }, async function () {

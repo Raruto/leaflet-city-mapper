@@ -24,6 +24,10 @@ Feature: Third-person walk mode
     Given a leaflet map
     Then keyboard walking moves toward a wall, stops at it and can move away
 
+  Scenario: Long walking steps reach walls without stopping early
+    Given a leaflet map
+    Then a long walking step reaches a nearby wall and can move away
+
   Scenario Outline: Walking in Paris preserves <check>
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings"
     Then walking in Paris preserves "<check>" and Esc restores the map

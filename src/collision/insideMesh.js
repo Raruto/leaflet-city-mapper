@@ -22,6 +22,9 @@ export function insideMesh(mesh, x, y, z, seen, intersections) {
   );
   if (Math.hypot(cx - x, cy - y, cz - z) > radius) return false;
   const shape = collider(mesh);
+  x += shape.origin[0] - world[12];
+  y += shape.origin[1] - world[13];
+  z += shape.origin[2] - world[14];
   const end = Math.floor(shape.maxX / CELL);
   if (x >= shape.maxX) return false;
   const iz = Math.floor(z / CELL);
