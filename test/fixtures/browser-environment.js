@@ -1,6 +1,9 @@
 import { dependencyFile } from './dependencies.js';
 
 export const testTime = '2026-06-21T12:00:00.000Z';
+export const swiftShaderArgs = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
+  '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader',
+  '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'];
 const localHosts = ['127.0.0.1', 'localhost', '[::1]'];
 const fetchNode = globalThis.fetch;
 

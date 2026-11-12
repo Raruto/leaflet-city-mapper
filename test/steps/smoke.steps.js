@@ -4,6 +4,7 @@ import path from 'node:path';
 import { AfterAll, Before, Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
 import { chromium } from 'playwright';
+import { swiftShaderArgs } from '../fixtures/browser-environment.js';
 
 const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
 const pluginName = manifest.name.split('/').pop();
@@ -20,7 +21,8 @@ Before({ tags: '@smoke', timeout: 30000 }, async function () {
     server = await startServer(0);
     base = `http://127.0.0.1:${server.address().port}`;
     browser = await chromium.launch({
-      args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
+      args: process.platform === 'linux' && process.env.CI ? swiftShaderArgs
+        : ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
     });
   }
 });
@@ -61,7 +63,7 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
     return response.request().resourceType() === 'script' && response.status() >= 200 && response.status() < 300 &&
       localBundles.has(response.url());
   }
-  page.on('pageerror', error => errors.push(`JavaScript: ${error.message}`));
+  page.on('pageerror', error => errors.push(`JavaScript: ${error.stack || error.message}`));
   page.on('console', message => {
     if (message.type() === 'error') {
       if (message.text().includes('Google Maps JavaScript API error: ApiProjectMapError') ||

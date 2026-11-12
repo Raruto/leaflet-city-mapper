@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 import { startServer } from '../../build/server.js';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 import { prepareDependencies } from '../fixtures/dependencies.js';
-import { createTestContext, createTestPage, fetchLocal, resetTestContext } from '../fixtures/browser-environment.js';
+import { createTestContext, createTestPage, fetchLocal, resetTestContext, swiftShaderArgs } from '../fixtures/browser-environment.js';
 import { withScenarioBudget } from './scenario-budget.js';
 import { focusParisLayers } from '../fixtures/focused-paris.js';
 
@@ -119,9 +119,7 @@ async function getBrowser() {
       ...options,
       channel: options.channel || 'chromium',
       // Use Chromium's bundled software adapters, not the runner's GPU drivers.
-      args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader',
-        '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader',
-        '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'],
+      args: swiftShaderArgs,
     }
     // Windows needs a window for WebGPU; avoid launching and closing a headless browser first.
     : {
