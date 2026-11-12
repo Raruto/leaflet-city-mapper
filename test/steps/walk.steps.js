@@ -72,6 +72,8 @@ Then('walk collision detects enclosed instances and moving traffic', function ()
   data.best = 10; data.found = false;
   assert.equal(trafficCollision(traffic, 5, 0, 5.7, 0, -1, 10, data), true, 'An overlapping walker cannot move deeper inside');
   assert.equal(data.best, 0);
+  data.best = 10; data.found = false;
+  assert.equal(trafficCollision(traffic, 5, 10, 4, 1, 0, 10, data), false, 'A walker above the boat is not blocked');
 });
 
 Then('Walk scratch stays map-owned across control replacement', function () {
