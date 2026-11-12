@@ -192,7 +192,8 @@ Then('coarse ground imagery precedes detail and survives delayed replacements', 
     preservedOnError: true, errors: ['Expected detail failure'] });
 });
 
-Then('fading terrain detail covers retained ground without depth interference', { timeout: 30000 }, async function () {
+Then('fading terrain detail preserves {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['pitched', 'rotated', 'flat', 'depth'].includes(check), check);
   await this.page.evaluate(async () => {
     const map = test3d.map, zoom = map.getZoom();
     testOperations.setPitch(map, 45); testOperations.setBearing(map, 30);
@@ -259,8 +260,8 @@ Then('fading terrain detail covers retained ground without depth interference', 
   let result;
   try {
     // Sample fixed fade states without queuing background frames while software GPUs read pixels.
-    await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 1000));
-    result = await this.page.evaluate(async () => {
+    await this.page.clock.pauseAt(await this.page.evaluate(() => Date.now() + 10000));
+    result = await this.page.evaluate(async check => {
       const map = test3d.map, { terrain, raster, zoom } = window.terrainOverlap;
       const object = nativeChecks.gpu.createMesh(terrain, {
         position: [-500, -10, -500, 500, -10, -500, 500, -10, 500,
@@ -270,7 +271,9 @@ Then('fading terrain detail covers retained ground without depth interference', 
       }, { unlit: true });
       const failures = [];
       map.options.zoomSnap = 0;
-      for (const [pitch, bearing, pan, delta] of [[45, 30, 0, 0], [60, 75, 12, 0.25], [0, 0, -24, 0.4]]) {
+      for (const [name, pitch, bearing, pan, delta] of [
+        ['pitched', 45, 30, 0, 0], ['rotated', 60, 75, 12, 0.25], ['flat', 0, 0, -24, 0.4],
+      ]) {
         testOperations.setPitch(map, pitch); testOperations.setBearing(map, bearing);
         map.setZoom(zoom + delta, { animate: false });
         map.panBy([pan, 0], { animate: false });
@@ -280,11 +283,17 @@ Then('fading terrain detail covers retained ground without depth interference', 
           mesh.fadeStart = performance.now() - (tile.coords.z === zoom ? 125 : 300);
         }
         globals.sceneByLayer.get(raster)._pruneAfter = 0;
+        if (check !== name) continue;
         const pixels = await nativeChecks.pixels(raster, 180, 130, 40, 40);
         const bad = pixels.filter((value, i) => i % 4 === 3 &&
           (value !== 255 || pixels[i - 1] < 60 || pixels[i - 2] !== 0 || pixels[i - 3] < 60)).length;
         failures.push({ bad, sample: [...pixels.slice(0, 4)], coarse: [...globals.sceneByLayer.get(terrain)._rasterTiles.keys()]
           .filter(tile => tile.coords.z < zoom).length });
+        break;
+      }
+      if (check !== 'depth') {
+        nativeChecks.gpu.disposeMesh(terrain, object);
+        return { failures };
       }
       object.position[1] = 20;
       const above = [...await nativeChecks.pixels(raster, 200, 150, 1, 1)];
@@ -297,7 +306,7 @@ Then('fading terrain detail covers retained ground without depth interference', 
       const steadyDepth = !globals.sceneByLayer.get(raster).renderer.groundOverlap &&
         globals.sceneByLayer.get(terrain)._rasterProgram.pipelineCache.has('back:ccw:less-equal');
       return { failures, above, steadyDepth };
-    });
+    }, check);
   } finally {
     try {
       await this.page.evaluate(() => {
@@ -309,9 +318,13 @@ Then('fading terrain detail covers retained ground without depth interference', 
       await this.page.clock.resume();
     }
   }
-  assert.ok(result.failures.every(frame => frame.bad === 0 && frame.coarse > 0), JSON.stringify(result));
-  assert.deepEqual(result.above, [0, 255, 0, 255]);
-  assert.equal(result.steadyDepth, true);
+  if (check === 'depth') {
+    assert.deepEqual(result.above, [0, 255, 0, 255]);
+    assert.equal(result.steadyDepth, true);
+  } else {
+    assert.equal(result.failures.length, 1);
+    assert.ok(result.failures[0].bad === 0 && result.failures[0].coarse > 0, JSON.stringify(result));
+  }
 });
 
 Then('streamed geometry dissolves progressively while remaining opaque', { timeout: 30000 }, async function () {

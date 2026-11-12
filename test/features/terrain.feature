@@ -12,9 +12,16 @@ Feature: Terrain and raster imagery
     Given a leaflet map
     Then coarse ground imagery precedes detail and survives delayed replacements
 
-  Scenario: Overlapping terrain tiles never punch holes during zoom and pan
+  Scenario Outline: Overlapping terrain tiles preserve <check>
     Given a leaflet map
-    Then fading terrain detail covers retained ground without depth interference
+    Then fading terrain detail preserves "<check>"
+
+    Examples:
+      | check   |
+      | pitched |
+      | rotated |
+      | flat    |
+      | depth   |
 
   Scenario: Streamed objects appear progressively without changing opaque depth
     Given a leaflet map

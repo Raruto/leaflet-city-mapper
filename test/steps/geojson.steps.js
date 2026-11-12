@@ -151,11 +151,14 @@ Then('GeoJSON reports invalid sources and cancels obsolete downloads', async fun
 });
 
 Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async function (check) {
-  assert.ok(['raster clipping', 'lens interactions'].includes(check), check);
+  assert.ok(['geometry', 'raster clipping left', 'raster clipping right', 'lens interactions', 'lens reattachment'].includes(check), check);
   this.focusedRomeGeometry = true;
+  this.focusedRomeLens = check !== 'geometry';
+  this.focusedRomeArchives = check !== 'geometry';
+  this.focusedRomeOnlyGeometry = check === 'geometry';
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
-  await this.page.setViewportSize({ width: 480, height: 320 });
+  await this.page.setViewportSize({ width: 320, height: 240 });
   const errors = [];
   this.page.on('pageerror', error => errors.push(error.message));
   await this.context.route('**/libs/leaflet-lens.js', async route => {
@@ -171,65 +174,78 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
     }
   });
   await this.page.goto(`${this.baseUrl}/examples/leaflet-city-mapper-rome.html`, { waitUntil: 'domcontentloaded' });
-  await this.page.waitForFunction(() => {
-    return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
-      [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
-  });
+  if (check === 'geometry') {
+    await this.page.waitForFunction(() => {
+      return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._geojson &&
+        [...globals.sceneByLayer.get(layer)._areas.values()].some(area => area.done && area.buildings === 5));
+    });
+  }
   assert.equal(await this.page.locator('#help').count(), 0);
   assert.equal(await this.page.getByRole('button', { name: 'Flip map', exact: true }).count(), 0);
   assert.equal(await this.page.evaluate(() => map.getPitch()), 65);
-  await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
-    layer.options.asset === 'orthophoto' &&
-    [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.done)));
-  assert.ok(imageryRequests.length > 0, 'Initial view uses local orthophotography');
-  assert.deepEqual(remoteRequests, [], 'The map must not call remote imagery providers');
+  if (check !== 'geometry') {
+    await this.page.waitForFunction(() => Object.values(map._layers).some(layer =>
+      layer.options.asset === 'orthophoto' &&
+      [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.done)));
+    assert.ok(imageryRequests.length > 0, 'Initial view uses local orthophotography');
+    assert.deepEqual(remoteRequests, [], 'The map must not call remote imagery providers');
+  }
   await this.page.waitForFunction(() => {
     const terrain = globals.cameraByMap.get(map)._terrain3D;
     return terrain && globals.sceneByLayer.get(terrain)._terrainReady;
   });
   await prepare3DChecks(this.page);
-  const geometry = await this.page.evaluate(() => {
-    const layer = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson);
-    const features = layer.options.data.features;
-    const mesh = globals.sceneByLayer.get(layer)._areas.get('geojson').mesh;
-    const positions = mesh.geometry.attributes.position.data;
-    const terrain = globals.cameraByMap.get(map)._terrain3D;
-    const roofs = mesh.extras.featureFaces.map((face, index) => {
-      let highest = -Infinity;
-      for (let i = face.vertexStart; i < face.vertexEnd; i++) {
-        highest = Math.max(highest, positions[i * 3 + 1]);
-      }
-      const ground = Math.max(...features[index].geometry.coordinates.flat().map(([lng, lat]) =>
-        nativeChecks.getElevation(terrain, new L.LatLng(lat, lng)))) - globals.sceneByLayer.get(layer).root.position[1];
-      return Math.round((highest - ground) * 1000) / 1000;
+  if (check === 'geometry') {
+    await this.page.waitForFunction(() => {
+      const layer = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson);
+      return globals.sceneByLayer.get(layer)._areas.get('geojson')?.mesh;
     });
-    const rings = features.map(feature => feature.geometry.coordinates);
-    const centerError = map.project(map.getCenter()).subtract(map.project([41.89021, 12.49223]));
-    const rotation = -25 * Math.PI / 180;
-    let arenaOpen = true;
-    for (let i = 0; i < positions.length; i += 9) {
-      if (positions[i + 1] <= 0 || positions[i + 1] !== positions[i + 4] ||
-        positions[i + 1] !== positions[i + 7]) continue;
-      const east = (positions[i] + positions[i + 3] + positions[i + 6]) / 3;
-      const north = -(positions[i + 2] + positions[i + 5] + positions[i + 8]) / 3;
-      const x = east * Math.cos(rotation) + north * Math.sin(rotation);
-      const y = -east * Math.sin(rotation) + north * Math.cos(rotation);
-      if ((x / 43) ** 2 + (y / 27) ** 2 < 0.98) arenaOpen = false;
-    }
-    return {
-      heights: features.map(feature => feature.properties.height),
-      roofs,
-      holes: rings.slice(0, 3).map(coordinates => coordinates.length),
-      closed: rings.every(coordinates => coordinates.every(ring =>
-        ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1])),
-      arenaOpen,
-      centered: Math.abs(centerError.x) <= 0.5 && Math.abs(centerError.y) <= 0.5,
-    };
-  });
-  assert.deepEqual(geometry, {
-    heights: [8, 16, 28, 48, 30], roofs: [8, 16, 28, 48, 30],
-    holes: [2, 2, 2], closed: true, arenaOpen: true, centered: true,
-  });
+    const geometry = await this.page.evaluate(() => {
+      const layer = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson);
+      const features = layer.options.data.features;
+      const mesh = globals.sceneByLayer.get(layer)._areas.get('geojson').mesh;
+      const positions = mesh.geometry.attributes.position.data;
+      const terrain = globals.cameraByMap.get(map)._terrain3D;
+      const roofs = mesh.extras.featureFaces.map((face, index) => {
+        let highest = -Infinity;
+        for (let i = face.vertexStart; i < face.vertexEnd; i++) {
+          highest = Math.max(highest, positions[i * 3 + 1]);
+        }
+        const ground = Math.max(...features[index].geometry.coordinates.flat().map(([lng, lat]) =>
+          nativeChecks.getElevation(terrain, new L.LatLng(lat, lng)))) - globals.sceneByLayer.get(layer).root.position[1];
+        return Math.round((highest - ground) * 1000) / 1000;
+      });
+      const rings = features.map(feature => feature.geometry.coordinates);
+      const centerError = map.project(map.getCenter()).subtract(map.project([41.89021, 12.49223]));
+      const rotation = -25 * Math.PI / 180;
+      let arenaOpen = true;
+      for (let i = 0; i < positions.length; i += 9) {
+        if (positions[i + 1] <= 0 || positions[i + 1] !== positions[i + 4] ||
+          positions[i + 1] !== positions[i + 7]) continue;
+        const east = (positions[i] + positions[i + 3] + positions[i + 6]) / 3;
+        const north = -(positions[i + 2] + positions[i + 5] + positions[i + 8]) / 3;
+        const x = east * Math.cos(rotation) + north * Math.sin(rotation);
+        const y = -east * Math.sin(rotation) + north * Math.cos(rotation);
+        if ((x / 43) ** 2 + (y / 27) ** 2 < 0.98) arenaOpen = false;
+      }
+      return {
+        heights: features.map(feature => feature.properties.height),
+        roofs,
+        holes: rings.slice(0, 3).map(coordinates => coordinates.length),
+        closed: rings.every(coordinates => coordinates.every(ring =>
+          ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1])),
+        arenaOpen,
+        centered: Math.abs(centerError.x) <= 0.5 && Math.abs(centerError.y) <= 0.5,
+      };
+    });
+    assert.deepEqual(geometry, {
+      heights: [8, 16, 28, 48, 30], roofs: [8, 16, 28, 48, 30],
+      holes: [2, 2, 2], closed: true, arenaOpen: true, centered: true,
+    });
+    assert.deepEqual(remoteRequests, [], 'The map must not call remote imagery providers');
+    assert.deepEqual(errors, []);
+    return;
+  }
   await this.page.waitForFunction(() => {
     return Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)._type === 'raster' &&
       [...globals.sceneByLayer.get(layer)._rasterTiles.values()].some(tile => tile.done));
@@ -237,13 +253,14 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
   assert.equal(await this.page.locator('canvas.leaflet-3d').count(), 1);
   assert.ok(await this.page.locator('.leaflet-control-attribution').textContent().then(text =>
     text.includes('SITAR') && text.includes('Regione Lazio') && text.includes('2002/03') && text.includes('CC BY 4.0')));
-  await this.page.evaluate(() => {
-    // Isolate raster clipping from the model's pointer highlight.
-    Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)._geojson).remove();
-  });
   await this.page.waitForFunction(() => {
     const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)._type === 'raster');
     const terrain = globals.cameraByMap.get(map)._terrain3D;
+    for (const layer of rasters) {
+      for (const tile of globals.sceneByLayer.get(layer)._rasterTiles.values()) {
+        if (tile.error) throw new Error(`Raster ${layer.options.asset}: ${tile.error}`);
+      }
+    }
     return rasters.length === 2 && rasters.every(layer =>
       globals.sceneByLayer.get(layer)._rasterTiles.size > 0 &&
       globals.sceneByLayer.get(layer)._loadingTiles === 0 &&
@@ -258,8 +275,8 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
     globalThis.lensBaseline = await nativeChecks.pixels(layer);
   });
   const box = await this.page.locator('#map').boundingBox();
-  const points = check === 'raster clipping'
-    ? [[box.width / 3, box.height / 2], [box.width * 3 / 4, box.height / 2]] : [];
+  const points = check === 'raster clipping left' ? [[box.width / 3, box.height / 2]]
+    : check === 'raster clipping right' ? [[box.width * 3 / 4, box.height / 2]] : [];
   for (const [x, y] of points) {
     await this.page.mouse.move(box.x + x, box.y + y);
     assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
@@ -271,7 +288,7 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
         layer.options.asset === 'orthophoto').options.cutout;
       const radius = cutout.radius;
       const pixels = await nativeChecks.pixels(layer);
-      let inside = 0, outside = 0;
+      let inside = 0, outside = 0, outsidePixels = 0;
       for (let i = 0; i < pixels.length; i += 4) {
         const px = (i / 4 % renderer.canvas.width + 0.5) / renderer.dpr;
         const py = (renderer.canvas.height - Math.floor(i / 4 / renderer.canvas.width) - 0.5) / renderer.dpr;
@@ -279,43 +296,52 @@ Then('the minimal GeoJSON example preserves {string}', { timeout: 30000 }, async
         const different = Math.abs(pixels[i] - baseline[i]) + Math.abs(pixels[i + 1] - baseline[i + 1]) +
           Math.abs(pixels[i + 2] - baseline[i + 2]) > 15;
         if (different && distance < radius - 1) inside++;
-        if (different && distance > radius + 1) outside++;
+        if (distance > radius + 1) {
+          outsidePixels++;
+          if (different) outside++;
+        }
       }
-      return { inside, outside };
+      return { inside, outside, outsidePixels };
     }, { x, y });
     assert.ok(changed.inside > 1000, `Archaeology must visibly replace the orthophoto inside the lens: ${JSON.stringify(changed)}`);
+    assert.ok(changed.outsidePixels > 1000, `The viewport must include pixels outside the lens: ${JSON.stringify(changed)}`);
     assert.equal(changed.outside, 0, `Orthophoto must remain unchanged outside the circular lens: ${JSON.stringify(changed)}`);
   }
-  if (check === 'raster clipping') {
+  if (check.startsWith('raster clipping')) {
     assert.deepEqual(errors, []);
     return;
   }
   const toggle = this.page.getByRole('button', { name: 'Toggle lens', exact: true });
-  await toggle.click();
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
-  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
-  assert.equal(await this.page.evaluate(() => Object.values(map._layers).find(layer =>
-    layer.options.asset === 'orthophoto').options.cutout.radius), 0);
-  await toggle.click();
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
-  await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
-  await this.page.locator('#map').dispatchEvent('pointerleave');
-  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
-  await this.page.locator('#map').focus();
-  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
-  await this.page.keyboard.press('Escape');
-  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
-  await toggle.click();
-  await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
-  assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
-  assert.equal(await this.page.evaluate(async () => {
-    const layer = globals.cameraByMap.get(map)._terrain3D;
-    const pixels = await nativeChecks.pixels(layer);
-    return pixels.every((value, i) => value === globalThis.lensBaseline[i]);
-  }), true, 'Disabling restores the complete outer raster');
-  await toggle.click();
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+  if (check === 'lens interactions') {
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'false');
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+    assert.equal(await this.page.evaluate(() => Object.values(map._layers).find(layer =>
+      layer.options.asset === 'orthophoto').options.cutout.radius), 0);
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+    await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
+    await this.page.locator('#map').dispatchEvent('pointerleave');
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+    await this.page.locator('#map').focus();
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), true);
+    await this.page.keyboard.press('Escape');
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+    await toggle.click();
+    await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
+    assert.equal(await this.page.locator('.leaflet-lens').isVisible(), false);
+    assert.equal(await this.page.evaluate(async () => {
+      const layer = globals.cameraByMap.get(map)._terrain3D;
+      const pixels = await nativeChecks.pixels(layer);
+      return pixels.every((value, i) => value === globalThis.lensBaseline[i]);
+    }), true, 'Disabling restores the complete outer raster');
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(remoteRequests, []);
+    assert.deepEqual(errors, []);
+    return;
+  }
   const requestsBeforeReadd = imageryRequests.length;
   await this.page.evaluate(() => { testLensControl.remove(); testLensControl.addTo(map); });
   await this.page.locator('#map').dispatchEvent('pointermove', { clientX: 220, clientY: 220 });
@@ -469,6 +495,7 @@ Then('lens controls preserve clipping options and remove their handlers', async 
 
 Then('the Colosseum lighting JSON preserves {string}', { timeout: 30000 }, async function (check) {
   assert.ok(['night illumination', 'daylight suppression'].includes(check), check);
+  this.focusedRomeArchives = true;
   await this.context.route('**/dist/leaflet-city-mapper.js', route =>
     route.fulfill({ contentType: 'text/javascript', body: this.pluginBundle }));
   await this.page.setViewportSize({ width: 320, height: 240 });

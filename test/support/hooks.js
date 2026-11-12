@@ -201,7 +201,7 @@ AfterAll({ timeout: process.platform === 'win32' ? 90000 : 30000 }, async () => 
 });
 
 // @unit scenarios run in Node only and need no browser page.
-Before({ tags: 'not @unit', timeout: 30000 }, async function () {
+Before({ tags: 'not @unit and not @smoke', timeout: 30000 }, async function () {
   await getBrowser();
   this.baseUrl = baseUrl;
   if (context) await resetTestContext(context, unexpectedRequests);
@@ -238,6 +238,29 @@ Before({ tags: 'not @unit', timeout: 30000 }, async function () {
       body = body.replace("url: 'data/colosseum-lights.json',",
         "data: { type: 'FeatureCollection', features: [] },")
         .replace('new L.Control.Time().layer.addTo(map);', '');
+    }
+    if (this.focusedRomeLens && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper-rome.html') {
+      const focused = body.replace(/'Colosseum \(3D\)': new L\.Layer\(\{[\s\S]*?\}\)\.addTo\(map\),/,
+        "'Colosseum (3D)': new L.LayerGroup(),");
+      assert.notEqual(focused, body, 'Colosseum example layer was not found');
+      body = focused;
+    }
+    if (this.focusedRomeArchives && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper-rome.html') {
+      // COG worker loading is tested separately; share real archives for rendering checks.
+      for (const asset of ['elevation', 'archaeology', 'orthophoto']) {
+        const withArchive = body.replace(`asset: '${asset}',`,
+          `asset: '${asset}', archive: import('/src/cog/openCog.js').then(({ openCog }) =>
+            openCog(new URL('data/colosseum.pmtiles', document.baseURI).href, '${asset}')),`);
+        assert.notEqual(withArchive, body, `Colosseum ${asset} asset was not found`);
+        body = withArchive;
+      }
+    }
+    if (this.focusedRomeOnlyGeometry && new URL(route.request().url()).pathname === '/examples/leaflet-city-mapper-rome.html') {
+      for (const name of ['ancient', 'modern']) {
+        const focused = body.replace(new RegExp(`(const ${name} = new L\\.Layer\\(\\{[\\s\\S]*?\\}\\))\\.addTo\\(map\\);`), '$1;');
+        assert.notEqual(focused, body, `${name} raster layer was not found`);
+        body = focused;
+      }
     }
     if (version === '2') {
       body = body
@@ -319,7 +342,7 @@ Before({ tags: 'not @unit', timeout: 30000 }, async function () {
   });
 });
 
-After({ tags: 'not @unit', wrapperOptions: { cleanup: true } }, async function ({ pickle, result }) {
+After({ tags: 'not @unit and not @smoke', wrapperOptions: { cleanup: true } }, async function ({ pickle, result }) {
   if (result?.status === Status.FAILED && this.browserErrors?.length) {
     console.error(`Browser errors [${pickle.name}]:`, this.browserErrors.join('\n'));
   }

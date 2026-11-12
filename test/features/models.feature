@@ -29,7 +29,13 @@ Feature: glTF models
     When I hover and click the Eiffel Tower in the 3D example
     Then the tower information is shown without moving the map or pinning the tooltip
 
-  Scenario: The real Eiffel Tower model follows the map camera
+  Scenario Outline: The real Eiffel Tower model preserves <check>
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Eiffel Tower"
-    When I visit and inspect the Eiffel Tower 3D model
-    Then the tower is rendered at its geographic position through camera changes
+    When I inspect the Eiffel Tower 3D model for "<check>"
+    Then the Eiffel Tower model preserves "<check>"
+
+    Examples:
+      | check               |
+      | geographic camera   |
+      | animated zoom       |
+      | rendering lifecycle |

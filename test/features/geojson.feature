@@ -17,9 +17,12 @@ Feature: Standalone GeoJSON sources
     Then the minimal GeoJSON example preserves "<check>"
 
     Examples:
-      | check             |
-      | raster clipping   |
-      | lens interactions |
+      | check                 |
+      | geometry              |
+      | raster clipping left  |
+      | raster clipping right |
+      | lens interactions     |
+      | lens reattachment     |
 
   Scenario: Reusable lens controls isolate maps and clean up their lifecycle
     Given the instrumented city mapper plugin is loaded after Leaflet alone

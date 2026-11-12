@@ -502,147 +502,153 @@ Then('the tower information is shown without moving the map or pinning the toolt
   assert.equal(zoom.canvases, 1);
 });
 
-When('I visit and inspect the Eiffel Tower 3D model', { timeout: 30000 }, async function () {
+When('I inspect the Eiffel Tower 3D model for {string}', { timeout: 30000 }, async function (check) {
+  assert.ok(['geographic camera', 'animated zoom', 'rendering lifecycle'].includes(check), check);
   await this.page.evaluate(() => map.setZoom(15, { animate: false }));
   await this.page.waitForFunction(() =>
     Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer).model && globals.sceneByLayer.get(layer).renderer),
   null, { timeout: 30000 });
   await this.page.waitForFunction(() => globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._terrainReady);
   await this.page.waitForFunction(() => map.getZoom() === 15 && Math.abs(testOperations.getPitch(map) - 45) < 0.01);
-  this.eiffel = await this.page.evaluate(async () => {
+  this.eiffel = await this.page.evaluate(async check => {
     let tower, eiffel;
     map.eachLayer(layer => {
       if (globals.sceneByLayer.get(layer).renderer && !globals.sceneByLayer.get(layer).model) tower = layer;
       if (globals.sceneByLayer.get(layer).model) eiffel = layer;
     });
-    const backend = tower;
-    const bounds = nativeChecks.bounds(globals.sceneByLayer.get(eiffel).model, backend);
-    const height = bounds.max[1] - bounds.min[1];
-    const topClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
-      [bounds.min[2], bounds.max[2]].map(z => {
-        const clip = new DOMPoint(x, bounds.max[1], z, 1)
-          .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
-        return clip.y / clip.w;
-      }));
-    const baseClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
-      [bounds.min[2], bounds.max[2]].map(z => {
-        const clip = new DOMPoint(x, bounds.min[1], z, 1)
-          .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
-        return clip.y / clip.w;
-      }));
-    const topClipY = Math.max(...topClips);
-    const baseClipY = Math.min(...baseClips);
-    let meshes = 0;
-    nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => { if (object.geometry) meshes++; });
-    const errors = [];
-    // Outer ground corners: OSM nodes 33388343, 33388336, 33388327 and 33388350.
-    const feet = [
-      { local: [60.118438720703125, 0, -60.605037689208984], latlng: [48.8590453, 2.2944834] },
-      { local: [60.11847686767578, 0, 60.60499954223633], latlng: [48.8582718, 2.2956897] },
-      { local: [-60.118438720703125, 0, 60.605037689208984], latlng: [48.8574753, 2.2945144] },
-      { local: [-60.11847686767578, 0, -60.60499954223633], latlng: [48.8582480, 2.2933119] }
-    ];
-    const [northwest, northeast, southeast, southwest] = feet.map(({ latlng }) => latlng);
-    nativeChecks.graph.updateWorldMatrix(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared).scene);
-    const terrain = globals.cameraByMap.get(map)._terrain3D, crs = map.options.crs;
-    const sceneOrigin = crs.project(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared)._sceneOrigin);
-    const metres = Math.cos(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared)._sceneOrigin.lat * Math.PI / 180);
-    const pixelScale = crs.scale(globals.sceneByLayer.get(terrain)._terrainZoom);
-    const terrainConformanceErrors = [];
-    nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => {
-      const geometry = object.geometry, positions = geometry?.attributes.position.data;
-      const base = geometry?._terrainBasePositions, world = object.worldMatrix;
-      if (!base) return;
-      for (let i = 0; i < positions.length; i += 3) {
-        const baseY = world[1] * base[i] + world[5] * base[i + 1] + world[9] * base[i + 2] + world[13];
-        if (Math.abs(baseY - globals.sceneByLayer.get(eiffel).root.position[1]) > 0.05) continue;
-        const x = world[0] * positions[i] + world[4] * positions[i + 1] + world[8] * positions[i + 2] + world[12];
-        const y = world[1] * positions[i] + world[5] * positions[i + 1] + world[9] * positions[i + 2] + world[13];
-        const z = world[2] * positions[i] + world[6] * positions[i + 1] + world[10] * positions[i + 2] + world[14];
-        const point = crs.transformation.transform(
-          new L.Point(sceneOrigin.x + x / metres, sceneOrigin.y - z / metres), pixelScale);
-        const elevation = nativeChecks.getElevation(terrain, point);
-        if (Number.isFinite(elevation)) terrainConformanceErrors.push(Math.abs(y - elevation));
-      }
-    });
-    const terrainConformanceError = Math.max(...terrainConformanceErrors);
-    const footprintErrors = [];
-    let maskDepthWrite = eiffel.options.alphaMode === 'MASK' && eiffel.options.terrainConform;
-    let baseLayer;
-    map.eachLayer(layer => {
-      if (globals.sceneByLayer.get(layer)._type === 'raster' && layer._map) baseLayer = layer;
-    });
-    for (const [zoom, pitch, bearing] of [[17, 0, 0], [17, 45, 30], [18, 60, 135], [16, 80, 270]]) {
-      map.setView(globals.sceneByLayer.get(tower).location, zoom, { animate: false });
-      testOperations.setPitch(map, pitch);
-      testOperations.setBearing(map, bearing);
-      map.panBy([35, -20], { animate: false });
-      await new Promise(requestAnimationFrame);
-      const scale = map.options.crs.scale(zoom) /
-        (40075016.68557849 * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180));
-      const origin = map.project(globals.sceneByLayer.get(tower).location).subtract(map.getPixelOrigin());
-      const size = map.getSize();
-      const ground = nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, map.getCenter()) ?? 0;
-      for (const [x, z] of [[-40, -40], [0, 0], [40, 40]]) {
-        const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
-        const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
-        const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
-        const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
-        errors.push(actual.distanceTo(expected));
-      }
-      for (const foot of feet) {
-        const transformed = new DOMPoint(...foot.local, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(eiffel).model.worldMatrix));
-        const world = [transformed.x / transformed.w, transformed.y / transformed.w, transformed.z / transformed.w];
-        const geographic = map.unproject(map.project(globals.sceneByLayer.get(tower).location).add([world[0] * scale, world[2] * scale]), zoom);
-        footprintErrors.push(geographic.distanceTo(new L.LatLng(...foot.latlng)));
-      }
-    }
-    nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => {
-      if (object.program && (object.program._layerMaterial.alphaMode !== 'MASK' || !object.program.depthWrite)) {
-        maskDepthWrite = false;
-      }
-    });
-
-    const zoomErrors = [];
-    let animatedFrames = 0;
-    let hiddenFrames = 0;
-    const shared = globals.sceneByLayer.get(tower)._shared;
-    const queue = globals.sceneByLayer.get(shared).renderer.device.queue;
-    const writeBuffer = queue.writeBuffer;
-    const observeZoom = () => {
-      animatedFrames++;
-      if (globals.sceneByLayer.get(shared).renderer.canvas.hidden) hiddenFrames++;
-      const size = map.getSize();
-      const zoom = map.getZoom();
-      const scale = map.options.crs.scale(zoom) /
-        (40075016.68557849 * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180));
-      const origin = map.project(globals.sceneByLayer.get(tower).location, zoom).subtract(map.getPixelOrigin());
-      const ground = nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, map.getCenter()) ?? 0;
-      for (const [x, z] of [[0, 0], [-40, -40], [40, 40]]) {
-        const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
-        const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
-        const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
-        const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
-        zoomErrors.push(actual.distanceTo(expected));
-      }
-    };
-    queue.writeBuffer = function (buffer, ...args) {
-      const result = writeBuffer.call(this, buffer, ...args);
-      if (buffer === globals.sceneByLayer.get(shared).renderer.uniformBuffer && map._animatingZoom) observeZoom();
-      return result;
-    };
-    map.setView(globals.sceneByLayer.get(tower).location, 16, { animate: false });
-    testOperations.setPitch(map, 45);
-    testOperations.setBearing(map, 30);
-    map.panBy([70, -35], { animate: false });
-    for (const zoom of [17, 16]) {
-      await new Promise(requestAnimationFrame);
-      await new Promise(resolve => {
-        map.once('zoomend', resolve);
-        map.setZoomAround(new L.Point(320, 220), zoom, { animate: true });
+    if (check === 'geographic camera') {
+      const backend = tower;
+      const bounds = nativeChecks.bounds(globals.sceneByLayer.get(eiffel).model, backend);
+      const height = bounds.max[1] - bounds.min[1];
+      const topClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
+        [bounds.min[2], bounds.max[2]].map(z => {
+          const clip = new DOMPoint(x, bounds.max[1], z, 1)
+            .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
+          return clip.y / clip.w;
+        }));
+      const baseClips = [bounds.min[0], bounds.max[0]].flatMap(x =>
+        [bounds.min[2], bounds.max[2]].map(z => {
+          const clip = new DOMPoint(x, bounds.min[1], z, 1)
+            .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
+          return clip.y / clip.w;
+        }));
+      const topClipY = Math.max(...topClips);
+      const baseClipY = Math.min(...baseClips);
+      let meshes = 0;
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => { if (object.geometry) meshes++; });
+      const errors = [];
+      // Outer ground corners: OSM nodes 33388343, 33388336, 33388327 and 33388350.
+      const feet = [
+        { local: [60.118438720703125, 0, -60.605037689208984], latlng: [48.8590453, 2.2944834] },
+        { local: [60.11847686767578, 0, 60.60499954223633], latlng: [48.8582718, 2.2956897] },
+        { local: [-60.118438720703125, 0, 60.605037689208984], latlng: [48.8574753, 2.2945144] },
+        { local: [-60.11847686767578, 0, -60.60499954223633], latlng: [48.8582480, 2.2933119] }
+      ];
+      const [northwest, northeast, southeast, southwest] = feet.map(({ latlng }) => latlng);
+      nativeChecks.graph.updateWorldMatrix(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared).scene);
+      const terrain = globals.cameraByMap.get(map)._terrain3D, crs = map.options.crs;
+      const sceneOrigin = crs.project(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared)._sceneOrigin);
+      const metres = Math.cos(globals.sceneByLayer.get(globals.sceneByLayer.get(backend)._shared)._sceneOrigin.lat * Math.PI / 180);
+      const pixelScale = crs.scale(globals.sceneByLayer.get(terrain)._terrainZoom);
+      const terrainConformanceErrors = [];
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => {
+        const geometry = object.geometry, positions = geometry?.attributes.position.data;
+        const base = geometry?._terrainBasePositions, world = object.worldMatrix;
+        if (!base) return;
+        for (let i = 0; i < positions.length; i += 3) {
+          const baseY = world[1] * base[i] + world[5] * base[i + 1] + world[9] * base[i + 2] + world[13];
+          if (Math.abs(baseY - globals.sceneByLayer.get(eiffel).root.position[1]) > 0.05) continue;
+          const x = world[0] * positions[i] + world[4] * positions[i + 1] + world[8] * positions[i + 2] + world[12];
+          const y = world[1] * positions[i] + world[5] * positions[i + 1] + world[9] * positions[i + 2] + world[13];
+          const z = world[2] * positions[i] + world[6] * positions[i + 1] + world[10] * positions[i + 2] + world[14];
+          const point = crs.transformation.transform(
+            new L.Point(sceneOrigin.x + x / metres, sceneOrigin.y - z / metres), pixelScale);
+          const elevation = nativeChecks.getElevation(terrain, point);
+          if (Number.isFinite(elevation)) terrainConformanceErrors.push(Math.abs(y - elevation));
+        }
       });
+      const terrainConformanceError = Math.max(...terrainConformanceErrors);
+      const footprintErrors = [];
+      let maskDepthWrite = eiffel.options.alphaMode === 'MASK' && eiffel.options.terrainConform;
+      for (const [zoom, pitch, bearing] of [[17, 0, 0], [17, 45, 30], [18, 60, 135], [16, 80, 270]]) {
+        map.setView(globals.sceneByLayer.get(tower).location, zoom, { animate: false });
+        testOperations.setPitch(map, pitch);
+        testOperations.setBearing(map, bearing);
+        map.panBy([35, -20], { animate: false });
+        await new Promise(requestAnimationFrame);
+        const scale = map.options.crs.scale(zoom) /
+          (40075016.68557849 * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180));
+        const origin = map.project(globals.sceneByLayer.get(tower).location).subtract(map.getPixelOrigin());
+        const size = map.getSize();
+        const ground = nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, map.getCenter()) ?? 0;
+        for (const [x, z] of [[-40, -40], [0, 0], [40, 40]]) {
+          const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
+          const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
+          const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
+          const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
+          errors.push(actual.distanceTo(expected));
+        }
+        for (const foot of feet) {
+          const transformed = new DOMPoint(...foot.local, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(eiffel).model.worldMatrix));
+          const world = [transformed.x / transformed.w, transformed.y / transformed.w, transformed.z / transformed.w];
+          const geographic = map.unproject(map.project(globals.sceneByLayer.get(tower).location).add([world[0] * scale, world[2] * scale]), zoom);
+          footprintErrors.push(geographic.distanceTo(new L.LatLng(...foot.latlng)));
+        }
+      }
+      nativeChecks.graph.traverse(globals.sceneByLayer.get(eiffel).model, object => {
+        if (object.program && (object.program._layerMaterial.alphaMode !== 'MASK' || !object.program.depthWrite)) {
+          maskDepthWrite = false;
+        }
+      });
+
+      return { height, meshes, errors, footprintErrors, topClipY, baseClipY, terrainConformanceError,
+        terrainConformanceSamples: terrainConformanceErrors.length, maskDepthWrite,
+        latitude: globals.sceneByLayer.get(eiffel).location.lat, longitude: globals.sceneByLayer.get(eiffel).location.lng };
     }
-    delete queue.writeBuffer;
+
+    if (check === 'animated zoom') {
+      const zoomErrors = [];
+      let animatedFrames = 0;
+      let hiddenFrames = 0;
+      const shared = globals.sceneByLayer.get(tower)._shared;
+      const queue = globals.sceneByLayer.get(shared).renderer.device.queue;
+      const writeBuffer = queue.writeBuffer;
+      const observeZoom = () => {
+        animatedFrames++;
+        if (globals.sceneByLayer.get(shared).renderer.canvas.hidden) hiddenFrames++;
+        const size = map.getSize();
+        const zoom = map.getZoom();
+        const scale = map.options.crs.scale(zoom) /
+          (40075016.68557849 * Math.cos(globals.sceneByLayer.get(tower).location.lat * Math.PI / 180));
+        const origin = map.project(globals.sceneByLayer.get(tower).location, zoom).subtract(map.getPixelOrigin());
+        const ground = nativeChecks.getElevation(globals.cameraByMap.get(map)._terrain3D, map.getCenter()) ?? 0;
+        for (const [x, z] of [[0, 0], [-40, -40], [40, 40]]) {
+          const expected = map.layerPointToContainerPoint(origin.add([x * scale, z * scale]));
+          const clip = new DOMPoint(x, ground, z, 1).matrixTransform(new DOMMatrix(globals.sceneByLayer.get(tower).camera.projectionViewMatrix));
+          const ndcX = clip.x / clip.w, ndcY = clip.y / clip.w;
+          const actual = new L.Point((ndcX + 1) * size.x / 2, (1 - ndcY) * size.y / 2);
+          zoomErrors.push(actual.distanceTo(expected));
+        }
+      };
+      queue.writeBuffer = function (buffer, ...args) {
+        const result = writeBuffer.call(this, buffer, ...args);
+        if (buffer === globals.sceneByLayer.get(shared).renderer.uniformBuffer && map._animatingZoom) observeZoom();
+        return result;
+      };
+      map.setView(globals.sceneByLayer.get(tower).location, 16, { animate: false });
+      testOperations.setPitch(map, 45);
+      testOperations.setBearing(map, 30);
+      map.panBy([70, -35], { animate: false });
+      for (const zoom of [17, 16]) {
+        await new Promise(requestAnimationFrame);
+        await new Promise(resolve => {
+          map.once('zoomend', resolve);
+          map.setZoomAround(new L.Point(320, 220), zoom, { animate: true });
+        });
+      }
+      delete queue.writeBuffer;
+      return { zoomErrors, animatedFrames, hiddenFrames };
+    }
 
     map.setView(globals.sceneByLayer.get(tower).location, 17, { animate: false });
     testOperations.setPitch(map, 60);
@@ -655,6 +661,8 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 30000 }, async 
       if (pixels[i]) visiblePixels++;
     }
     const clickThrough = getComputedStyle(renderer.canvas).pointerEvents === 'none';
+    const baseLayer = Object.values(map._layers).find(layer =>
+      globals.sceneByLayer.get(layer)._type === 'raster' && layer._map);
     map.removeLayer(tower);
     const sharedCanvasRemains = document.querySelector('.leaflet-3d') === globals.sceneByLayer.get(eiffel).renderer.canvas;
     map.removeLayer(eiffel);
@@ -669,36 +677,36 @@ When('I visit and inspect the Eiffel Tower 3D model', { timeout: 30000 }, async 
     baseLayer.addTo(map);
     await Promise.all([tower, eiffel, ...other3d, baseLayer].map(layer => globals.sceneByLayer.get(layer)._added.promise));
     return {
-      height, meshes, errors, footprintErrors, zoomErrors, animatedFrames, hiddenFrames,
-      topClipY, baseClipY, terrainConformanceError, terrainConformanceSamples: terrainConformanceErrors.length,
-      maskDepthWrite, visiblePixels, clickThrough, removed, sharedCanvasRemains,
+      visiblePixels, clickThrough, removed, sharedCanvasRemains,
       restored: globals.sceneByLayer.get(tower).renderer.width === map.getSize().x && globals.sceneByLayer.get(tower).renderer.height === map.getSize().y,
-      latitude: globals.sceneByLayer.get(eiffel).location.lat,
-      longitude: globals.sceneByLayer.get(eiffel).location.lng
     };
-  });
+  }, check);
 });
 
-Then('the tower is rendered at its geographic position through camera changes', function () {
+Then('the Eiffel Tower model preserves {string}', function (check) {
   const result = this.eiffel;
-  assert.ok(result.height > 299 && result.height < 301, JSON.stringify(result));
-  assert.ok(result.topClipY < 0.9, `Eiffel Tower top is too close to the viewport edge: ${result.topClipY}`);
-  assert.ok(result.baseClipY > -0.9, `Eiffel Tower base is too close to the viewport edge: ${result.baseClipY}`);
-  assert.ok(result.terrainConformanceSamples > 0, 'No Eiffel Tower ground vertices were conformed');
-  assert.ok(result.terrainConformanceError < 0.1,
-    `Eiffel Tower ground vertices are not attached to terrain: ${result.terrainConformanceError}`);
-  assert.equal(result.maskDepthWrite, true, 'Eiffel Tower alpha mask must write depth for correct occlusion');
-  assert.ok(result.meshes > 1, JSON.stringify(result));
-  assert.ok(Math.max(...result.errors) < 1.5, `Logical coordinate rounding errors: ${result.errors}`);
-  assert.ok(Math.max(...result.footprintErrors) < 0.5, `Footprint errors in metres: ${result.footprintErrors}`);
-  assert.ok(result.animatedFrames >= 4, `Too few animated zoom frames: ${result.animatedFrames}`);
-  assert.equal(result.hiddenFrames, 0);
-  assert.ok(Math.max(...result.zoomErrors) < 0.1, `Animated tile alignment errors: ${result.zoomErrors}`);
-  assert.ok(result.visiblePixels > 1000, JSON.stringify(result));
-  assert.equal(result.latitude, 48.8582601);
-  assert.equal(result.longitude, 2.29449985);
-  assert.equal(result.clickThrough, true);
-  assert.equal(result.removed, true);
-  assert.equal(result.sharedCanvasRemains, true);
-  assert.equal(result.restored, true);
+  if (check === 'geographic camera') {
+    assert.ok(result.height > 299 && result.height < 301, JSON.stringify(result));
+    assert.ok(result.topClipY < 0.9, `Eiffel Tower top is too close to the viewport edge: ${result.topClipY}`);
+    assert.ok(result.baseClipY > -0.9, `Eiffel Tower base is too close to the viewport edge: ${result.baseClipY}`);
+    assert.ok(result.terrainConformanceSamples > 0, 'No Eiffel Tower ground vertices were conformed');
+    assert.ok(result.terrainConformanceError < 0.1,
+      `Eiffel Tower ground vertices are not attached to terrain: ${result.terrainConformanceError}`);
+    assert.equal(result.maskDepthWrite, true, 'Eiffel Tower alpha mask must write depth for correct occlusion');
+    assert.ok(result.meshes > 1, JSON.stringify(result));
+    assert.ok(Math.max(...result.errors) < 1.5, `Logical coordinate rounding errors: ${result.errors}`);
+    assert.ok(Math.max(...result.footprintErrors) < 0.5, `Footprint errors in metres: ${result.footprintErrors}`);
+    assert.equal(result.latitude, 48.8582601);
+    assert.equal(result.longitude, 2.29449985);
+  } else if (check === 'animated zoom') {
+    assert.ok(result.animatedFrames >= 4, `Too few animated zoom frames: ${result.animatedFrames}`);
+    assert.equal(result.hiddenFrames, 0);
+    assert.ok(Math.max(...result.zoomErrors) < 0.1, `Animated tile alignment errors: ${result.zoomErrors}`);
+  } else {
+    assert.ok(result.visiblePixels > 1000, JSON.stringify(result));
+    assert.equal(result.clickThrough, true);
+    assert.equal(result.removed, true);
+    assert.equal(result.sharedCanvasRemains, true);
+    assert.equal(result.restored, true);
+  }
 });

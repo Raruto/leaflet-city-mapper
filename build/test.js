@@ -9,8 +9,8 @@ const args = process.argv.slice(2);
 for (const version of ['1', '2']) {
   const testArgs = [...args];
   // Node-only tests already ran with Leaflet 1; keep custom selections unchanged.
-  if (version === '2' && args.length === 0) {
-    testArgs.push('--tags', 'not @unit');
+  if (version === '2') {
+    testArgs.push('--tags', args.length === 0 ? 'not @unit and not @smoke' : 'not @smoke');
   }
 
   console.log(`\nRunning tests with Leaflet v${version}.x`);

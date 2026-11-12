@@ -24,6 +24,12 @@ Feature: Third-person walk mode
     Given a leaflet map
     Then keyboard walking moves toward a wall, stops at it and can move away
 
-  Scenario: The keyboard walks a pedestrian over a bridge deck while dragging only turns the camera and buildings block it
+  Scenario Outline: Walking in Paris preserves <check>
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings"
-    Then the walk layer moves the pedestrian on Pont d'Iéna, stops it at walls and Esc restores the map
+    Then walking in Paris preserves "<check>" and Esc restores the map
+
+    Examples:
+      | check              |
+      | bridge movement    |
+      | bridge camera      |
+      | building collision |
