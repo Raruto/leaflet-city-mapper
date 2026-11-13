@@ -88,51 +88,9 @@ npm run test  # build and run browser tests
 
 After that you can start developing inside the `src` folder (eg. open "http://localhost:8080/examples" in your browser to preview changes).
 
-### Source layout
+### Repository guidance
 
-```text
-src/
-  index.js           Public entry point and source registration
-  globals/           One shared constant or mutable cell per module
-  weakmaps/          One private WeakMap per map/layer state field
-  mvt/               PBF vector tile decoding and tessellation
-  vector-style/      Safe vector style parsing and expressions
-  vector-tiles/      Native vector tile lifecycle and worker preparation
-  camera/            Leaflet camera API and scene camera state
-  controls/          Compass, dragging, touch and resizing
-  core/              Leaflet hooks, camera-aware overlays and readiness
-  native/            Native Leaflet layers rendered through WebGPU
-  layer-controls/    Layer entry placement and progress indicators
-  scene/             Source routing, lifecycle and graph nodes
-  sources/           GeoJSON and streamed source loading and assembly
-  workers/           Geometry, MVT, COG and model tasks sharing one CDN-compatible worker
-  picking/           Raycasting, highlighting and feature interaction
-  rendering/         Frame stages, draw pipelines and mesh lifecycle
-  gpu/               Device initialization, renderer resources and diagnostics
-  materials/         Material programs, uniforms, glTF materials and cutouts
-  textures/          Image loading, texture upload/binding and roof atlases
-  animations/        Camera transitions, zoom synchronization and tile fading
-  shadows/           Directional shadow maps and cache
-  lighting/          Point lights and spatial light grids
-  shaders/           Material shader generation
-  geometry/          Mesh construction, bounds, grids, vectors and route geometry
-  projections/       Map, screen and local coordinate conversion
-  transforms/        Local/world matrices and glTF node transforms
-  triangulation/     Polygon triangulation and ring operations
-  collision/         Mesh intersection and collision queries
-  models/            glTF loading, decoding and scene assembly
-  archives/          PMTiles archive reading and decompression
-  cog/               Supported GeoTIFF directories, byte ranges and tile decoding
-  raster/            Raster tile loading, attachment and lifecycle
-  traffic/           Routes, scheduling, simulation, loading and rendering
-  vehicles/          Vehicle model geometry
-  terrain/           Terrain loading and sampling
-  astronomy/         Sun/moon position and observer/date validation
-  sunlight/          Sky, celestial display and time controls
-  walk/              First-person walking
-  colors/            Colour parsing, conversion, interpolation and formatting
-  utils/             Shared numeric and no-op helpers
-```
+Repository structure and conventions are documented in [here](.github/copilot-instructions.md).
 
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--beta.3-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)
