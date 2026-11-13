@@ -92,5 +92,7 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 
 Repository structure and conventions are documented in [here](.github/copilot-instructions.md).
 
+---
+
 **Compatibile with:**
 [![Leaflet 1.9.4 compatible!](https://img.shields.io/badge/Leaflet-1.9.4-1EB300.svg?style=flat)](http://leafletjs.com/reference.html) [![Leaflet 2.x compatible!](https://img.shields.io/badge/Leaflet-2.0.0--beta.3-1EB300.svg?style=flat)](http://leafletjs.com/reference.html)
