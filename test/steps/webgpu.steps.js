@@ -301,16 +301,8 @@ Then('WebGPU {string} preserves its rendering invariants', function (check) {
   assert.deepEqual(result.pageErrors, [], details);
 });
 
-Given('a raster edge is ready for pruning', async function () {
-  await waitForWebGPUScene(this.page);
-  await this.page.evaluate(() => {
-    const raster = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)?.kind === 'raster');
-    const state = globals.sceneByLayer.get(raster);
-    const maxX = Math.max(...[...state._rasterTiles.values()].filter(tile => tile.done).map(tile => tile.coords.x));
-    state._wantedRasterTiles = new Set([...state._wantedRasterTiles].filter(key => Number(key.split('/')[1]) !== maxX));
-    state._pruneVersion = -1;
-    for (const tile of state._rasterTiles.values()) tile.loadedAt = 0;
-  });
+Given('a raster edge is ready for pruning', function () {
+  this.pruneRoofEdge = true;
 });
 
 When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
@@ -319,11 +311,18 @@ When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
   this.page.on('pageerror', onPageError);
   try {
     await waitForWebGPUScene(this.page);
-    this.webgpuAtlas = await this.page.evaluate(async () => {
+    this.webgpuAtlas = await this.page.evaluate(async pruneRoofEdge => {
       const owner = globals.renderers.get(map);
       const terrain = globals.cameraByMap.get(map)._terrain3D;
       const { device } = globals.sceneByLayer.get(owner).renderer;
       const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)?.kind === 'raster');
+      if (pruneRoofEdge) {
+        const state = globals.sceneByLayer.get(rasters[0]);
+        const maxX = Math.max(...[...state._rasterTiles.values()].filter(tile => tile.done).map(tile => tile.coords.x));
+        state._wantedRasterTiles = new Set([...state._wantedRasterTiles].filter(key => Number(key.split('/')[1]) !== maxX));
+        state._pruneVersion = -1;
+        for (const tile of state._rasterTiles.values()) tile.loadedAt = 0;
+      }
       const gpuErrors = [];
       const onGpuError = event => gpuErrors.push(event.error.message);
       device.addEventListener('uncapturederror', onGpuError);
@@ -427,7 +426,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
         alpha,
         gpuErrors,
       };
-    });
+    }, Boolean(this.pruneRoofEdge));
   } finally {
     this.page.off('pageerror', onPageError);
   }

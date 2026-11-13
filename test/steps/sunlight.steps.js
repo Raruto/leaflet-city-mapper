@@ -61,7 +61,15 @@ Then('shadow maps are reused until geometry, appearance or sunlight changes', { 
 });
 
 Then('sky and terrain change from day to night and restore after removal', { timeout: 30000 }, async function () {
-  await this.page.waitForFunction(() => globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight);
+  await this.page.waitForFunction(() => {
+    const terrain = globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D);
+    const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)?.kind === 'raster');
+    return globals.sceneByLayer.get(sunlightOverlay).control && globals.cameraByMap.get(map)._sunlight &&
+      terrain?._terrainReady && terrain._rasterTiles.size > 0 && rasters.length > 0 &&
+      rasters.every(layer => !testOperations.isLoading(layer) &&
+        [...globals.sceneByLayer.get(layer)._rasterTiles.values()]
+          .every(tile => !tile.done || (terrain._rasterTiles.has(tile) && performance.now() - tile.loadedAt >= 250)));
+  });
   const result = await this.page.evaluate(async () => {
     const owner = globals.renderers.get(map), { device } = globals.sceneByLayer.get(owner).renderer;
     const input = globals.sceneByLayer.get(sunlightOverlay).control.getContainer().querySelector('input[type=range]');
@@ -109,7 +117,7 @@ Then('sky and terrain change from day to night and restore after removal', { tim
       skyRestored: !map.getContainer().style.getPropertyValue('--leaflet-sky-background'),
       removed: !map.getContainer().querySelector('.sunlight-sun, .sunlight-moon') };
   });
-  assert.ok(result.day.count > 10000);
+  assert.ok(result.day.count > 10000, JSON.stringify(result));
   assert.ok(result.night.average < result.day.average * 0.6, JSON.stringify(result));
   assert.notEqual(result.daySky, result.nightSky);
   assert.ok(result.nightTint[2] > result.nightTint[0]);
