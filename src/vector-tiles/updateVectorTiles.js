@@ -2,6 +2,9 @@ import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.j
 import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { reportError } from '../scene/reportLayerError.js';
 
+/**
+ * Update needed tiles for the map bounds, then schedule loading, paint and labels.
+ */
 export function updateVectorTiles() {
   if (!this.session) return;
   const { minNativeZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);

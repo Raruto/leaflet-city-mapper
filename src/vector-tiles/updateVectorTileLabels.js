@@ -5,6 +5,11 @@ import { updateVectorLabelMarker } from './updateVectorLabelMarker.js';
 import { vectorTilesIdle } from './vectorTilesIdle.js';
 import { yieldTask } from '../utils/yieldTask.js';
 
+/**
+ * Place visible vector labels without overlapping occupied cells and remove stale markers.
+ *
+ * @returns {Promise<void>} Completion of the current placement revision.
+ */
 export async function updateVectorTileLabels() {
   const session = this.session, revision = this.labelRevision = (this.labelRevision || 0) + 1;
   this.labelsReady = false;

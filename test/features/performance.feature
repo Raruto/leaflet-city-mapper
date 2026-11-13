@@ -333,6 +333,14 @@ Feature: Performance-oriented source style
     Then every source file documents its functions and exported variables with JSDoc
 
   @unit
+  Scenario: Native layer modules document their arguments and results
+    Then JSDoc tag checks accept source directory "src/native"
+
+  @unit
+  Scenario: Vector tile modules document their arguments and results
+    Then JSDoc tag checks accept source directory "src/vector-tiles"
+
+  @unit
   Scenario: Sources avoid closures and functional iteration
     Then no source file defines arrows, nested functions or callback array methods
 

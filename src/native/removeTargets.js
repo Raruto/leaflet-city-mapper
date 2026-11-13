@@ -1,6 +1,11 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
 import { disposeNativeLayer } from './disposeNativeLayer.js';
 
+/**
+ * Dispose a removed native layer and restore its hidden DOM elements.
+ *
+ * @param {Object} state Native layer state.
+ */
 export function removeTargets(state) {
   if (nativeGPUByLayer.get(state.source) === state) nativeGPUByLayer.set(state.source, null);
   if (state.backend) disposeNativeLayer.call(state);

@@ -6,6 +6,11 @@ import { addImageState } from '../textures/addImageState.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 import { hideTargets } from './hideTargets.js';
 
+/**
+ * Mark a native layer dirty, synchronize image listeners and schedule rendering.
+ *
+ * @param {Object} state Native layer state, defaulting to the bound context.
+ */
 export function refreshNativeLayer(state = this) {
   state.zoomOnly = false;
   state.dirty = true;

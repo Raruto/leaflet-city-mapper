@@ -16,6 +16,11 @@ import { timeControlByMap } from './timeControlByMap.js';
 import { touchPitchByMap } from './touchPitchByMap.js';
 import { touchRotateByMap } from './touchRotateByMap.js';
 
+/**
+ * Index camera and control state maps by their compatibility field names.
+ *
+ * @type {Object<string, WeakMap>}
+ */
 export const cameraFields = {
   "_cameraAnimation": cameraAnimationByMap,
   "_cameraBearing": cameraBearingByMap,

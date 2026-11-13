@@ -4,6 +4,14 @@ import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { vectorTilePaint } from './vectorTilePaint.js';
 import { forwardVectorTileError } from './forwardVectorTileError.js';
 
+/**
+ * Create and attach a rendered Leaflet layer for a prepared vector batch.
+ *
+ * @param {Object} owner Vector tile layer.
+ * @param {Object} tile Tile receiving the rendered batch.
+ * @param {Object} group Leaflet group receiving the layer.
+ * @param {Object} batch Prepared vector batch.
+ */
 export function attachVectorTileBatch(owner, tile, group, batch) {
   const { pane } = vectorTileOptionsByLayer.get(owner);
   const paint = vectorTilePaint(batch, vectorStyleZoom(owner));

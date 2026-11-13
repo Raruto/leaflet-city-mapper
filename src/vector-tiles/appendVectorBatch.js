@@ -1,5 +1,17 @@
 import { vectorFeaturePaths } from './vectorFeaturePaths.js';
 
+/**
+ * Group feature paths by paint and style dependencies, splitting large batches.
+ *
+ * @param {Object} job Vector tile preparation job.
+ * @param {Object} layer Decoded source layer.
+ * @param {Object} entry Style layer entry.
+ * @param {Object} feature Decoded feature.
+ * @param {number} order Style layer order.
+ * @param {Map} batches Batches indexed by paint and property values.
+ * @param {Iterable<string>} dependencies Feature properties used by the style.
+ * @param {Object} paint Evaluated paint.
+ */
 export function appendVectorBatch(job, layer, entry, feature, order, batches, dependencies, paint) {
   const values = /* alloc */ [];
   let key, batch, path, count;

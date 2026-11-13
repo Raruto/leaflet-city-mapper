@@ -10,6 +10,11 @@ import { onVectorTileWorkerError } from './onVectorTileWorkerError.js';
 import { createGeometryWorker } from '../workers/createGeometryWorker.js';
 import { vectorWorkerByLayer } from '../weakmaps/vectorWorkerByLayer.js';
 
+/**
+ * Initialize vector tile panes, worker and map listeners when the layer is added.
+ *
+ * @param {Object} map Leaflet map.
+ */
 export function onVectorTileAdd(map) {
   const { style, pane } = vectorTileOptionsByLayer.get(this);
   let index, entry;

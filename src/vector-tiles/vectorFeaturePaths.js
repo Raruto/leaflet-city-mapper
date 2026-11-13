@@ -2,6 +2,16 @@ import { projectVectorTriangles } from './projectVectorTriangles.js';
 import { projectVectorPaths } from './projectVectorPaths.js';
 import { vectorTolerance } from './vectorTolerance.js';
 
+/**
+ * Project and cache a feature's paths or fill triangles for the tile job.
+ *
+ * @param {Object} job Vector tile preparation job.
+ * @param {Object} layer Decoded source layer.
+ * @param {Object} entry Style layer entry.
+ * @param {Object} feature Decoded feature.
+ *
+ * @returns {Array} Projected feature paths.
+ */
 export function vectorFeaturePaths(job, layer, entry, feature) {
   const cache = entry.type === 'fill' ? job.triangles : job.projected;
   let paths = cache.get(feature);

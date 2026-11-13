@@ -5,6 +5,13 @@ import { locationByLayer } from '../weakmaps/locationByLayer.js';
 import { radians } from '../globals/radians.js';
 import { L } from '../globals/L.js';
 
+/**
+ * Build native vector geometry using the layer's local pixel projection.
+ *
+ * @param {Object} state Native layer state.
+ *
+ * @returns {*} Geometry produced for the source layer.
+ */
 export function nativeVectorGeometry(state) {
   const { source } = state;
   state.strokeCoordinates = null;

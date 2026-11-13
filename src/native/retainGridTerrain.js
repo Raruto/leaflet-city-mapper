@@ -1,3 +1,8 @@
+/**
+ * Retain terrain meshes and textures while replacement grid tiles are pending.
+ *
+ * @param {Object} state Native grid layer state.
+ */
 export function retainGridTerrain(state) {
   let key, mesh, retained;
   for ([key, mesh] of state.meshes) {

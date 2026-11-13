@@ -3,6 +3,15 @@ import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.j
 import { visibleStyle } from '../vector-style/visibleStyle.js';
 import { updateVectorLabelStyle } from './updateVectorLabelStyle.js';
 
+/**
+ * Compute screen cells occupied by a visible, placeable vector label.
+ *
+ * @param {Object} layer Vector tile layer.
+ * @param {Object} label Label candidate.
+ * @param {Object} size Map viewport size.
+ *
+ * @returns {Array<string>|null} Occupied cell keys, or null if the label cannot be placed.
+ */
 export function vectorLabelCells(layer, label, size) {
   const map = layer._map, zoom = vectorStyleZoom(layer);
   if (!visibleStyle(label.entry, label.properties, zoom)) return null;

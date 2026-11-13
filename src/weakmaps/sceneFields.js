@@ -77,6 +77,11 @@ import { zoomLevelByLayer } from './zoomLevelByLayer.js';
 import { zoomTransitionsByLayer } from './zoomTransitionsByLayer.js';
 import { zoomViewByLayer } from './zoomViewByLayer.js';
 
+/**
+ * Index scene state maps by their lifecycle and compatibility field names.
+ *
+ * @type {Object<string, WeakMap>}
+ */
 export const sceneFields = {
   "_3d": state3dByLayer,
   "_added": addedByLayer,

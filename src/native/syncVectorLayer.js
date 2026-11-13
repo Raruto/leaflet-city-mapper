@@ -4,6 +4,11 @@ import { syncNativeStrokeZoom } from './syncNativeStrokeZoom.js';
 import { nativeVectorGeometry } from './nativeVectorGeometry.js';
 import { syncNativeStrokeAnchors } from './syncNativeStrokeAnchors.js';
 
+/**
+ * Synchronize native vector fill and stroke meshes or rescale them after zoom.
+ *
+ * @param {Object} state Native vector layer state.
+ */
 export function syncVectorLayer(state) {
   const { source } = state;
   if (state.zoomOnly) {

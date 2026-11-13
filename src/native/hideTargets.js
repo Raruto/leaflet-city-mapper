@@ -1,5 +1,10 @@
 import { L } from '../globals/L.js';
 
+/**
+ * Hide rendered marker images while leaving HTML icons available for interaction.
+ *
+ * @param {Object} state Native layer state and its set of hidden elements.
+ */
 export function hideTargets(state) {
   const { source } = state;
   const htmlIcon = source instanceof L.Marker && source.options.icon instanceof L.DivIcon;

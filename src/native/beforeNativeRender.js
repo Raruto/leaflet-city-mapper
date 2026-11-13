@@ -1,6 +1,11 @@
 import { synchronizeNativeLayer } from './synchronizeNativeLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
 
+/**
+ * Synchronize a native layer and adjust its stroke scale before rendering.
+ *
+ * @param {Object} state Native layer state.
+ */
 export function beforeNativeRender(state) {
   try {
     synchronizeNativeLayer(state);

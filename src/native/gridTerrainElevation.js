@@ -1,6 +1,14 @@
 import { terrainElevation } from '../terrain/terrainElevation.js';
 import { nativeTerrainElevation } from './nativeTerrainElevation.js';
 
+/**
+ * Find a terrain elevation from the native grid or cached tiles at available zooms.
+ *
+ * @param {Object} state Native layer state.
+ * @param {Object} location Geographic location to sample.
+ *
+ * @returns {number|null} Elevation, or null when no sample is available.
+ */
 export function gridTerrainElevation(state, location) {
   let z = Math.max(0, Math.min(24, Math.round(state.map.getZoom())));
   const tiles = /* alloc */ new Map();

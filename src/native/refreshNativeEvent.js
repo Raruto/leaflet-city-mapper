@@ -2,6 +2,11 @@ import { refreshNativeLayer } from './refreshNativeLayer.js';
 import { L } from '../globals/L.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 
+/**
+ * Refresh native rendering for a source or map event, optimizing stroke-only zooms.
+ *
+ * @param {Object} event Leaflet event.
+ */
 export function refreshNativeEvent(event) {
   if (event?.type === 'zoomend' && this.source instanceof L.Polyline &&
     (!this.source.options.stroke || !(Number(this.source.options.weight) > 0))) return;

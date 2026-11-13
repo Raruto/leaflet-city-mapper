@@ -4,6 +4,15 @@ import { vectorLabelAnchors } from './vectorLabelAnchors.js';
 import { vectorLabelText } from './vectorLabelText.js';
 import { createVectorLabel } from './createVectorLabel.js';
 
+/**
+ * Add in-tile label candidates for a styled vector feature.
+ *
+ * @param {Object} job Vector tile preparation job.
+ * @param {Object} layer Decoded source layer.
+ * @param {Object} entry Style layer entry.
+ * @param {Object} feature Decoded feature.
+ * @param {number} order Style layer order.
+ */
 export function prepareVectorLabel(job, layer, entry, feature, order) {
   const { properties } = feature, { zoom } = job;
   const text = vectorLabelText(entry, properties, zoom);

@@ -1,3 +1,9 @@
+/**
+ * Retain stroke coordinates and anchors for subsequent zoom scaling.
+ *
+ * @param {Object} state Native layer state.
+ * @param {Array} stroke Stroke coordinates.
+ */
 export function syncNativeStrokeAnchors(state, stroke) {
   const { source } = state;
   if (state.strokeAnchors?.length === stroke.length && stroke.length) {

@@ -5,6 +5,19 @@ import { terrainElevation } from '../terrain/terrainElevation.js';
 import { localPosition } from '../projections/localPosition.js';
 import { putNativeMesh } from './putNativeMesh.js';
 
+/**
+ * Build a textured grid tile mesh draped over sampled terrain.
+ *
+ * @param {Object} state Native grid layer state.
+ * @param {string} key Tile key.
+ * @param {Object} tile Loaded tile.
+ * @param {Object} request Terrain request containing elevation tiles.
+ * @param {number} opacity Tile opacity.
+ *
+ * @returns {Object|undefined} Terrain mesh, if its texture is available.
+ *
+ * @throws {Error} If an elevation sample is missing.
+ */
 export function terrainGridMesh(state, key, tile, request, opacity) {
   const texture = textureFor(state, key, tile.el);
   if (!texture) return;

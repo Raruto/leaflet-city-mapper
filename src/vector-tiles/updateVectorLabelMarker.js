@@ -4,6 +4,15 @@ import { vectorLabelIcon } from './vectorLabelIcon.js';
 import { rotateVectorLabel } from './rotateVectorLabel.js';
 import { forwardVectorTileError } from './forwardVectorTileError.js';
 
+/**
+ * Create or update a marker for a vector label candidate.
+ *
+ * @param {Object} owner Vector tile layer.
+ * @param {Object} label Label candidate.
+ * @param {string} key Label identity key.
+ *
+ * @returns {boolean} Whether the marker was created or its appearance changed.
+ */
 export function updateVectorLabelMarker(owner, label, key) {
   const appearance = JSON.stringify(/* alloc */ [label.size, label.color, label.halo, label.haloWidth, label.icon]);
   const sheet = vectorTileOptionsByLayer.get(owner).spriteSheet;

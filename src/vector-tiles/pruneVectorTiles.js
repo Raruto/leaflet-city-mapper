@@ -1,6 +1,9 @@
 import { reportError } from '../scene/reportLayerError.js';
 import { vectorTileAwaited } from './vectorTileAwaited.js';
 
+/**
+ * Cancel unneeded vector tiles and retire groups no longer needed as fallbacks.
+ */
 export function pruneVectorTiles() {
   let tile, key;
   for ([key, tile] of this.tiles) {

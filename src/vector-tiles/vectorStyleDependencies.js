@@ -1,3 +1,10 @@
+/**
+ * Collect feature property names referenced by paint and filter expressions.
+ *
+ * @param {Object} entry Style layer entry.
+ *
+ * @returns {Set<string>} Referenced property names.
+ */
 export function vectorStyleDependencies(entry) {
   const dependencies = /* alloc */ new Set();
   const expressions = /* alloc */ [entry.paint, entry.filter];

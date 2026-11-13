@@ -5,6 +5,15 @@ import { refreshNativeLayer } from './refreshNativeLayer.js';
 import { canScaleNativeStyle } from './canScaleNativeStyle.js';
 import { orderNativeGridLayer } from './orderNativeGridLayer.js';
 
+/**
+ * Call the original layer method and update the corresponding GPU rendering.
+ *
+ * @param {string} name Original method name.
+ * @param {Object} source Leaflet source layer.
+ * @param {Array} args Arguments passed to the original method.
+ *
+ * @returns {*} Result of the original method.
+ */
 export function nativeLayerMethod(name, source, args) {
   const state = nativeGPUByLayer.get(source), original = state.methods.get(name).original;
   const scalable = canScaleNativeStyle(name, state, args);

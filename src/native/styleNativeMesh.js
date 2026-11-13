@@ -1,6 +1,14 @@
 import { cameraZIndexOffsetByLayer } from '../weakmaps/cameraZIndexOffsetByLayer.js';
 import { L } from '../globals/L.js';
 
+/**
+ * Apply color, opacity, ordering and source metadata to a native mesh.
+ *
+ * @param {Object} state Native layer state.
+ * @param {Object} mesh Mesh to update.
+ * @param {number|Array} color Material color.
+ * @param {number} opacity Material opacity.
+ */
 export function styleNativeMesh(state, mesh, color, opacity) {
   const { source, marker, paneOrder, order } = state;
   mesh.program.uniforms.baseColor.value = color;

@@ -1,6 +1,11 @@
 import { quadNativeMesh } from './quadNativeMesh.js';
 import { markerQuadCorners } from '../geometry/markerQuadCorners.js';
 
+/**
+ * Synchronize loaded marker icon and shadow images as native meshes.
+ *
+ * @param {Object} state Native marker state.
+ */
 export function syncMarker(state) {
   const { source } = state;
   let i, key, image, mesh;

@@ -1,5 +1,12 @@
 import { compareVectorLabelPriority } from './compareVectorLabelPriority.js';
 
+/**
+ * Collect candidates from needed tiles and sort them by label priority.
+ *
+ * @param {Object} layer Vector tile layer.
+ *
+ * @returns {Array} Sorted label candidates.
+ */
 export function vectorLabelCandidates(layer) {
   const candidates = /* alloc */ [];
   let tile, label;

@@ -1,3 +1,11 @@
+/**
+ * Simplify a path with a distance tolerance while retaining its endpoints.
+ *
+ * @param {Array} path Tile-coordinate points.
+ * @param {number} tolerance Maximum retained deviation.
+ *
+ * @returns {Array} Simplified path.
+ */
 export function simplifyVectorPath(path, tolerance) {
   if (path.length < 3) return path;
   const keep = /* alloc */ new Uint8Array(path.length);

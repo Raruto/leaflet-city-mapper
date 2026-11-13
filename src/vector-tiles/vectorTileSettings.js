@@ -2,6 +2,16 @@ import { readTileJSON } from './readTileJSON.js';
 import { readVectorStyle } from './readVectorStyle.js';
 import { validateVectorTileZooms } from './validateVectorTileZooms.js';
 
+/**
+ * Resolve and validate vector tile source options, metadata and style.
+ *
+ * @param {Object} options Vector tile source options.
+ *
+ * @returns {Promise<Object>} Resolved settings.
+ *
+ * @throws {TypeError} If source options are absent or not an object.
+ * @throws {Error} If the XYZ tile URL template is invalid.
+ */
 export async function vectorTileSettings(options) {
   if (!options || typeof options !== 'object') throw /* alloc */ new TypeError('Vector tiles require source options');
   if (options.tileJSON) options = await readTileJSON(options);

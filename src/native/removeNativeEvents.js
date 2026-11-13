@@ -1,5 +1,10 @@
 import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
 
+/**
+ * Unregister native layer event handling and restore map handling when unused.
+ *
+ * @param {Object} state Native layer state.
+ */
 export function removeNativeEvents(state) {
   const context = state._nativeEventContext;
   if (!context) return;

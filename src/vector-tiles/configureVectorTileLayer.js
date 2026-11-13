@@ -12,6 +12,14 @@ import { retireVectorTileGroup } from './retireVectorTileGroup.js';
 import { pumpVectorTiles } from './pumpVectorTiles.js';
 import { loadVectorTile } from './loadVectorTile.js';
 
+/**
+ * Resolve vector tile settings and install the layer's lifecycle methods.
+ *
+ * @param {Object} layer Leaflet layer to configure.
+ * @param {Object} options Vector tile source options.
+ *
+ * @returns {Promise<Object>} The configured layer.
+ */
 export async function configureVectorTileLayer(layer, options) {
   const settings = await vectorTileSettings(options);
   if (typeof settings.sprite === 'string') settings.spriteSheet = await loadVectorSprite(settings.sprite);

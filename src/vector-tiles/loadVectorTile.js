@@ -3,6 +3,15 @@ import { vectorTileOptionsByLayer } from '../weakmaps/vectorTileOptionsByLayer.j
 import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { attachVectorTileBatches } from './attachVectorTileBatches.js';
 
+/**
+ * Fetch, prepare and attach a vector tile while its session remains current.
+ *
+ * @param {Object} tile Tile state and abort controller.
+ *
+ * @returns {Promise<void>} Completion of the load or error reporting.
+ *
+ * @throws {Error} HTTP errors are caught internally and emitted on the owning layer.
+ */
 export async function loadVectorTile(tile) {
   const { coords, controller } = tile, session = this.session;
   const { url, style, sourceId, maxZoom, maxNativeZoom } = vectorTileOptionsByLayer.get(this);

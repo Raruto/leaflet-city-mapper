@@ -4,7 +4,11 @@ import { raycast } from '../picking/raycast.js';
 import { restoreNativeEvents } from './restoreNativeEvents.js';
 import { handleNativeMapEvent } from './handleNativeMapEvent.js';
 
-/** One GPU hit test per map event, rather than one invisible SVG path per feature. */
+/**
+ * Install one GPU hit test per map event and register the native layer.
+ *
+ * @param {Object} state Native layer state.
+ */
 export function nativeEvents(state) {
   const { map } = state;
   let context = nativeEventMaps.get(map);

@@ -2,6 +2,11 @@ import { vectorTileEvents } from '../globals/vectorTileEvents.js';
 import { vectorWorkerByLayer } from '../weakmaps/vectorWorkerByLayer.js';
 import { revokeVectorWorkerUrl } from './revokeVectorWorkerUrl.js';
 
+/**
+ * Remove listeners, cancel pending work and dispose rendered vector tiles and labels.
+ *
+ * @param {Object} map Leaflet map.
+ */
 export function onVectorTileRemove(map) {
   map.off(vectorTileEvents, this.refresh);
   map.off('move rotate pitch', this.rotateLabels);

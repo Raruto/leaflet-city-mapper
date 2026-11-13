@@ -4,6 +4,16 @@ import { styleNativeMesh } from './styleNativeMesh.js';
 import { quadNativeMesh } from './quadNativeMesh.js';
 import { boundsQuad } from '../geometry/boundsQuad.js';
 
+/**
+ * Reuse or rebuild the textured mesh for a loaded grid tile.
+ *
+ * @param {Object} state Native grid layer state.
+ * @param {string} key Tile key.
+ * @param {Object} tile Loaded tile.
+ * @param {number} opacity Tile opacity.
+ *
+ * @returns {Object|undefined} Tile mesh, if available.
+ */
 export function syncGridTile(state, key, tile, opacity) {
   const retained = state.textures.get(key), mesh = state.meshes.get(key);
   if (mesh && !mesh._terrainRequest && retained?.image === tile.el &&

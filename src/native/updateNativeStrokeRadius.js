@@ -1,3 +1,8 @@
+/**
+ * Store the maximum distance between stroke vertices and their anchors.
+ *
+ * @param {Object} mesh Native stroke mesh.
+ */
 export function updateNativeStrokeRadius(mesh) {
   const attributes = mesh.geometry.attributes, positions = attributes.position.data, anchors = attributes.normal.data;
   let i, radius = 0;

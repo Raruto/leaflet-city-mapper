@@ -1,6 +1,13 @@
 import { radians } from '../globals/radians.js';
 import { markerSetRotation } from '../core/markerSetRotation.js';
 
+/**
+ * Rotate a line label to follow its projected segment while keeping text upright.
+ *
+ * @param {Object} map Leaflet map.
+ * @param {Object} marker Label marker.
+ * @param {Object} label Label candidate with optional line endpoints.
+ */
 export function rotateVectorLabel(map, marker, label) {
   if (!label.along) return;
   const a = map.latLngToContainerPoint(label.along[0]), b = map.latLngToContainerPoint(label.along[1]);

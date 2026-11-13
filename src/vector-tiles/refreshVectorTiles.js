@@ -1,3 +1,6 @@
+/**
+ * Debounce vector tile updates after map changes.
+ */
 export function refreshVectorTiles() {
   clearTimeout(this.timer);
   this.changedAt = performance.now();

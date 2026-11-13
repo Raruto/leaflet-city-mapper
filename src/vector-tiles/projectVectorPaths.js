@@ -1,6 +1,16 @@
 import { projectVectorPoint } from './projectVectorPoint.js';
 import { simplifyVectorPath } from './simplifyVectorPath.js';
 
+/**
+ * Simplify and project tile geometry paths to geographic coordinates.
+ *
+ * @param {Array} geometry Tile coordinate paths.
+ * @param {Object} coords Tile coordinates.
+ * @param {number} extent Tile coordinate extent.
+ * @param {number} tolerance Simplification tolerance.
+ *
+ * @returns {Array} Projected paths.
+ */
 export function projectVectorPaths(geometry, coords, extent, tolerance) {
   const paths = /* alloc */ [];
   let path, simplified, projected, point;

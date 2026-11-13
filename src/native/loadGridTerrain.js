@@ -1,6 +1,16 @@
 import { getGridTerrainTile } from './getGridTerrainTile.js';
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
+/**
+ * Load the nine elevation tiles needed by a grid tile and refresh it when current.
+ *
+ * @param {Object} state Native grid layer state.
+ * @param {string} key Grid tile key.
+ * @param {Object} tile Grid tile being updated.
+ * @param {Object} request Tracked terrain request.
+ *
+ * @returns {Promise<void>} Completion of the load or error reporting.
+ */
 export async function loadGridTerrain(state, key, tile, request) {
   const { x, y, z } = tile.coords, stream = request.stream;
   const jobs = /* alloc */ [], tiles = /* alloc */ new Map();

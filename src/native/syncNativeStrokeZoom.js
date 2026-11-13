@@ -1,6 +1,11 @@
 import { styleNativeMesh } from './styleNativeMesh.js';
 import { parseColor } from '../colors/parseColor.js';
 
+/**
+ * Rescale a native stroke for the current zoom and refresh stroke and fill styles.
+ *
+ * @param {Object} state Native vector layer state.
+ */
 export function syncNativeStrokeZoom(state) {
   const { source, meshes, strokeCoordinates, strokeAnchors } = state;
   const mesh = meshes.get('stroke');

@@ -6,6 +6,15 @@ import { nativeEventSource } from './nativeEventSource.js';
 import { updateNativeHover } from './updateNativeHover.js';
 import { bypassNativeEvent } from './bypassNativeEvent.js';
 
+/**
+ * Dispatch map events to native layer hits while preserving normal Leaflet handling.
+ *
+ * @param {Event} event Original DOM event.
+ * @param {string} type Event type to dispatch.
+ * @param {Array} targets Explicit event targets, when provided.
+ *
+ * @returns {*} Result of Leaflet's DOM event dispatcher.
+ */
 export function handleNativeMapEvent(event, type = event.type, targets) {
   const map = this, context = nativeEventMaps.get(map), fireDOMEvent = context.fireDOMEvent;
   const owner = renderers.get(map);

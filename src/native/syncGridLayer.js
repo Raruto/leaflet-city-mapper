@@ -3,6 +3,11 @@ import { syncGridTile } from './syncGridTile.js';
 import { syncTerrainGridTile } from './syncTerrainGridTile.js';
 import { retainGridTerrain } from './retainGridTerrain.js';
 
+/**
+ * Synchronize loaded grid tiles and retain terrain while replacements are pending.
+ *
+ * @param {Object} state Native grid layer state.
+ */
 export function syncGridLayer(state) {
   const { source } = state;
   const stream = prepareGridTerrainRequests(state);

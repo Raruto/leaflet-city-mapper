@@ -1,6 +1,13 @@
 import { vectorStraightRun } from './vectorStraightRun.js';
 
-/** Anchors evenly spread along a path: each is a point on a segment plus that segment's ends. */
+/**
+ * Spread anchors along a path, recording segment ends and straight-run lengths.
+ *
+ * @param {Array} path Tile-coordinate points.
+ * @param {number} spacing Desired anchor spacing.
+ *
+ * @returns {Array} Label anchors.
+ */
 export function vectorLabelAnchors(path, spacing) {
   const anchors = /* alloc */ [];
   let length = 0, i, walked, target, count, k, segment, t, point;

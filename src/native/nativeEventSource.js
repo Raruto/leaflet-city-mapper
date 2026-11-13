@@ -2,6 +2,15 @@ import { L } from '../globals/L.js';
 import { raycast } from '../picking/raycast.js';
 import { compareNativeHits } from './compareNativeHits.js';
 
+/**
+ * Find the foremost interactive native path hit by a map event.
+ *
+ * @param {Object} context Native event state for the map.
+ * @param {Event} event Original DOM event.
+ * @param {string} type Event type being dispatched.
+ *
+ * @returns {Object|null} Hit source layer, or null.
+ */
 export function nativeEventSource(context, event, type) {
   const hits = /* alloc */ [];
   let candidate, source, layer;

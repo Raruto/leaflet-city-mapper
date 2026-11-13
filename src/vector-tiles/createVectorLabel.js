@@ -2,6 +2,21 @@ import { evaluateStyle } from '../vector-style/evaluateStyle.js';
 import { projectVectorPoint } from './projectVectorPoint.js';
 import { vectorStyleValue } from './vectorStyleValue.js';
 
+/**
+ * Construct a projected vector label candidate with evaluated style properties.
+ *
+ * @param {Object} job Vector tile preparation job.
+ * @param {Object} layer Decoded source layer.
+ * @param {Object} entry Style layer entry.
+ * @param {Object} properties Feature properties.
+ * @param {number} order Style layer order.
+ * @param {string} text Label text.
+ * @param {Object} icon Sprite icon.
+ * @param {Object} anchor Label anchor and optional line endpoints.
+ * @param {number} size Text size.
+ *
+ * @returns {Object} Label candidate.
+ */
 export function createVectorLabel(job, layer, entry, properties, order, text, icon, anchor, size) {
   return /* alloc */ {
     text, latlng: projectVectorPoint(anchor.point, job.coords, layer.extent),

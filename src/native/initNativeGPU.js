@@ -6,6 +6,12 @@ import { removeTargets } from './removeTargets.js';
 import { readyNativeGPU } from './readyNativeGPU.js';
 import { reportError } from '../scene/reportLayerError.js';
 
+/**
+ * Initialize GPU rendering for a native Leaflet layer and track its readiness.
+ *
+ * @param {Object} source Leaflet layer to render.
+ * @param {Object} map Map containing the layer.
+ */
 export function initNativeGPU(source, map) {
   if (nativeGPUByLayer.get(source)) return;
   if (!document.getElementById('leaflet-webgpu-targets')) {

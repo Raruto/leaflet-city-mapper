@@ -4,6 +4,17 @@ import { coreWhite } from '../globals/coreWhite.js';
 import { textureFor } from '../textures/nativeTextureFor.js';
 import { putNativeMesh } from './putNativeMesh.js';
 
+/**
+ * Create or update a textured native mesh from four corners.
+ *
+ * @param {Object} state Native layer state.
+ * @param {string} key Mesh identifier.
+ * @param {HTMLImageElement} image Image to use as a texture.
+ * @param {Array} corners Quad corner coordinates.
+ * @param {number} opacity Mesh opacity.
+ *
+ * @returns {Object|undefined} Mesh, if the texture is available.
+ */
 export function quadNativeMesh(state, key, image, corners, opacity) {
   const texture = textureFor(state, key, image);
   if (!texture) return;

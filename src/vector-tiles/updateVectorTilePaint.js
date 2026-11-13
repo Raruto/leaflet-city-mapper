@@ -3,6 +3,11 @@ import { vectorStyleZoom } from './vectorStyleZoom.js';
 import { vectorTilesIdle } from './vectorTilesIdle.js';
 import { yieldTask } from '../utils/yieldTask.js';
 
+/**
+ * Update rendered tile paint incrementally while the zoom and session remain current.
+ *
+ * @returns {Promise<void>} Completion of the current paint revision.
+ */
 export async function updateVectorTilePaint() {
   const zoom = vectorStyleZoom(this), session = this.session;
   if (this.paintZoom === zoom) return;

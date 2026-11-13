@@ -1,5 +1,11 @@
 import { L } from '../globals/L.js';
 
+/**
+ * Move a native grid layer beyond the other grid layers in its pane.
+ *
+ * @param {Object} state Native layer state.
+ * @param {string} name Layer method being called.
+ */
 export function orderNativeGridLayer(state, name) {
   const { source } = state;
   if (!(source instanceof L.GridLayer) || name !== 'bringToFront' && name !== 'bringToBack') return;

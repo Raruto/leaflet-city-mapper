@@ -1,5 +1,8 @@
 import { compareVectorTileDistance } from './compareVectorTileDistance.js';
 
+/**
+ * Start pending needed tiles nearest the map center, up to the concurrency limit.
+ */
 export function pumpVectorTiles() {
   if (!this.session) return;
   const center = this._map.getCenter(), pending = /* alloc */ [];

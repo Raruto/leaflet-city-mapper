@@ -2,6 +2,14 @@ import { L } from '../globals/L.js';
 import { vectorSpriteIcon } from './vectorSpriteIcon.js';
 import { wrapVectorLabel } from './wrapVectorLabel.js';
 
+/**
+ * Create a sprite or SVG text icon for a vector label.
+ *
+ * @param {Object} label Label candidate and appearance.
+ * @param {Object} sheet Sprite sheet, when needed.
+ *
+ * @returns {Object} Leaflet icon.
+ */
 export function vectorLabelIcon(label, sheet) {
   if (label.icon) return vectorSpriteIcon(label, sheet);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

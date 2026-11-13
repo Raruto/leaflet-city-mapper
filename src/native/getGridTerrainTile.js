@@ -1,3 +1,16 @@
+/**
+ * Load and cache a validated grid terrain tile, wrapping horizontal coordinates.
+ *
+ * @param {Object} state Native layer state with a terrain cache.
+ * @param {number} z Tile zoom.
+ * @param {number} x Tile column.
+ * @param {number} y Tile row.
+ *
+ * @returns {Promise<Float32Array>} The elevation samples.
+ *
+ * @throws {Error} If the tile is not a 256-by-256 Float32Array.
+ * @throws {Error} If the tile request or validation fails.
+ */
 export async function getGridTerrainTile(state, z, x, y) {
   const limit = 2 ** z;
   x = ((x % limit) + limit) % limit;

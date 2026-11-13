@@ -3,6 +3,20 @@ import { styleNativeMesh } from './styleNativeMesh.js';
 import { createNativeMesh } from './createNativeMesh.js';
 import { updateNativeStrokeRadius } from './updateNativeStrokeRadius.js';
 
+/**
+ * Create or update a native mesh and apply its style.
+ *
+ * @param {Object} state Native layer state.
+ * @param {string} key Mesh identifier.
+ * @param {Array} position Vertex coordinates.
+ * @param {number|Array} color Material color.
+ * @param {number} opacity Material opacity.
+ * @param {Object} texture Optional base texture.
+ * @param {Array} uv Optional texture coordinates.
+ * @param {boolean} terrain Whether the mesh represents terrain.
+ *
+ * @returns {Object|undefined} Updated mesh, if positions were provided.
+ */
 export function putNativeMesh(state, key, position, color, opacity, texture, uv, terrain = false) {
   const { source, meshes } = state;
   if (!position.length) return;

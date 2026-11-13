@@ -7,6 +7,11 @@ import { syncMarker } from './syncMarker.js';
 import { syncVectorLayer } from './syncVectorLayer.js';
 import { pruneNativeResources } from './pruneNativeResources.js';
 
+/**
+ * Synchronize a dirty native layer and dispose resources no longer in use.
+ *
+ * @param {Object} state Native layer state.
+ */
 export function synchronizeNativeLayer(state) {
   const { source, meshes, textures } = state;
   if (!current(state) || !rendererByLayer.get(state.backend) || state.failed) return;

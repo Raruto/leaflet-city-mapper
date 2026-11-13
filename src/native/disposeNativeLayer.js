@@ -8,6 +8,9 @@ import { nativeImageRefresh } from '../textures/nativeImageRefresh.js';
 import { nativeImageError } from '../textures/nativeImageError.js';
 import { removeImageState } from '../textures/removeImageState.js';
 
+/**
+ * Dispose the native layer state, restore source methods and release its resources.
+ */
 export function disposeNativeLayer() {
   const state = this;
   if (state.disposed) return;

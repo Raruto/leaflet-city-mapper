@@ -1,5 +1,12 @@
 import { yieldTask } from '../utils/yieldTask.js';
 
+/**
+ * Remove a tile group's layers incrementally while its session remains current.
+ *
+ * @param {Object} group Leaflet layer group to retire.
+ *
+ * @returns {Promise<void>} Completion of retirement.
+ */
 export async function retireVectorTileGroup(group) {
   const session = this.session;
   this.retiring.add(group);

@@ -3,6 +3,14 @@ import { nativeProgramsByRenderer } from '../weakmaps/nativeProgramsByRenderer.j
 import { createProgram } from '../materials/createProgram.js';
 import { createProgramUniforms } from '../materials/createProgramUniforms.js';
 
+/**
+ * Create a native material program from a renderer-local cached template.
+ *
+ * @param {Object} layer Backend layer.
+ * @param {Object} material Material properties.
+ *
+ * @returns {Object} Program with material-specific uniforms.
+ */
 export function nativeProgram(layer, material) {
   const renderer = rendererByLayer.get(layer);
   let programs = nativeProgramsByRenderer.get(renderer);

@@ -5,6 +5,14 @@ import { vectorFeaturePaint } from './vectorFeaturePaint.js';
 import { vectorPaint } from '../vector-style/vectorPaint.js';
 import { appendVectorBatch } from './appendVectorBatch.js';
 
+/**
+ * Prepare labels or painted geometry batches for a vector style layer.
+ *
+ * @param {Object} job Vector tile preparation job.
+ * @param {Object} layer Decoded source layer.
+ * @param {Object} entry Style layer entry.
+ * @param {number} order Style layer order.
+ */
 export function prepareVectorStyleLayer(job, layer, entry, order) {
   const batches = /* alloc */ new Map(), dependencies = vectorStyleDependencies(entry);
   const outlineColor = entry.type === 'fill' ? entry.paint?.['fill-outline-color'] : null;

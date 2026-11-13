@@ -16,7 +16,16 @@ import { forwardNativeError } from './forwardNativeError.js';
 import { updateNativeLayerView } from './updateNativeLayerView.js';
 import { synchronizeNativeLayer } from './synchronizeNativeLayer.js';
 
-/** Render from coordinates and detached raster sources; only accessible marker controls remain DOM. */
+/**
+ * Set up native rendering from coordinates and detached raster sources.
+ *
+ * @param {Object} state Native layer state.
+ *
+ * @returns {Promise<Object>} The original source layer.
+ *
+ * @throws {Error} If the backend fails to become ready.
+ * @throws {Error} If initial synchronization fails.
+ */
 export async function nativeLayer(state) {
   const { source, map } = state;
   const layer = state.backend = createLayer(/* alloc */ {

@@ -1,5 +1,11 @@
 import { vectorTilePaint } from './vectorTilePaint.js';
 
+/**
+ * Update a rendered vector batch's paint at the given zoom.
+ *
+ * @param {Object} batch Rendered batch and its style entry.
+ * @param {number} zoom Style zoom.
+ */
 export function paintVectorTileBatch(batch, zoom) {
   const paint = vectorTilePaint(batch, zoom), { layer } = batch;
   if (batch.kind === 'line') {
