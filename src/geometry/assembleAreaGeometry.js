@@ -3,6 +3,13 @@ import { buildProjectedPoint } from './buildProjectedPoint.js';
 import { instanceAreaGeometry } from './instanceAreaGeometry.js';
 import { computeBounds } from './computeBounds.js';
 
+/**
+ * Build area jobs into typed geometry buffers, feature ranges and light metadata.
+ *
+ * @param {Object} options Geometry jobs and night-light setting.
+ *
+ * @returns {Object} Prepared area geometry and metadata.
+ */
 export function assembleAreaGeometry({ jobs, nightLight }) {
   const context = /* alloc */ {
     backend: /* alloc */ { options: /* alloc */ { nightLight } },

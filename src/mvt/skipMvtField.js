@@ -3,6 +3,14 @@ import { readMvtInteger } from './readMvtInteger.js';
 import { readMvtNumber } from './readMvtNumber.js';
 import { takeMvtBytes } from './takeMvtBytes.js';
 
+/**
+ * Skip an unknown protobuf field according to its wire type.
+ *
+ * @param {Object} reader MVT byte reader.
+ * @param {number} wire Protobuf wire type.
+ *
+ * @throws {Error} If the wire type is unsupported.
+ */
 export function skipMvtField(reader, wire) {
   switch (wire) {
     case 0: readMvtInteger(reader); break;

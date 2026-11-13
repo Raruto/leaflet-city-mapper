@@ -9,6 +9,16 @@ import { evaluatePrimitive } from './evaluatePrimitive.js';
 import { evaluateStep } from './evaluateStep.js';
 import { evaluateToExpression } from './evaluateToExpression.js';
 
+/**
+ * Evaluate a supported vector style expression or return a non-array value unchanged.
+ *
+ * @param {*} value Style value or expression.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ * @param {boolean} [legacy] Whether to use legacy filter semantics.
+ *
+ * @returns {*} Evaluated value.
+ */
 export function evaluateStyle(value, properties, zoom, legacy = false) {
   if (!Array.isArray(value)) return value;
   const op = value[0];

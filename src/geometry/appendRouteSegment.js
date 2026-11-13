@@ -1,5 +1,18 @@
 import { appendRouteDash } from './appendRouteDash.js';
 
+/**
+ * Append route dashes for a segment using cumulative distances to preserve dash phase.
+ *
+ * @param {Array<number>} position Destination positions.
+ * @param {Array<number>} normal Destination normals.
+ * @param {Array<number>} color Destination colors.
+ * @param {Array<Array<number>>} points Route points.
+ * @param {Array<number>} lengths Cumulative route distances.
+ * @param {number} i Segment end index.
+ * @param {number} r Red component.
+ * @param {number} g Green component.
+ * @param {number} blue Blue component.
+ */
 export function appendRouteSegment(position, normal, color, points, lengths, i, r, g, blue) {
   const a = points[i - 1], b = points[i];
   const dx = b[0] - a[0], dz = b[1] - a[1], length = lengths[i] - lengths[i - 1];

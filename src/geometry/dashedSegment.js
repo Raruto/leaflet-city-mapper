@@ -1,5 +1,17 @@
 import { segment } from './segment.js';
 
+/**
+ * Append dashed geometry along a segment while preserving the pattern phase.
+ *
+ * @param {Object} context Line geometry context and dash pattern.
+ * @param {L.Point} a Segment start.
+ * @param {L.Point} b Segment end.
+ * @param {number} length Segment length.
+ * @param {number} distance Distance at the start of the segment.
+ * @param {number} period Dash pattern period.
+ *
+ * @throws {Error} If dash lengths cannot advance at these coordinates.
+ */
 export function dashedSegment(context, a, b, length, distance, period) {
   const dash = context.dash;
   let offset = 0, phase = ((distance % period) + period) % period, index = 0, end, delta, skipped = 0;

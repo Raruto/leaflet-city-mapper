@@ -1,5 +1,13 @@
 import { lampDirections } from '../globals/lampDirections.js';
 
+/**
+ * Create a ring of lamp points with ground height and fixed UVs.
+ *
+ * @param {Object} point Ring center and ground height.
+ * @param {number} radius Ring radius.
+ *
+ * @returns {Array<Object>} Lamp ring points.
+ */
 export function ring(point, radius) {
   const points = /* alloc */ new Array(lampDirections.length);
   let i;

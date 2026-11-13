@@ -3,6 +3,19 @@ import { appendMvtCoordinates } from './appendMvtCoordinates.js';
 import { beginMvtPath } from './beginMvtPath.js';
 import { closeMvtPath } from './closeMvtPath.js';
 
+/**
+ * Decode MVT geometry commands into tile-coordinate paths.
+ *
+ * @param {Array<number>} commands Geometry command integers.
+ * @param {number} type MVT geometry type.
+ *
+ * @returns {Array} Decoded paths.
+ *
+ * @throws {Error} If a command or count is invalid.
+ * @throws {Error} If geometry command parameters are invalid or truncated.
+ * @throws {Error} If a LineTo is invalid for the current path.
+ * @throws {Error} If no geometry path was decoded.
+ */
 export function readMvtGeometry(commands, type) {
   const paths = /* alloc */ [];
   const state = /* alloc */ { x: 0, y: 0, path: null, closed: false, index: 0 };

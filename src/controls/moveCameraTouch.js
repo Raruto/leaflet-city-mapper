@@ -4,6 +4,11 @@ import { degrees } from '../globals/degrees.js';
 import { touchByContainer } from '../weakmaps/touchByContainer.js';
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 
+/**
+ * Update camera angles and anchored zoom during a two-finger gesture.
+ *
+ * @param {TouchEvent} event Touch-move event.
+ */
 export function moveCameraTouch(event) {
   const state = touchByContainer.get(this), { map, container, touch } = state;
   if (!touch || event.touches.length !== 2) return;

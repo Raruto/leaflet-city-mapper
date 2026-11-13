@@ -2,6 +2,15 @@ import { L } from '../globals/L.js';
 import { triangle } from './appendNativeTriangle.js';
 import { disk } from './disk.js';
 
+/**
+ * Append a stroke segment with optional square or round caps.
+ *
+ * @param {Object} context Line style and geometry buffers.
+ * @param {L.Point} a Segment start.
+ * @param {L.Point} b Segment end.
+ * @param {boolean} startCap Whether to add a start cap.
+ * @param {boolean} endCap Whether to add an end cap.
+ */
 export function segment(context, a, b, startCap, endCap) {
   const { options, width, stroke, point } = context;
   const radius = width / 2;

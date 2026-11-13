@@ -297,6 +297,10 @@ Feature: Performance-oriented source style
     And JSDoc tag checks accept source directory "src/sources"
     And JSDoc tag checks accept source directory "src/scene"
     And JSDoc tag checks accept source directory "src/core"
+    And JSDoc tag checks accept source directory "src/cog"
+    And JSDoc tag checks accept source directory "src/vector-style"
+    And JSDoc tag checks accept source directory "src/mvt"
+    And JSDoc tag checks accept source directory "src/controls"
 
   @unit
   Scenario: Rendering modules document their arguments and results
@@ -322,6 +326,7 @@ Feature: Performance-oriented source style
     And JSDoc tag checks accept source directory "src/projections"
     And JSDoc tag checks accept source directory "src/transforms"
     And JSDoc tag checks accept source directory "src/collision"
+    And JSDoc tag checks accept source directory "src/geometry"
 
   @unit
   Scenario: Source files document functions and exports with JSDoc

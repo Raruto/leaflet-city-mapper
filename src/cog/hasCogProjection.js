@@ -1,3 +1,10 @@
+/**
+ * Check GeoTIFF keys for EPSG:3857 and PixelIsArea.
+ *
+ * @param {ArrayLike<number>} keys GeoKey directory values, if present.
+ *
+ * @returns {boolean} Whether both required keys are present.
+ */
 export function hasCogProjection(keys) {
   let projected = false, area = false, i;
   if (keys) for (i = 4; i < keys.length; i += 4) {

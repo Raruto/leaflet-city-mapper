@@ -1,3 +1,12 @@
+/**
+ * Parse a Leaflet dash array into a validated even-length numeric pattern.
+ *
+ * @param {Object} options Leaflet path options.
+ *
+ * @returns {Array<number>} Dash pattern, or an empty array for a solid line.
+ *
+ * @throws {Error} If a dash value is negative or non-finite.
+ */
 export function dashValues(options) {
   const values = Array.isArray(options.dashArray) ? options.dashArray :
     String(options.dashArray || '').trim().split(/[ ,]+/);

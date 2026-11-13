@@ -2,6 +2,20 @@ import { validateCogRange } from './validateCogRange.js';
 import { validateCogResponse } from './validateCogResponse.js';
 import { readCogBody } from './readCogBody.js';
 
+/**
+ * Read a validated byte range from a COG source, caching an accepted full response.
+ *
+ * @param {Object} source COG byte source and response state.
+ * @param {number} offset Byte offset relative to the source.
+ * @param {number} length Number of bytes to read.
+ * @param {AbortSignal} [signal] Request cancellation signal.
+ *
+ * @returns {Promise<ArrayBuffer>} Requested bytes.
+ *
+ * @throws {Error} If the HTTP response is unsuccessful.
+ * @throws {Error} If a full PMTiles container response is truncated.
+ * @throws {Error} If the resulting byte range is truncated.
+ */
 export async function readCog(source, offset, length, signal) {
   signal?.throwIfAborted();
   validateCogRange(source, offset, length);

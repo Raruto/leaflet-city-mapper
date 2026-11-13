@@ -14,6 +14,12 @@ import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
 import { vertexNormals } from './vertexNormals.js';
 import { collectMeshes } from '../collision/collectMeshes.js';
 
+/**
+ * Conform model vertices to terrain or restore their original positions when disabled.
+ *
+ * @param {L.Layer} layer Model layer.
+ * @param {L.Layer} terrain Terrain layer, if available.
+ */
 export function conformModelToTerrain(layer, terrain) {
   if (!modelByLayer.get(layer)) return;
   const meshes = /* alloc */ [];

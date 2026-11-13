@@ -1,4 +1,13 @@
-/** Point and unit direction at distance `s` along `points` ([x, z, y?]) with cumulative `lengths`. */
+/**
+ * Compute point and unit direction at a distance along a route.
+ *
+ * @param {Array<Array<number>>} points Route points as [x, z, y?].
+ * @param {Array<number>} lengths Cumulative route distances.
+ * @param {number} s Distance along the route.
+ * @param {Object} [target] Object to populate.
+ *
+ * @returns {Object} Position and horizontal direction.
+ */
 export function along(points, lengths, s, target) {
   let i = 1, end = lengths.length - 1;
   let middle;

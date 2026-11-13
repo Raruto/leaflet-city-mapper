@@ -7,6 +7,18 @@ import { readMvtNumber } from './readMvtNumber.js';
 import { readMvtNumbers } from './readMvtNumbers.js';
 import { skipMvtField } from './skipMvtField.js';
 
+/**
+ * Decode an MVT feature's ID, property tags and geometry.
+ *
+ * @param {Object} reader Feature message reader.
+ * @param {Array<string>} keys Layer property keys.
+ * @param {Array} values Layer property values.
+ *
+ * @returns {Object} Decoded feature.
+ *
+ * @throws {Error} If feature tags or geometry type are invalid.
+ * @throws {Error} If a property index is outside the layer tables.
+ */
 export function readMvtFeature(reader, keys, values) {
   let id, type = 0, field, wire, i = 0;
   const tags = /* alloc */ [], commands = /* alloc */ [];

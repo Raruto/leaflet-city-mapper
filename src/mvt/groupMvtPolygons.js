@@ -1,5 +1,15 @@
 import { finiteMvtCoordinate } from './finiteMvtCoordinate.js';
 
+/**
+ * Group closed MVT rings into polygons according to exterior winding.
+ *
+ * @param {Array} rings Closed tile-coordinate rings.
+ *
+ * @returns {Array} Polygons containing exterior and following hole rings.
+ *
+ * @throws {Error} If a ring is not closed or is too short.
+ * @throws {Error} If a ring coordinate is non-finite.
+ */
 export function groupMvtPolygons(rings) {
   const polygons = /* alloc */ [];
   let polygon, exteriorSign, ring, area, i;

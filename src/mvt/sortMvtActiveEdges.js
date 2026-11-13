@@ -1,5 +1,10 @@
 import { mergeMvtActiveEdges } from './mergeMvtActiveEdges.js';
 
+/**
+ * Stably sort active polygon edges in place by their x coordinate.
+ *
+ * @param {Array<Object>} active Active edges with x values.
+ */
 export function sortMvtActiveEdges(active) {
   const sorted = /* alloc */ new Array(active.length);
   let width = 1, left, mid, right, i;

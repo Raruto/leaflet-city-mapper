@@ -1,6 +1,17 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { createProgram } from '../materials/createProgram.js';
 
+/**
+ * Create GPU buffers and a material program for a model primitive.
+ *
+ * @param {Object} context Model context tracking materials and resources.
+ * @param {Object} primitive glTF primitive specification.
+ * @param {Object} attributes Prepared geometry attributes.
+ *
+ * @returns {Object} Device, geometry and program.
+ *
+ * @throws {Error} If a textured material has no UV attribute.
+ */
 export function createModelGeometry(context, primitive, attributes) {
   const style = context.materials[primitive.material] || /* alloc */ {
     color: /* alloc */ [1, 1, 1], metallic: 1,

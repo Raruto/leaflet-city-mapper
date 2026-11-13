@@ -1,3 +1,10 @@
+/**
+ * Sort vertical levels and collapse values within the tessellation tolerance.
+ *
+ * @param {Set<number>} levels Unsorted vertical levels.
+ *
+ * @returns {Array<number>} Sorted distinct levels.
+ */
 export function sortedMvtLevels(levels) {
   const sorted = /* alloc */ [];
   let y, gap = 0, i = 0, j, value, count = 0;

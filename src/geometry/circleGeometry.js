@@ -5,6 +5,12 @@ import { line } from './line.js';
 import { triangle } from './appendNativeTriangle.js';
 import { projectNativePath } from '../core/projectNativePath.js';
 
+/**
+ * Generate native circle or ellipse fill and stroke triangles.
+ *
+ * @param {L.Circle|L.CircleMarker} source Native circle layer.
+ * @param {Object} context Projection, style and destination buffers.
+ */
 export function circleGeometry(source, context) {
   const { map, point, fill, stroke, options, dash, width } = context;
   const center = map.project(source.getLatLng());

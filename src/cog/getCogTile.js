@@ -2,6 +2,19 @@ import { getElevationTile } from './getElevationTile.js';
 import { getColorTile } from './getColorTile.js';
 import { validCogTileCoordinates } from './validCogTileCoordinates.js';
 
+/**
+ * Read an XYZ color or elevation tile from an open COG, if covered by a level.
+ *
+ * @param {Object} source Open COG source.
+ * @param {number} z Tile zoom.
+ * @param {number} x Tile column.
+ * @param {number} y Tile row.
+ * @param {AbortSignal} [signal] Request cancellation signal.
+ *
+ * @returns {Promise<Object|undefined>} Tile image or elevation data, if covered.
+ *
+ * @throws {Error} If tile coordinates are invalid.
+ */
 export async function getCogTile(source, z, x, y, signal) {
   signal?.throwIfAborted();
   if (!validCogTileCoordinates(z, x, y)) throw /* alloc */ new Error('Invalid COG tile coordinates');

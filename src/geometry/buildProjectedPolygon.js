@@ -2,6 +2,15 @@ import { triangulate } from '../triangulation/triangulate.js';
 import { addTriangle } from './appendAreaTriangle.js';
 import { isClockWise } from '../triangulation/isClockWise.js';
 
+/**
+ * Append roof, optional bottom and side triangles for a projected polygon.
+ *
+ * @param {Object} context Destination area geometry.
+ * @param {Array<Array<Object>>} paths Projected outer ring and holes.
+ * @param {number} top Extrusion top height.
+ * @param {number} bottom Extrusion bottom height.
+ * @param {Object} baseColor Parsed RGB color.
+ */
 export function buildProjectedPolygon(context, paths, top, bottom, baseColor) {
   const points = /* alloc */ [];
   let path, point, a, b, c, index, sign, i, length, nx, nz;

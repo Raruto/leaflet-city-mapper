@@ -1,4 +1,10 @@
-/** Compact repeated features only when reconstructed float32 positions compare equal. */
+/**
+ * Compact repeated features only when reconstructed float32 positions compare equal.
+ *
+ * @param {Object} context Area geometry buffers and feature ranges.
+ *
+ * @returns {Object} Instanced buffers, or the original context if compaction is unsuitable.
+ */
 export function instanceAreaGeometry(context) {
   const { positions, normals, colors, featureFaces } = context;
   if (context.backend.options.nightLight || featureFaces.length < 2) return context;

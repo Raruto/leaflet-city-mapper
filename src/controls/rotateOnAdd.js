@@ -8,6 +8,13 @@ import { dragCamera } from './dragCamera.js';
 import { acceptRotateDrag } from './acceptRotateDrag.js';
 import { refreshRotateFocus } from './refreshRotateFocus.js';
 
+/**
+ * Create this rotate control's accessible button and attach camera interactions.
+ *
+ * @param {L.Map} map Map receiving the control.
+ *
+ * @returns {HTMLElement} Control container.
+ */
 export function rotateOnAdd(map) {
   const container = L.DomUtil.create('div', 'leaflet-control-rotate leaflet-bar');
   const button = L.DomUtil.create('a', 'leaflet-control-rotate-toggle', container);

@@ -1,5 +1,13 @@
 import { ringDirections } from '../globals/ringDirections.js';
 
+/**
+ * Create a ring of projected tree points around a center.
+ *
+ * @param {Object} point Ring center and ground height.
+ * @param {number} radius Ring radius.
+ *
+ * @returns {Array<Object>} Tree ring points.
+ */
 export function ring(point, radius) {
   const result = /* alloc */ new Array(ringDirections.length);
   let i;

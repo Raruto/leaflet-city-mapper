@@ -1,3 +1,12 @@
+/**
+ * Subtract a raster tile's footprint from uncovered roof rectangles.
+ *
+ * @param {Array<Array<number>>} remaining Uncovered pixel rectangles.
+ * @param {Object} tile Raster tile with XYZ coordinates.
+ * @param {number} zoom Zoom used by the rectangles.
+ *
+ * @returns {Array<Array<number>>} Remaining uncovered rectangles.
+ */
 export function subtractRoofTile(remaining, tile, zoom) {
   const size = 256 * 2 ** (zoom - tile.coords.z);
   const left = tile.coords.x * size, top = tile.coords.y * size;

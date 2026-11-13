@@ -1,5 +1,18 @@
 import { evaluateStyle } from './evaluateStyle.js';
 
+/**
+ * Evaluate a boolean or numeric conversion expression.
+ *
+ * @param {string} op Conversion operator.
+ * @param {Array} args Candidate expressions.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {boolean|number} Converted value.
+ *
+ * @throws {Error} If no numeric candidate is finite.
+ * @throws {Error} If the operator is unsupported.
+ */
 export function evaluateToExpression(op, args, properties, zoom) {
   if (op === 'to-boolean') return Boolean(evaluateStyle(args[0], properties, zoom));
   if (op === 'to-number') {

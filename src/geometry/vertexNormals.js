@@ -1,4 +1,11 @@
-/** Area-weighted vertex normals, for indexed or non-indexed triangles. */
+/**
+ * Compute area-weighted vertex normals for indexed or non-indexed triangles.
+ *
+ * @param {ArrayLike<number>} p Flat vertex positions.
+ * @param {ArrayLike<number>} [indices] Optional triangle vertex indices.
+ *
+ * @returns {Float32Array} Normalized vertex normals.
+ */
 export function vertexNormals(p, indices) {
   // Accumulate area-weighted face normals for shared vertices, then normalize.
   const normals = /* alloc */ new Float32Array(p.length);

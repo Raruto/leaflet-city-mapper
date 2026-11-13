@@ -1,6 +1,13 @@
 import { appendQuotedStyleCharacter } from './appendQuotedStyleCharacter.js';
 import { skipStyleComment } from './skipStyleComment.js';
 
+/**
+ * Strip style comments and normalize quoted strings to JSON form.
+ *
+ * @param {string} text Style source text.
+ *
+ * @returns {string} Comment-free JSON-like text.
+ */
 export function stripStyleComments(text) {
   let json = '', i = 0, char = '', next = '', converted = undefined;
   const state = /* alloc */ { quoted: '', escaped: false };

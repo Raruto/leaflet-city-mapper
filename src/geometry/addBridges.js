@@ -11,6 +11,9 @@ import { bridgePolygon } from './bridgePolygon.js';
  * Bare-earth DEMs drop bridges: `getElevation` returns the deck height inside these polygons (GeoJSON
  * Polygon/MultiPolygon with Z, e.g. IGN BD TOPO), and one mesh draws the 1.2 m thick decks.
  * ponytail: anything under a deck (quays, boats asking `getElevation`) also gets the deck height.
+ *
+ * @param {L.Layer} layer Terrain layer owning bridge geometry.
+ * @param {Object} geojson Feature collection of bridge polygons.
  */
 export function addBridges(layer, geojson) {
   const map = layer._map, crs = map.options.crs, zoom = terrainZoomByLayer.get(layer);

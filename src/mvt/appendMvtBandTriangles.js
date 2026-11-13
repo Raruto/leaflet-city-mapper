@@ -1,6 +1,17 @@
 import { mvtEdgeX } from './mvtEdgeX.js';
 import { sortMvtActiveEdges } from './sortMvtActiveEdges.js';
 
+/**
+ * Tessellate one vertical band using even-odd pairs of polygon edges.
+ *
+ * @param {Array} edges Polygon edges ordered by endpoint y.
+ * @param {number} top Band's upper y.
+ * @param {number} bottom Band's lower y.
+ * @param {Array} triangles Destination triangles.
+ *
+ * @throws {Error} If the band has an odd number of active edges.
+ * @throws {Error} If paired edges cross inside the band.
+ */
 export function appendMvtBandTriangles(edges, top, bottom, triangles) {
   const mid = (top + bottom) / 2, active = /* alloc */ [];
   let edge, i = 0, leftTop, leftBottom, rightTop, rightBottom;

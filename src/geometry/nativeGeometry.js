@@ -3,7 +3,15 @@ import { visit } from './visitNativeCoordinates.js';
 import { dashValues } from './dashValues.js';
 import { circleGeometry } from './circleGeometry.js';
 
-/** Leaflet paths become flat triangles; solid strokes retain stationary zoom anchors. */
+/**
+ * Convert a Leaflet path into flat fill and stroke triangles.
+ *
+ * @param {L.Path} source Native path.
+ * @param {L.Map} map Map used to project coordinates.
+ * @param {Function} point Vertex projection function.
+ *
+ * @returns {Object} Fill and stroke vertex arrays.
+ */
 export function nativeGeometry(source, map, point) {
   const fill = /* alloc */ [];
   const stroke = /* alloc */ [];

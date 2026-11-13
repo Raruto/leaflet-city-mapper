@@ -3,6 +3,14 @@ import { readCog } from './readCog.js';
 import { validateCogContainer } from './validateCogContainer.js';
 import { getCogAssetEntry } from './getCogAssetEntry.js';
 
+/**
+ * Open a named COG asset within a PMTiles container as a bounded byte source.
+ *
+ * @param {string} url Container URL.
+ * @param {string} asset Asset name.
+ *
+ * @returns {Promise<Object>} COG source with container offset and size.
+ */
 export async function openCogAsset(url, asset) {
   const container = /* alloc */ { url };
   const header = decodeHeader(await readCog(container, 0, 127));

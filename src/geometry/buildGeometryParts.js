@@ -1,5 +1,12 @@
 import { triangle } from './triangle.js';
 
+/**
+ * Build colored extruded parts from bottom and top rings.
+ *
+ * @param {Array<Array>} parts Ring, bottom, top, tint and optional top-ring tuples.
+ *
+ * @returns {Object} Flat position, normal and color arrays.
+ */
 export function build(parts) {
   const position = /* alloc */ [];
   const normal = /* alloc */ [];

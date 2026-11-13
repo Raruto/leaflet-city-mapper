@@ -1,3 +1,12 @@
+/**
+ * Transform and cache a mesh's bounding box for shadow calculations.
+ *
+ * @param {Object} mesh Mesh containing the world-matrix version.
+ * @param {Object} bounds Local bounding box.
+ * @param {ArrayLike<number>} matrix World transformation matrix.
+ *
+ * @returns {Object} Cached transformed minimum and maximum bounds.
+ */
 export function meshShadowBounds(mesh, bounds, matrix) {
   let cached = mesh._shadowBounds;
   if (!cached || cached.version !== mesh._worldMatrixVersion || cached.bounds !== bounds) {

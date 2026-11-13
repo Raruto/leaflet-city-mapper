@@ -2,6 +2,16 @@ import { demByLayer } from '../weakmaps/demByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
 
+/**
+ * Create terrain tile geometry with bounds covering DEM-displaced elevations.
+ *
+ * @param {L.Layer} layer Terrain layer.
+ * @param {Object} attributes Shared terrain grid attributes.
+ * @param {number} sizeX Tile width in scene units.
+ * @param {number} sizeZ Tile depth in scene units.
+ *
+ * @returns {Object} Tile geometry and bounds.
+ */
 export function terrainTileGeometry(layer, attributes, sizeX, sizeZ) {
   const base = terrainOriginElevationByLayer.get(layer)
   const bottom = Math.min(demByLayer.get(layer).low, base) - base, top = Math.max(demByLayer.get(layer).high, base) - base;

@@ -1,6 +1,17 @@
 import { validateCogContentRange } from './validateCogContentRange.js';
 import { invalidCogFullResponse } from './invalidCogFullResponse.js';
 
+/**
+ * Validate a COG HTTP response's entity tag, range and full-response size.
+ *
+ * @param {Object} source COG source whose ETag and size are updated.
+ * @param {Response} response HTTP response.
+ * @param {number} rangeStart Requested absolute byte offset.
+ * @param {number} length Requested byte length.
+ *
+ * @throws {Error} If the source ETag changes.
+ * @throws {Error} If a full response is unsupported or too large.
+ */
 export function validateCogResponse(source, response, rangeStart, length) {
   const etag = response.headers.get('ETag');
   if (source.etag && source.etag !== etag) throw /* alloc */ new Error('COG changed; recreate the layer');

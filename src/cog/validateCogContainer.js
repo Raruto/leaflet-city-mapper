@@ -1,3 +1,11 @@
+/**
+ * Validate the PMTiles header and bounds for a COG asset container.
+ *
+ * @param {Object} container Container source with known size.
+ * @param {Object} header Decoded PMTiles header.
+ *
+ * @throws {Error} If the container metadata or tile data range is invalid.
+ */
 export function validateCogContainer(container, header) {
   if (header.tileType !== 0 || header.tileCompression !== 1 ||
     !Number.isSafeInteger(header.jsonMetadataOffset) || !Number.isSafeInteger(header.jsonMetadataLength) ||

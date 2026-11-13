@@ -1,3 +1,10 @@
+/**
+ * Create a protobuf reader over the supplied tile bytes.
+ *
+ * @param {Uint8Array} bytes Input bytes.
+ *
+ * @returns {Object} Reader with a data view and cursor.
+ */
 export function createMvtReader(bytes) {
   return /* alloc */ {
     bytes,

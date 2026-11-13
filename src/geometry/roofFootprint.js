@@ -4,6 +4,15 @@ import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
 import { radians } from '../globals/radians.js';
 import { earthCirc } from '../globals/earthCirc.js';
 
+/**
+ * Project a mesh's bounding box into raster pixels and clip it to archive bounds.
+ *
+ * @param {Object} mesh Mesh with bounds and world matrix.
+ * @param {L.Layer} layer Rendering layer.
+ * @param {L.Layer} rasterLayer Raster layer providing zoom and archive bounds.
+ *
+ * @returns {Array<number>|null} Pixel rectangle, or null when outside the archive.
+ */
 export function roofFootprint(mesh, layer, rasterLayer) {
   const map = layer._map, bounds = mesh.geometry.bounds, world = mesh.worldMatrix;
   const zoom = tileZoomByLayer.get(rasterLayer)

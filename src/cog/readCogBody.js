@@ -1,3 +1,13 @@
+/**
+ * Read a COG HTTP body while enforcing the range or full-response size limit.
+ *
+ * @param {Response} response HTTP response with a readable body.
+ * @param {number} length Expected byte length for a range response.
+ *
+ * @returns {Promise<Uint8Array>} Response bytes.
+ *
+ * @throws {Error} If the response exceeds its permitted size.
+ */
 export async function readCogBody(response, length) {
   const reader = response.body.getReader(), chunks = /* alloc */ [];
   let total = 0, part;

@@ -2,6 +2,16 @@ import { readPaintValue } from './readPaintValue.js';
 import { scaleDashArray } from './scaleDashArray.js';
 import { styleColor } from './styleColor.js';
 
+/**
+ * Resolve line paint and layout to rendering options.
+ *
+ * @param {Object} layer Vector style layer.
+ * @param {Object} paint Vector style paint values.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {Object} Line color, opacity, width, dash, cap and join options.
+ */
 export function lineVectorPaint(layer, paint, properties, zoom) {
   const weight = readPaintValue(paint, 'line-width', 1, properties, zoom);
   const rgb = styleColor(readPaintValue(paint, 'line-color', '#000', properties, zoom));

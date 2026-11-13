@@ -1,5 +1,15 @@
 import { finiteMvtCoordinate } from './finiteMvtCoordinate.js';
 
+/**
+ * Collect non-horizontal edges and vertical levels from closed MVT rings.
+ *
+ * @param {Array} rings Closed polygon rings.
+ * @param {Array} edges Destination edges.
+ * @param {Set<number>} levels Destination vertical levels.
+ *
+ * @throws {Error} If a ring is not closed or is too short.
+ * @throws {Error} If a ring coordinate is non-finite.
+ */
 export function collectMvtEdges(rings, edges, levels) {
   let ring, i, a, b;
   for (ring of rings) {

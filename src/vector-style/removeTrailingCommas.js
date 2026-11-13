@@ -1,3 +1,10 @@
+/**
+ * Remove trailing object and array commas outside quoted JSON strings.
+ *
+ * @param {string} json JSON-like source.
+ *
+ * @returns {string} Source without trailing commas.
+ */
 export function removeTrailingCommas(json) {
   let cleaned = '', quoted = false, escaped = false, i = 0, char = '';
   for (i = 0; i < json.length; i++) {

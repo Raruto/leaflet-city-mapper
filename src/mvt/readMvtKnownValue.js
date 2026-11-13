@@ -4,6 +4,15 @@ import { readMvtInteger } from './readMvtInteger.js';
 import { readMvtString } from './readMvtString.js';
 import { takeMvtBytes } from './takeMvtBytes.js';
 
+/**
+ * Decode a known MVT value field according to its protobuf type.
+ *
+ * @param {Object} reader MVT byte reader.
+ * @param {number} field Value field number.
+ * @param {number} wire Protobuf wire type.
+ *
+ * @returns {string|number|boolean} Decoded value.
+ */
 export function readMvtKnownValue(reader, field, wire) {
   let offset, integer;
   if (field === 1) return readMvtString(reader, wire);

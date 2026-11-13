@@ -1,5 +1,14 @@
 import { evaluateStyle } from './evaluateStyle.js';
 
+/**
+ * Evaluate a match expression against scalar or array labels.
+ *
+ * @param {Array} args Input, labels, outputs and fallback.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {*} Matched output or fallback.
+ */
 export function evaluateMatch(args, properties, zoom) {
   const result = evaluateStyle(args[0], properties, zoom);
   let i = 0, matched = false;

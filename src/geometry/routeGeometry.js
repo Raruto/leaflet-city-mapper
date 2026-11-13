@@ -1,6 +1,12 @@
 import { appendRouteSegment } from './appendRouteSegment.js';
 
-/** Dashed lane outline, in layer-local metres. */
+/**
+ * Build dashed lane geometry in layer-local metres.
+ *
+ * @param {Array<Object>} lanes Lanes with points, cumulative lengths and optional route colors.
+ *
+ * @returns {Object} Flat position, normal and color arrays.
+ */
 export function routeGeometry(lanes) {
   const position = /* alloc */ [];
   const normal = /* alloc */ [];

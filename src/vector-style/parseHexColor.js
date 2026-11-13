@@ -1,3 +1,10 @@
+/**
+ * Parse a three- or six-digit hexadecimal color.
+ *
+ * @param {string} value Validated hexadecimal color text.
+ *
+ * @returns {Array<number>} Red, green, blue and opaque alpha.
+ */
 export function parseHexColor(value) {
   let i = 0, offset = 0;
   if (value.length === 4) {

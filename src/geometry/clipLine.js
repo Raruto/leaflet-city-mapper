@@ -1,7 +1,14 @@
 import { samePoint } from './samePoint.js';
 import { clipSegment } from './clipSegment.js';
 
-/** Clip a geographic line to [west, south, east, north] without joining disjoint pieces. */
+/**
+ * Clip a geographic line to [west, south, east, north] without joining disjoint pieces.
+ *
+ * @param {Array<Array<number>>} line Geographic coordinates.
+ * @param {Array<number>} bounds West, south, east and north.
+ *
+ * @returns {Array<Array<Array<number>>>} Clipped line pieces.
+ */
 export function clipLine(line, bounds) {
   const pieces = /* alloc */ [];
   let current;

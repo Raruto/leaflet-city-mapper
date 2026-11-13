@@ -2,6 +2,16 @@ import { readMvtField } from './readMvtField.js';
 import { skipMvtField } from './skipMvtField.js';
 import { readMvtKnownValue } from './readMvtKnownValue.js';
 
+/**
+ * Decode an MVT value message containing exactly one known value field.
+ *
+ * @param {Object} reader Value message reader.
+ *
+ * @returns {string|number|boolean} Decoded value.
+ *
+ * @throws {Error} If multiple known value fields are present.
+ * @throws {Error} If no known value field is present.
+ */
 export function readMvtValue(reader) {
   let value, found = false, field, wire;
   while (reader.pos < reader.bytes.length) {

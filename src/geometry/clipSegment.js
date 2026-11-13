@@ -1,3 +1,12 @@
+/**
+ * Clip a segment to geographic bounds, discarding zero-length results.
+ *
+ * @param {Array<number>} a Segment start.
+ * @param {Array<number>} b Segment end.
+ * @param {Array<number>} bounds West, south, east and north.
+ *
+ * @returns {Array<Array<number>>|null} Clipped endpoints, or null if outside.
+ */
 export function clipSegment(a, b, bounds) {
   const [west, south, east, north] = bounds;
   const dx = b[0] - a[0], dy = b[1] - a[1];

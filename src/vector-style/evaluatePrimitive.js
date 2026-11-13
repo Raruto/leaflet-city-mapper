@@ -1,3 +1,15 @@
+/**
+ * Evaluate a literal, property lookup, property existence or zoom expression.
+ *
+ * @param {string} op Expression operator.
+ * @param {Array} args Expression operands.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {*} Expression result.
+ *
+ * @throws {Error} If the operator is unsupported.
+ */
 export function evaluatePrimitive(op, args, properties, zoom) {
   switch (op) {
     case 'literal': return args[0];

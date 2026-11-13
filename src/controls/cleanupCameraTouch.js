@@ -9,6 +9,7 @@ import { endCameraTouchEvent } from './endCameraTouchEvent.js';
 import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { changeCameraTouch } from './changeCameraTouch.js';
 
+/** Remove this map's camera touch listeners, state and rotate control. */
 export function cleanupCameraTouch() {
   const state = cameraTouchStateByMap.get(this);
   if (!state) return;

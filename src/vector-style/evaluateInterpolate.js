@@ -1,6 +1,15 @@
 import { styleColor } from './styleColor.js';
 import { evaluateStyle } from './evaluateStyle.js';
 
+/**
+ * Interpolate numeric or color style outputs between expression stops.
+ *
+ * @param {Array} args Interpolation mode, input and stops.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {*} Interpolated or endpoint value.
+ */
 export function evaluateInterpolate(args, properties, zoom) {
   const result = evaluateStyle(args[1], properties, zoom);
   const base = args[0][0] === 'exponential' ? args[0][1] : 1;

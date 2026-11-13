@@ -2,7 +2,15 @@ import { parseColor } from "../colors/parseColor.js";
 import { ring } from './createLampRing.js';
 import { lampDirections } from '../globals/lampDirections.js';
 
-/** Schematic support and lamp head; wall-mounted fixtures do not get an invented pole. */
+/**
+ * Generate a schematic support and lamp head.
+ *
+ * @param {Object} point Projected position and ground height.
+ * @param {Object} style Lamp height and pole radius.
+ * @param {Function} addTriangle Triangle destination callback.
+ *
+ * @throws {Error} If the pole radius is not finite and positive.
+ */
 export function lampPostGeometry(point, style, addTriangle) {
   const color = parseColor(0x50565a), radius = style.poleRadius;
   if (!Number.isFinite(radius) || radius <= 0) {

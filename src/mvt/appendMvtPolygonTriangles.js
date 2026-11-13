@@ -2,6 +2,16 @@ import { tessellateVectorRings } from './tessellateVectorRings.js';
 import { triangulate } from '../triangulation/triangulate.js';
 import { isMvtFallbackError } from './isMvtFallbackError.js';
 
+/**
+ * Triangulate a polygon, falling back to even-odd tessellation for recognized errors.
+ *
+ * @param {Array} rings Closed tile-coordinate rings.
+ * @param {Array} paths Rings converted to point objects.
+ * @param {Array} vertices Flattened path vertices.
+ * @param {Array} triangles Destination triangle coordinates.
+ *
+ * @throws {Error} If triangulation fails with an error not eligible for fallback.
+ */
 export function appendMvtPolygonTriangles(rings, paths, vertices, triangles) {
   let indices, index, triangle, points, i = 0;
   try {

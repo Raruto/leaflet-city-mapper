@@ -1,3 +1,12 @@
+/**
+ * Resolve and cache a marker icon or shadow's dimensions and anchor.
+ *
+ * @param {Object} state Native marker state.
+ * @param {string} key Image kind, such as shadow.
+ * @param {HTMLImageElement} image Image providing fallback dimensions.
+ *
+ * @returns {Array<number>} Width, height, anchor x and anchor y.
+ */
 export function markerImageBounds(state, key, image) {
   const options = state.source.options.icon.options;
   const dimensions = options[key === 'shadow' ? 'shadowSize' : 'iconSize'];

@@ -3,6 +3,14 @@ import { terrainGridsByLayer } from '../weakmaps/terrainGridsByLayer.js';
 import { demBuffer } from '../globals/demBuffer.js';
 import { terrainGrid } from './terrainGrid.js';
 
+/**
+ * Get or create cached GPU buffers for a terrain grid subdivision count.
+ *
+ * @param {L.Layer} layer Terrain layer owning the cache.
+ * @param {number} divisions Grid subdivisions per side.
+ *
+ * @returns {Object} GPU-backed grid attributes.
+ */
 export function terrainBuffers(layer, divisions) {
   const device = rendererByLayer.get(layer).device
   let attributes = terrainGridsByLayer.get(layer).get(divisions);

@@ -1,5 +1,12 @@
 import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
 
+/**
+ * Index bridge triangles in 64-pixel buckets for elevation lookup.
+ *
+ * @param {L.Layer} layer Terrain layer owning the bridge index.
+ * @param {Array<Array<number>>} pixels Projected vertices including elevation.
+ * @param {Array<Array<number>>} triangles Triangle vertex indices.
+ */
 export function indexBridge(layer, pixels, triangles) {
   const bridgeTriangles = /* alloc */ [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

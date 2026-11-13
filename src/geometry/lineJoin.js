@@ -2,6 +2,15 @@ import { L } from '../globals/L.js';
 import { triangle } from './appendNativeTriangle.js';
 import { disk } from './disk.js';
 
+/**
+ * Append a round, bevel or limited miter join between consecutive line segments.
+ *
+ * @param {Object} context Line style and geometry buffers.
+ * @param {Array<L.Point>} points Projected line points.
+ * @param {number} i Index of the join point.
+ * @param {L.Point} b Next point.
+ * @param {number} length Outgoing segment length.
+ */
 export function lineJoin(context, points, i, b, length) {
   const { options, width, point, stroke } = context;
   const a = points[i], radius = width / 2;

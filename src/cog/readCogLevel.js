@@ -3,6 +3,15 @@ import { getCogBase } from './getCogBase.js';
 import { validCogGrid } from './validCogGrid.js';
 import { validateCogOffsets } from './validateCogOffsets.js';
 
+/**
+ * Validate and register one TIFF directory as a COG XYZ level.
+ *
+ * @param {Object} source Open COG source and level map.
+ * @param {Object} directory TIFF directory with parsed tags.
+ * @param {Object} state Mutable base image and zoom range.
+ *
+ * @throws {Error} If the level does not align with the supported Web Mercator grid.
+ */
 export function readCogLevel(source, directory, state) {
   const tags = directory.tags, profile = getCogProfile(tags);
   if (!state.base) state.base = getCogBase(tags, profile.width, profile.height, profile.elevation);

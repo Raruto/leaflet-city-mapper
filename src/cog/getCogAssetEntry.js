@@ -1,6 +1,17 @@
 import { decompress } from '../archives/decompress.js';
 import { readCog } from './readCog.js';
 
+/**
+ * Read and validate a named COG asset entry from PMTiles metadata.
+ *
+ * @param {Object} container Container byte source.
+ * @param {Object} header Decoded PMTiles header.
+ * @param {string} asset Asset name.
+ *
+ * @returns {Promise<Object>} Validated asset entry.
+ *
+ * @throws {Error} If metadata does not contain a valid bounded asset.
+ */
 export async function getCogAssetEntry(container, header, asset) {
   const metadata = JSON.parse(/* alloc */ new TextDecoder().decode(await decompress(
     await readCog(container, header.jsonMetadataOffset, header.jsonMetadataLength), header.internalCompression)));

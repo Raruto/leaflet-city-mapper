@@ -1,5 +1,18 @@
 import { readCog } from './readCog.js';
 
+/**
+ * Read the numeric values of a supported TIFF directory entry.
+ *
+ * @param {Object} source Open COG byte source.
+ * @param {DataView} entries Directory entry data.
+ * @param {number} i Entry index.
+ * @param {number} tag TIFF tag number.
+ * @param {boolean} little Whether the TIFF uses little-endian byte order.
+ *
+ * @returns {Promise<Array<number>>} Decoded tag values.
+ *
+ * @throws {Error} If the tag type or value count is unsupported.
+ */
 export async function readCogTag(source, entries, i, tag, little) {
   const type = entries.getUint16(i * 12 + 2, little);
   const size = type === 3 ? 2 : type === 4 ? 4 : type === 12 ? 8 : 0;

@@ -1,5 +1,18 @@
 import { readCogBlock } from './readCogBlock.js';
 
+/**
+ * Composite the COG color blocks overlapping an XYZ tile into an image bitmap.
+ *
+ * @param {Object} source Open COG source.
+ * @param {Object} level COG overview level.
+ * @param {number} x XYZ tile column.
+ * @param {number} y XYZ tile row.
+ * @param {AbortSignal} [signal] Request cancellation signal.
+ *
+ * @returns {Promise<Object>} Object containing the resulting image bitmap.
+ *
+ * @throws {Error} If a 2D canvas context cannot be created.
+ */
 export async function getColorTile(source, level, x, y, signal) {
   const canvas = /* alloc */ new OffscreenCanvas(256, 256), context = canvas.getContext('2d');
   if (!context) throw /* alloc */ new Error('Unable to create COG tile canvas');

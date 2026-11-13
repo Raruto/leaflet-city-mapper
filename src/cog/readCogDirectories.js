@@ -1,6 +1,18 @@
 import { readCogDirectory } from './readCogDirectory.js';
 import { readCogLevel } from './readCogLevel.js';
 
+/**
+ * Read TIFF image directories and register contiguous COG zoom levels.
+ *
+ * @param {Object} source Open COG byte source.
+ * @param {number} offset First TIFF directory offset.
+ *
+ * @returns {Promise<Object>} Base image and minimum and maximum zoom.
+ *
+ * @throws {Error} If directories are cyclic or exceed the supported count.
+ * @throws {Error} If there is no image directory.
+ * @throws {Error} If overview zoom levels are not contiguous.
+ */
 export async function readCogDirectories(source, offset) {
   const state = /* alloc */ { base: null, minZoom: Infinity, maxZoom: -Infinity };
   const seen = /* alloc */ new Set();

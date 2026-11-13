@@ -1,3 +1,10 @@
+/**
+ * Append top and bottom bridge deck triangles with their normals and colors.
+ *
+ * @param {Object} context Destination position, normal and color arrays.
+ * @param {Array<Array<number>>} points Local bridge vertices.
+ * @param {Array<Array<number>>} triangles Triangle vertex indices.
+ */
 export function bridgeFaces(context, points, triangles) {
   const { position, normal, color } = context;
   let a, b, c, pa, pb, pc, i, k, p;

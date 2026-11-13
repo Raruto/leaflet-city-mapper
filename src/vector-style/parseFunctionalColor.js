@@ -1,3 +1,12 @@
+/**
+ * Parse an rgb or rgba color into numeric components.
+ *
+ * @param {string} value Color text.
+ *
+ * @returns {Array<number>} Red, green, blue and alpha components.
+ *
+ * @throws {Error} If the color syntax or components are unsupported.
+ */
 export function parseFunctionalColor(value) {
   const match = /^rgba?\(([^)]+)\)$/.exec(value);
   if (match) {

@@ -1,5 +1,17 @@
 import { evaluateStyle } from './evaluateStyle.js';
 
+/**
+ * Evaluate addition or unary/binary subtraction in a style expression.
+ *
+ * @param {string} op Arithmetic operator.
+ * @param {Array} args Expression operands.
+ * @param {Object} properties Feature properties.
+ * @param {number} zoom Current zoom.
+ *
+ * @returns {number} Arithmetic result.
+ *
+ * @throws {Error} If the operator is unsupported.
+ */
 export function evaluateMath(op, args, properties, zoom) {
   let i = 0, sum = 0;
   if (op === '+') {

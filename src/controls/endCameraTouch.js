@@ -1,3 +1,9 @@
+/**
+ * End a camera touch gesture and restore map dragging and zoom snapping.
+ *
+ * @param {Object} state Camera touch state.
+ * @param {TouchEvent} [event] Touch completion event.
+ */
 export function endCameraTouch(state, event) {
   if (!state.touch) return;
   if (event?.touches?.length >= 2) return;

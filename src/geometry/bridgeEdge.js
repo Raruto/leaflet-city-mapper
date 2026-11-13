@@ -1,3 +1,10 @@
+/**
+ * Append a bridge deck edge as two triangles with outward normals.
+ *
+ * @param {Object} context Destination position, normal and color arrays.
+ * @param {Array<number>} p First edge point.
+ * @param {Array<number>} q Second edge point.
+ */
 export function bridgeEdge(context, p, q) {
   const { position, normal, color } = context;
   const length = Math.hypot(q[0] - p[0], q[2] - p[2]) || 1;

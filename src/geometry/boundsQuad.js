@@ -1,5 +1,13 @@
 import { localPosition } from '../projections/localPosition.js';
 
+/**
+ * Project geographic bounds corners into local scene positions.
+ *
+ * @param {Object} state Native layer projection state.
+ * @param {L.LatLngBounds} bounds Geographic bounds.
+ *
+ * @returns {Array} Projected northwest, northeast, southwest and southeast corners.
+ */
 export function boundsQuad(state, bounds) {
   const positions = /* alloc */ [];
   let i, corner;

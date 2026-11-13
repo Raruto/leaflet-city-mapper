@@ -1,6 +1,13 @@
 import { line } from './line.js';
 import { fillNativePolygon } from './fillNativePolygon.js';
 
+/**
+ * Project polygon or line rings and append their fill and stroke geometry.
+ *
+ * @param {Object} context Projection, style and geometry buffers.
+ * @param {Array<Array<L.LatLng>>} rings Geographic rings or lines.
+ * @param {boolean} closed Whether to close and optionally fill the rings.
+ */
 export function polygon(context, rings, closed) {
   const { options, map } = context;
   const projected = /* alloc */ [];

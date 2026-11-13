@@ -4,7 +4,17 @@ import { getCogTile } from './getCogTile.js';
 import { getCogHeader } from './getCogHeader.js';
 import { openCogAsset } from './openCogAsset.js';
 
-/** EPSG:3857 COGs, standalone or named assets in a PMTiles container. */
+/**
+ * Open an EPSG:3857 COG, standalone or as a named asset in a PMTiles container.
+ *
+ * @param {string} url COG or container URL.
+ * @param {string} [asset] Named COG asset in the container.
+ *
+ * @returns {Promise<Object>} Archive-compatible header and XYZ tile methods.
+ *
+ * @throws {Error} If TIFF byte order is invalid.
+ * @throws {Error} If the file is not classic TIFF.
+ */
 export async function openCog(url, asset) {
   const source = asset === undefined ? /* alloc */ { url } : await openCogAsset(url, asset);
   source.levels = /* alloc */ new Map();

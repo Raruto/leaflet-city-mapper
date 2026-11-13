@@ -5,6 +5,11 @@ import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 
+/**
+ * Update camera pitch and bearing from an active pointer drag.
+ *
+ * @param {PointerEvent} event Pointer-move event.
+ */
 export function cameraDragMove(event) {
   const state = dragStates.value.get(this);
   if (!state.drag || state.drag.id !== event.pointerId) return;

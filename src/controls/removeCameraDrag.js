@@ -8,6 +8,11 @@ import { cameraDragClick } from './cameraDragClick.js';
 import { cameraDragContextMenu } from './cameraDragContextMenu.js';
 import { endAllCameraDrags } from './endAllCameraDrags.js';
 
+/**
+ * Finish a drag and remove its element and shared blur listeners.
+ *
+ * @param {Object} state Registered camera drag state.
+ */
 export function removeCameraDrag(state) {
   finishCameraDrag(state);
   const { element } = state;

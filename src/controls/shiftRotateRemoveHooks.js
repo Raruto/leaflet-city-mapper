@@ -1,3 +1,4 @@
+/** Remove this handler's Shift-wheel rotation listener. */
 export function shiftRotateRemoveHooks() {
   const container = this._map.getContainer();
   container.removeEventListener('wheel', this._wheel, true);

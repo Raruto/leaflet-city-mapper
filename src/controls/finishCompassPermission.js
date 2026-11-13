@@ -1,5 +1,12 @@
 import { failCompassPermission } from './failCompassPermission.js';
 
+/**
+ * Install compass listeners if the current permission request succeeded.
+ *
+ * @param {Array<Object>} results Settled handler-generation and permission results.
+ *
+ * @returns {*} Permission failure handler result when permission is unavailable or denied.
+ */
 export function finishCompassPermission([handlerResult, permissionResult]) {
   const { handler, generation } = handlerResult.value;
   if (!handler.enabled() || handler._generation !== generation) return;

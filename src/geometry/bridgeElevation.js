@@ -1,4 +1,11 @@
-/** Height inside a bridge deck, or null outside its triangles. */
+/**
+ * Interpolate bridge deck height at a DEM pixel point.
+ *
+ * @param {L.Point} point DEM pixel coordinate.
+ * @param {Map} bridges Bridge triangle buckets, if present.
+ *
+ * @returns {number|null} Deck elevation, or null outside its triangles.
+ */
 export function bridgeElevation(point, bridges) {
   // Bridges bucketed by 64 DEM pixels.
   const bucket = bridges?.get(`${Math.floor(point.x / 64)}/${Math.floor(point.y / 64)}`);

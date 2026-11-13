@@ -6,6 +6,11 @@ import { mapStopPitchBearingAnimation } from '../animations/mapStopPitchBearingA
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 
+/**
+ * Start a two-finger camera gesture and retain its initial anchor and map state.
+ *
+ * @param {TouchEvent} event Touch-start event.
+ */
 export function startCameraTouch(event) {
   const state = touchByContainer.get(this), { map, container } = state;
   if (state.touch || event.touches.length !== 2 || event.target.closest('.leaflet-control')) return;

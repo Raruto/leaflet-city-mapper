@@ -3,6 +3,7 @@ import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { project } from '../projections/projectCameraPoint.js';
 
+/** Convert this map's draggable displacement into ground-space camera movement. */
 export function adjustCameraDrag() {
   const map = this;
   const draggable = cameraDraggableByMap.get(map);

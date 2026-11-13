@@ -2,6 +2,11 @@ import { dragStates } from '../weakmaps/dragStates.js';
 import { cameraFocusOptions } from '../globals/cameraFocusOptions.js';
 import { editable } from './isEditableTarget.js';
 
+/**
+ * Begin an accepted camera pointer drag and temporarily disable map dragging.
+ *
+ * @param {PointerEvent} event Pointer-down event.
+ */
 export function cameraDragDown(event) {
   const state = dragStates.value.get(this);
   if (state.drag || !state.accept(event) || editable(event.target)) return;

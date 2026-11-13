@@ -4,7 +4,13 @@ import { ring } from './createTreeRing.js';
 import { surface } from './surface.js';
 import { validateTree } from './validateTree.js';
 
-/** Low-poly tree, sharing the source block's buffers, picking and terrain offset. */
+/**
+ * Generate a low-poly tree in the source block's geometry buffers.
+ *
+ * @param {Object} point Projected position and ground height.
+ * @param {Object} style Tree dimensions, crown shape and colors.
+ * @param {Function} addTriangle Triangle destination callback.
+ */
 export function treeGeometry(point, style, addTriangle) {
   const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = 'round' } = style;
   validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);

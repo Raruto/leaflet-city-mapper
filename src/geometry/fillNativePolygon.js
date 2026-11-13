@@ -1,6 +1,14 @@
 import { triangle } from './appendNativeTriangle.js';
 import { triangulate } from '../triangulation/triangulate.js';
 
+/**
+ * Append fill triangles for a native polygon, respecting pre-triangulated input.
+ *
+ * @param {Object} context Projection, style and fill buffer.
+ * @param {Array<Array<L.Point>>} projected Projected polygon rings.
+ *
+ * @throws {Error} If a pre-triangulated polygon does not have exactly three vertices and no holes.
+ */
 export function fillNativePolygon(context, projected) {
   const { options, fill, point } = context;
   if (options.triangulated) {

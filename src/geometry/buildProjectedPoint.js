@@ -3,6 +3,17 @@ import { lampPostGeometry } from './lampPostGeometry.js';
 import { lightGeometry } from './lightGeometry.js';
 import { treeGeometry } from './treeGeometry.js';
 
+/**
+ * Generate tree or night-light geometry for a projected point.
+ *
+ * @param {Object} context Area geometry and light state.
+ * @param {Object} projected Projected point with ground height.
+ * @param {Object} style Point geometry style.
+ * @param {Object} baseColor Parsed RGB color.
+ * @param {string} support Support identifier used to deduplicate lamp posts.
+ *
+ * @throws {Error} If a night-light flux is not finite and positive.
+ */
 export function buildProjectedPoint(context, projected, style, baseColor, support) {
   const { top } = style;
   if (context.backend.options.nightLight) {

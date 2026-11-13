@@ -2,6 +2,19 @@ import { readCog } from './readCog.js';
 import { cogTags } from '../globals/cogTags.js';
 import { readCogTag } from './readCogTag.js';
 
+/**
+ * Read supported TIFF tags from one image directory.
+ *
+ * @param {Object} source Open COG byte source.
+ * @param {number} offset Directory byte offset.
+ *
+ * @returns {Promise<Object>} Tag map and next directory offset.
+ *
+ * @throws {Error} If the directory size is invalid.
+ * @throws {Error} If a nodata tag is present.
+ * @throws {Error} If an affine transformation tag is present.
+ * @throws {Error} If a supported tag is duplicated.
+ */
 export async function readCogDirectory(source, offset) {
   const little = source.little;
   const count = /* alloc */ new DataView(await readCog(source, offset, 2)).getUint16(0, little);

@@ -8,6 +8,13 @@ import { skipMvtField } from './skipMvtField.js';
  * Decode an uncompressed MVT ArrayBuffer/Uint8Array into tile-local layers.
  * Feature types: 0 unknown, 1 points, 2 lines, 3 polygon rings (including holes).
  * Integers outside JavaScript's safe range are returned as decimal strings.
+ *
+ * @param {ArrayBuffer|Uint8Array} buffer Uncompressed tile data.
+ *
+ * @returns {Array<Object>} Decoded tile layers.
+ *
+ * @throws {TypeError} If the input is not a supported byte buffer.
+ * @throws {Error} If layer names are duplicated.
  */
 export function decodeVectorTile(buffer) {
   if (!(buffer instanceof ArrayBuffer) && !(buffer instanceof Uint8Array)) {

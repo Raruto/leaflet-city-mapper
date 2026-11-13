@@ -1,6 +1,14 @@
 import { computeBounds } from './computeBounds.js';
 import { meshShadowBounds } from './meshShadowBounds.js';
 
+/**
+ * Compute combined world-space mesh bounds including ground below them.
+ *
+ * @param {Array<Object>} meshes Shadow meshes.
+ * @param {Object} [output] Bounds object to populate.
+ *
+ * @returns {Object} Combined minimum and maximum bounds.
+ */
 export function shadowBounds(meshes, output = /* alloc */ {
   min: /* alloc */ [Infinity, Infinity, Infinity],
   max: /* alloc */ [-Infinity, -Infinity, -Infinity],

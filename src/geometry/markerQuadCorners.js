@@ -8,6 +8,15 @@ import { markerImageBounds } from './markerImageBounds.js';
 import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';
 import { mapElevationOf } from '../terrain/mapElevationOf.js';
 
+/**
+ * Compute local scene corners for a camera-oriented marker image quad.
+ *
+ * @param {Object} state Native marker state and projection context.
+ * @param {string} key Image kind, such as shadow.
+ * @param {HTMLImageElement} image Image providing fallback dimensions.
+ *
+ * @returns {Array<Array<number>>} Four local scene corners.
+ */
 export function markerQuadCorners(state, key, image) {
   const { source, map, backend: layer } = state;
 

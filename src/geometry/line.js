@@ -2,6 +2,13 @@ import { segment } from './segment.js';
 import { lineJoin } from './lineJoin.js';
 import { dashedSegment } from './dashedSegment.js';
 
+/**
+ * Generate solid or dashed stroke geometry for a projected line or ring.
+ *
+ * @param {Object} context Line style and geometry buffers.
+ * @param {Array<L.Point>} points Projected line points.
+ * @param {boolean} closed Whether to connect the last point to the first.
+ */
 export function line(context, points, closed) {
   const { options, width, dash } = context;
   if (!options.stroke || width <= 0 || points.length < 2) return;

@@ -8,6 +8,17 @@ import { cameraDragClick } from './cameraDragClick.js';
 import { cameraDragContextMenu } from './cameraDragContextMenu.js';
 import { endAllCameraDrags } from './endAllCameraDrags.js';
 
+/**
+ * Install camera drag listeners on an element.
+ *
+ * @param {L.Map} map Map to manipulate.
+ * @param {HTMLElement} element Drag target.
+ * @param {Function} accept Predicate for starting a drag.
+ * @param {Array<number>} [sensitivity] Bearing and pitch sensitivities.
+ * @param {boolean} [orbit] Whether horizontal movement can orbit around the map center.
+ *
+ * @returns {Object} Registered drag state.
+ */
 export function dragCamera(map, element, accept, sensitivity = cameraDragSensitivity, orbit = false) {
   const state = /* alloc */ { map, element, accept, sensitivity, orbit, drag: null, moved: false };
   dragStates.value.set(element, state);

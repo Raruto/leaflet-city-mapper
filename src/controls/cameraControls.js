@@ -71,6 +71,11 @@ L.Control.Rotate = RotateControl;
 
 if (L.control) L.control.rotate = rotateControl;
 
+/**
+ * Install camera handlers, touch listeners and the optional rotate control.
+ *
+ * @param {L.Map} map Map receiving the controls.
+ */
 export function cameraControls(map) {
   addCameraHandler(map, 'trackContainerMutation', ContainerResize.value);
   if (!map.options.rotate) return;

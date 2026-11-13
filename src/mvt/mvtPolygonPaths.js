@@ -1,3 +1,10 @@
+/**
+ * Convert closed coordinate rings to point-object paths without duplicate closing vertices.
+ *
+ * @param {Array} rings Closed tile-coordinate rings.
+ *
+ * @returns {Array<Array<Object>>} Polygon point paths.
+ */
 export function mvtPolygonPaths(rings) {
   const paths = /* alloc */ [];
   let ring, i, path;

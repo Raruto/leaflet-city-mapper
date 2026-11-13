@@ -4,6 +4,13 @@ import { rasterNormals } from '../globals/rasterNormals.js';
 import { rasterUVs } from '../globals/rasterUVs.js';
 import { rasterIndices } from '../globals/rasterIndices.js';
 
+/**
+ * Create GPU geometry for a shared indexed raster quad.
+ *
+ * @param {GPUDevice} device Device owning the buffers.
+ *
+ * @returns {Object} Quad geometry and attributes.
+ */
 export function createGeometry(device) {
   const attributes = /* alloc */ {
     position: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(rasterPositions) },

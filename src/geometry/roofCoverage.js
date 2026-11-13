@@ -4,7 +4,15 @@ import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
 import { roofFootprint } from './roofFootprint.js';
 import { subtractRoofTile } from './subtractRoofTile.js';
 
-/** Test the mesh's ground footprint against loaded imagery, including coarse parent tiles. */
+/**
+ * Test the mesh's ground footprint against loaded imagery, including coarse parent tiles.
+ *
+ * @param {Object} mesh Mesh whose footprint is tested.
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Array<L.Layer>} rasters Raster layers to inspect.
+ *
+ * @returns {boolean} Whether the footprint is covered or needs no imagery.
+ */
 export function roofCoverage(mesh, layer, rasters) {
   let intersectsArchive = false, pending = false;
   let rasterLayer, footprint, remaining, tile;

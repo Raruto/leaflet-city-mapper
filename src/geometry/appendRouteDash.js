@@ -1,3 +1,21 @@
+/**
+ * Append a raised route dash as two colored triangles.
+ *
+ * @param {Array<number>} position Destination positions.
+ * @param {Array<number>} normal Destination normals.
+ * @param {Array<number>} color Destination colors.
+ * @param {Array<number>} a Segment start.
+ * @param {Array<number>} b Segment end.
+ * @param {number} dx Segment x displacement.
+ * @param {number} dz Segment z displacement.
+ * @param {number} x Dash half-width x offset.
+ * @param {number} z Dash half-width z offset.
+ * @param {number} start Start fraction along the segment.
+ * @param {number} end End fraction along the segment.
+ * @param {number} r Red component.
+ * @param {number} g Green component.
+ * @param {number} blue Blue component.
+ */
 export function appendRouteDash(position, normal, color, a, b, dx, dz, x, z, start, end, r, g, blue) {
   const px = a[0] + dx * start, pz = a[1] + dz * start;
   const py = a[2] + (b[2] - a[2]) * start + 0.4;

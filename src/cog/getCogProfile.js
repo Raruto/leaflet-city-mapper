@@ -1,6 +1,15 @@
 import { validCogDimensions } from './validCogDimensions.js';
 import { validCogEncoding } from './validCogEncoding.js';
 
+/**
+ * Extract and validate a supported tiled color or elevation TIFF profile.
+ *
+ * @param {Map} tags TIFF tags.
+ *
+ * @returns {Object} Image dimensions, sample count and elevation flag.
+ *
+ * @throws {Error} If the TIFF dimensions or encoding are unsupported.
+ */
 export function getCogProfile(tags) {
   const width = tags.get(256)?.[0], height = tags.get(257)?.[0], samples = tags.get(277)?.[0] ?? 1;
   const bits = tags.get(258), format = tags.get(339) || /* alloc */ [1];

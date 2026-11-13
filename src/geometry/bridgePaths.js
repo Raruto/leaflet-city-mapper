@@ -1,3 +1,11 @@
+/**
+ * Reconstruct ring paths from flattened projected bridge pixels.
+ *
+ * @param {Array<Array>} rings Original bridge rings.
+ * @param {Array<Array<number>>} pixels Flattened projected coordinates.
+ *
+ * @returns {Array<Array<Object>>} Projected x/y paths.
+ */
 export function bridgePaths(rings, pixels) {
   const paths = /* alloc */ [];
   let start = 0, ring, path, i;

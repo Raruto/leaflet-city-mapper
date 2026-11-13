@@ -7,6 +7,15 @@ import { readMvtString } from './readMvtString.js';
 import { readMvtValue } from './readMvtValue.js';
 import { skipMvtField } from './skipMvtField.js';
 
+/**
+ * Decode an MVT layer and resolve its features against property tables.
+ *
+ * @param {Object} reader Layer message reader.
+ *
+ * @returns {Object} Layer name, extent and features.
+ *
+ * @throws {Error} If layer name, version or extent is invalid.
+ */
 export function readMvtLayer(reader) {
   let name, version, extent = 4096, field, wire, value, i = 0;
   const keys = /* alloc */ [], values = /* alloc */ [], features = /* alloc */ [];

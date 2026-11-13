@@ -1,3 +1,9 @@
+/**
+ * Recreate geometry buffers on a device from retained CPU attributes.
+ *
+ * @param {Object} geometry Geometry and attribute data to restore.
+ * @param {GPUDevice} device Device receiving the buffers.
+ */
 export function restoreGeometry(geometry, device) {
   if (geometry.attributes.index?.data instanceof Uint8Array) {
     geometry.attributes.index.data = /* alloc */ new Uint16Array(geometry.attributes.index.data);

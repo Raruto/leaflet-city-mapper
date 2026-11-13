@@ -1,3 +1,12 @@
+/**
+ * Load and initialize camera controls for a map that is still mounted.
+ *
+ * @param {L.Map} map Map receiving the controls.
+ *
+ * @returns {Promise<void>} Completion of control loading.
+ *
+ * @throws {Error} If loading or initialization fails, after emitting a map error.
+ */
 export async function loadCameraControls(map) {
   try {
     const { cameraControls } = await import('./cameraControls.js');

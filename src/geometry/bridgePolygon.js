@@ -5,6 +5,12 @@ import { indexBridge } from './indexBridge.js';
 import { bridgeFaces } from './bridgeFaces.js';
 import { bridgeSides } from './bridgeSides.js';
 
+/**
+ * Project, triangulate and index a bridge polygon, adding its deck geometry.
+ *
+ * @param {Object} context Bridge projection and destination buffers.
+ * @param {Array<Array<Array<number>>>} polygon GeoJSON polygon rings with elevations.
+ */
 export function bridgePolygon(context, polygon) {
   const { backend: layer, map, zoom, crs, origin, metres, base } = context;
   const rings = /* alloc */ [];

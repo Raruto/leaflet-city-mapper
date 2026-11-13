@@ -1,6 +1,7 @@
 import { compassOrientation } from './compassOrientation.js';
 import { finishCompassPermission } from './finishCompassPermission.js';
 
+/** Request device compass permission for this handler and install listeners when granted. */
 export function compassAddHooks() {
   this._compassGeneration = (this._generation = (this._generation || 0) + 1);
   this._orientation = /* alloc */ { handler: this, handleEvent: compassOrientation };

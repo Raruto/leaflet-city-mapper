@@ -1,6 +1,17 @@
 import { ringDirections } from '../globals/ringDirections.js';
 import { ring } from './createTreeRing.js';
 
+/**
+ * Generate the side surface between two eight-sided tree rings.
+ *
+ * @param {Object} point Ring center and ground height.
+ * @param {Function} addTriangle Triangle destination callback.
+ * @param {number} lowRadius Lower ring radius.
+ * @param {number} low Lower ring height.
+ * @param {number} highRadius Upper ring radius.
+ * @param {number} high Upper ring height.
+ * @param {Object} color Surface color.
+ */
 export function surface(point, addTriangle, lowRadius, low, highRadius, high, color) {
   const lower = ring(point, lowRadius), upper = ring(point, highRadius);
   let i, next, slope, length, nx, nz, ny, normalX, normalZ;
