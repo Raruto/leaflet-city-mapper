@@ -207,7 +207,8 @@ Then('vector tile sources switch without mixing layers or requests', { timeout: 
         source.labelsReady && source.labels.size &&
         [...source.tiles.values()].every(tile => tile.group) &&
         [...source.tiles.values()].some(tile => tile.group.getLayers().some(layer =>
-          layer instanceof L.Polygon && globals.sceneByLayer.get(layer).renderer));
+          layer instanceof L.Polygon &&
+          globals.sceneByLayer.get(globals.sceneByLayer.get(layer)._nativeGPU?.backend)?.renderer));
     });
     const switched = await this.page.evaluate(() => {
       const source = Object.values(map._layers).find(layer => layer.tiles);

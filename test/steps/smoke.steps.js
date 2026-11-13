@@ -16,6 +16,41 @@ let server;
 let browser;
 let base;
 
+async function trackArchiveCancellations(page) {
+  await page.addInitScript(() => {
+    const fetch = globalThis.fetch;
+    let nextId = 0;
+    globalThis.smokeCancelledArchives = [];
+    globalThis.fetch = function (input, options) {
+      const url = new URL(input instanceof Request ? input.url : input, location.href);
+      const signal = options?.signal || (input instanceof Request && input.signal);
+      if (url.origin !== location.origin || !url.pathname.endsWith('.pmtiles') || !signal) {
+        return fetch.call(this, input, options);
+      }
+      const id = String(++nextId);
+      const headers = new Headers(options?.headers || (input instanceof Request && input.headers) || undefined);
+      headers.set('x-smoke-request-id', id);
+      if (signal.aborted) globalThis.smokeCancelledArchives.push(id);
+      else signal.addEventListener('abort', () => globalThis.smokeCancelledArchives.push(id), { once: true });
+      return fetch.call(this, input, { ...options, headers });
+    };
+  });
+  const failures = [];
+  page.on('requestfailed', request => failures.push({
+    url: request.url(), type: request.resourceType(), error: request.failure().errorText,
+    id: request.headers()['x-smoke-request-id'],
+  }));
+  return failures;
+}
+
+async function unexpectedRequestFailures(page, failures) {
+  const cancelled = new Set(await page.evaluate(() => globalThis.smokeCancelledArchives));
+  return failures.filter(({ type, error, id }) =>
+    !(type === 'image' && error === 'net::ERR_ABORTED') &&
+    !(type === 'fetch' && error === 'net::ERR_ABORTED' && id && cancelled.has(id)))
+    .map(({ url, error }) => `Request: ${url} (${error})`);
+}
+
 Before({ tags: '@smoke', timeout: 30000 }, async function () {
   if (!server) {
     server = await startServer(0);
@@ -56,6 +91,7 @@ Then('all HTML examples are listed', function () {
 Then('the example {string} loads without browser errors', { timeout: 30000 }, async function (example) {
   const page = await browser.newPage();
   const errors = [];
+  const failures = await trackArchiveCancellations(page);
   const localBundles = new Set();
   let googleKeyWarning = false;
   let bundleLoaded = false;
@@ -71,12 +107,6 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
         googleKeyWarning = true;
       }
       else errors.push(`Console: ${message.text()}`);
-    }
-  });
-  page.on('requestfailed', request => {
-    const error = request.failure().errorText;
-    if (request.resourceType() !== 'image' || error !== 'net::ERR_ABORTED') {
-      errors.push(`Request: ${request.url()} (${error})`);
     }
   });
   page.on('response', response => {
@@ -116,6 +146,7 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
       page.locator('.leaflet-container').first().waitFor({ state: 'attached', timeout: 8000 }),
     ]);
     await page.waitForTimeout(1000);
+    errors.push(...await unexpectedRequestFailures(page, failures));
     assert.ok(!errors.length, errors.join('\n'));
     if (googleKeyWarning) console.log('Google Maps API-key warning ignored: API key not configured');
   } catch (error) {
@@ -123,6 +154,39 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
     throw error;
   } finally {
     page.removeAllListeners();
+    await page.close();
+  }
+});
+
+Then('smoke tests distinguish cancelled archive requests from network failures', async function () {
+  const page = await browser.newPage();
+  const failures = await trackArchiveCancellations(page);
+  let release, started;
+  const routed = new Promise(resolve => { started = resolve; });
+  try {
+    await page.route('**/cancelled.pmtiles', async route => {
+      await new Promise(resolve => { release = resolve; started(); });
+      await route.abort('failed');
+    });
+    await page.route('**/broken.pmtiles', route => route.abort('failed'));
+    await page.goto(base);
+    await page.evaluate(() => {
+      globalThis.smokeController = new AbortController();
+      fetch('/cancelled.pmtiles', { signal: smokeController.signal }).catch(() => {});
+    });
+    await routed;
+    const cancelled = page.waitForEvent('requestfailed', request => request.url().endsWith('/cancelled.pmtiles'));
+    await page.evaluate(() => smokeController.abort());
+    release();
+    await cancelled;
+    const broken = page.waitForEvent('requestfailed', request => request.url().endsWith('/broken.pmtiles'));
+    await page.evaluate(() => fetch('/broken.pmtiles', { signal: new AbortController().signal }).catch(() => {}));
+    await broken;
+    const errors = await unexpectedRequestFailures(page, failures);
+    assert.equal(failures.length, 2);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /broken\.pmtiles/);
+  } finally {
     await page.close();
   }
 });
