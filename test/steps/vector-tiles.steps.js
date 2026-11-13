@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
-import { Then } from '@cucumber/cucumber';
+import { Given, Then } from '@cucumber/cucumber';
 import { field, feature, tile } from '../fixtures/vector-tile.js';
 import { prepare3DChecks } from './3d.steps.js';
 import { build } from 'esbuild';
 import { decodeVectorTile } from '../../src/mvt/decodeVectorTile.js';
 import { PNG } from 'pngjs';
 
-Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
+Given('the vector tiles example is loaded with offline fixtures',
   { timeout: 30000 }, async function () {
     await this.page.setViewportSize({ width: 640, height: 480 });
-    const errors = [], downloads = [], libraryRequests = [];
+    const errors = this.vectorErrors = [], downloads = this.vectorDownloads = [], libraryRequests = this.vectorLibraryRequests = [];
     this.page.on('request', request => {
       if (/\/(?:libs\/vector-tile(?:-layer|-style|-worker)?\.js$|src\/(?:mvt|vector-style|vector-tiles)\/)/.test(
         new URL(request.url()).pathname)) {
@@ -62,6 +62,7 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
     const label = tile([feature(1, [9, 4096, 4096], [0, 0])], ['name'],
       [field(1, 2, [...new TextEncoder().encode('Paris <test>')])], 'place_labels');
     const body = Buffer.concat([building, road, label]);
+    this.vectorTileBody = body;
     await this.context.route('https://opentopomap.org/otm/**', route => {
       downloads.push(route.request().url());
       return route.fulfill({ contentType: 'application/vnd.mapbox-vector-tile', body });
@@ -74,6 +75,10 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
       return source && !source.inflight && source.labelsReady && source.labels.size &&
         [...source.tiles.values()].every(tile => tile.group);
     });
+  });
+
+Then('the vector tiles example preserves geometry and label sizes through zoom and rotation',
+  { timeout: 30000 }, async function () {
     await prepare3DChecks(this.page);
     const contract = await this.page.evaluate(() => {
       const layer = Object.values(map._layers).find(layer => layer.tiles);
@@ -172,10 +177,15 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
       assert.ok(Math.abs(snapshot.scale - snapshot.expectedScale) < 1e-7, JSON.stringify(snapshot));
       assert.ok(snapshot.elapsed < 150, `Dense-tile view update exceeds 150 ms: ${JSON.stringify(snapshot)}`);
     }
-    assert.ok(downloads.length > 0);
-    assert.ok(downloads.every(url => Number(new URL(url).pathname.split('/')[2]) <= 14),
+    assert.ok(this.vectorDownloads.length > 0);
+    assert.ok(this.vectorDownloads.every(url => Number(new URL(url).pathname.split('/')[2]) <= 14),
       'Overzoom never requests unsupported tiles');
     assert.deepEqual(result.failure, []);
+    assert.deepEqual(this.vectorLibraryRequests, [], 'MVT support is bundled without runtime library or source imports');
+    assert.deepEqual(this.vectorErrors, []);
+  });
+
+Then('vector tile sources switch without mixing layers or requests', { timeout: 30000 }, async function () {
     await this.page.evaluate(() => {
       globalThis.originalVectorTiles = Object.values(map._layers).find(layer => layer.tiles);
       originalVectorTiles.remove();
@@ -225,11 +235,11 @@ Then('the vector tiles example preserves geometry and label sizes through zoom a
           key: tile.key, needed: tile.needed, started: tile.started, loaded: Boolean(tile.group),
         })),
       })));
-      error.message += `\nVector sources: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(errors)}`;
+      error.message += `\nVector sources: ${JSON.stringify(state)}\nPage errors: ${JSON.stringify(this.vectorErrors)}`;
       throw error;
     });
-    const decoder = decodeVectorTile(body).map(layer => layer.name);
+    const decoder = decodeVectorTile(this.vectorTileBody).map(layer => layer.name);
     assert.deepEqual(decoder, ['buildings', 'streets', 'place_labels']);
-    assert.deepEqual(libraryRequests, [], 'MVT support is bundled without runtime library or source imports');
-    assert.deepEqual(errors, []);
+    assert.deepEqual(this.vectorLibraryRequests, [], 'MVT support is bundled without runtime library or source imports');
+    assert.deepEqual(this.vectorErrors, []);
   });

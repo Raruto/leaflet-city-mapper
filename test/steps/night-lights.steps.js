@@ -140,16 +140,17 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
   this.page.on('pageerror', error => errors.push(error.message));
   this.page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   if (check !== 'Eiffel Tower sparkle') await waitForStreetlights(this.page);
-  await this.page.waitForFunction(() => {
+  await this.page.waitForFunction(check => {
     const owner = globals.renderers.get(map);
     const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
     return (!map.hasLayer(buildings) || globals.sceneByLayer.get(owner)?._roofRaster) &&
-      globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0 &&
+      (check === 'illumination on 3D surfaces' ||
+        globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles.size > 0) &&
       !Object.values(map._layers).some(layer => globals.sceneByLayer.get(layer)?.kind === 'raster'
         ? testOperations.isLoading(layer) : layer.isLoading?.()) &&
       [...globals.sceneByLayer.get(owner)._layers].every(layer => !globals.sceneByLayer.get(layer)._3d || !globals.sceneByLayer.get(layer).url || (globals.sceneByLayer.get(layer)._inflight === 0 &&
         [...globals.sceneByLayer.get(layer)._areas.values()].every(area => area.done || area.error)));
-  }, null, { timeout: 30000 }).catch(async error => {
+  }, check, { timeout: 30000 }).catch(async error => {
     const state = await this.page.evaluate(() => ({
       roof: Boolean(globals.sceneByLayer.get(globals.renderers.get(map))?._roofRaster),
       terrainTiles: globals.sceneByLayer.get(globals.cameraByMap.get(map)._terrain3D)?._rasterTiles?.size,
@@ -214,14 +215,14 @@ Then('real night lighting preserves {string}', { timeout: 30000 }, async functio
       }
       if (check === 'illumination on 3D surfaces') {
         const terrain = [...globals.sceneByLayer.get(owner)._layers].find(layer => globals.sceneByLayer.get(layer)._type === 'terrain');
-        globals.sceneByLayer.get(terrain).root.visible = false;
+        if (terrain) globals.sceneByLayer.get(terrain).root.visible = false;
         const ranges = globals.sceneByLayer.get(layer).root.children.map(mesh => [mesh, mesh.geometry.drawRange.count]);
         for (const [mesh] of ranges) mesh.geometry.drawRange.count = 0;
         const objectsLit = await capture();
         globals.sceneByLayer.get(layer).root.visible = false;
         const objectsUnlit = await capture();
         globals.sceneByLayer.get(layer).root.visible = true;
-        globals.sceneByLayer.get(terrain).root.visible = true;
+        if (terrain) globals.sceneByLayer.get(terrain).root.visible = true;
         for (const [mesh, count] of ranges) mesh.geometry.drawRange.count = count;
         return { objectPixels: brighter(objectsLit, objectsUnlit), gpuErrors };
       }
