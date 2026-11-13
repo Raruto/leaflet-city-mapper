@@ -18,6 +18,8 @@ flowchart LR
 [hooks.js](./hooks.js) creates the browser lazily for ordinary browser
 scenarios; `@smoke` has separate setup. Non-unit `@coverage` scenarios require
 WebGPU. On Linux CI the shared setup checks WebGPU using SwiftShader.
+On Windows, Chromium uses its modern headless mode (`channel: chromium`);
+if WebGPU is unavailable, the 3D scenarios fail rather than opening a window.
 
 [scenario-budget.js](./scenario-budget.js) gives setup and steps one shared
 30-second deadline. Global hooks and cleanup are exempt; split independent

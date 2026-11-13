@@ -121,15 +121,15 @@ async function getBrowser() {
       // Use Chromium's bundled software adapters, not the runner's GPU drivers.
       args: swiftShaderArgs,
     }
-    // Windows needs a window for WebGPU; avoid launching and closing a headless browser first.
-    : {
-      ...options, headless: process.platform !== 'win32',
+    : engine === chromium && process.platform === 'win32'
+    ? {
+      ...options, channel: options.channel || 'chromium', headless: true,
       // The auxiliary DX12 diagnostic process can stall Chromium shutdown on Windows.
-      args: process.platform === 'win32' && engine === chromium
-        ? ['--disable-gpu-process-for-dx12-info-collection'] : undefined,
-    };
+      args: ['--disable-gpu-process-for-dx12-info-collection'],
+    }
+    : { ...options, headless: process.platform !== 'win32' };
   browser = await engine.launch(launchOptions);
-  // Headless Firefox (and some GPUs/drivers) expose no WebGPU adapter: retry with a window when one can open.
+  // Retry other non-CI headless browsers with a window when WebGPU is unavailable.
   // Without any adapter the @coverage scenarios fail instead of being skipped.
   const page = await browser.newPage();
   await page.goto(baseUrl);
@@ -162,7 +162,8 @@ async function getBrowser() {
   });
   await page.close();
   if (webgpu) return;
-  if (process.env.CI || launchOptions.headless === false) {
+  if (process.env.CI || launchOptions.headless === false ||
+      process.platform === 'win32' && engine === chromium) {
     if (engine === chromium) {
       const session = await browser.newBrowserCDPSession();
       const { gpu } = await session.send('SystemInfo.getInfo');

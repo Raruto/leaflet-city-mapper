@@ -90,7 +90,7 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 
 ### Repository guidance
 
-Repository structure and other conventions are documented in [here](.github/copilot-instructions.md).
+Folders structure and other conventions are documented in [here](.github/copilot-instructions.md).
 
 ---
 
