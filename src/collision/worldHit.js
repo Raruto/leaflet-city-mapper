@@ -1,3 +1,15 @@
+/**
+ * Convert a local ray hit to a world-space point and its distance from the original ray origin.
+ *
+ * @param {Object} ray Original world-space ray.
+ * @param {Object} mesh Intersected mesh.
+ * @param {number[]} origin Local ray origin.
+ * @param {number[]} direction Local ray direction.
+ * @param {number} closest Local ray distance to the hit.
+ * @param {number} faceIndex Index of the hit triangle.
+ *
+ * @returns {Object} Hit containing the mesh, face index, world point and distance.
+ */
 export function worldHit(ray, mesh, origin, direction, closest, faceIndex) {
   const x = direction[0] * closest + origin[0];
   const y = direction[1] * closest + origin[1];

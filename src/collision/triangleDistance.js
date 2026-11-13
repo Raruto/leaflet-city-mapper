@@ -1,6 +1,19 @@
 import { hiddenLightHit } from './hiddenLightHit.js';
 
-/** Moller-Trumbore with the renderer's culling and light-halo rules. */
+/**
+ * Compute ray-triangle distance using the renderer's culling and light-halo rules.
+ *
+ * @param {Object} mesh Mesh containing material and geometry attributes.
+ * @param {number} i Triangle's first vertex or index offset.
+ * @param {number[]} a First vertex.
+ * @param {number[]} b Second vertex.
+ * @param {number[]} c Third vertex.
+ * @param {number[]} origin Local ray origin.
+ * @param {number[]} direction Local ray direction.
+ * @param {number} night Night-light intensity.
+ *
+ * @returns {number} Signed ray distance, or Infinity when the hit is rejected.
+ */
 export function triangleDistance(mesh, i, a, b, c, origin, direction, night) {
   const ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2];
   const fx = c[0] - a[0], fy = c[1] - a[1], fz = c[2] - a[2];

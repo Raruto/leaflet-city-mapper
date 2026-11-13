@@ -1,7 +1,13 @@
 import { sample } from './sampleTerrainTile.js';
 
-/** Bilinear DEM sampling, with the original first-valid-neighbour no-data rule. */
-
+/**
+ * Sample the DEM bilinearly, falling back to the first valid neighbour for no-data.
+ *
+ * @param {L.Point} point Pixel location at terrain zoom.
+ * @param {Map} tiles DEM tiles keyed by x/y.
+ *
+ * @returns {number|null} Elevation, or null when no neighbour is valid.
+ */
 export function terrainElevation(point, tiles) {
   const x = point.x - 0.5, y = point.y - 0.5;
   const x0 = Math.floor(x), y0 = Math.floor(y);

@@ -1,9 +1,17 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
-
-
 import { textureSampler } from './modelTextureSampler.js';
 
+/**
+ * Get or create a model texture, using separate cache entries for color and data formats.
+ *
+ * @param {Object} context Model context containing images, texture descriptions and cache.
+ * @param {Object} reference glTF texture reference, if present.
+ * @param {boolean} [color] Whether to use an sRGB color format.
+ *
+ * @returns {Object|null} Cached texture state, or null without a reference.
+ *
+ * @throws {Error} If the texture uses transformed UVs or a set other than TEXCOORD_0.
+ */
 export function textureFor(context, reference, color = false) {
   const { backend: layer, description, images, textures } = context;
   if (!reference) return null;

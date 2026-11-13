@@ -1,17 +1,17 @@
 import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
 import { modelByLayer } from '../weakmaps/modelByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
-
-
 import { raycast } from './raycast.js';
 
 /**
  * Translate a geometry hit into a configured model or batched source feature.
  * Sorted half-open face ranges permit binary search without a feature per triangle.
+ *
+ * @param {L.Layer} layer Layer containing the features.
+ * @param {MouseEvent} event Pointer location used for raycasting.
+ *
  * @returns {PickedFeature|null}
  */
-
 export function findFeature(layer, event) {
   const model = modelByLayer.get(layer)
   if (!rootByLayer.get(layer) || !cameraByLayer.get(layer)) {

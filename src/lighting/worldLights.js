@@ -1,6 +1,13 @@
 import { lightScale } from '../globals/lightScale.js';
 
-/** World-space [x, y, z, radius, r, g, b, intensity] for one mesh's point lights. */
+/**
+ * Transform a mesh's point lights to world-space packed records.
+ *
+ * @param {Object[]} lights Local point lights.
+ * @param {number[]|Float32Array} m Column-major world matrix.
+ *
+ * @returns {Float32Array} Records of [x, y, z, radius, r, g, b, intensity].
+ */
 export function worldLights(lights, m) {
   const values = /* alloc */ new Float32Array(lights.length * 8);
   let i, x, y, z, radius, color, flux, w;

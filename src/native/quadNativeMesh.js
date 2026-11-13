@@ -4,7 +4,6 @@ import { coreWhite } from '../globals/coreWhite.js';
 import { textureFor } from '../textures/nativeTextureFor.js';
 import { putNativeMesh } from './putNativeMesh.js';
 
-
 export function quadNativeMesh(state, key, image, corners, opacity) {
   const texture = textureFor(state, key, image);
   if (!texture) return;

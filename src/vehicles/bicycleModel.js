@@ -2,9 +2,15 @@ import { paints } from '../globals/paints.js';
 import { dark } from '../globals/dark.js';
 import { skin } from '../globals/skin.js';
 import { trousers } from '../globals/trousers.js';
-
 import { box } from '../geometry/box.js';
 
+/**
+ * Build the geometry parts for a bicycle and rider.
+ *
+ * @param {number} index Index selecting a paint color.
+ *
+ * @returns {Array} Extrusion parts for the model.
+ */
 export function bicycleModel(index) {
   const paint = paints[index % paints.length];
   return /* alloc */ [

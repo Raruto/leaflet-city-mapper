@@ -4,6 +4,13 @@ import { updateSun } from './updateSun.js';
 import { useLiveTime } from './useLiveTime.js';
 import { useSelectedTime } from './useSelectedTime.js';
 
+/**
+ * Create the time-control UI, celestial discs and bound update handlers.
+ *
+ * @param {L.Map} map Map associated with the control.
+ *
+ * @returns {Object} Sunlight and control state.
+ */
 export function createSun(map) {
   const disc = 'position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;';
   const sunDisc = L.DomUtil.create('div', 'sunlight-sun');

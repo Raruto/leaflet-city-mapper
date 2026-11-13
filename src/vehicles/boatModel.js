@@ -1,15 +1,15 @@
 import { hull } from '../globals/hull.js';
 import { white } from '../globals/white.js';
 import { glass } from '../globals/glass.js';
-
-
 import { box } from '../geometry/box.js';
-
 import { mirror } from './mirrorVehiclePart.js';
-
 import { boatBenches } from './boatBenches.js';
 
-// Panoramic river cruiser, about 60 x 11 m.
+/**
+ * Build the geometry parts for a panoramic river cruiser, about 60 by 11 metres.
+ *
+ * @returns {Array} Extrusion parts for the hull, deck and fittings.
+ */
 export function boatModel() {
   return /* alloc */ [
     /* alloc */ [

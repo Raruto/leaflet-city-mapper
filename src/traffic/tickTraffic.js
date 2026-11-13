@@ -1,12 +1,14 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
-
-
 import { update as updateScene } from '../scene/scheduleSceneUpdate.js';
 import { trafficNow } from './trafficNow.js';
 import { refreshTrafficTrips } from './refreshTrafficTrips.js';
 import { updateTrafficPose } from './updateTrafficPose.js';
 
+/**
+ * Update trips and GPU poses for the simulation clock, scheduling another frame in live mode.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function tickTraffic(state) {
   state.frame = undefined;
   if (!state.ready || !state.layer._map) return;

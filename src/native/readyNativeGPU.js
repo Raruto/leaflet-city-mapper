@@ -1,7 +1,4 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
-
-
-
 import { nativeLayer } from './nativeLayer.js';
 
 export function readyNativeGPU(state) {

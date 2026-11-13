@@ -1,8 +1,19 @@
 import { directoryReader } from '../globals/directoryReader.js';
 import { varint } from './readVarint.js';
 
-/** Decode delta/varint directory columns, rejecting malformed entries. */
-
+/**
+ * Decode delta/varint directory columns, rejecting malformed entries.
+ *
+ * @param {ArrayBuffer} data Encoded PMTiles directory.
+ *
+ * @returns {Object[]} Decoded directory entries.
+ *
+ * @throws {Error} If the directory entry count is invalid.
+ * @throws {Error} If tile IDs are invalid or not increasing.
+ * @throws {Error} If an entry has zero length.
+ * @throws {Error} If the first entry has an implicit offset.
+ * @throws {Error} If data remains after the directory entries.
+ */
 export function decodeDirectory(data) {
   const reader = directoryReader;
   const bytes = /* alloc */ new Uint8Array(data);

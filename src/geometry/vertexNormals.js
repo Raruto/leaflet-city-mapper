@@ -1,5 +1,4 @@
 /** Area-weighted vertex normals, for indexed or non-indexed triangles. */
-
 export function vertexNormals(p, indices) {
   // Accumulate area-weighted face normals for shared vertices, then normalize.
   const normals = /* alloc */ new Float32Array(p.length);

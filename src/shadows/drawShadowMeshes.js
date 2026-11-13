@@ -1,10 +1,15 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { shadowPass } from '../globals/shadowPass.js';
 import { shadowBindGroup } from '../globals/shadowBindGroup.js';
 import { shadowOffsets } from '../globals/shadowOffsets.js';
 
-
+/**
+ * Encode the shadow depth pass for the supplied meshes.
+ *
+ * @param {L.Layer} layer Layer owning the renderer.
+ * @param {GPUCommandEncoder} encoder Encoder receiving the render pass.
+ * @param {Object[]} meshes Meshes to draw into the depth texture.
+ */
 export function drawShadowMeshes(layer, encoder, meshes) {
   const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
   const pass = encoder.beginRenderPass((

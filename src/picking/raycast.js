@@ -3,10 +3,7 @@ import { raycasterByLayer } from '../weakmaps/raycasterByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
-
 import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
-
-
 import { intersectMeshes } from '../collision/intersectMeshes.js';
 import { traverse } from '../scene/traverse.js';
 import { updateCamera } from '../camera/updateSceneCamera.js';
@@ -19,12 +16,13 @@ import { validateCameraInverse } from './validateCameraInverse.js';
 /**
  * Finds the objects under a mouse or pointer event, nearest first.
  *
+ * @param {L.Layer} layer Layer providing the scene and camera.
  * @param {MouseEvent} event
  * @param {Object[]} [objects] Defaults to this layer's root children, not all map layers.
  * @param {boolean} [recursive] Also test the descendants of `objects`.
+ *
  * @returns {Object[]} Nearest hit per mesh: object, shared-world point/distance and triangle faceIndex.
  */
-
 export function raycast(layer, event, objects = rootByLayer.get(layer).children, recursive = true) {
   if (!rendererByLayer.get(layer)) {
     return /* alloc */ [];

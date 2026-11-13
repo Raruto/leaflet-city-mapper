@@ -1,8 +1,13 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { sceneSunlightUniforms } from '../globals/sceneSunlightUniforms.js';
 import { resizeSunlight } from '../shadows/resizeSunlight.js';
 
+/**
+ * Create sunlight bindings and a fallback roof texture for the layer's renderer.
+ *
+ * @param {L.Layer} layer Layer owning the renderer.
+ * @param {GPUDevice} device Device used to create the resources.
+ */
 export function initializeRendererResources(layer, device) {
   const renderer = rendererByLayer.get(layer);
   const layout = device.createBindGroupLayout(/* alloc */ {

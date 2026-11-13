@@ -2,9 +2,15 @@ import { parts } from '../globals/parts.js';
 import { paints } from '../globals/paints.js';
 import { trousers } from '../globals/trousers.js';
 import { skin } from '../globals/skin.js';
-
 import { box } from '../geometry/box.js';
 
+/**
+ * Build a pedestrian from the shared body and additional limb parts.
+ *
+ * @param {number} index Index selecting a clothing color.
+ *
+ * @returns {Array} Pedestrian extrusion parts.
+ */
 export function pedestrianModel(index) {
   const model = parts.body.slice();
   model[1] = /* alloc */ [model[1][0], model[1][1], model[1][2], paints[index % paints.length]];

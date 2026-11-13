@@ -1,5 +1,13 @@
 import { textureFor } from '../textures/modelTextureFor.js';
 
+/**
+ * Translate a glTF material into renderer material properties and texture bindings.
+ *
+ * @param {Object} context Model loading context and backend layer.
+ * @param {Object} material glTF material definition.
+ *
+ * @returns {Object} Renderer material properties.
+ */
 export function materialFor(context, material) {
   const { backend: layer } = context;
   const pbr = material.pbrMetallicRoughness;

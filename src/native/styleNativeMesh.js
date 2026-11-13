@@ -1,7 +1,5 @@
 import { cameraZIndexOffsetByLayer } from '../weakmaps/cameraZIndexOffsetByLayer.js';
-
 import { L } from '../globals/L.js';
-
 
 export function styleNativeMesh(state, mesh, color, opacity) {
   const { source, marker, paneOrder, order } = state;

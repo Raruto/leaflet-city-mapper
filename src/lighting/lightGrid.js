@@ -1,6 +1,15 @@
 import { visitCells } from './visitLightGridCells.js';
 
-/** Pack world-space point lights into the shader's spatial grid. */
+/**
+ * Pack world-space point lights into the shader's spatial grid.
+ *
+ * @param {Float32Array[]} packed Arrays of world-space light records.
+ * @param {number} maxBytes Maximum GPU storage size in bytes.
+ *
+ * @returns {Object} Packed grid data and light count.
+ *
+ * @throws {Error} If the grid exceeds the GPU storage limit.
+ */
 export function lightGrid(packed, maxBytes) {
   let count = 0;
   let values, i, value, key;

@@ -1,11 +1,13 @@
 import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { rendererDevices } from '../weakmaps/rendererDevices.js';
 import { renderers } from '../weakmaps/renderers.js';
 
-
-
+/**
+ * Report device loss to layers using the affected current renderer.
+ *
+ * @param {Array} result Device-lost information followed by the device.
+ */
 export function rendererDeviceLost([info, device]) {
   const map = rendererDevices.get(device);
   const owner = renderers.get(map);

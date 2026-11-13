@@ -1,9 +1,16 @@
 import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
-
 import { reportError } from './reportLayerError.js';
 
-
+/**
+ * Initialize a queued layer and reattach it to its map if necessary.
+ *
+ * @param {Object} task Queued initialization, settings and readiness state.
+ *
+ * @returns {L.Layer|Promise} Initialized layer or its readiness promise.
+ *
+ * @throws {Error} If initialization or reattachment fails.
+ */
 export function initializeLayer(task) {
   const { layer, ready } = task;
   if (task.error) {

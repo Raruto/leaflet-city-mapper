@@ -1,3 +1,13 @@
+import { prepareMeshCutout } from '../materials/prepareMeshCutout.js';
+
+/**
+ * Write a mesh's transforms and material values into the next frame uniform slot.
+ *
+ * @param {Object} renderer Renderer containing uniform data and slot state.
+ * @param {Object} mesh Mesh to prepare.
+ *
+ * @returns {number} Dynamic uniform buffer offset in bytes.
+ */
 export function prepareMeshUniforms(renderer, mesh) {
   const uniforms = mesh.program.uniforms;
   const offset = renderer.uniformSlot++ * 256;
@@ -24,4 +34,3 @@ export function prepareMeshUniforms(renderer, mesh) {
   data[base + 41] = data[base + 42] = data[base + 43] = 0;
   return offset;
 }
-import { prepareMeshCutout } from '../materials/prepareMeshCutout.js';

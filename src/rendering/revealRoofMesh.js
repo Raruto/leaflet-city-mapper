@@ -2,9 +2,18 @@ import { headerByLayer } from '../weakmaps/headerByLayer.js';
 import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
 import { walkByMap } from '../weakmaps/walkByMap.js';
-
 import { roofCoverage } from '../geometry/roofCoverage.js';
 
+/**
+ * Delay revealing a roof mesh while its uncovered raster imagery is still loading.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Object} mesh Roof or other mesh being considered.
+ * @param {Array<L.Layer>} rasters Raster layers used for roof coverage.
+ * @param {number} now Current frame time in milliseconds.
+ *
+ * @returns {boolean} Whether the mesh may be drawn.
+ */
 export function revealRoofMesh(layer, mesh, rasters, now) {
   let raster, loading;
   if (mesh.program.uniforms.roofTexture && !rasters.length) mesh._roofRevealed = true;

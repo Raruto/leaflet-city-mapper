@@ -1,5 +1,18 @@
 import { materialBaseShader } from './materialBaseShader.js';
 
+/**
+ * Generate lit or unlit material fragment code for the available textures.
+ *
+ * @param {Object} material Material settings.
+ * @param {boolean} sparkle Whether to include sparkle shading.
+ * @param {boolean} hasBase Whether a base texture is bound.
+ * @param {boolean} hasMetal Whether a metallic-roughness texture is bound.
+ * @param {boolean} hasEmissive Whether an emissive texture is bound.
+ * @param {boolean} hasOcclusion Whether an occlusion texture is bound.
+ * @param {boolean} hasRoof Whether a roof texture is bound.
+ *
+ * @returns {string} WGSL fragment code.
+ */
 export function materialSurfaceShader(material, sparkle, hasBase, hasMetal, hasEmissive, hasOcclusion, hasRoof) {
   return material.unlit ? /* wgsl */ `
         let rasterTexel = ${hasBase ? 'textureSample(baseTexture, baseTextureSampler, input.uv)' : 'vec4<f32>(input.color, 1.0)'};

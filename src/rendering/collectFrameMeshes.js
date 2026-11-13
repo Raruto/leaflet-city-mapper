@@ -3,12 +3,16 @@ import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
 import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
 import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
-
-
-
 import { updateWorldMatrix } from "../transforms/updateWorldMatrix.js";
 import { collectMeshes } from './collectMeshes.js';
 
+/**
+ * Refresh the camera frustum and collect visible and shadow-casting scene meshes.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Object} sunlight Current sunlight state, if available.
+ * @param {boolean} sceneChanged Whether scene world matrices need updating.
+ */
 export function collectFrameMeshes(layer, sunlight, sceneChanged) {
   const camera = cameraByLayer.get(layer);
   const projection = camera.projectionViewMatrix;

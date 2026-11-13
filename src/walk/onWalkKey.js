@@ -1,8 +1,11 @@
 import { moves } from '../globals/moves.js';
-
-
 import { stop } from './stopWalking.js';
 
+/**
+ * Track walking keys and Escape without stealing input from text fields or modified shortcuts.
+ *
+ * @param {KeyboardEvent} event Keydown or keyup event.
+ */
 export function onKey(event) {
   if (event.type === 'keyup' && event.code === 'Space') this.keys.delete('Space');
   // Text fields and sliders keep their keys; buttons and checkboxes don't.

@@ -1,3 +1,10 @@
+/**
+ * Generate vertex code for roof and wall texture coordinates and opacity.
+ *
+ * @param {Object} material Roof and wall texture settings.
+ *
+ * @returns {string} WGSL vertex code.
+ */
 export function roofVertexShader(material) {
   const roofOpacity = Number(material.roofTexture ?? 0);
   const wallOpacity = Number(material.wallTexture ?? 0);

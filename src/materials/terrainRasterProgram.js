@@ -5,7 +5,6 @@ import { terrainBoundsByLayer } from '../weakmaps/terrainBoundsByLayer.js';
 import { terrainGridsByLayer } from '../weakmaps/terrainGridsByLayer.js';
 import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
-
 import { demTexture } from '../globals/demTexture.js';
 import { demTarget } from '../globals/demTarget.js';
 import { demLayout } from '../globals/demLayout.js';
@@ -14,6 +13,14 @@ import { createProgram } from './createProgram.js';
 import { destroyTexture } from '../textures/destroyTexture.js';
 import { terrainAtlas } from '../terrain/terrainAtlas.js';
 
+/**
+ * Reuse the current terrain raster program or create it with an uploaded elevation atlas.
+ *
+ * @param {L.Layer} layer Layer providing terrain and renderer state.
+ * @param {Object} texture Raster texture used by the program.
+ *
+ * @returns {Object} Terrain raster program.
+ */
 export function rasterProgram(layer, texture) {
   const device = rendererByLayer.get(layer).device
   if (rasterProgramByLayer.get(layer)?.device === device) return rasterProgramByLayer.get(layer);

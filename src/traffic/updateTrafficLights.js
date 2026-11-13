@@ -1,5 +1,10 @@
 import { locateTraffic } from './locateTraffic.js';
 
+/**
+ * Rebuild the mesh's light snapshot by transforming each vehicle light to its current lane pose.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function updateTrafficLights(state) {
   state.litAt = performance.now();
   const lights = /* alloc */ [];

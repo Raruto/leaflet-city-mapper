@@ -1,6 +1,5 @@
 import { ringDirections } from '../globals/ringDirections.js';
 
-
 export function ring(point, radius) {
   const result = /* alloc */ new Array(ringDirections.length);
   let i;

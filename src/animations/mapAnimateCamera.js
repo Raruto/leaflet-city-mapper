@@ -1,14 +1,24 @@
 import { cameraAnimationByMap } from '../weakmaps/cameraAnimationByMap.js';
-
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-
 import { cancelCameraAnimation } from './cancelCameraAnimation.js';
 import { scheduleCameraAnimation } from './scheduleCameraAnimation.js';
 
-
+/**
+ * Set camera angles immediately or animate toward them along the shortest bearing arc.
+ *
+ * @param {L.Map} map Map whose camera should move.
+ * @param {number} pitch Target pitch in degrees.
+ * @param {number} bearing Target bearing in degrees.
+ * @param {Object} [options] Animation settings, including duration in seconds.
+ *
+ * @returns {L.Map} The updated map.
+ *
+ * @throws {TypeError} If either camera angle is not finite.
+ * @throws {TypeError} If an animated duration is negative or not finite.
+ */
 export function mapAnimateCamera(map, pitch, bearing, options = cameraEmptyOptions) {
   cancelCameraAnimation(map);
   if (!Number.isFinite(pitch) || !Number.isFinite(bearing)) throw /* alloc */ new TypeError('Camera angles must be finite numbers');

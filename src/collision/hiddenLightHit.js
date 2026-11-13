@@ -1,3 +1,14 @@
+/**
+ * Reject picks on light halos that are invisible in the current day/night state.
+ *
+ * @param {Object} mesh Picked mesh.
+ * @param {number} i Triangle's first vertex or index offset.
+ * @param {number} u First barycentric coordinate.
+ * @param {number} v Second barycentric coordinate.
+ * @param {number} night Current night-light intensity.
+ *
+ * @returns {boolean} Whether the hit belongs to an invisible halo.
+ */
 export function hiddenLightHit(mesh, i, u, v, night) {
   if (!mesh.program.nightLight) return false;
   const { index, uv: { data: uv } } = mesh.geometry.attributes;

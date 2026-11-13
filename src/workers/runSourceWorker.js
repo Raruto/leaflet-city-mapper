@@ -2,6 +2,18 @@ import { geometryWorkerUrl } from '../globals/geometryWorkerUrl.js';
 import { startGeometryWorker } from './startGeometryWorker.js';
 import { acquireGeometryWorker } from './acquireGeometryWorker.js';
 
+/**
+ * Run a cancellable source job, returning successful workers to the map pool and terminating failed ones.
+ *
+ * @param {L.Map|null|undefined} map Map owning the worker pool, if available.
+ * @param {string|null|undefined} url Worker URL; a falsy value selects the default.
+ * @param {Object} input Message sent to the worker.
+ * @param {AbortSignal} [signal] Cancellation signal.
+ *
+ * @returns {Promise<*>} The worker's response.
+ *
+ * @throws {*} Rejects on cancellation, worker creation or execution errors, or a worker-reported failure.
+ */
 export async function runSourceWorker(map, url, input, signal = /* alloc */ new AbortController().signal) {
   signal.throwIfAborted();
   const entry = acquireGeometryWorker(map, url || geometryWorkerUrl);

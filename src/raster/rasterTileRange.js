@@ -3,6 +3,15 @@ import { TILE_RADIUS } from '../globals/TILE_RADIUS.js';
 import { archiveNorthWest } from '../globals/archiveNorthWest.js';
 import { archiveSouthEast } from '../globals/archiveSouthEast.js';
 
+/**
+ * Compute the visible tile range, clipped to archive bounds and the center tile radius.
+ *
+ * @param {L.Map} map Map providing the view bounds and projection.
+ * @param {Object} header Archive header with optional geographic bounds.
+ * @param {number} zoom Tile zoom level.
+ *
+ * @returns {Object} Inclusive minimum and maximum tile coordinates.
+ */
 export function rasterTileRange(map, header, zoom) {
   const bounds = map.getBounds();
   const northwest = map.project(bounds.getNorthWest(), zoom).divideBy(TILE_SIZE).floor();

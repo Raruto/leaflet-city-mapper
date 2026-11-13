@@ -1,10 +1,16 @@
 import { CELL } from '../globals/CELL.js';
-
 import { computeBounds } from '../geometry/computeBounds.js';
 import { collider } from '../collision/collider.js';
-
 import { hitColliderCell } from './hitColliderCell.js';
 
+/**
+ * Test a visible mesh's nearby collider cells against the walking ray.
+ *
+ * @param {Object} mesh Scene node being visited.
+ * @param {Object} data Collision scratch and nearest-hit state.
+ *
+ * @returns {boolean|undefined} True when traversal should skip the node's descendants.
+ */
 export function hitMesh(mesh, data) {
   if (!mesh.visible) return true;
   if (!mesh.geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return;

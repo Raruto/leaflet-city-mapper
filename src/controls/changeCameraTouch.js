@@ -1,9 +1,6 @@
 import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
 import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
 import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
-
-
-
 import { endCameraTouch } from './endCameraTouch.js';
 
 export function changeCameraTouch() {

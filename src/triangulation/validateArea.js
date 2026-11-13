@@ -1,6 +1,15 @@
 import { area } from './area.js';
 import { cross } from './cross.js';
 
+/**
+ * Check that triangle area matches the outer ring area minus its holes.
+ *
+ * @param {Object[][]} rings Outer ring followed by hole rings.
+ * @param {Object[]} vertices Indexed planar vertices.
+ * @param {number[][]} result Triangles of vertex indices.
+ *
+ * @throws {Error} If the expected area is nonpositive or the triangle area differs.
+ */
 export function validateArea(rings, vertices, result) {
   let holeArea = 0, actual = 0, i, triangle;
   for (i = 1; i < rings.length; i++) holeArea += area(rings[i]);

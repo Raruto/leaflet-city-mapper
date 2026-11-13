@@ -1,9 +1,7 @@
 import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
-
 import { blobParts } from '../globals/blobParts.js';
-
 import { update } from "../scene/scheduleSceneUpdate.js";
 import { registerTerrainTile } from "./registerTerrainTile.js";
 import { pruneRasterTiles } from "./pruneRasterTiles.js";
@@ -11,6 +9,17 @@ import { pumpRasterTiles } from './pumpRasterTiles.js';
 import { createRasterMesh } from './createRasterMesh.js';
 import { getZxy } from '../archives/getZxy.js';
 
+/**
+ * Load and decode an archive tile, attach its mesh and report load or error events.
+ *
+ * @param {L.Layer} layer Raster layer.
+ * @param {Object} tile Tile state and abort controller.
+ *
+ * @returns {Promise<void>} Completion of the load attempt.
+ *
+ * @throws {Error} Internally if the tile is missing from the archive; reported to the layer.
+ * @throws {Error} Internally if tile decoding fails; reported to the layer.
+ */
 export async function finishRasterTile(layer, tile) {
   try {
     await readyByLayer.get(layer);

@@ -1,5 +1,12 @@
 import { settleGeometryWorker } from './settleGeometryWorker.js';
 
+/**
+ * Install worker and abort listeners, then submit the task unless already cancelled.
+ *
+ * @param {Object} task Worker, input and cancellation signal.
+ * @param {Function} resolve Resolve the task with the worker response.
+ * @param {Function} reject Reject the task on cancellation or failure.
+ */
 export function startGeometryWorker(task, resolve, reject) {
   task.resolve = resolve;
   task.reject = reject;

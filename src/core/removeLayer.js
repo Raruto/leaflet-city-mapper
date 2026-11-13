@@ -1,12 +1,15 @@
 import { kindByLayer } from '../weakmaps/kindByLayer.js';
-
 import { L } from '../globals/L.js';
 import { removeLayer as sharedRemoveLayer } from '../globals/removeLayer.js';
-
 import { removeSceneLayer } from '../scene/removeSceneLayer.js';
 
-
-
+/**
+ * Remove a scene layer from this map, delegating ordinary layers to Leaflet.
+ *
+ * @param {L.Layer} layer Layer to remove.
+ *
+ * @returns {L.Map} This map.
+ */
 export function removeLayer(layer) {
   const id = L.Util.stamp(layer);
   if (!this._layers[id]) return this;

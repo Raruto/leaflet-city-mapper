@@ -1,9 +1,6 @@
 import { L } from '../globals/L.js';
 import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
-
-
 import { raycast } from '../picking/raycast.js';
-
 import { restoreNativeEvents } from './restoreNativeEvents.js';
 import { handleNativeMapEvent } from './handleNativeMapEvent.js';
 

@@ -2,7 +2,17 @@ import { cameraAngles } from '../globals/cameraAngles.js';
 import { pointOf } from './toPoint.js';
 import { angles } from './cameraAngles.js';
 
-
+/**
+ * Project a map point through the pitched camera, or invert the projection onto a height plane.
+ *
+ * @param {L.Map} map Map supplying viewport size, bearing and pitch.
+ * @param {L.Point|number[]} point Point to project.
+ * @param {boolean} [inverse] Invert the projection.
+ * @param {boolean} [limit] Clamp inverse ground distance.
+ * @param {number} [height] Height of the point or inverse projection plane.
+ *
+ * @returns {L.Point} Projected point.
+ */
 export function project(map, point, inverse = false, limit = false, height = 0) {
   const size = map.getSize(), halfX = size.x / 2, halfY = size.y / 2, distance = size.y * 1.5;
   const result = pointOf(point);

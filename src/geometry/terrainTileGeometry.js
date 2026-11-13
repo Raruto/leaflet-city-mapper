@@ -2,7 +2,6 @@ import { demByLayer } from '../weakmaps/demByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevationByLayer.js';
 
-
 export function terrainTileGeometry(layer, attributes, sizeX, sizeZ) {
   const base = terrainOriginElevationByLayer.get(layer)
   const bottom = Math.min(demByLayer.get(layer).low, base) - base, top = Math.max(demByLayer.get(layer).high, base) - base;

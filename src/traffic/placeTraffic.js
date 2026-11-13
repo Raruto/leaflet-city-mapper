@@ -1,5 +1,10 @@
 import { locateTraffic } from './locateTraffic.js';
 
+/**
+ * Refresh stale CPU traffic positions and normals from the current trip poses.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function placeTraffic(state) {
   if (!state.mesh || !state.stale) return;
   state.stale = false;

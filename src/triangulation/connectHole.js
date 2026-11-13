@@ -2,6 +2,18 @@ import { inside } from './inside.js';
 import { insideHole } from './insideHole.js';
 import { crossesBoundary } from './crossesBoundary.js';
 
+/**
+ * Connect a hole to the polygon using the shortest valid vertex bridge.
+ *
+ * @param {Object[]} polygon Current polygon vertices.
+ * @param {Object[]} hole Hole vertices to connect.
+ * @param {Object[][]} rings Outer ring followed by hole rings.
+ * @param {Object} mid Reusable midpoint with x and y fields.
+ *
+ * @returns {Object[]} Polygon vertices including the bridged hole.
+ *
+ * @throws {Error} If no valid bridge can be found.
+ */
 export function connectHole(polygon, hole, rings, mid) {
   let h2 = -1, p2 = -1, distance = Infinity, h, p, a, b, d;
   for (h = 0; h < hole.length; h++) for (p = 0; p < polygon.length; p++) {

@@ -1,10 +1,16 @@
 import { mapMethods } from '../globals/mapMethods.js';
-
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
-
 import { project } from '../projections/projectCameraPoint.js';
 
+/**
+ * Limit a screen pan offset to geographic bounds under the camera projection.
+ *
+ * @param {L.Point} offset Proposed screen offset.
+ * @param {L.LatLngBounds} bounds Maximum geographic bounds.
+ *
+ * @returns {L.Point} Limited screen offset.
+ */
 export function mapLimitOffset(offset, bounds) {
   if (!bounds || !mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value._limitOffset.call(this, offset, bounds);
   const half = this.getSize().divideBy(2), ground = half.subtract(project(this, half.subtract(offset), true));

@@ -1,3 +1,9 @@
+/**
+ * Dispatch the GPU traffic pose computation for the elapsed time and mark CPU geometry stale.
+ *
+ * @param {Object} state Traffic layer state.
+ * @param {number} seconds Seconds elapsed since the trip positions were rebased.
+ */
 export function moveTraffic(state, seconds) {
   const { device } = state.gpu;
   state.paramFloats[0] = state.elapsed = seconds;

@@ -1,9 +1,13 @@
 import { areasByLayer } from '../weakmaps/areasByLayer.js';
 import { countStatusByLayer } from '../weakmaps/countStatusByLayer.js';
-
 import { underEntry } from './underEntry.js';
 import { renderLayerCount } from './renderLayerCount.js';
 
+/**
+ * Collect loaded and pending counts from an event or layer areas and refresh the status.
+ *
+ * @param {Object} event Layer event containing the target and optional loading counts.
+ */
 export function updateLayerCount(event) {
   const layer = event.target, status = countStatusByLayer.get(layer)
   if (!layer._map) return;

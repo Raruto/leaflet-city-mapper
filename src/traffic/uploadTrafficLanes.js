@@ -1,5 +1,11 @@
 import { trafficStorage } from './trafficStorage.js';
 
+/**
+ * Pack lane coordinates, elevations and cumulative distances into the GPU points buffer.
+ *
+ * @param {Object} state Traffic layer state.
+ * @param {GPUDevice} device Device used to create the points buffer.
+ */
 export function uploadTrafficLanes(state, device) {
   let lane, i, point, count = 0;
   for (lane of state.lanes) count += lane.points.length;

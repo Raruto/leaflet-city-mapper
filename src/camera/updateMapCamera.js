@@ -1,8 +1,6 @@
 import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
 import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
-
-
 import { radians } from '../globals/radians.js';
 import { cameraFov } from '../globals/cameraFov.js';
 import { earthCirc } from '../globals/earthCirc.js';
@@ -11,11 +9,15 @@ import { mapMethods } from '../globals/mapMethods.js';
 import { walkByMap } from '../weakmaps/walkByMap.js';
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
-
 import { updateCamera } from "./updateSceneCamera.js";
-
 import { animationPoint } from '../projections/transformZoomAnimationPoint.js';
 
+/**
+ * Match the scene camera to the map view, terrain and active walker height.
+ *
+ * @param {L.Layer} layer Layer owning the camera and scene origin.
+ * @param {L.Point} size Viewport dimensions in pixels.
+ */
 export function updateMapCamera(layer, size) {
   const map = layer._map;
   // Match the map's perspective, including the intermediate view of an animated zoom.

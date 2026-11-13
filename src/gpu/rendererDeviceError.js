@@ -1,11 +1,13 @@
 import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { rendererDevices } from '../weakmaps/rendererDevices.js';
 import { renderers } from '../weakmaps/renderers.js';
 
-
-
+/**
+ * Forward an uncaptured GPU error to layers using the current renderer.
+ *
+ * @param {GPUUncapturedErrorEvent} event Device error event.
+ */
 export function rendererDeviceError(event) {
   const map = rendererDevices.get(event.currentTarget);
   const owner = renderers.get(map);

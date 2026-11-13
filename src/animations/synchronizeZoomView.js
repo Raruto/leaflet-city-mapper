@@ -1,9 +1,14 @@
 import { zoomTransitionsByLayer } from '../weakmaps/zoomTransitionsByLayer.js';
 import { zoomViewByLayer } from '../weakmaps/zoomViewByLayer.js';
-
 import { meshStack } from '../globals/meshStack.js';
 import { updateZoomCamera } from './updateZoomCamera.js';
 
+/**
+ * Pause zoom transitions and advance them with the rendered camera frame.
+ *
+ * @param {L.Layer} layer Layer whose map zoom is being synchronized.
+ * @param {number} now Current frame timestamp in milliseconds.
+ */
 export function synchronizeZoomView(layer, now) {
   const map = layer._map;
   let animation, time, start;

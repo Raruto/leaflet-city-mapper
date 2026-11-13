@@ -2,8 +2,15 @@ import { headerOffsets } from '../globals/headerOffsets.js';
 import { headerFlags } from '../globals/headerFlags.js';
 import { headerBounds } from '../globals/headerBounds.js';
 
-
-/** Decode the PMTiles v3 header. */
+/**
+ * Decode the PMTiles v3 header.
+ *
+ * @param {ArrayBuffer} data Header bytes.
+ *
+ * @returns {Object} Archive offsets, flags, bounds and center.
+ *
+ * @throws {Error} If the header is too short or not PMTiles version 3.
+ */
 export function decodeHeader(data) {
   const view = data.byteLength >= 127
     ? /* alloc */ new DataView(data) : null;

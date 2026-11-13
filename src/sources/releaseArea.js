@@ -1,14 +1,16 @@
 import { highlightedFeatureByLayer } from '../weakmaps/highlightedFeatureByLayer.js';
 import { hoveredFeatureByLayer } from '../weakmaps/hoveredFeatureByLayer.js';
-
-
-
 import { setHighlight } from '../picking/setHighlight.js';
 import { showFeature } from '../picking/showFeature.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 
-/** Cancel pending work and dispose this block's GPU data, including any hover highlight. */
+/**
+ * Cancel pending work and dispose this block's GPU data, including any hover highlight.
+ *
+ * @param {L.Layer} layer Layer owning the area.
+ * @param {Object} area Area to release.
+ */
 export function releaseArea(layer, area) {
   area.request.abort();
   let attribute;

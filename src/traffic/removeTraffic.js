@@ -1,9 +1,12 @@
 import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
-
-
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
 
+/**
+ * Abort loading, unregister listeners and release traffic meshes, GPU resources and lane state.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function removeTraffic(state) {
   state.request?.abort();
   cancelAnimationFrame(state.frame);

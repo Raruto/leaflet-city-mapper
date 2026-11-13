@@ -1,5 +1,14 @@
-/** Cumulative Hilbert ID for an archive tile. */
-
+/**
+ * Compute the cumulative Hilbert ID for an archive tile.
+ *
+ * @param {number} z Tile zoom level.
+ * @param {number} x Tile column.
+ * @param {number} y Tile row.
+ *
+ * @returns {number} Cumulative tile ID.
+ *
+ * @throws {Error} If the tile coordinates are outside the supported zoom grid.
+ */
 export function tileId(z, x, y) {
   if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) || z < 0 || z > 26 ||
     x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) {

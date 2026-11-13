@@ -16,6 +16,11 @@ class WalkControl extends extendLeafletClass(L.Control) {
   static initHooks = true;
   static defaultOptions = { position: 'bottomright', speed: 70, distance: 20 };
 
+  /**
+   * Initialize the control and its hooks explicitly when using Leaflet 2.
+   *
+   * @param {Object} options Walk control options.
+   */
   constructor(options) {
     super(options);
     if (L.version.startsWith('2.')) {

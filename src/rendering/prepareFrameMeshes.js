@@ -1,12 +1,19 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
 import { visibleMeshesByLayer } from '../weakmaps/visibleMeshesByLayer.js';
-
-
-
 import { compareMeshes } from './compareMeshes.js';
 import { revealRoofMesh } from './revealRoofMesh.js';
 
+/**
+ * Prepare and sort visible meshes, update fades and filter the shadow list.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Array<L.Layer>} rasters Raster layers used for roof coverage.
+ * @param {number} now Current frame time in milliseconds.
+ * @param {Array<Object>} meshes Destination for meshes to draw.
+ *
+ * @returns {boolean} Whether a mesh is still fading in.
+ */
 export function prepareFrameMeshes(layer, rasters, now, meshes) {
   const candidates = visibleMeshesByLayer.get(layer), shadowMeshes = shadowMeshesByLayer.get(layer), renderer = rendererByLayer.get(layer);
   let appearing = false;

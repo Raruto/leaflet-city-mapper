@@ -2,6 +2,14 @@ import { readModelAttributes } from './readModelAttributes.js';
 import { readModelIndices } from './readModelIndices.js';
 import { vertexNormals } from '../geometry/vertexNormals.js';
 
+/**
+ * Decode primitive attributes and indices, generating normals when absent.
+ *
+ * @param {Object} description Decoded glTF document with loaded buffers.
+ * @param {Object} primitive glTF mesh primitive to prepare.
+ *
+ * @returns {Object} Prepared attributes, also stored on the primitive.
+ */
 export function prepareModelPrimitive(description, primitive) {
   const { attributes, vertexCount } = readModelAttributes(description, primitive);
   readModelIndices(description, primitive, attributes, vertexCount);

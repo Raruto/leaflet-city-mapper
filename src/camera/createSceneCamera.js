@@ -1,4 +1,8 @@
-/** Perspective camera state: fov in degrees, near/far in scene metres. */
+/**
+ * Create perspective camera state with identity matrices and default projection parameters.
+ *
+ * @returns {Object} Camera state; fov is in degrees and near/far are in scene metres.
+ */
 export function createSceneCamera() {
   return /* alloc */ {
     position: /* alloc */ [0, 0, 0],

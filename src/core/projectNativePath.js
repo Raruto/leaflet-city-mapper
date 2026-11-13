@@ -1,6 +1,13 @@
 import { L } from '../globals/L.js';
 import { pathProjectionByMap } from '../weakmaps/pathProjectionByMap.js';
 
+/**
+ * Project a native path using a temporary renderer view when required by Leaflet 2.
+ *
+ * @param {L.Path} source Path to project.
+ *
+ * @returns {*} Original projection result on Leaflet 1.
+ */
 export function projectNativePath(source) {
   if (!L.version.startsWith('2.')) return source._project();
   const map = source._map, renderer = source._renderer;

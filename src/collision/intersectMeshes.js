@@ -5,7 +5,15 @@ import { readTriangle } from './readTriangle.js';
 import { triangleDistance } from './triangleDistance.js';
 import { worldHit } from './worldHit.js';
 
-/** Nearest triangle hit per mesh, sorted by world-space distance. */
+/**
+ * Find the nearest triangle hit per mesh, sorted by world-space distance.
+ *
+ * @param {Object} ray World-space ray with origin and direction.
+ * @param {Object[]} meshes Meshes to test.
+ * @param {number} [night] Night-light intensity for halo picking.
+ *
+ * @returns {Object[]} Nearest hit for each intersected mesh.
+ */
 export function intersectMeshes(ray, meshes, night = 0) {
   const hits = /* alloc */ [];
   const a = /* alloc */ [0, 0, 0], b = /* alloc */ [0, 0, 0], c = /* alloc */ [0, 0, 0];

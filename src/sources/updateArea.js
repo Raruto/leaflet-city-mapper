@@ -2,15 +2,15 @@ import { areasByLayer } from '../weakmaps/areasByLayer.js';
 import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
 import { headerByLayer } from '../weakmaps/headerByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
-
-
 import { pump } from "./pumpSourceAreas.js";
 import { releaseArea } from './releaseArea.js';
 import { compareAreaDistance } from './compareAreaDistance.js';
 
-/** Cover the visible ground bounds and one bordering block, clipped to the archive. */
-
+/**
+ * Update source areas covering visible ground and one bordering block, clipped to the archive.
+ *
+ * @param {L.Layer} layer Source layer.
+ */
 export function updateArea(layer) {
   if (!layer._map || !sharedByLayer.get(layer)) return;
   if (geojsonByLayer.get(layer)) {

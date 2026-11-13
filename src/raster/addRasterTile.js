@@ -8,8 +8,6 @@ import { terrainOriginElevationByLayer } from '../weakmaps/terrainOriginElevatio
 import { terrainPromiseByLayer } from '../weakmaps/terrainPromiseByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-
-
 import { radians } from '../globals/radians.js';
 import { rasterPoint } from '../globals/rasterPoint.js';
 import { nextId } from '../globals/nextId.js';
@@ -19,6 +17,16 @@ import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 import { terrainTileGeometry } from '../geometry/terrainTileGeometry.js';
 
+/**
+ * Attach a loaded raster tile to terrain after its terrain data is ready.
+ *
+ * @param {L.Layer} layer Terrain layer.
+ * @param {L.Layer} rasterLayer Raster source layer.
+ * @param {Object} coords Tile coordinates.
+ * @param {Object} tile Loaded raster tile.
+ *
+ * @returns {Promise<void>} Completion of the attachment attempt.
+ */
 export async function addRasterTile(layer, rasterLayer, coords, tile) {
   const ready = await terrainPromiseByLayer.get(layer);
   if (!ready || !layer._map || terrain3DByMap.get(layer._map) !== layer || terrain3DByLayer.get(rasterLayer) !== layer ||

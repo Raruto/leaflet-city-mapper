@@ -1,3 +1,9 @@
+/**
+ * Recreate material textures and samplers that belong to a different GPU device.
+ *
+ * @param {Object} material Material containing model texture states.
+ * @param {GPUDevice} device Device to own restored resources.
+ */
 export function restoreMaterialTextures(material, device) {
   let name, texture;
   for (name in material) {

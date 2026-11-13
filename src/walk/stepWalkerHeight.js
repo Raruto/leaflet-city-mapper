@@ -1,3 +1,10 @@
+/**
+ * Advance ascent or gravity-driven descent and report whether the walker's height changed.
+ *
+ * @param {number} dt Frame duration in seconds.
+ *
+ * @returns {boolean} Whether a vertical update was applied.
+ */
 export function stepWalkerHeight(dt) {
   if (this.keys.has('Space')) {
     this.verticalSpeed = 6;

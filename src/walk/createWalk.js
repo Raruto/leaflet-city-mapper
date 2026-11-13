@@ -1,9 +1,6 @@
 import { typeByLayer } from '../weakmaps/typeByLayer.js';
 import { walkerByLayer } from '../weakmaps/walkerByLayer.js';
-
 import { L } from '../globals/L.js';
-
-
 import { init3D } from '../scene/init3D.js';
 import { onBlur } from './onWalkBlur.js';
 import { onKey } from './onWalkKey.js';
@@ -14,6 +11,12 @@ import { step } from './animateWalker.js';
 import { stop } from './stopWalking.js';
 import { toggle } from './toggleWalking.js';
 
+/**
+ * Create the walk layer, control UI and bound event handlers for a control.
+ *
+ * @param {L.Control} control Control receiving the walk state.
+ * @param {Object} options Walking speed, camera distance and layer options.
+ */
 export function createWalk(control, {
   speed,
   distance,

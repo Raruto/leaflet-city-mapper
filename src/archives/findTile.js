@@ -2,6 +2,20 @@ import { getDirectoryEntries } from './getDirectoryEntries.js';
 import { findDirectoryEntry } from './findDirectoryEntry.js';
 import { getTileData } from './getTileData.js';
 
+/**
+ * Follow root and leaf directories to find an archive tile.
+ *
+ * @param {L.Layer} layer Archive layer.
+ * @param {Object} header Decoded archive header.
+ * @param {number} id Cumulative Hilbert tile ID.
+ * @param {AbortSignal} [signal] Request cancellation signal.
+ *
+ * @returns {Promise<Object|undefined>} Tile data, or undefined if not found.
+ *
+ * @throws {Error} If directory offsets form a cycle.
+ * @throws {Error} If a leaf directory extends outside its section.
+ * @throws {Error} If directory nesting exceeds four levels.
+ */
 export async function findTile(layer, header, id, signal) {
   let offset = header.rootDirectoryOffset, length = header.rootDirectoryLength;
   let firstOffset = -1, secondOffset = -1, thirdOffset = -1;

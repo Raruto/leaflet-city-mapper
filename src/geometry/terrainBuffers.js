@@ -1,6 +1,5 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { terrainGridsByLayer } from '../weakmaps/terrainGridsByLayer.js';
-
 import { demBuffer } from '../globals/demBuffer.js';
 import { terrainGrid } from './terrainGrid.js';
 

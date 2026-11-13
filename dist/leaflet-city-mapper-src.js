@@ -8689,6 +8689,11 @@
   var TimeControl = class extends extendLeafletClass(L.Control) {
     static initHooks = true;
     static defaultOptions = { position: "bottomright" };
+    /**
+     * Initialize the time control and its hooks explicitly when using Leaflet 2.
+     *
+     * @param {Object} options Time control options.
+     */
     constructor(options) {
       super(options);
       if (L.version.startsWith("2.")) {
@@ -9726,7 +9731,8 @@
       {
         id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
         properties: feature.properties,
-        baseColor
+        baseColor,
+        polygon: geometry.type === "Polygon" || geometry.type === "MultiPolygon"
       }
     );
   }
@@ -11426,6 +11432,10 @@
       /* alloc */
       []
     );
+    const features = (
+      /* alloc */
+      []
+    );
     const cells = (
       /* alloc */
       /* @__PURE__ */ new Map()
@@ -11444,8 +11454,10 @@
       /* alloc */
       []
     );
-    let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
+    const ranges = mesh.extras?.featureFaces;
+    let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, feature = 0, maxX = -Infinity;
     for (i = 0; i < count; i += 3) {
+      while (ranges && feature < ranges.length && i / 3 >= ranges[feature].faceEnd) feature++;
       first = index ? index.data[i % vertices] : i % vertices;
       if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
         continue;
@@ -11477,19 +11489,19 @@
       tri.push(...v);
       maxX = Math.max(maxX, v[0], v[3], v[6]);
       nrm.push(nx / h, nz / h);
+      features.push(ranges ? feature : instanceOffset ? Math.floor(i / vertices) : 0);
       indexTriangle(cells, v, t);
     }
     c = /* alloc */
     {
       tri: Float32Array.from(tri),
       nrm: Float32Array.from(nrm),
+      features: Uint32Array.from(features),
+      ranges,
       cells,
       maxX,
       geometry: mesh.geometry,
-      matrix: (
-        /* alloc */
-        Array.from(m)
-      ),
+      matrix: Array.from(m),
       origin: (
         /* alloc */
         [m[12], m[13], m[14]]
@@ -11514,34 +11526,65 @@
 
   // src/collision/collectIntersections.js
   function collectIntersections(shape, x, y, z, seen, hits, end, iz) {
-    let ix, cell, triangle3, distance;
+    const { tri, features, ranges } = shape;
+    let ix, cell, triangle3, distance, feature, i, ax, az, bx, bz, cx, cz, ab, ac, bc;
     for (ix = Math.floor(x / CELL); ix <= end; ix++) {
       cell = shape.cells.get(`${ix},${iz}`);
       if (!cell) continue;
       for (triangle3 of cell) {
         if (seen.has(triangle3)) continue;
         seen.add(triangle3);
-        distance = horizontalRay(shape.tri, triangle3, x, y, z, 1, 0);
-        if (distance > 1e-4) hits.push(distance);
+        feature = features[triangle3];
+        distance = horizontalRay(tri, triangle3, x, y, z, 1, 0);
+        if (distance > 1e-4) hits.push(feature * 2, distance);
+        if (!ranges?.[feature]?.polygon) continue;
+        i = triangle3 * 9;
+        ax = tri[i], az = tri[i + 2], bx = tri[i + 3], bz = tri[i + 5], cx = tri[i + 6], cz = tri[i + 8];
+        ab = (ax - bx) ** 2 + (az - bz) ** 2;
+        ac = (ax - cx) ** 2 + (az - cz) ** 2;
+        bc = (bx - cx) ** 2 + (bz - cz) ** 2;
+        if (ac > ab && ac >= bc) bx = cx, bz = cz;
+        else if (bc > ab && bc > ac) ax = bx, az = bz, bx = cx, bz = cz;
+        if (az > z === bz > z) continue;
+        distance = ax + (z - az) * (bx - ax) / (bz - az) - x;
+        if (distance > 1e-4) hits.push(feature * 2 + 1, distance);
       }
     }
   }
 
   // src/collision/countCrossings.js
-  function countCrossings(hits) {
-    let ix, j, distance;
-    for (ix = 1; ix < hits.length; ix++) {
-      distance = hits[ix];
-      j = ix - 1;
-      while (j >= 0 && hits[j] > distance) hits[j + 1] = hits[j--];
-      hits[j + 1] = distance;
+  function countCrossings(hits, ranges) {
+    let ix, j, feature, distance;
+    for (ix = 2; ix < hits.length; ix += 2) {
+      feature = hits[ix], distance = hits[ix + 1];
+      j = ix - 2;
+      while (j >= 0 && (hits[j] > feature || hits[j] === feature && hits[j + 1] > distance)) {
+        hits[j + 2] = hits[j], hits[j + 3] = hits[j + 1];
+        j -= 2;
+      }
+      hits[j + 2] = feature, hits[j + 3] = distance;
     }
-    let crossings = 0, previous = -Infinity;
-    for (distance of hits) {
-      if (distance - previous > 1e-4) crossings++;
+    let crossings = 0, enclosed = 0, previous = -Infinity, previousKey = -1, previousFeature = -1, height = 0, footprint = 0, key;
+    for (ix = 0; ix <= hits.length; ix += 2) {
+      key = ix < hits.length ? hits[ix] : -1;
+      feature = Math.floor(key / 2);
+      if (key !== previousKey) {
+        if (previousKey >= 0) {
+          if (previousKey % 2) footprint = crossings % 2;
+          else height = crossings % 2;
+          if (feature !== previousFeature) {
+            if (height && (!ranges?.[previousFeature]?.polygon || footprint)) enclosed++;
+            height = 0, footprint = 0;
+          }
+        }
+        crossings = 0, previous = -Infinity, previousKey = key, previousFeature = feature;
+      }
+      if (ix === hits.length) break;
+      distance = hits[ix + 1];
+      if (distance - previous > (key % 2 ? 1e-3 : 1e-4)) crossings++;
       previous = distance;
     }
-    return crossings;
+    return enclosed;
   }
 
   // src/collision/insideMesh.js
@@ -11572,7 +11615,7 @@
     hits.length = 0;
     seen.clear();
     collectIntersections(shape, x, y, z, seen, hits, end, iz);
-    return countCrossings(hits) % 2 === 1;
+    return countCrossings(hits, shape.ranges) > 0;
   }
 
   // src/collision/trafficCollision.js
@@ -12145,6 +12188,11 @@
   var WalkControl = class extends extendLeafletClass(L.Control) {
     static initHooks = true;
     static defaultOptions = { position: "bottomright", speed: 70, distance: 20 };
+    /**
+     * Initialize the control and its hooks explicitly when using Leaflet 2.
+     *
+     * @param {Object} options Walk control options.
+     */
     constructor(options) {
       super(options);
       if (L.version.startsWith("2.")) {

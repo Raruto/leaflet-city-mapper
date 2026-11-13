@@ -1,8 +1,6 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
 import { nativeGPUBackByMap } from '../weakmaps/nativeGPUBackByMap.js';
 import { nativeGPUOrderByMap } from '../weakmaps/nativeGPUOrderByMap.js';
-
-
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 import { canScaleNativeStyle } from './canScaleNativeStyle.js';
 import { orderNativeGridLayer } from './orderNativeGridLayer.js';

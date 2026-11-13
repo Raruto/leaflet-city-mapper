@@ -1,11 +1,9 @@
 import { L } from './globals/L.js';
 import { layerProto } from './globals/layerProto.js';
 import { removeLayer as sharedRemoveLayer } from './globals/removeLayer.js';
-
 import './camera/mapCamera.js';
 import './sunlight/initSunlight.js';
 import './walk/initWalk.js';
-
 import { layerLayerAdd } from './scene/addRegisteredLayer.js';
 import { layerInitialize } from './scene/layerInitialize.js';
 import { removeLayer } from './core/removeLayer.js';

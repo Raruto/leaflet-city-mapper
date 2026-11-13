@@ -1,16 +1,20 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { disabledShadow } from '../globals/disabledShadow.js';
 import { shadowValues } from '../globals/shadowValues.js';
-
 import { shadowCacheMatches } from './shadowCacheMatches.js';
 import { shadowMatrix } from './shadowMatrix.js';
 import { ensureShadowPipeline } from './ensureShadowPipeline.js';
 import { drawShadowMeshes } from './drawShadowMeshes.js';
 import { resizeSunlight } from './resizeSunlight.js';
 
-/** One shared directional depth map. Off-screen but loaded geometry can cast shadows. */
-
+/**
+ * Render one shared directional depth map, including off-screen loaded geometry.
+ *
+ * @param {L.Layer} layer Layer owning the renderer.
+ * @param {GPUCommandEncoder} encoder Encoder receiving the shadow pass.
+ * @param {Object[]} meshes Meshes that can cast shadows.
+ * @param {Object|null} sunlight Sun position and direction, if available.
+ */
 export function renderSunlight(layer, encoder, meshes, sunlight) {
   const renderer = rendererByLayer.get(layer), device = renderer.device, sun = renderer.sunlight;
   if (!meshes.length || !sunlight || sunlight.altitude < 3) {

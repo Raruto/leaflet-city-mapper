@@ -7,15 +7,21 @@ import { raycasterByLayer } from '../weakmaps/raycasterByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
-
-
 import { emptyNode } from './createSceneNode.js';
 import { getHeader } from '../archives/getHeader.js';
 import { attach } from './attachSharedScene.js';
 import { loadModel } from '../models/loadModel.js';
 import { update } from './scheduleSceneUpdate.js';
 
+/**
+ * Initialize a 3D scene root and source, attach if mapped, and emit readiness.
+ *
+ * @param {L.Layer} layer 3D layer to initialize.
+ *
+ * @returns {Promise<L.Layer>} The initialized layer.
+ *
+ * @throws {Error} If initialization fails, after emitting an error event.
+ */
 export async function ready3D(layer) {
   try {
     rootByLayer.set(layer, emptyNode());

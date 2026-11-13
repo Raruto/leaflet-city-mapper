@@ -1,14 +1,17 @@
 import { cameraAnimationByMap } from '../weakmaps/cameraAnimationByMap.js';
 import { cameraFrameByMap } from '../weakmaps/cameraFrameByMap.js';
-
 import { cameraAnimationFrame } from '../globals/cameraAnimationFrame.js';
 import { cameraAnimations } from '../globals/cameraAnimations.js';
-
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
-
-
 import { scheduleCameraAnimation } from './scheduleCameraAnimation.js';
 
+/**
+ * Advance pending camera animations and reschedule those still active.
+ *
+ * @param {number} now Animation-frame timestamp in milliseconds.
+ *
+ * @throws {*} The first error caught while updating a camera.
+ */
 export function runCameraAnimations(now) {
   cameraAnimationFrame.value = null;
   const pending = /* alloc */ [...cameraAnimations];

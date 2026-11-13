@@ -1,5 +1,4 @@
 import { ringDirections } from '../globals/ringDirections.js';
-
 import { ring } from './createTreeRing.js';
 
 export function surface(point, addTriangle, lowRadius, low, highRadius, high, color) {

@@ -1,7 +1,12 @@
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
-
 import { releaseRasterTile } from './releaseRasterTile.js';
 
+/**
+ * Cancel unneeded unfinished tiles and create state for missing required tiles.
+ *
+ * @param {L.Layer} layer Raster layer.
+ * @param {Map<string, Object>} required Required tile coordinates by key.
+ */
 export function retainRasterTiles(layer, required) {
   const tiles = rasterTilesByLayer.get(layer);
   let key, tile, coords;

@@ -1,10 +1,17 @@
 import { atmosphereStops } from '../globals/atmosphereStops.js';
 import { atmosphereColor } from '../globals/atmosphereColor.js';
-
 import { mix } from '../colors/mixColor.js';
 import { rgb } from '../colors/formatRGB.js';
 
-
+/**
+ * Interpolate sky background and light tint for a solar altitude.
+ *
+ * @param {number} altitude Solar altitude in degrees.
+ *
+ * @returns {Object} CSS background gradient and RGB tint.
+ *
+ * @throws {Error} If the altitude is not finite.
+ */
 export function atmosphere(altitude) {
   if (!Number.isFinite(altitude)) {
     throw /* alloc */ new Error('Invalid solar altitude');

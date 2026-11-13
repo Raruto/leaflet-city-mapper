@@ -1,4 +1,16 @@
-// Möller-Trumbore for the horizontal ray (ox, oy, oz) + d·(dx, 0, dz) against triangle t; returns d or -1.
+/**
+ * Möller-Trumbore for the horizontal ray (ox, oy, oz) + d·(dx, 0, dz) against triangle t; returns d or -1.
+ *
+ * @param {Float32Array|number[]} v Packed triangle coordinates.
+ * @param {number} t Triangle index.
+ * @param {number} ox Ray origin x.
+ * @param {number} oy Ray origin y.
+ * @param {number} oz Ray origin z.
+ * @param {number} dx Ray direction x.
+ * @param {number} dz Ray direction z.
+ *
+ * @returns {number} Signed ray distance, or -1 when the triangle is missed.
+ */
 export function horizontalRay(v, t, ox, oy, oz, dx, dz) {
   const i = t * 9, ex = v[i + 3] - v[i], ey = v[i + 4] - v[i + 1], ez = v[i + 5] - v[i + 2];
   const fx = v[i + 6] - v[i], fy = v[i + 7] - v[i + 1], fz = v[i + 8] - v[i + 2];

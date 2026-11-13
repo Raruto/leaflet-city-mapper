@@ -2,6 +2,7 @@ import { mapSetBearing } from '../camera/mapSetBearing.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapSetPitch } from '../camera/mapSetPitch.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
+
 export function rotateButtonKeydown(event) {
   const control = this._rotateControl, map = control._map, step = event.shiftKey ? 15 : 5;
   if (event.key === 'ArrowLeft') mapSetBearing(map, mapGetBearing(map) - step);

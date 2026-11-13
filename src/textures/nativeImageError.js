@@ -1,6 +1,10 @@
 import { imageStates } from '../weakmaps/imageStates.js';
 
-
+/**
+ * Report a native image load failure to every associated source layer.
+ *
+ * @param {Event} event Image error event.
+ */
 export function nativeImageError(event) {
   const states = imageStates.get(event.currentTarget);
   if (!states) return;

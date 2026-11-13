@@ -1,6 +1,12 @@
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
+
+/**
+ * Rotate the walk camera on primary-pointer drags outside map controls.
+ *
+ * @param {PointerEvent} event Pointer event on the map.
+ */
 export function onPointer(event) {
   // Dragging only turns the camera around the walker: horizontal = bearing, vertical = pitch.
   const map = this.layer._map;

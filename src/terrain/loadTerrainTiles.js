@@ -1,7 +1,15 @@
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
+import { getZxy } from '../archives/getZxy.js';
 
-
-
+/**
+ * Consume the shared tile queue and store decoded Float32 terrain tiles.
+ *
+ * @param {Object} state Queue, archive, layer and cancellation state.
+ *
+ * @returns {Promise<void>} Resolves when the queue is exhausted.
+ *
+ * @throws {Error} If a tile is missing or has an invalid byte length.
+ */
 export async function loadTerrainTiles(state) {
   const { backend: layer, archive, controller, tiles } = state;
   let coords, result;
@@ -15,4 +23,3 @@ export async function loadTerrainTiles(state) {
     terrainTilesByLayer.get(layer).set(`${coords.x}/${coords.y}`, /* alloc */ new Float32Array(result.data));
   }
 }
-import { getZxy } from '../archives/getZxy.js';

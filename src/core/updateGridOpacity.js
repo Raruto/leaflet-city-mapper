@@ -1,7 +1,9 @@
 
 import { cancelGridFade } from '../animations/cancelGridFade.js';
 import { scheduleGridFade } from '../animations/scheduleGridFade.js';
+import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';
 
+/** Update this grid layer's GPU tile fades and schedule further frames when needed. */
 export function updateGridOpacity() {
   if (!this._map) return;
   const layer = this, now = Date.now();
@@ -24,4 +26,3 @@ export function updateGridOpacity() {
   cancelGridFade(layer);
   if (fading) scheduleGridFade(layer);
 }
-import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';

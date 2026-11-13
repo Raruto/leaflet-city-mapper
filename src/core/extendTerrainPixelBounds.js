@@ -6,6 +6,16 @@ import { mapElevationOf } from '../terrain/mapElevationOf.js';
 import { groundBounds } from '../projections/groundBounds.js';
 import { animationPoint } from '../projections/transformZoomAnimationPoint.js';
 
+/**
+ * Extend tiled pixel bounds to include the visible footprint at cached terrain elevation extremes.
+ *
+ * @param {L.GridLayer} layer Grid layer with the tile zoom.
+ * @param {L.Bounds} result Bounds to extend in place.
+ * @param {Object} stream Terrain stream and elevation cache.
+ * @param {L.LatLng} origin Scene origin.
+ *
+ * @returns {L.Bounds} Extended bounds.
+ */
 export function extendTerrainPixelBounds(layer, result, stream, origin) {
   const map = layer._map;
   let minimum = Infinity, maximum = -Infinity, key, entry;

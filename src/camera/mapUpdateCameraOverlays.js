@@ -1,4 +1,10 @@
 import { L } from '../globals/L.js';
+
+/**
+ * Refresh marker, popup and tooltip positions for a camera change.
+ *
+ * @param {L.Map} map Map containing the overlays.
+ */
 export function mapUpdateCameraOverlays(map) {
   let layer;
   for (layer of Object.values(map._layers)) {

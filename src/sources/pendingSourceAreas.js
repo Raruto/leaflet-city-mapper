@@ -1,7 +1,14 @@
 import { areasByLayer } from '../weakmaps/areasByLayer.js';
-
 import { compareDistance } from '../utils/compareDistance.js';
 
+/**
+ * Gather unstarted, unaborted source areas in order of distance from the map center.
+ *
+ * @param {Array<L.Layer>} layers Source layers.
+ * @param {L.Map} map Map providing the view center and projection.
+ *
+ * @returns {Array<Object>} Pending layer and area entries with distances.
+ */
 export function pendingSourceAreas(layers, map) {
   const pending = /* alloc */ [];
   let layer, area, center;

@@ -1,11 +1,18 @@
 import { terrainBoundsByLayer } from '../weakmaps/terrainBoundsByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
-
 import { L } from '../globals/L.js';
 import { archiveNorthWest } from '../globals/archiveNorthWest.js';
 import { archiveSouthEast } from '../globals/archiveSouthEast.js';
 import { compareDistance } from '../utils/compareDistance.js';
 
+/**
+ * Build the archive terrain tile queue ordered by distance from the map center.
+ *
+ * @param {L.Layer} layer Terrain layer.
+ * @param {Object} header Archive bounds and zoom metadata.
+ *
+ * @returns {Object[]} Tile coordinates with their distance from the center.
+ */
 export function terrainTileQueue(layer, header) {
   const map = layer._map
   terrainZoomByLayer.set(layer, header.maxZoom);

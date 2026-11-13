@@ -1,12 +1,9 @@
 import { fadeFrameByLayer } from '../weakmaps/fadeFrameByLayer.js';
-
 import { gridFadeFrame } from '../globals/gridFadeFrame.js';
 import { pendingGridFades } from '../globals/pendingGridFades.js';
-
-
-
 import { updateGridOpacity } from '../core/updateGridOpacity.js';
 
+/** Advance queued grid fades whose scheduled versions are still current. */
 export function runGridFades() {
   gridFadeFrame.value = null;
   const layers = /* alloc */ [...pendingGridFades];

@@ -1,3 +1,9 @@
+/**
+ * Resolve a worker task from its message or reject it on abort, worker error or serialized failure.
+ *
+ * @param {Object} task Pending worker task with resolve, reject and signal.
+ * @param {Event} event Message, error, messageerror or abort event.
+ */
 export function settleGeometryWorker(task, event) {
   if (event.type === 'abort') task.reject(task.signal.reason);
   else if (event.type === 'error') task.reject(/* alloc */ new Error(`Geometry worker failed: ${event.message}`));

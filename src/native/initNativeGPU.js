@@ -1,8 +1,5 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
-
-
-
 import { nativeLayer } from './nativeLayer.js';
 import { hideTargets } from './hideTargets.js';
 import { removeTargets } from './removeTargets.js';

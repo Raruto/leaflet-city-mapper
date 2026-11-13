@@ -3,7 +3,6 @@ import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
 import { locationByLayer } from '../weakmaps/locationByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { createMesh } from '../rendering/createMesh.js';
 import { bridgePolygon } from './bridgePolygon.js';

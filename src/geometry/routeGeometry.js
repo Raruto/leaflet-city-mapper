@@ -1,7 +1,6 @@
 import { appendRouteSegment } from './appendRouteSegment.js';
 
 /** Dashed lane outline, in layer-local metres. */
-
 export function routeGeometry(lanes) {
   const position = /* alloc */ [];
   const normal = /* alloc */ [];

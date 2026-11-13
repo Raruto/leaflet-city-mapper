@@ -6,6 +6,14 @@ import { terrainLayoutEntry } from '../globals/terrainLayoutEntry.js';
 import { textureLayoutEntries } from '../globals/textureLayoutEntries.js';
 import { samplerLayoutEntries } from '../globals/samplerLayoutEntries.js';
 
+/**
+ * Create a bind group layout for mesh, frame, terrain and shader texture bindings.
+ *
+ * @param {GPUDevice} device Device creating the layout.
+ * @param {Object} shaders Shader bindings and terrain requirements.
+ *
+ * @returns {GPUBindGroupLayout} The created layout.
+ */
 export function createProgramLayout(device, shaders) {
   const bindGroupEntries = programEntries;
   bindGroupEntries.length = 0;

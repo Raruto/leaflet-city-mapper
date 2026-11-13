@@ -4,6 +4,12 @@ import { extrusionStyle } from './extrusionStyle.js';
 import { prepareAreaGeometryJob } from './prepareAreaGeometryJob.js';
 import { matchesAreaTile } from './matchesAreaTile.js';
 
+/**
+ * Queue geometry and picking metadata for a styled feature belonging to the current source area.
+ *
+ * @param {Object} context Area build context.
+ * @param {Object} feature GeoJSON feature to process.
+ */
 export function buildAreaFeature(context, feature) {
   const { backend: layer, area, map } = context;
   const coords = area.coords;
@@ -21,6 +27,6 @@ export function buildAreaFeature(context, feature) {
   prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor);
   context.featureFaces.push(/* alloc */ {
     id: feature.id ?? feature.properties?.objectid ?? JSON.stringify(geometry),
-    properties: feature.properties, baseColor,
+    properties: feature.properties, baseColor, polygon: geometry.type === 'Polygon' || geometry.type === 'MultiPolygon',
   });
 }

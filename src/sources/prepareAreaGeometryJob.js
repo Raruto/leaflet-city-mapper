@@ -2,6 +2,16 @@ import { projectedTree } from '../projections/projectTreePoint.js';
 import { parseColor } from '../colors/parseColor.js';
 import { projectAreaPolygons } from './projectAreaPolygons.js';
 
+/**
+ * Queue projected feature geometry and resolved style values for the geometry worker.
+ *
+ * @param {Object} context Area build context and job queue.
+ * @param {Object} feature GeoJSON feature.
+ * @param {number} lon Anchor longitude.
+ * @param {number} lat Anchor latitude.
+ * @param {Object} style Validated extrusion style.
+ * @param {Object} baseColor Parsed feature color.
+ */
 export function prepareAreaGeometryJob(context, feature, lon, lat, style, baseColor) {
   const geometry = feature.geometry;
   const polygons = projectAreaPolygons(context, geometry);

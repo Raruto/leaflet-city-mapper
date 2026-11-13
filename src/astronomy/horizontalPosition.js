@@ -1,5 +1,16 @@
 import { radians } from '../globals/radians.js';
 
+/**
+ * Convert equatorial coordinates to observer-relative altitude, azimuth and direction.
+ *
+ * @param {number} d Days since the J2000 epoch.
+ * @param {number} lat Observer latitude in degrees.
+ * @param {number} lng Observer longitude in degrees.
+ * @param {number} ascension Right ascension in radians.
+ * @param {number} declination Declination in radians.
+ *
+ * @returns {Object} Altitude and azimuth in degrees and a world-space direction vector.
+ */
 export function horizontalPosition(d, lat, lng, ascension, declination) {
   const hourAngle = (280.16 + 360.9856235 * d + lng) * radians - ascension;
   const latitude = lat * radians;

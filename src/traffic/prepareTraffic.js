@@ -1,12 +1,14 @@
 import { locationByLayer } from '../weakmaps/locationByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { L } from '../globals/L.js';
-
-
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { groundTraffic } from './groundTraffic.js';
 
+/**
+ * Project lane coordinates to local metres, compute distances and heights, and invalidate old route geometry.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function prepareTraffic(state) {
   const { layer, lanes } = state;
   const crs = layer._map.options.crs, origin = crs.project(locationByLayer.get(layer));

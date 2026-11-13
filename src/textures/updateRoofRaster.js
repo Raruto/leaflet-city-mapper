@@ -6,6 +6,14 @@ import { roofRastersByLayer } from '../weakmaps/roofRastersByLayer.js';
 import { updateRoofAtlas } from './updateRoofAtlas.js';
 import { destroyTexture } from './destroyTexture.js';
 
+/**
+ * Update or remove the roof atlas according to scene texture settings and active rasters.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {number} now Current frame time in milliseconds.
+ *
+ * @returns {Array<L.Layer>} Raster layers contributing to the roof atlas.
+ */
 export function updateRoofRaster(layer, now) {
   const map = layer._map;
   let rasters = roofRastersByLayer.get(layer);

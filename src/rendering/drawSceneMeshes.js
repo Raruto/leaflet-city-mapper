@@ -1,11 +1,17 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
-
 import { scenePass } from '../globals/scenePass.js';
-
-
 import { drawGeometry } from './drawGeometry.js';
 
+/**
+ * Encode the scene render pass, including both faces of double-sided transparent meshes.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {GPUCommandEncoder} encoder Encoder receiving the pass.
+ * @param {Array<Object>} meshes Sorted meshes to draw.
+ *
+ * @throws {Error} If a mesh has a singular or non-finite world transform.
+ */
 export function drawSceneMeshes(layer, encoder, meshes) {
   const renderer = rendererByLayer.get(layer);
   const pass = encoder.beginRenderPass((

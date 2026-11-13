@@ -1,3 +1,10 @@
+/**
+ * Create material uniform values and add bindings for configured textures.
+ *
+ * @param {Object} material Material properties.
+ *
+ * @returns {Object} Uniform values keyed by shader property.
+ */
 export function createProgramUniforms(material) {
   const uniforms = /* alloc */ {
     baseColor: /* alloc */ { value: material.color || /* alloc */ [1, 1, 1] },

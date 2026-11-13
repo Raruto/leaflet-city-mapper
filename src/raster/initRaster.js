@@ -7,10 +7,7 @@ import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
 import { L } from '../globals/L.js';
-
-
 import { isLoading } from './isRasterLoading.js';
 import { getRasterEvents } from './getRasterEvents.js';
 import { readyRaster } from './readyRaster.js';
@@ -25,6 +22,12 @@ import { getRasterTileSize } from './getRasterTileSize.js';
 import { setPMTileOpacity } from './setPMTileOpacity.js';
 import { setPMTileZIndex } from './setPMTileZIndex.js';
 
+/**
+ * Initialize raster layer state and start reading its archive header.
+ *
+ * @param {L.Layer} layer Raster layer to initialize.
+ * @param {Object} options Layer and archive options.
+ */
 export function initRaster(layer, options) {
   kindByLayer.set(layer, 'raster');
   options = /* alloc */ { ariaLabel: 'PMTiles raster', maxZoom: 18, opacity: 1, zIndex: 0, ...options };

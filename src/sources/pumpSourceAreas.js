@@ -3,17 +3,17 @@ import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
 import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
 import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
 import { renderers } from '../weakmaps/renderers.js';
-
-
-
 import { updateStatus } from './updateSourceStatus.js';
-
 import { buildArea } from './buildArea.js';
 import { pendingSourceAreas } from './pendingSourceAreas.js';
 
-/** Share four load/build slots across source layers, nearest ground blocks first. */
+/**
+ * Share four load/build slots across source layers, nearest ground blocks first.
+ *
+ * @param {L.Layer} layer Layer used to find the shared renderer.
+ * @param {L.Map} [map] Map containing the source layers.
+ */
 export function pump(layer, map = layer._map) {
   const shared = map && renderers.get(map);
   if (!shared || !layersByLayer.has(shared)) return;

@@ -1,8 +1,18 @@
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { L } from '../globals/L.js';
 import { mapElevationOf } from '../terrain/mapElevationOf.js';
 
+/**
+ * Validate ring length and coordinates, then project its vertices except the closing point and sample terrain.
+ *
+ * @param {Object} context Projection state, backend layer and map.
+ * @param {number[][]} ring GeoJSON polygon ring.
+ *
+ * @returns {Object[]} Projected points with x, y and ground coordinates.
+ *
+ * @throws {Error} If the ring has fewer than four positions.
+ * @throws {Error} If a projected position has invalid longitude or latitude.
+ */
 export function projectRing(context, ring) {
   const { backend: layer, crs, origin, metres, map } = context;
   if (ring.length < 4) throw /* alloc */ new Error('Invalid GeoJSON polygon ring');

@@ -4,8 +4,15 @@ import { radians } from '../globals/radians.js';
 import { sinObliquity } from '../globals/sinObliquity.js';
 import { cosObliquity } from '../globals/cosObliquity.js';
 
-// Solar centre, without atmospheric refraction.
-
+/**
+ * Calculate the solar center position without atmospheric refraction.
+ *
+ * @param {Date|string|number} date Observation date.
+ * @param {number} lat Observer latitude in degrees.
+ * @param {number} lng Observer longitude in degrees.
+ *
+ * @returns {Object} Altitude, azimuth and world-space direction.
+ */
 export function solarPosition(date, lat, lng) {
   const time = solarTime(date, lat, lng);
   const d = time / 86400000 - 10957.5;

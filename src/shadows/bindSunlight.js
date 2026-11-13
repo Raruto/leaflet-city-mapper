@@ -1,9 +1,11 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { sunBindGroup } from '../globals/sunBindGroup.js';
 
-
-
+/**
+ * Bind the renderer's sunlight uniforms, shadow texture, sampler and light buffer.
+ *
+ * @param {L.Layer} layer Layer owning the renderer.
+ */
 export function bindSunlight(layer) {
   const sun = rendererByLayer.get(layer).sunlight;
   sun.bindGroup = rendererByLayer.get(layer).device.createBindGroup((

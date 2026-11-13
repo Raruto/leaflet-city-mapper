@@ -3,6 +3,11 @@ import { onVectorTileMessage } from './vectorTileWorker.js';
 import { onCogMessage } from './cogWorker.js';
 import { onModelMessage } from './modelWorker.js';
 
+/**
+ * Route worker requests to the appropriate source handler or assemble and transfer area geometry.
+ *
+ * @param {MessageEvent} event Worker request.
+ */
 export function onGeometryMessage(event) {
   if (event.data.type === 'model') {
     onModelMessage(event);

@@ -1,9 +1,8 @@
 import { limbs } from '../globals/limbs.js';
-
 import { update } from '../scene/scheduleSceneUpdate.js';
-
 import { local } from '../projections/walkerLocalPosition.js';
 
+/** Place and animate the walker meshes at the current position and heading, then request a scene update. */
 export function place() {
   const [x, y, z] = local.call(this, this.local);
   // Model forward is -z; a yaw of -heading turns it to the compass heading (x east, -z north).

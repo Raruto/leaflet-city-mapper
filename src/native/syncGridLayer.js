@@ -3,7 +3,6 @@ import { syncGridTile } from './syncGridTile.js';
 import { syncTerrainGridTile } from './syncTerrainGridTile.js';
 import { retainGridTerrain } from './retainGridTerrain.js';
 
-
 export function syncGridLayer(state) {
   const { source } = state;
   const stream = prepareGridTerrainRequests(state);

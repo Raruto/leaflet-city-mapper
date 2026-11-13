@@ -1,5 +1,17 @@
 import { readAccessor } from './readAccessor.js';
 
+/**
+ * Read and validate triangle indices, or validate an unindexed triangle list.
+ *
+ * @param {Object} description Decoded glTF document.
+ * @param {Object} primitive glTF mesh primitive.
+ * @param {Object} attributes Destination attribute map.
+ * @param {number} vertexCount Number of vertices.
+ *
+ * @throws {Error} If the index type, size or count is invalid.
+ * @throws {Error} If an index is outside the vertex range.
+ * @throws {Error} If the unindexed triangle list is incomplete.
+ */
 export function readModelIndices(description, primitive, attributes, vertexCount) {
   if (primitive.indices !== undefined) {
     const index = readAccessor(description, primitive.indices);

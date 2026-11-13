@@ -3,7 +3,13 @@ import { indexTriangle } from './indexTriangle.js';
 import { readTriangle } from './readTriangle.js';
 import { vertexCount } from './vertexCount.js';
 
-
+/**
+ * Cache world-space collision triangles and their grid cells, rebuilding when geometry or rotation/scale changes.
+ *
+ * @param {Object} mesh Mesh containing geometry and a world matrix.
+ *
+ * @returns {Object} Cached triangle, normal, feature and grid data.
+ */
 export function collider(mesh) {
   const m = mesh.worldMatrix;
   let c = colliders.get(mesh), i;
@@ -19,12 +25,15 @@ export function collider(mesh) {
   const count = vertices * (instanceOffset?.count ?? 1);
   const tri = /* alloc */ [];
   const nrm = /* alloc */ [];
+  const features = /* alloc */ [];
   const cells = /* alloc */ new Map();
   const a = /* alloc */ [0, 0, 0], b = /* alloc */ [0, 0, 0], d = /* alloc */ [0, 0, 0];
   const v = /* alloc */ [];
 
-  let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, maxX = -Infinity;
+  const ranges = mesh.extras?.featureFaces;
+  let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, feature = 0, maxX = -Infinity;
   for (i = 0; i < count; i += 3) {
+    while (ranges && feature < ranges.length && i / 3 >= ranges[feature].faceEnd) feature++;
     first = index ? index.data[i % vertices] : i % vertices;
     // Streetlight halos (uv.x <= 2, see scene/picking.js) are light, not matter.
     if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
@@ -62,16 +71,19 @@ export function collider(mesh) {
     tri.push(...v);
     maxX = Math.max(maxX, v[0], v[3], v[6]);
     nrm.push(nx / h, nz / h);
+    features.push(ranges ? feature : instanceOffset ? Math.floor(i / vertices) : 0);
 
     indexTriangle(cells, v, t);
   }
   c = /* alloc */ {
     tri: Float32Array.from(tri),
     nrm: Float32Array.from(nrm),
+    features: Uint32Array.from(features),
+    ranges,
     cells,
     maxX,
     geometry: mesh.geometry,
-    matrix: /* alloc */ Array.from(m),
+    matrix: Array.from(m),
     origin: /* alloc */ [m[12], m[13], m[14]]
   };
   colliders.set(mesh, c);

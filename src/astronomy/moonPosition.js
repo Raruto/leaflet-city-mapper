@@ -4,8 +4,15 @@ import { radians } from '../globals/radians.js';
 import { sinObliquity } from '../globals/sinObliquity.js';
 import { cosObliquity } from '../globals/cosObliquity.js';
 
-// Low-precision geocentric lunar orbit; no parallax or atmospheric refraction.
-
+/**
+ * Approximate the geocentric lunar position without parallax or atmospheric refraction.
+ *
+ * @param {Date|string|number} date Observation date.
+ * @param {number} lat Observer latitude in degrees.
+ * @param {number} lng Observer longitude in degrees.
+ *
+ * @returns {Object} Altitude, azimuth and world-space direction.
+ */
 export function moonPosition(date, lat, lng) {
   const d = solarTime(date, lat, lng) / 86400000 - 10957.5;
   const anomaly = (134.963 + 13.064993 * d) * radians;

@@ -1,6 +1,15 @@
 import { cross } from './cross.js';
 import { containsVertex } from './containsVertex.js';
 
+/**
+ * Clip convex ears from a polygon in place to produce indexed triangles.
+ *
+ * @param {Object[]} polygon Counterclockwise vertices carrying original indices.
+ *
+ * @returns {number[][]} Triangles of original vertex indices.
+ *
+ * @throws {Error} If no further ear can be clipped.
+ */
 export function clipEars(polygon) {
   const result = /* alloc */ [];
   let clipped, i, a, b, c, p;

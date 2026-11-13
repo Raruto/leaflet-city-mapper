@@ -1,6 +1,4 @@
 import { cameraTouchStates } from '../globals/cameraTouchStates.js';
-
-
 import { endCameraTouch } from './endCameraTouch.js';
 
 export function endAllCameraTouches() {

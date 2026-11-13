@@ -1,7 +1,7 @@
 import { markerPanFrame } from '../globals/markerPanFrame.js';
 import { pendingMarkerPan } from '../globals/pendingMarkerPan.js';
 
-
+/** Apply the latest queued pan event for each marker drag. */
 export function runMarkerPanFrame() {
   markerPanFrame.value = null;
   const pending = /* alloc */ [...pendingMarkerPan];

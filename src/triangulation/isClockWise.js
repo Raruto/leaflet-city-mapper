@@ -1,7 +1,10 @@
 /**
+ * Determine a planar ring's winding from its signed area.
+ *
+ * @param {Object[]} points Ring points with x and y coordinates.
+ *
  * @returns {boolean} Whether the `{x, y}` points are in clockwise order.
  */
-
 export function isClockWise(points) {
   let area = 0;
   let i, a, b;

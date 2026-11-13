@@ -1,6 +1,4 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
-
-
 import { disposeNativeLayer } from './disposeNativeLayer.js';
 
 export function removeTargets(state) {

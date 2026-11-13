@@ -3,20 +3,20 @@ import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
 import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
-
 import { wantedTiles } from '../globals/wantedTiles.js';
 import { coverageTiles } from '../globals/coverageTiles.js';
-
-
-
 import { pumpRasterTiles } from './pumpRasterTiles.js';
-
 import { retainRasterTiles } from './retainRasterTiles.js';
 import { pruneRasterTiles } from './pruneRasterTiles.js';
 import { rasterTileRange } from './rasterTileRange.js';
 
 // ponytail: cap horizon views at 169 tiles; raise the radius if extreme pitches need more.
 
+/**
+ * Update visible and fallback raster tiles for the current map view.
+ *
+ * @param {L.Layer} layer Raster layer.
+ */
 export function updateRasterTiles(layer) {
   const map = layer._map;
   if (!map || !sharedByLayer.get(layer) || !headerByLayer.get(layer)) return;

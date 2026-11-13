@@ -1,11 +1,17 @@
 import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
-
 import { L } from '../globals/L.js';
 import { roofSignatures } from '../globals/roofSignatures.js';
 import { rebuildRoofAtlas } from './rebuildRoofAtlas.js';
 
+/**
+ * Rebuild a changed roof atlas, throttling updates while raster tiles are loading.
+ *
+ * @param {L.Layer} layer Rendering layer owning the atlas.
+ * @param {Array<L.Layer>} rasters Raster layers included in the atlas.
+ * @param {number} now Current frame time in milliseconds.
+ */
 export function updateRoofAtlas(layer, rasters, now) {
   const signatures = roofSignatures;
   signatures.length = 0;

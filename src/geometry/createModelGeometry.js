@@ -1,5 +1,4 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { createProgram } from '../materials/createProgram.js';
 
 export function createModelGeometry(context, primitive, attributes) {

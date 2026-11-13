@@ -3,7 +3,6 @@ import { quad } from './quad.js';
 import { emitter } from './emitter.js';
 
 /** Three crossed emitter discs; illumination itself is evaluated on receiving surfaces. */
-
 export function lightGeometry(point, style, addTriangle) {
   if (!Number.isFinite(style.lightRadius) || style.lightRadius <= 0) throw /* alloc */ new Error('Invalid light radius');
   const color = parseColor(style.color);

@@ -3,7 +3,16 @@ import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
 import { modelByLayer } from '../weakmaps/modelByLayer.js';
 import { headerByLayer } from '../weakmaps/headerByLayer.js';
 import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
+import { layerCountTitle } from './layerCountTitle.js';
 
+/**
+ * Update a layer count's text, title and error accessibility state.
+ *
+ * @param {L.Layer} layer Layer whose count is displayed.
+ * @param {number} count Number of loaded elements.
+ * @param {number} pending Number of blocks still loading.
+ * @param {Error|string} [error] Loading error, if any.
+ */
 export function renderLayerCount(layer, count, pending, error) {
   const status = countStatusByLayer.get(layer);
   const modelUrl = modelUrlByLayer.get(layer), model = modelByLayer.get(layer);
@@ -17,4 +26,3 @@ export function renderLayerCount(layer, count, pending, error) {
   if (error && status.getAttribute('role') !== 'alert') status.setAttribute('role', 'alert');
   else if (!error && status.hasAttribute('role')) status.removeAttribute('role');
 }
-import { layerCountTitle } from './layerCountTitle.js';

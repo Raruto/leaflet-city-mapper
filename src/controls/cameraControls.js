@@ -3,7 +3,6 @@ import { cameraHandlersByMap } from '../weakmaps/cameraHandlersByMap.js';
 import { rotateControlByMap } from '../weakmaps/rotateControlByMap.js';
 import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
 import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
-
 import { L } from '../globals/L.js';
 import { Compass } from '../globals/Compass.js';
 import { ContainerResize } from '../globals/ContainerResize.js';
@@ -15,9 +14,6 @@ import { cameraTouchStates } from '../globals/cameraTouchStates.js';
 import { cameraListenerOptions } from '../globals/cameraListenerOptions.js';
 import { cameraEmptyOptions } from '../globals/cameraEmptyOptions.js';
 import { notifyCameraTouchChange } from './notifyCameraTouchChange.js';
-
-
-
 import { rotateOnAdd } from './rotateOnAdd.js';
 import { rotateOnRemove } from './rotateOnRemove.js';
 import { rotateControl } from './rotateControl.js';

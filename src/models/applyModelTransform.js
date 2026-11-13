@@ -1,6 +1,10 @@
 import { modelByLayer } from '../weakmaps/modelByLayer.js';
 
-
+/**
+ * Apply the layer's optional rotation and scale to its model.
+ *
+ * @param {L.Layer} layer Layer containing the transform options.
+ */
 export function applyModelTransform(layer) {
   const model = modelByLayer.get(layer);
   if (layer.options.rotation) {

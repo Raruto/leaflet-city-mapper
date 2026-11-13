@@ -1,6 +1,12 @@
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 
+/**
+ * Detach a mesh and destroy its geometry buffers.
+ *
+ * @param {L.Layer} layer Layer to refresh.
+ * @param {Object} mesh Mesh to dispose, if present.
+ */
 export function disposeMesh(layer, mesh) {
   if (!mesh) {
     return;

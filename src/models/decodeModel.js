@@ -1,8 +1,19 @@
 import { geometryDecoder } from '../globals/geometryDecoder.js';
-/** Decode a static glTF JSON document or GLB v2 container. */
 import { hasUnsupportedPrimitives } from './hasUnsupportedPrimitives.js';
 
-
+/**
+ * Decode a static glTF JSON document or GLB v2 container.
+ *
+ * @param {ArrayBuffer} data Encoded glTF or GLB data.
+ *
+ * @returns {Object} Decoded glTF document.
+ *
+ * @throws {Error} If the GLB header is invalid.
+ * @throws {Error} If a GLB chunk header is truncated.
+ * @throws {Error} If GLB chunk data is truncated.
+ * @throws {Error} If the GLB JSON chunk is missing.
+ * @throws {Error} If the model uses unsupported glTF features.
+ */
 export function decodeModel(data) {
   const view = /* alloc */ new DataView(data);
   const decoder = geometryDecoder;

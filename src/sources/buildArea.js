@@ -1,8 +1,6 @@
 import { geojsonByLayer } from '../weakmaps/geojsonByLayer.js';
 import { inflightByLayer } from '../weakmaps/inflightByLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
-
-
 import { attachAreaMesh } from './attachAreaMesh.js';
 import { loadSource } from '../archives/loadSource.js';
 import { sourceAreaContext } from './sourceAreaContext.js';
@@ -10,6 +8,19 @@ import { pump } from './pumpSourceAreas.js';
 import { buildAreaInWorker } from '../workers/buildAreaInWorker.js';
 import { buildAreaFeatures } from './buildAreaFeatures.js';
 
+/**
+ * Load and build an area with worker geometry, reporting errors and releasing its load slot.
+ *
+ * @param {L.Layer} layer Source layer.
+ * @param {Object} area Area state and abort controller.
+ * @param {L.Map} map Map containing the layer.
+ *
+ * @returns {Promise<void>} Completion of the build attempt.
+ *
+ * @throws {Error} Internally if the response is not a GeoJSON feature collection; reported to the layer.
+ * @throws {Error} Internally if the GeoJSON style is not a function; reported to the layer.
+ * @throws {Error} Internally if workers are disabled; reported to the layer.
+ */
 export async function buildArea(layer, area, map) {
   try {
     await /* alloc */ new Promise(requestAnimationFrame);

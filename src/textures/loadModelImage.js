@@ -1,6 +1,16 @@
 import { geometryImageOptions } from '../globals/geometryImageOptions.js';
 
-
+/**
+ * Load a glTF image from a buffer view or URI as an unpremultiplied image bitmap.
+ *
+ * @param {Object} description Decoded glTF document with loaded buffers.
+ * @param {string} directory Base URL for external image URIs.
+ * @param {Object} image glTF image specification.
+ *
+ * @returns {Promise<ImageBitmap>} Decoded image.
+ *
+ * @throws {Error} If an external image response is not successful.
+ */
 export async function loadImage(description, directory, image) {
   let blob;
   if (image.bufferView !== undefined) {

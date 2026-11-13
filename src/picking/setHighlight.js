@@ -1,11 +1,12 @@
 import { highlightedFeatureByLayer } from '../weakmaps/highlightedFeatureByLayer.js';
-
-
-
 import { update } from '../scene/scheduleSceneUpdate.js';
 
-/** Highlight a source vertex range in the shader; vertex colors stay untouched. */
-
+/**
+ * Highlight a source vertex range in the shader; vertex colors stay untouched.
+ *
+ * @param {L.Layer} layer Layer whose highlight is updated.
+ * @param {Object|null} feature Picked feature to highlight, or null to clear it.
+ */
 export function setHighlight(layer, feature) {
   if (feature?.model) feature = null;
   if (highlightedFeatureByLayer.get(layer)?.mesh === feature?.mesh &&

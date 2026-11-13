@@ -1,5 +1,10 @@
 import { mirror } from './mirrorVehiclePart.js';
 
+/**
+ * Build twelve mirrored pairs of benches for the boat deck.
+ *
+ * @returns {Array} Bench extrusion parts.
+ */
 export function boatBenches() {
   const benches = /* alloc */ [];
   let i;

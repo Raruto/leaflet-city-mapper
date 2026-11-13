@@ -1,8 +1,11 @@
 import { worldMatrixChanged } from './worldMatrixChanged.js';
 import { composeLocalTransform } from './composeLocalTransform.js';
 
-/** Compose parent*local matrices; a node.matrix overrides its position/rotation/scale. */
-
+/**
+ * Compose parent*local matrices; a node.matrix overrides its position/rotation/scale.
+ *
+ * @param {Object} node Scene node whose subtree will be updated.
+ */
 export function updateWorldMatrix(node) {
   const parent = node.parent;
   const parentVersion = parent?._worldMatrixVersion || 0;

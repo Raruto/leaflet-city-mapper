@@ -1,5 +1,14 @@
 import { walkByMap } from '../weakmaps/walkByMap.js';
 
+/**
+ * Attach the walk layer and reuse map-owned collision scratch, rejecting duplicate controls.
+ *
+ * @param {L.Map} map Map receiving the control.
+ *
+ * @returns {HTMLElement} Walk control container.
+ *
+ * @throws {Error} If another walk control is already attached to the map.
+ */
 export function onAdd(map) {
   let state = walkByMap.get(map);
   if (state?.control && state.control !== this) {

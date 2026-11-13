@@ -5,12 +5,8 @@ import { shadowMeshesByLayer } from '../weakmaps/shadowMeshesByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
 import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
-
-
 import { frameCommands } from '../globals/frameCommands.js';
 import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
-
-
 import { synchronizeZoomView } from '../animations/synchronizeZoomView.js';
 import { resizeRenderer } from './resizeRenderer.js';
 import { updateMapCamera } from '../camera/updateMapCamera.js';
@@ -30,8 +26,9 @@ import { beforeNativeRender } from '../native/beforeNativeRender.js';
  * Rendering owner: CSS pixels -> scene metres -> perspective camera.
  * Lights and transparent sort centers are converted into the current camera space.
  * Without raster tiles, logical map projection supplies the same static alignment.
+ *
+ * @param {L.Layer} layer Shared rendering layer.
  */
-
 export function render(layer) {
   cancelUpdate(layer);
   if (sharedByLayer.get(layer) !== layer || !rendererByLayer.get(layer)) return;

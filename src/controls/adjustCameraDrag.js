@@ -1,9 +1,6 @@
 import { cameraDraggableByMap } from '../weakmaps/cameraDraggableByMap.js';
-
-
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-
 import { project } from '../projections/projectCameraPoint.js';
 
 export function adjustCameraDrag() {

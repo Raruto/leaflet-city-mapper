@@ -1,5 +1,15 @@
 import { horizontalRay } from '../collision/horizontalRay.js';
 
+/**
+ * Test unseen, front-facing triangles in a collider cell at knee and chest heights.
+ *
+ * @param {number[]} cell Triangle indices in the cell.
+ * @param {Object} c Cached collider geometry and normals.
+ * @param {Object} data Collision scratch and nearest-hit state.
+ * @param {number} ox Collider-local ray origin x coordinate.
+ * @param {number} oy Collider-local ray origin y coordinate.
+ * @param {number} oz Collider-local ray origin z coordinate.
+ */
 export function hitColliderCell(cell, c, data, ox, oy, oz) {
   const { dx, dz, seen } = data;
   let t, height, d;

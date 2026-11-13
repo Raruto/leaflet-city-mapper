@@ -11,7 +11,6 @@ import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
 import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { terrainBaseYByLayer } from '../weakmaps/terrainBaseYByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { renderers } from '../weakmaps/renderers.js';
 import { setParent } from './setParent.js';
@@ -27,6 +26,12 @@ import { initializeSharedRenderer } from '../gpu/initializeSharedRenderer.js';
 /**
  * Join/create this map's shared scene and rebuild GPU objects if its context changed.
  * Buffer/program handles belong to one context; typed arrays and decoded images do not.
+ *
+ * @param {L.Layer} layer Layer to attach.
+ * @param {L.Map} map Map owning the shared scene.
+ *
+ * @returns {Promise<void>} Completion of scene attachment.
+ *
  * @private
  */
 export async function attach(layer, map) {

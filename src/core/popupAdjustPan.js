@@ -1,10 +1,13 @@
 import { popupPan } from '../globals/popupPan.js';
-
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
-
 import { pointOf } from '../projections/toPoint.js';
 
+/**
+ * Auto-pan this popup into the padded viewport under the current camera.
+ *
+ * @returns {*} Original Leaflet handler result when the camera is untransformed.
+ */
 export function popupAdjustPan() {
   const map = this._map;
   if (!mapGetPitch(map) && !mapGetBearing(map)) return popupPan.value.call(this);

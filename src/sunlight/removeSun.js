@@ -1,12 +1,14 @@
 import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
 import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
-
 import { sunByMap } from '../weakmaps/sunByMap.js';
-
-
 import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 
+/**
+ * Remove sunlight listeners, celestial discs and map state, then redraw.
+ *
+ * @param {Object} state Sunlight and time-control state.
+ */
 export function removeSun(state) {
   const { map, timer, sunDisc, moonDisc } = state;
   const shared = sunByMap.get(map);

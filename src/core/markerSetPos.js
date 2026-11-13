@@ -1,9 +1,12 @@
 import { markerMethods } from '../globals/markerMethods.js';
-
 import { markerCameraIconPoint } from '../projections/markerCameraIconPoint.js';
-
 import { displayPoint } from '../projections/displayContainerPoint.js';
 
+/**
+ * Position and orient this marker's icon and shadow under the current camera.
+ *
+ * @param {L.Point} point Marker layer point.
+ */
 export function markerSetPos(point) {
   markerMethods.value._setPos.call(this, displayPoint(this._map, point, this.getLatLng()));
   let i, element, key, direction, options, anchor;

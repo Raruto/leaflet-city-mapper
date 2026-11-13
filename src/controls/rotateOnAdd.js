@@ -8,7 +8,6 @@ import { dragCamera } from './dragCamera.js';
 import { acceptRotateDrag } from './acceptRotateDrag.js';
 import { refreshRotateFocus } from './refreshRotateFocus.js';
 
-
 export function rotateOnAdd(map) {
   const container = L.DomUtil.create('div', 'leaflet-control-rotate leaflet-bar');
   const button = L.DomUtil.create('a', 'leaflet-control-rotate-toggle', container);

@@ -1,3 +1,8 @@
+/**
+ * Close a map's worker pool, terminating workers and rejecting pending tasks.
+ *
+ * @param {Object} pool Worker pool to close.
+ */
 export function closeGeometryWorkers(pool) {
   pool.closed = true;
   let entry;

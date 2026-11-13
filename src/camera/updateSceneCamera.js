@@ -1,6 +1,12 @@
 import { halfRadians } from '../globals/halfRadians.js';
-/** Orthonormal view basis plus perspective matrices, refreshed before projecting/drawing. */
 
+/**
+ * Refresh the camera's orthonormal view basis and perspective matrices.
+ *
+ * @param {Object} camera Camera position, target, up vector and matrix state.
+ *
+ * @throws {Error} If the view transform is singular.
+ */
 export function updateCamera(camera) {
   camera.x ||= /* alloc */ [0, 0, 0];
   camera.y ||= /* alloc */ [0, 0, 0];

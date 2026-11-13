@@ -1,5 +1,12 @@
 import { degrees } from '../globals/degrees.js';
 
+/**
+ * Reuse the node's local matrix to compose translation, YXZ rotation and scale.
+ *
+ * @param {Object} node Scene node with position, rotation and scale.
+ *
+ * @returns {DOMMatrix} The composed local matrix.
+ */
 export function composeLocalTransform(node) {
   const matrix = node._localTransform ||= /* alloc */ new DOMMatrix();
   matrix.m11 = 1, matrix.m12 = 0, matrix.m13 = 0, matrix.m14 = 0;

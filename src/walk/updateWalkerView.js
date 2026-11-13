@@ -5,6 +5,15 @@ import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';
 import { wrap } from '../utils/wrap.js';
 
+/**
+ * Follow movement with the map camera and ease the limb swing toward its active or idle amplitude.
+ *
+ * @param {number} forward Signed movement direction.
+ * @param {number} turn Signed turning direction.
+ * @param {number} dt Frame duration in seconds.
+ *
+ * @returns {boolean} Whether the limb swing was updated.
+ */
 export function updateWalkerView(forward, turn, dt) {
   const map = this.layer._map;
   if (forward || turn) {

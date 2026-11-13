@@ -1,5 +1,8 @@
-/** Cache local AABB and center for ray picking and transparent mesh sorting. */
-
+/**
+ * Cache local bounds, center and bounding radius, including any instance offsets.
+ *
+ * @param {Object} geometry Geometry with position and optional instance-offset attributes.
+ */
 export function computeBounds(geometry) {
   const min = /* alloc */ [Infinity, Infinity, Infinity];
   const max = /* alloc */ [-Infinity, -Infinity, -Infinity];

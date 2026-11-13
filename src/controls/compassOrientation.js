@@ -1,4 +1,5 @@
 import { mapSetBearing } from '../camera/mapSetBearing.js';
+
 export function compassOrientation(event) {
   const handler = this.handler;
   const bearing = Number.isFinite(event.webkitCompassHeading) ? -event.webkitCompassHeading : event.alpha;

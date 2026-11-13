@@ -4,7 +4,6 @@ import { rasterNormals } from '../globals/rasterNormals.js';
 import { rasterUVs } from '../globals/rasterUVs.js';
 import { rasterIndices } from '../globals/rasterIndices.js';
 
-
 export function createGeometry(device) {
   const attributes = /* alloc */ {
     position: /* alloc */ { size: 3, data: /* alloc */ new Float32Array(rasterPositions) },

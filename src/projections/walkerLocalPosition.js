@@ -4,6 +4,13 @@ import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { radians } from '../globals/radians.js';
 import { mapElevationOf } from '../terrain/mapElevationOf.js';
 
+/**
+ * Write the walker's local scene position, including terrain elevation and relative height, into output.
+ *
+ * @param {number[]} output Reusable three-element coordinate array.
+ *
+ * @returns {number[]} The supplied output array.
+ */
 export function local(output) {
   const { layer, state } = this;
   const map = layer._map, crs = map.options.crs

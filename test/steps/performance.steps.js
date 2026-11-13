@@ -8,6 +8,286 @@ const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFu
 const ITERATORS = new Set(['forEach', 'map', 'filter', 'reduce', 'reduceRight', 'some', 'every', 'find', 'findIndex', 'findLast', 'findLastIndex', 'flatMap']);
 const LOOPS = new Set(['ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'DoWhileStatement']);
 
+function importLayoutErrors(source, file) {
+  const comments = [], errors = [];
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true, onComment: comments });
+  let previous = null, last = null, seenOther = false;
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration') {
+      seenOther = true;
+      previous = null;
+      continue;
+    }
+    if (seenOther) errors.push(`${file}:${node.loc.start.line} import follows another statement`);
+    if (previous) {
+      const lines = source.slice(previous.end, node.start).split(/\r\n|\r|\n/);
+      if (lines.length < 2 || lines.slice(1, -1).some(line => !line.trim())) {
+        errors.push(`${file}:${node.loc.start.line} imports must be on consecutive lines without blank lines`);
+      }
+    }
+    previous = last = node;
+  }
+  if (last) {
+    let end = last.end, endLine = last.loc.end.line;
+    const following = [...comments, ...ast.body].filter(node => node.start >= last.end).sort((a, b) => a.start - b.start);
+    for (const node of following) {
+      if ((node.type === 'Line' || node.type === 'Block') && node.loc.start.line === endLine) {
+        end = node.end;
+        endLine = node.loc.end.line;
+        continue;
+      }
+      if (!/^[ \t]*(?:\r\n|\r(?!\n)|\n)[ \t]*(?:\r\n|\r(?!\n)|\n)[ \t]*$/.test(source.slice(end, node.start))) {
+        errors.push(`${file}:${last.loc.start.line} last import must be followed by one blank line`);
+      }
+      break;
+    }
+  }
+  return errors;
+}
+
+Then('source import layout checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    const example = source.replaceAll('\\n', '\n');
+    assert.equal(importLayoutErrors(example, 'example.js').length, Number(violations), source);
+    assert.equal(importLayoutErrors(example.replaceAll('\n', '\r\n'), 'example.js').length, Number(violations), source);
+  }
+});
+
+Then('source modules place imports together at the top', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    errors.push(...importLayoutErrors(await readFile(file, 'utf8'), file));
+  }
+  assert.deepEqual(errors, []);
+});
+
+function documentationErrors(source, file, requireTags = false, checkSpacing = false, onlySpacing = false) {
+  const comments = [], errors = [], spacingErrors = [], exported = new Set(), documentedExports = new Map(), formatted = new Set();
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true, onComment: comments });
+  function isJSDoc(comment) {
+    return comment.type === 'Block' && comment.value.startsWith('*') && /[^\s*]/.test(comment.value.slice(1));
+  }
+  function documented(node) {
+    for (let i = comments.length - 1; i >= 0; i--) {
+      const comment = comments[i];
+      if (comment.end > node.start) continue;
+      return isJSDoc(comment) && /^\s*$/.test(source.slice(comment.end, node.start)) ? comment : null;
+    }
+    return false;
+  }
+  function checkFormat(doc) {
+    if (checkSpacing && !formatted.has(doc.start)) {
+      formatted.add(doc.start);
+      spacingErrors.push(...jsdocSpacingErrors(doc, file));
+    }
+  }
+  for (const node of ast.body) {
+    if (node.type === 'ExportNamedDeclaration') {
+      if (node.declaration?.type === 'VariableDeclaration') {
+        for (const declaration of node.declaration.declarations) {
+          for (const name of bindingNames(declaration.id)) exported.add(name);
+        }
+      } else if (!node.source) {
+        for (const specifier of node.specifiers) {
+          exported.add(specifier.local.name);
+          if (documented(node)) documentedExports.set(specifier.local.name, documented(node));
+        }
+      }
+    } else if (node.type === 'ExportDefaultDeclaration' && node.declaration.type === 'Identifier') {
+      exported.add(node.declaration.name);
+      if (documented(node)) documentedExports.set(node.declaration.name, documented(node));
+    } else if (node.type === 'ExportDefaultDeclaration' && !FUNCTIONS.has(node.declaration.type) &&
+      node.declaration.type !== 'ClassDeclaration') {
+      if (!documented(node)) errors.push(`${file}:${node.loc.start.line} default export lacks JSDoc`);
+      else {
+        const doc = documented(node);
+        if (requireTags && !jsdocTags(doc).type.length) errors.push(`${file}:${node.loc.start.line} default export lacks @type`);
+        checkFormat(doc);
+      }
+    }
+  }
+  function inspect(node, ancestors) {
+    if (!node || typeof node.type !== 'string') return;
+    const parent = ancestors.at(-1), grandparent = ancestors.at(-2);
+    if (FUNCTIONS.has(node.type)) {
+      let owner = node;
+      if (parent?.type === 'ExportNamedDeclaration' || parent?.type === 'ExportDefaultDeclaration' ||
+          parent?.type === 'MethodDefinition' || parent?.type === 'Property') owner = parent;
+      else if (parent?.type === 'VariableDeclarator' && grandparent?.type === 'VariableDeclaration') {
+        owner = ancestors.at(-3)?.type === 'ExportNamedDeclaration' ? ancestors.at(-3) : grandparent;
+      }
+      const doc = documented(owner) || documented(node);
+      if (!doc) errors.push(`${file}:${node.loc.start.line} function lacks JSDoc`);
+      else {
+        if (requireTags) errors.push(...functionTagErrors(node, doc, file));
+        checkFormat(doc);
+        const target = documented(owner) === doc ? owner : node;
+        if (checkSpacing && (source.slice(doc.end, target.start).match(/\r\n|\r|\n/g) || []).length > 1) {
+          spacingErrors.push(`${file}:${node.loc.start.line} blank line between JSDoc and function`);
+        }
+      }
+    }
+    if (node.type === 'VariableDeclaration' && (parent?.type === 'Program' || parent?.type === 'ExportNamedDeclaration')) {
+      const owner = parent.type === 'ExportNamedDeclaration' ? parent : node;
+      for (const declaration of node.declarations) {
+        for (const name of bindingNames(declaration.id)) {
+          if (exported.has(name)) {
+            const doc = documented(declaration) || documented(node) || documented(owner) || documentedExports.get(name);
+            if (!doc) errors.push(`${file}:${declaration.loc.start.line} exported variable ${name} lacks JSDoc`);
+            else {
+              if (requireTags && !jsdocTags(doc).type.length) {
+                errors.push(`${file}:${declaration.loc.start.line} exported variable ${name} lacks @type`);
+              }
+              checkFormat(doc);
+            }
+          }
+        }
+      }
+    }
+    ancestors.push(node);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) for (const child of value) inspect(child, ancestors);
+      else if (value && typeof value.type === 'string') inspect(value, ancestors);
+    }
+    ancestors.pop();
+  }
+  inspect(ast, []);
+  return onlySpacing ? spacingErrors : errors.concat(spacingErrors);
+}
+
+function jsdocSpacingErrors(comment, file) {
+  const errors = [];
+  let section = null, blankLines = 0;
+  for (const raw of comment.value.split(/\r\n|\r|\n/)) {
+    const line = raw.replace(/^\s*\* ?/, '').trim();
+    if (!line) {
+      if (section) blankLines++;
+      continue;
+    }
+    const matches = [...line.matchAll(/(?<![\w$])@(param|returns?|throws|type)\b/g)];
+    if (!section && (!matches.length || line.slice(0, matches[0].index).trim())) section = 'description';
+    for (const match of matches) {
+      const next = match[1] === 'return' ? 'returns' : match[1];
+      if (section && section !== next && blankLines !== 1) {
+        errors.push(`${file}:${comment.loc.start.line} JSDoc sections ${section} and ${next} need one blank line`);
+      }
+      section = next;
+      blankLines = 0;
+    }
+    blankLines = 0;
+  }
+  return errors;
+}
+
+function jsdocTags(comment) {
+  const tags = { param: [], returns: [], throws: [], type: [] };
+  for (const match of comment.value.matchAll(/(?<![\w$])@(param|returns?|throws|type)\b[ \t]*([^@\r\n]*)/g)) {
+    let value = match[2].trim().replace(/\s*\*$/, '').trim();
+    if (!value) continue;
+    if (value.startsWith('{')) {
+      let depth = 0, end = -1;
+      for (let i = 0; i < value.length; i++) {
+        if (value[i] === '{') depth++;
+        if (value[i] === '}' && --depth === 0) { end = i; break; }
+      }
+      if (end < 2 || !value.slice(1, end).trim()) continue;
+      if (match[1] === 'param') value = value.slice(end + 1).trim();
+    } else if (match[1] === 'type') continue;
+    tags[match[1] === 'return' ? 'returns' : match[1]].push(value);
+  }
+  return tags;
+}
+
+function functionTagErrors(node, doc, file) {
+  const tags = jsdocTags(doc), errors = [], used = new Set(), names = [];
+  for (const value of tags.param) {
+    const match = /^(?:\[)?(?:\.\.\.)?([$\w]+)(?:=[^\]]*)?\]?($|[\s-])/.exec(value);
+    names.push(match?.[1]);
+  }
+  for (const parameter of node.params) {
+    const pattern = parameter.type === 'AssignmentPattern' ? parameter.left :
+      parameter.type === 'RestElement' ? parameter.argument : parameter;
+    if (pattern.type !== 'Identifier') continue;
+    const index = names.indexOf(pattern.name);
+    if (index < 0 || used.has(index)) errors.push(`${file}:${node.loc.start.line} parameter ${pattern.name} lacks @param`);
+    else used.add(index);
+  }
+  for (const parameter of node.params) {
+    const pattern = parameter.type === 'AssignmentPattern' ? parameter.left :
+      parameter.type === 'RestElement' ? parameter.argument : parameter;
+    if (pattern.type === 'Identifier') continue;
+    const index = names.findIndex((name, i) => name && !used.has(i));
+    if (index < 0) errors.push(`${file}:${node.loc.start.line} destructured parameter lacks @param`);
+    else used.add(index);
+  }
+  let returns = node.async || node.generator || node.body.type !== 'BlockStatement', throws = 0;
+  function inspectBody(child) {
+    if (!child || typeof child.type !== 'string' || FUNCTIONS.has(child.type)) return;
+    if (child.type === 'ReturnStatement' && child.argument) returns = true;
+    if (child.type === 'ThrowStatement') throws++;
+    for (const value of Object.values(child)) {
+      if (Array.isArray(value)) for (const item of value) inspectBody(item);
+      else if (value && typeof value.type === 'string') inspectBody(value);
+    }
+  }
+  inspectBody(node.body);
+  if (returns && !tags.returns.length) errors.push(`${file}:${node.loc.start.line} function lacks @returns`);
+  if (throws > tags.throws.length) errors.push(`${file}:${node.loc.start.line} function has ${throws} throw(s) but ${tags.throws.length} @throws tag(s)`);
+  return errors;
+}
+
+Then('source documentation checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    assert.equal(documentationErrors(source, 'example.js').length, Number(violations), source);
+  }
+});
+
+Then('source documentation tag checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    assert.equal(documentationErrors(source, 'example.js', true).length, Number(violations), source);
+  }
+});
+
+Then('source documentation spacing checks handle these modules:', function (table) {
+  for (const { source, violations } of table.hashes()) {
+    const example = source.replaceAll('\\n', '\n');
+    assert.equal(documentationErrors(example, 'example.js', false, true, true).length, Number(violations), source);
+    assert.equal(documentationErrors(example.replaceAll('\n', '\r\n'), 'example.js', false, true, true).length, Number(violations), source);
+  }
+});
+
+Then('documented source files follow JSDoc spacing rules', async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    errors.push(...documentationErrors(await readFile(file, 'utf8'), file, false, true, true));
+  }
+  assert.deepEqual(errors, []);
+});
+
+Then('JSDoc tag checks accept source directory {string}', async function (directory) {
+  const errors = [];
+  for (const entry of await readdir(directory, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    errors.push(...documentationErrors(await readFile(file, 'utf8'), file, true, true));
+  }
+  assert.deepEqual(errors, []);
+});
+
+Then('every source file documents its functions and exported variables with JSDoc', { timeout: 30000 }, async function () {
+  const errors = [];
+  for (const entry of await readdir('src', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const file = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/');
+    errors.push(...documentationErrors(await readFile(file, 'utf8'), file, true, true));
+  }
+  assert.equal(errors.length, 0, `Missing JSDoc:\n${errors.join('\n')}`);
+});
+
 function globalObject(node, aliases) {
   return node?.type === 'Identifier' && aliases.has(node.name) ||
     node?.type === 'MemberExpression' && globalObject(node.object, aliases) &&

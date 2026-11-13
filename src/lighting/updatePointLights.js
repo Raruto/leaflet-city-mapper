@@ -1,14 +1,18 @@
 import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
-
-
 import { destroyTexture } from '../textures/destroyTexture.js';
 import { bindSunlight } from '../shadows/bindSunlight.js';
 import { cacheLightGrid } from './cacheLightGrid.js';
 import { collectLightMeshes } from './collectLightMeshes.js';
 
+/**
+ * Cache and upload fixed and moving point-light grids for the shared renderer.
+ *
+ * @param {L.Layer} layer Layer owning the shared renderer.
+ *
+ * @throws {Error} If the combined grids exceed the GPU storage limit.
+ */
 export function updatePointLights(layer) {
   const { device, sunlight: sun } = rendererByLayer.get(layer);
   const fixed = /* alloc */ [];

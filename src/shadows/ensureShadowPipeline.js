@@ -7,6 +7,13 @@ import { shadowPipelineLayout } from '../globals/shadowPipelineLayout.js';
 import { shadowInstanceLayouts } from '../globals/shadowInstanceLayouts.js';
 import { shadowLayouts } from '../globals/shadowLayouts.js';
 
+/**
+ * Create the shadow pipeline and shared depth bindings if they are not yet available.
+ *
+ * @param {GPUDevice} device Device creating the GPU resources.
+ * @param {Object} sun Renderer sunlight state.
+ * @param {boolean} [instanced=false] Whether to create the instanced pipeline.
+ */
 export function ensureShadowPipeline(device, sun, instanced = false) {
   const key = instanced ? 'instancePipeline' : 'pipeline';
   if (!sun[key]) {

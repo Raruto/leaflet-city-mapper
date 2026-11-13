@@ -5,9 +5,13 @@ import { removeEntry } from './removeEntry.js';
 
 /**
  * Keeps `element` right under `layer`'s entry in the map's layers control while the layer is on the map.
- * Returns false when no layers control lists the layer.
+ *
+ * @param {L.Layer} layer Layer whose entry should contain the element.
+ * @param {HTMLElement} element Element to place.
+ * @param {Function} [onPlace] Callback receiving whether placement succeeded.
+ *
+ * @returns {boolean} False when no layers control lists the layer.
  */
-
 export function underEntry(layer, element, onPlace) {
   const state = /* alloc */ { map: layer._map, layer, element, onPlace };
   state.map.on('layeradd layerremove', replaceEntry, state);

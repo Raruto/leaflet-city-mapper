@@ -1,7 +1,6 @@
 import { headerByLayer } from '../weakmaps/headerByLayer.js';
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
-
 import { roofFootprint } from './roofFootprint.js';
 import { subtractRoofTile } from './subtractRoofTile.js';
 

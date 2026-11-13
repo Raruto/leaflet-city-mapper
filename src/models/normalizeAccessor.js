@@ -1,3 +1,13 @@
+/**
+ * Convert integer accessor data to floats, applying glTF normalization when requested.
+ *
+ * @param {Object} spec glTF accessor specification.
+ * @param {TypedArrayConstructor} Type Integer component array constructor.
+ * @param {TypedArray} data Raw accessor components.
+ * @param {number} size Components per element.
+ *
+ * @returns {Object} Float data, element size and original integer data.
+ */
 export function normalizeAccessor(spec, Type, data, size) {
   const normalized = /* alloc */ new Float32Array(data.length);
   let i;

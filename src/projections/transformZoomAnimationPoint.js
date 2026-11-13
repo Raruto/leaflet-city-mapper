@@ -1,7 +1,14 @@
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
 
-
-
+/**
+ * Apply or invert the current camera zoom-animation transform to a container point.
+ *
+ * @param {L.Map} map Map providing the current animation view.
+ * @param {L.Point} point Container point.
+ * @param {boolean} [inverse] Apply the inverse transform.
+ *
+ * @returns {L.Point} Transformed point, or the input when no animation view exists.
+ */
 export function animationPoint(map, point, inverse = false) {
   const view = cameraViewByMap.get(map);
   if (!view) return point;

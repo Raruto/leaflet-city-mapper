@@ -1,5 +1,12 @@
 import { L } from '../globals/L.js';
 
+/**
+ * Place a count, traffic status or other element next to a layer selector.
+ *
+ * @param {HTMLInputElement} input Layers-control selector.
+ * @param {L.Layer} layer Layer associated with the selector.
+ * @param {HTMLElement} element Element to place.
+ */
 export function placeEntryElement(input, layer, element) {
   const label = input.closest('label');
   if (element.classList.contains('layer-count')) {

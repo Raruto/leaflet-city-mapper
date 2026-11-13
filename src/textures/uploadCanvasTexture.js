@@ -1,6 +1,21 @@
 import { current } from '../native/isCurrentNativeLayer.js';
 import { refreshNativeLayer } from '../native/refreshNativeLayer.js';
 
+/**
+ * Rasterize a native canvas or image into a GPU texture and refresh its layer when ready.
+ *
+ * @param {Object} state Native layer state.
+ * @param {string} key Texture cache key.
+ * @param {Object} texture Destination texture state.
+ * @param {HTMLCanvasElement|HTMLImageElement} image Source image.
+ * @param {GPUDevice} device Device owning the destination.
+ * @param {number} width Image width in pixels.
+ * @param {number} height Image height in pixels.
+ *
+ * @returns {Promise<void>} Completion of the upload attempt.
+ *
+ * @throws {Error} Internally if SVG rasterization lacks a 2D context; reported to the source layer.
+ */
 export async function uploadCanvasTexture(state, key, texture, image, device, width, height) {
   let bitmap, source = image;
   try {

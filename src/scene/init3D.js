@@ -10,15 +10,18 @@ import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
 import { state3dByLayer } from '../weakmaps/state3dByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
 import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
-
-
 import { ready3D } from './ready3D.js';
 import { noOperation } from '../utils/noOperation.js';
 import { updateLayerCount } from '../layer-controls/updateLayerCount.js';
 
+/**
+ * Initialize 3D layer state, source settings and asynchronous readiness.
+ *
+ * @param {L.Layer} layer Layer to initialize.
+ * @param {Object} [options] 3D layer and source options.
+ */
 export function init3D(layer, options = sceneEmptyOptions) {
   state3dByLayer.set(layer, true);
   L.Util.setOptions(layer, /* alloc */ { ariaLabel: '3D scene', ...options });

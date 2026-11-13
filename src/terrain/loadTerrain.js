@@ -6,14 +6,22 @@ import { terrainLoadingByLayer } from '../weakmaps/terrainLoadingByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainSourceByLayer } from '../weakmaps/terrainSourceByLayer.js';
 import { workerMapByLayer } from '../weakmaps/workerMapByLayer.js';
-
 import { createLayer } from '../scene/createLayer.js';
-
 import { loadTerrainTiles } from './loadTerrainTiles.js';
 import { readBridges } from './readBridges.js';
 import { terrainTileQueue } from './terrainTileQueue.js';
 import { applyTerrain } from './applyTerrain.js';
 
+/**
+ * Load archive terrain tiles and optional bridges, then apply them to the map.
+ *
+ * @param {L.Layer} layer Terrain layer.
+ *
+ * @returns {Promise<boolean|undefined>} True on success, false on failure, or undefined if skipped or cancelled.
+ *
+ * @throws {Error} Raised internally and reported as a layer error if the archive URL is missing.
+ * @throws {Error} Raised internally and reported as a layer error if the archive is not single-zoom Float32.
+ */
 export async function loadTerrain(layer) {
   if (terrainLoadingByLayer.get(layer) || !layer._map) return;
   terrainLoadingByLayer.set(layer, true);

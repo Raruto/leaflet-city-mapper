@@ -1,5 +1,4 @@
 import { triangleContexts } from '../globals/triangleContexts.js';
-
 import { addTriangle } from './appendAreaTriangle.js';
 
 export function addGeneratedTriangle(...args) {

@@ -1,3 +1,13 @@
+/**
+ * Interpolate corresponding color components into a reusable array.
+ *
+ * @param {number[]} a Starting components.
+ * @param {number[]} b Ending components.
+ * @param {number} t Interpolation factor.
+ * @param {number[]} [values] Output array to reuse.
+ *
+ * @returns {number[]} Interpolated components.
+ */
 export function mix(a, b, t, values) {
   values ||= /* alloc */ [];
   values.length = a.length;

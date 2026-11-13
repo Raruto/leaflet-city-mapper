@@ -1,6 +1,5 @@
 import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
 
-
 export function removeNativeEvents(state) {
   const context = state._nativeEventContext;
   if (!context) return;

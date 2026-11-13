@@ -1,7 +1,4 @@
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
-
-
 import { update } from '../scene/scheduleSceneUpdate.js';
 
 export function updateNativeLayerView() {

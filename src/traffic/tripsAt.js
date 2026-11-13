@@ -1,8 +1,15 @@
 import { vehicleOffsets } from "./vehicleOffsets.js";
 import { scheduledTrips } from "./scheduledTrips.js";
 
-// A lane with a `timetable` runs scheduled trips end to end; one with a `flow` (vehicles/h) loops evenly spaced vehicles.
-
+/**
+ * Generate active timetable trips and evenly spaced looping vehicles for flow-based lanes at the given time.
+ *
+ * @param {Date} time Simulation time.
+ * @param {Array} lanes Prepared traffic lanes.
+ * @param {number} velocity Flow-vehicle speed in metres per second.
+ *
+ * @returns {Array} Active trips and their lane positions.
+ */
 export function tripsAt(time, lanes, velocity) {
   const trips = /* alloc */ [];
   let l, lane, timetable, flow, trip, travelled, offsets, k;

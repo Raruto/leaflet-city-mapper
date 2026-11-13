@@ -1,11 +1,9 @@
 import { pitchSkyByMap } from '../weakmaps/pitchSkyByMap.js';
-
 import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
-
 import { mapGetPitch } from './mapGetPitch.js';
 
-
+/** Update this map's sky element to match the pitched horizon. */
 export function updateSky() {
   const height = this.getSize().y, pitch = mapGetPitch(this) * radians;
   const far = height * this.options.pitchMaxDistance, distance = height * 1.5;

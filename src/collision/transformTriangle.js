@@ -1,3 +1,12 @@
+/**
+ * Write three indexed or sequential positions transformed by matrix m into v.
+ *
+ * @param {number[]} v Output packed triangle coordinates.
+ * @param {ArrayLike<number>} p Packed input positions.
+ * @param {Object|undefined} index Optional geometry index attribute.
+ * @param {number} i First vertex or index offset.
+ * @param {ArrayLike<number>} m Column-major transformation matrix.
+ */
 export function transformTriangle(v, p, index, i, m) {
   let k, j, x, y, z;
   for (k = 0; k < 3; k++) {

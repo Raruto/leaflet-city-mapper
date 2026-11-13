@@ -1,3 +1,11 @@
+/**
+ * Wait for submitted GPU work, release renderer resources and destroy the device.
+ *
+ * @param {Object} renderer Renderer whose resources are released.
+ * @param {L.Layer} layer Layer notified if resource cleanup fails.
+ *
+ * @returns {Promise<void>} Resolves after device destruction.
+ */
 export async function releaseRenderer(renderer, layer) {
   try {
     await renderer.device.queue.onSubmittedWorkDone();

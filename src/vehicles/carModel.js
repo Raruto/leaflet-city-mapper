@@ -3,15 +3,16 @@ import { tyre } from '../globals/tyre.js';
 import { glass } from '../globals/glass.js';
 import { headlight } from '../globals/headlight.js';
 import { taillight } from '../globals/taillight.js';
-
 import { box } from '../geometry/box.js';
-
-
 import { mirror } from './mirrorVehiclePart.js';
 
-
-
-
+/**
+ * Build the geometry parts for a car.
+ *
+ * @param {number} i Index selecting a paint color.
+ *
+ * @returns {Array} Car body, wheels, windows and light parts.
+ */
 export function carModel(i) {
   const paint = paints[i % paints.length];
   return /* alloc */ [

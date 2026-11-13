@@ -1,3 +1,11 @@
+/**
+ * Compare and cache the node's explicit matrix or position, rotation and scale components.
+ *
+ * @param {Object} node Scene node with cached transform state.
+ * @param {boolean} changed Whether another change was already detected.
+ *
+ * @returns {boolean} Whether the transform or another input changed.
+ */
 export function worldMatrixChanged(node, changed) {
   let i, value;
   if (node.matrix) {

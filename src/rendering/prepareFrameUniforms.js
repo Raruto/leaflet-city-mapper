@@ -1,12 +1,17 @@
 import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
-
-
-
 import { prepareFrameBuffer } from './prepareFrameBuffer.js';
 import { updatePointLights } from '../lighting/updatePointLights.js';
 
+/**
+ * Prepare camera, roof and lighting uniforms and reserve space for per-mesh uniforms.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Array<Object>} meshes Meshes to render.
+ * @param {Array<Object>} shadowMeshes Shadow-casting meshes.
+ * @param {Object} sunlight Current sunlight state, if available.
+ */
 export function prepareFrameUniforms(layer, meshes, shadowMeshes, sunlight) {
   const renderer = rendererByLayer.get(layer), camera = cameraByLayer.get(layer);
   const view = camera.viewMatrix, direction = sunlight?.direction;

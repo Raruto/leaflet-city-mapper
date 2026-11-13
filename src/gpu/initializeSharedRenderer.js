@@ -5,7 +5,6 @@ import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
 import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
 import { rendererDevices } from '../weakmaps/rendererDevices.js';
 import { emptyNode } from '../scene/createSceneNode.js';
 import { failAttachment } from '../scene/failAttachment.js';
@@ -17,6 +16,14 @@ import { createSceneCamera } from '../camera/createSceneCamera.js';
 import { initializeRendererResources } from './initializeRendererResources.js';
 import { mountRenderer } from './mountRenderer.js';
 
+/**
+ * Acquire a WebGPU device and initialize the shared scene, renderer and canvas.
+ *
+ * @param {L.Layer} layer Layer that owns the shared renderer.
+ * @param {L.Map} map Map receiving the renderer.
+ *
+ * @returns {Promise<void>} Resolves after the renderer is mounted.
+ */
 export async function initializeSharedRenderer(layer, map) {
   const canvas = document.createElement('canvas');
   if (!navigator.gpu) {

@@ -1,8 +1,22 @@
 import { etagByLayer } from '../weakmaps/etagByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
 
-
-
+/**
+ * Read and validate a byte range from a PMTiles archive.
+ *
+ * @param {L.Layer} layer Archive layer containing the URL and cached ETag.
+ * @param {number} offset Starting byte offset.
+ * @param {number} length Number of bytes to read.
+ * @param {AbortSignal} [signal] Request cancellation signal.
+ *
+ * @returns {Promise<ArrayBuffer>} Requested archive bytes.
+ *
+ * @throws {Error} If the requested byte range is invalid.
+ * @throws {Error} If the HTTP request fails.
+ * @throws {Error} If the archive ETag changes.
+ * @throws {Error} If the range response headers or status are invalid.
+ * @throws {Error} If the response length differs from the requested range.
+ */
 export async function read(layer, offset, length, signal) {
   signal?.throwIfAborted();
   if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) ||

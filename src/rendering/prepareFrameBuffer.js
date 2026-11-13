@@ -1,8 +1,14 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { frameBuffer } from '../globals/frameBuffer.js';
 import { destroyTexture } from '../textures/destroyTexture.js';
 
+/**
+ * Ensure the renderer has uniform-buffer capacity for this frame's meshes and shadows.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Array<Object>} meshes Meshes to render.
+ * @param {Array<Object>} shadowMeshes Shadow-casting meshes.
+ */
 export function prepareFrameBuffer(layer, meshes, shadowMeshes) {
   const renderer = rendererByLayer.get(layer);
   // Slot 0 holds the camera; 256-byte mesh slots follow (double-sided meshes use two).

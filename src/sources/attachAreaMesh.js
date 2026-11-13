@@ -1,15 +1,16 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { nextId } from '../globals/nextId.js';
-
-
 import { emptyNode } from '../scene/createSceneNode.js';
 import { createProgram } from '../materials/createProgram.js';
-
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 
+/**
+ * Attach an area's prepared geometry as a GPU mesh, or mark an empty area complete.
+ *
+ * @param {Object} context Area build context containing geometry and feature metadata.
+ */
 export function attachAreaMesh(context) {
   const { backend: layer, area } = context;
   if (!context.positions.length) {

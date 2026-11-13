@@ -1,4 +1,8 @@
-/** A fresh, empty scene-graph node. */
+/**
+ * Create a fresh, empty scene-graph node.
+ *
+ * @returns {Object} Node with identity transform and no children.
+ */
 export function emptyNode() {
   return /* alloc */ {
     position: /* alloc */ [0, 0, 0],

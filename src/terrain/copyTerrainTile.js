@@ -1,3 +1,11 @@
+/**
+ * Copy valid elevations from a DEM tile into an atlas and update its extrema.
+ *
+ * @param {Object} atlas Destination elevations and minimum and maximum values.
+ * @param {Float32Array} values Source 256-by-256 elevation tile.
+ * @param {number} start First destination index.
+ * @param {number} columns Number of tile columns in the atlas.
+ */
 export function copyTerrainTile(atlas, values, start, columns) {
   let row, column, value;
   for (row = 0; row < 256; row++) {

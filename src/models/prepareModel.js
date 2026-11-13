@@ -2,6 +2,16 @@ import { decodeModel } from './decodeModel.js';
 import { loadModelResources } from './loadModelResources.js';
 import { prepareModelGeometry } from './prepareModelGeometry.js';
 
+/**
+ * Fetch a static model and prepare its images and geometry for transfer from a worker.
+ *
+ * @param {string} url Model URL.
+ *
+ * @returns {Promise<Object>} Prepared description, images and transferables.
+ *
+ * @throws {Error} If the model response is not successful.
+ * @throws {Error} If the glTF scene is missing.
+ */
 export async function prepareModel(url) {
   const response = await fetch(url);
   if (!response.ok) throw /* alloc */ new Error(`Unable to load model: HTTP ${response.status}`);

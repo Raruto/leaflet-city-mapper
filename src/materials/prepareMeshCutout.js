@@ -1,3 +1,12 @@
+/**
+ * Validate and write native or raster cutout settings into the mesh uniform buffer.
+ *
+ * @param {Object} renderer Renderer containing uniform data and pixel ratio.
+ * @param {Object} mesh Mesh with optional native or raster source.
+ * @param {number} base Starting index in the uniform array.
+ *
+ * @throws {Error} If cutout coordinates or radius are invalid.
+ */
 export function prepareMeshCutout(renderer, mesh, base) {
   const data = renderer.uniformData;
   const cutout = (mesh._nativeSource || mesh._rasterSource)?.options.cutout;

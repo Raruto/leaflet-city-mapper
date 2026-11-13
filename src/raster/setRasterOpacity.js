@@ -1,10 +1,13 @@
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
-
-
-
 import { update } from '../scene/scheduleSceneUpdate.js';
 
+/**
+ * Update opacity on the layer's raster and terrain meshes.
+ *
+ * @param {L.Layer} layer Raster layer.
+ * @param {number} opacity New opacity.
+ */
 export function setRasterOpacity(layer, opacity) {
   let tile, terrainMesh;
   for (tile of rasterTilesByLayer.get(layer).values()) {

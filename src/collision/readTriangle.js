@@ -1,5 +1,14 @@
 import { vertexCount } from './vertexCount.js';
 
+/**
+ * Read an indexed or non-indexed triangle into caller-owned vectors, applying any instance offset.
+ *
+ * @param {Object} mesh Mesh containing geometry attributes.
+ * @param {number} i First index or vertex offset, including instance offset.
+ * @param {number[]} a Output first vertex.
+ * @param {number[]} b Output second vertex.
+ * @param {number[]} c Output third vertex.
+ */
 export function readTriangle(mesh, i, a, b, c) {
   const { position, index, instanceOffset } = mesh.geometry.attributes;
   const size = position.size ?? 3;

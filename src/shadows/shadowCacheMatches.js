@@ -1,3 +1,14 @@
+import { shadowMeshMatches } from './shadowMeshMatches.js';
+
+/**
+ * Check whether the cached shadow map still matches sunlight and all meshes.
+ *
+ * @param {Object} sun Renderer sunlight state and shadow cache.
+ * @param {Object[]} meshes Current shadow-casting meshes.
+ * @param {Object} sunlight Current sunlight direction.
+ *
+ * @returns {boolean|undefined} Truthy if the cache is still valid.
+ */
 export function shadowCacheMatches(sun, meshes, sunlight) {
   const cache = sun.cache;
   let unchanged = sun.enabled && cache?.meshes.size === meshes.length;
@@ -14,4 +25,3 @@ export function shadowCacheMatches(sun, meshes, sunlight) {
   }
   return unchanged;
 }
-import { shadowMeshMatches } from './shadowMeshMatches.js';

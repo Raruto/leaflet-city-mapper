@@ -1,3 +1,11 @@
+/**
+ * Test a planar point against a ring using crossing parity.
+ *
+ * @param {Object} point Point with x and y coordinates.
+ * @param {Object[]} ring Planar ring vertices.
+ *
+ * @returns {boolean} Whether the crossing test places the point inside.
+ */
 export function inside(point, ring) {
   let result = false;
   let i, j, a, b;

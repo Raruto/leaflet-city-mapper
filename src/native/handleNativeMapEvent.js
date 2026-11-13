@@ -1,11 +1,7 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { nativeEventMaps } from '../weakmaps/nativeEventMaps.js';
 import { renderers } from '../weakmaps/renderers.js';
 import { coreEventTypes } from '../globals/coreEventTypes.js';
-
-
-
 import { nativeEventSource } from './nativeEventSource.js';
 import { updateNativeHover } from './updateNativeHover.js';
 import { bypassNativeEvent } from './bypassNativeEvent.js';

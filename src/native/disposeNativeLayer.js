@@ -1,6 +1,4 @@
 import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
-
-
 import { refreshNativeEvent } from './refreshNativeEvent.js';
 import { updateNativeLayerView } from './updateNativeLayerView.js';
 import { removeNativeEvents } from './removeNativeEvents.js';

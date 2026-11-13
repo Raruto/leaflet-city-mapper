@@ -1,11 +1,18 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { meshOffsets } from '../globals/meshOffsets.js';
 import { drawPipeline } from './drawPipeline.js';
 import { prepareMeshUniforms } from './prepareMeshUniforms.js';
 import { prepareMeshTextures } from '../textures/prepareMeshTextures.js';
 
-/** Upload retained CPU data and draw one mesh in the active WebGPU render pass. */
+/**
+ * Upload modified CPU attributes and draw one mesh in the active WebGPU render pass.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {Object} mesh Mesh to draw.
+ * @param {GPURenderPassEncoder} pass Active render pass.
+ * @param {GPUCullMode} cullMode Pipeline face-culling mode.
+ * @param {GPUFrontFace} frontFace Pipeline front-face winding.
+ */
 export function drawGeometry(layer, mesh, pass, cullMode, frontFace) {
   const { geometry } = mesh, { attributes, drawRange } = geometry;
   const renderer = rendererByLayer.get(layer);

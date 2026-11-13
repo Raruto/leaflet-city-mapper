@@ -1,10 +1,19 @@
 import { timeControlByMap } from '../weakmaps/timeControlByMap.js';
-
 import { sunlightByControl } from '../weakmaps/sunlightByControl.js';
 import { sunByMap } from '../weakmaps/sunByMap.js';
 import { createSun } from './createSun.js';
 import { tickSun } from './tickSun.js';
 
+/**
+ * Attach sunlight state and update listeners for a time control.
+ *
+ * @param {L.Control} control Time control being added.
+ * @param {L.Map} map Map receiving the control.
+ *
+ * @returns {HTMLElement} Time-control container.
+ *
+ * @throws {Error} If another time control is already active on the map.
+ */
 export function onAddSun(control, map) {
   let state = sunByMap.get(map);
   if (state?.control && state.control !== control) {

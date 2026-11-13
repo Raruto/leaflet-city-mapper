@@ -1,6 +1,4 @@
 import { nativeGPUByLayer } from '../weakmaps/nativeGPUByLayer.js';
-
-
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function refreshNativeLayerContract(layer = this) {

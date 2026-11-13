@@ -1,3 +1,12 @@
+import { mergeHits } from './mergeHits.js';
+
+/**
+ * Sort hits in place by ascending distance using a stable merge sort.
+ *
+ * @param {Object[]} hits Hits with distance properties.
+ *
+ * @returns {Object[]} The supplied array, sorted in place.
+ */
 export function sortHits(hits) {
   if (hits.length < 2) return hits;
   const buffer = /* alloc */ new Array(hits.length);
@@ -14,4 +23,3 @@ export function sortHits(hits) {
   if (source !== hits) for (i = 0; i < hits.length; i++) hits[i] = source[i];
   return hits;
 }
-import { mergeHits } from './mergeHits.js';

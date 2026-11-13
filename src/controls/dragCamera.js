@@ -1,8 +1,6 @@
 import { cameraDragSensitivity } from '../globals/cameraDragSensitivity.js';
 import { dragStates } from '../weakmaps/dragStates.js';
 import { cameraDrags } from '../globals/cameraDrags.js';
-
-
 import { cameraDragDown } from './cameraDragDown.js';
 import { cameraDragMove } from './cameraDragMove.js';
 import { cameraDragEnd } from './cameraDragEnd.js';

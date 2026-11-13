@@ -2,14 +2,17 @@ import { trafficClocks } from '../globals/trafficClocks.js';
 import { clockMinutes } from './clockMinutes.js';
 import { compareDepartures } from './compareDepartures.js';
 
-
 /**
  * Trips of a frequency-based timetable (like GTFS frequencies.txt) underway at `date`, in the timetable's local time.
+ *
+ * @param {Date|string|number} date Simulation date.
  * @param {{timeZone: string, duration: number, services: Array<{from: string, to: string, every?: number, months?: number[], weekdays?: number[]}>}} timetable
  * `duration` and `every` are minutes; `from`/`to` are 'HH:MM' first/last departures; months are 1-12, weekdays 0 (Sunday)-6.
+ *
  * @returns {Array<{id: string, departure: string, progress: number}>} `progress` is 0-1 along the lane.
+ *
+ * @throws {Error} If the date is invalid.
  */
-
 export function scheduledTrips(date, { timeZone, duration, services }) {
   const time = date instanceof Date ? date
     : /* alloc */ new Date(date);

@@ -2,12 +2,8 @@ import { eventMapByLayer } from '../weakmaps/eventMapByLayer.js';
 import { eventsByLayer } from '../weakmaps/eventsByLayer.js';
 import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { state3dByLayer } from '../weakmaps/state3dByLayer.js';
-
 import { L } from '../globals/L.js';
 import { layerProto } from '../globals/layerProto.js';
-
-
-
 import { initNativeGPU } from '../native/initNativeGPU.js';
 import { removeLayerEvents } from './removeLayerEvents.js';
 import { addSceneLayer } from './addSceneLayer.js';
@@ -16,6 +12,11 @@ import { getRasterEvents } from '../raster/getRasterEvents.js';
 import { emptyEvents } from './emptyEvents.js';
 import { isNativeLayer } from './isNativeLayer.js';
 
+/**
+ * Handle layer addition, registering scene events or delegating to Leaflet as appropriate.
+ *
+ * @param {Object} event Leaflet layer-add event whose target is the map.
+ */
 export function layerLayerAdd(event) {
   const native = isNativeLayer(this);
   if (native) {

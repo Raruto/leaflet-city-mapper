@@ -6,16 +6,18 @@ import { pointerEventsByLayer } from '../weakmaps/pointerEventsByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
 import { L } from '../globals/L.js';
-
-
 import { pointerMove } from '../picking/pointerMove.js';
 import { pointerClick } from '../picking/pointerClick.js';
 import { pointerLeave } from '../picking/pointerLeave.js';
 import { attachLayer } from './attachLayer.js';
 
-/** Attach interaction immediately; initialization may finish before or after onAdd. */
+/**
+ * Attach interaction immediately; initialization may finish before or after onAdd.
+ *
+ * @param {L.Layer} layer 3D layer being added.
+ * @param {L.Map} map Map receiving the layer.
+ */
 export function onAdd3DLayer(layer, map) {
   if (!locationByLayer.get(layer)) {
     const center = map.getCenter();

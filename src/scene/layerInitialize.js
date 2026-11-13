@@ -2,15 +2,11 @@ import { kindByLayer } from '../weakmaps/kindByLayer.js';
 import { readyByLayer } from '../weakmaps/readyByLayer.js';
 import { sceneLayers } from '../weakmaps/sceneLayers.js';
 import { typeByLayer } from '../weakmaps/typeByLayer.js';
-
 import { L } from '../globals/L.js';
 import { sceneEmptyOptions } from '../globals/sceneEmptyOptions.js';
 import { layerProto } from '../globals/layerProto.js';
 import { pendingInitializations } from '../globals/pendingInitializations.js';
 import { loading } from '../globals/loading.js';
-
-
-
 import { init3D } from './init3D.js';
 import { initializeGeoJSON } from '../sources/initializeGeoJSON.js';
 import { isVectorTileSource } from '../sources/isVectorTileSource.js';
@@ -19,6 +15,13 @@ import { noOperation } from '../utils/noOperation.js';
 import { resolveNextInitialization } from './resolveNextInitialization.js';
 import { initializeLayer } from './initializeLayer.js';
 
+/**
+ * Initialize this Leaflet layer, selecting or scheduling its configured source.
+ *
+ * @param {Object} [options] Layer options, optionally containing a source.
+ *
+ * @returns {*} Original Leaflet initializer result when delegated.
+ */
 export function layerInitialize(options = sceneEmptyOptions) {
   if (!sceneLayers.has(this)) {
     sceneLayers.add(this);

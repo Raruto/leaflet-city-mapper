@@ -2,6 +2,16 @@ import { geometryWorkersByMap } from '../weakmaps/geometryWorkersByMap.js';
 import { closeGeometryWorkers } from './closeGeometryWorkers.js';
 import { createGeometryWorker } from './createGeometryWorker.js';
 
+/**
+ * Reuse an idle worker for the URL or create one, closing the map's pool on unload.
+ *
+ * @param {L.Map|null|undefined} map Owner of the worker pool, if available.
+ * @param {string} url Worker module URL.
+ *
+ * @returns {Object} The acquired worker entry.
+ *
+ * @throws {DOMException} If the map's worker pool is closed.
+ */
 export function acquireGeometryWorker(map, url) {
   let pool = map && geometryWorkersByMap.get(map);
   if (map && !pool) {

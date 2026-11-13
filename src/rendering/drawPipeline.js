@@ -1,6 +1,16 @@
 import { meshPipeline } from '../globals/meshPipeline.js';
 import { alphaBlend } from '../globals/alphaBlend.js';
 
+/**
+ * Get or create a cached render pipeline for a mesh and its face/depth settings.
+ *
+ * @param {Object} renderer Renderer providing the device and color format.
+ * @param {Object} mesh Mesh providing the program and ground flag.
+ * @param {GPUCullMode} cullMode Face-culling mode.
+ * @param {GPUFrontFace} frontFace Front-face winding.
+ *
+ * @returns {GPURenderPipeline} Cached or newly created pipeline.
+ */
 export function drawPipeline(renderer, mesh, cullMode, frontFace) {
   const { program } = mesh;
   // Mixed-LOD imagery composites coarse-to-fine; its depth still occludes later 3D objects.

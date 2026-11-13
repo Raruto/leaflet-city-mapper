@@ -1,5 +1,4 @@
 /** Unit tile grid; the vertex shader supplies the elevation. */
-
 export function terrainGrid(divisions) {
   const vertices = (divisions + 1) ** 2;
   const positions = /* alloc */ new Float32Array(vertices * 3);

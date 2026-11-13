@@ -1,6 +1,16 @@
 import { equal } from './equal.js';
 import { cross } from './cross.js';
 
+/**
+ * Check whether a polygon has another vertex inside or on a counterclockwise triangle.
+ *
+ * @param {Object[]} polygon Planar polygon vertices.
+ * @param {Object} a First triangle vertex.
+ * @param {Object} b Second triangle vertex.
+ * @param {Object} c Third triangle vertex.
+ *
+ * @returns {boolean} Whether a distinct polygon vertex is contained.
+ */
 export function containsVertex(polygon, a, b, c) {
   let p;
   for (p of polygon) {

@@ -1,9 +1,8 @@
 import { dragByHandler } from '../weakmaps/dragByHandler.js';
-
-
 import { cameraMarkerOnDrag } from './cameraMarkerOnDrag.js';
 import { adjustCameraMarkerPan } from './adjustCameraMarkerPan.js';
 
+/** Install camera-aware drag and auto-pan handlers on this marker once. */
 export function cameraMarkerDrag() {
   if (!this.dragging || dragByHandler.has(this.dragging)) return;
   const drag = this.dragging, original = drag._onDrag, adjustPan = drag._adjustPan;

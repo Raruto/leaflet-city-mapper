@@ -1,11 +1,13 @@
 import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
-
-
-
 import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 import { updateSun } from './updateSun.js';
 
+/**
+ * Select the control's UTC date and minute, or report an invalid date.
+ *
+ * @param {Object} state Sunlight and time-control state.
+ */
 export function useSelectedTime(state) {
   const { control, map, date, slider, status } = state;
   control.live = false;

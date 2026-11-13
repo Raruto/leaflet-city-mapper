@@ -1,15 +1,11 @@
 import { cameraTouchStateByMap } from '../weakmaps/cameraTouchStateByMap.js';
 import { rotateControlByMap } from '../weakmaps/rotateControlByMap.js';
-
 import { cameraTouchStates } from '../globals/cameraTouchStates.js';
 import { touchByContainer } from '../weakmaps/touchByContainer.js';
-
-
 import { endCameraTouch } from './endCameraTouch.js';
 import { startCameraTouch } from './startCameraTouch.js';
 import { moveCameraTouch } from './moveCameraTouch.js';
 import { endCameraTouchEvent } from './endCameraTouchEvent.js';
-
 import { endAllCameraTouches } from './endAllCameraTouches.js';
 import { changeCameraTouch } from './changeCameraTouch.js';
 

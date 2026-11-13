@@ -12,6 +12,11 @@ class TimeControl extends extendLeafletClass(L.Control) {
   static initHooks = true;
   static defaultOptions = { position: 'bottomright' };
 
+  /**
+   * Initialize the time control and its hooks explicitly when using Leaflet 2.
+   *
+   * @param {Object} options Time control options.
+   */
   constructor(options) {
     super(options);
     if (L.version.startsWith('2.')) {

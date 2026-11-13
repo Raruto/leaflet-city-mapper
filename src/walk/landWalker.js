@@ -4,7 +4,6 @@ import { raycasterByLayer } from '../weakmaps/raycasterByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
 import { intersectMeshes } from '../collision/intersectMeshes.js';
 import { traverse } from '../scene/traverse.js';
 import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
@@ -12,6 +11,11 @@ import { collectVisibleMesh } from '../picking/collectVisibleMesh.js';
 import { shouldSkipOther } from '../picking/shouldSkipOther.js';
 import { local } from '../projections/walkerLocalPosition.js';
 
+/**
+ * Land a descending walker on the first visible surface crossed since its previous height.
+ *
+ * @param {number} previousY Previous world-space feet height.
+ */
 export function land(previousY) {
   const ray = raycasterByLayer.get(this.layer)
   const feet = local.call(this, this.local), root = rootByLayer.get(this.layer);

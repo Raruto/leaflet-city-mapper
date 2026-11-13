@@ -1,3 +1,13 @@
+/**
+ * Transform a world-space ray into mesh coordinates, normalizing its direction and rejecting singular transforms.
+ *
+ * @param {Object} ray World-space origin and direction.
+ * @param {Object} mesh Mesh whose world matrix is inverted.
+ * @param {number[]} origin Output local origin.
+ * @param {number[]} direction Output normalized local direction.
+ *
+ * @throws {Error} If the inverse transform contains non-finite values.
+ */
 export function localRay(ray, mesh, origin, direction) {
   const inverse = /* alloc */ new DOMMatrix(mesh.worldMatrix).invertSelf();
   const inverseValues = inverse.toFloat64Array();

@@ -1,11 +1,13 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
-
-
 import { destroyTrafficGpu } from './destroyTrafficGpu.js';
 import { trafficStorage } from './trafficStorage.js';
 import { uploadTrafficLanes } from './uploadTrafficLanes.js';
 
+/**
+ * Upload current lanes and trips, recreating device resources as needed and binding the traffic compute pipeline.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function rebaseTraffic(state) {
   const { device } = rendererByLayer.get(state.layer);
   if (state.gpu?.device !== device) {

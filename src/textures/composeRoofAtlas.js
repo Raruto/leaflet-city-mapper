@@ -1,6 +1,5 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
-
 import { roofBuffer } from '../globals/roofBuffer.js';
 import { roofPass } from '../globals/roofPass.js';
 import { uploadRoofTile } from './uploadRoofTile.js';
@@ -8,10 +7,19 @@ import { roofBindGroup } from '../globals/roofBindGroup.js';
 import { roofCommands } from '../globals/roofCommands.js';
 import { roofOpacities } from '../globals/roofOpacities.js';
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
-
-
 import { compareRoofTiles } from './compareRoofTiles.js';
 
+/**
+ * Composite raster tiles into the roof atlas on the GPU, in layer and zoom order.
+ *
+ * @param {L.Layer} layer Rendering layer owning the atlas.
+ * @param {Array<Object>} tiles Tile and layer entries to composite and sort.
+ * @param {number} zoom Atlas coordinate zoom.
+ * @param {L.Point} min Atlas origin in projected pixels.
+ * @param {L.Point} size Atlas extent in projected pixels.
+ * @param {number} width Texture width in pixels.
+ * @param {number} height Texture height in pixels.
+ */
 export function composeRoofAtlas(layer, tiles, zoom, min, size, width, height) {
   const renderer = rendererByLayer.get(layer), device = renderer.device, map = layer._map;
   const opacityLength = Math.max(1, tiles.length) * 64;

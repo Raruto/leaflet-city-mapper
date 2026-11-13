@@ -1,8 +1,5 @@
 import { nativeGPUBackByMap } from '../weakmaps/nativeGPUBackByMap.js';
 import { nativeGPUOrderByMap } from '../weakmaps/nativeGPUOrderByMap.js';
-
-
-
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 
 export function reorderNativeLayer(front) {

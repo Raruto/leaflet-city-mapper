@@ -4,7 +4,15 @@ import { validateRoofMaterial } from '../materials/validateRoofMaterial.js';
 import { materialVertexShader } from './materialVertexShader.js';
 import { materialSurfaceShader } from './materialSurfaceShader.js';
 
-/** Material WGSL and texture bindings, without a GPU device or Leaflet layer. */
+/**
+ * Generate material WGSL and texture bindings without a GPU device or Leaflet layer.
+ *
+ * @param {Object} [material] Material settings.
+ * @param {boolean} [sparkle=false] Whether to include sparkle coordinates and shading.
+ * @param {string} [elevationWGSL=''] Terrain elevation WGSL functions.
+ *
+ * @returns {Object} Vertex and fragment shaders, texture bindings and feature flags.
+ */
 export function materialShaders(material = defaultMaterial, sparkle = false, elevationWGSL = '') {
   const hasBase = Boolean(material.baseTexture);
   const hasMetal = Boolean(material.metalTexture);

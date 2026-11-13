@@ -4,7 +4,11 @@ import { createTrafficMesh } from './createTrafficMesh.js';
 import { disposeTrafficObject } from './disposeTrafficObject.js';
 import { trafficBounds } from './trafficBounds.js';
 
-
+/**
+ * Replace the batched vehicle mesh and feature ranges when the active trip set changes.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function rebuildTrafficMesh(state) {
   const { trips, model, vertices } = state;
   disposeTrafficObject(state, state.mesh);

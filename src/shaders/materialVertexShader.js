@@ -1,6 +1,18 @@
 import { roofVertexShader } from './roofVertexShader.js';
 import { nativeStrokeShader } from './nativeStrokeShader.js';
 
+/**
+ * Generate a vertex shader for the material and its enabled rendering features.
+ *
+ * @param {Object} material Material settings.
+ * @param {boolean} sparkle Whether to output local sparkle coordinates.
+ * @param {string} elevationWGSL Terrain elevation WGSL functions.
+ * @param {boolean} hasTerrain Whether terrain elevation is enabled.
+ * @param {boolean} textured Whether texture coordinates are needed.
+ * @param {boolean} hasRoof Whether roof texture coordinates are needed.
+ *
+ * @returns {string} WGSL vertex shader.
+ */
 export function materialVertexShader(material, sparkle, elevationWGSL, hasTerrain, textured, hasRoof) {
   const instanceOffset = material.instanced ? ' + input.instanceOffset.xyz' : '';
   const stroke = nativeStrokeShader(material);

@@ -1,11 +1,21 @@
 import { nextId } from '../globals/nextId.js';
 import { geometryEmpty } from '../globals/geometryEmpty.js';
-
 import { emptyNode } from '../scene/createSceneNode.js';
 import { nodeMatrix } from '../transforms/modelNodeMatrix.js';
 import { setParent } from '../scene/setParent.js';
 import { createModelGeometry } from '../geometry/createModelGeometry.js';
 
+/**
+ * Recursively construct a scene node and its mesh primitives and children.
+ *
+ * @param {Object} context Model construction context.
+ * @param {number} index Index into the glTF nodes array.
+ *
+ * @returns {Object} Constructed scene node.
+ *
+ * @throws {Error} If the node forms a cycle.
+ * @throws {Error} If the node index is invalid.
+ */
 export function modelNode(context, index) {
   const { backend: layer, description, active } = context;
   // Track only the recursion path: shared mesh references are valid, cycles are not.

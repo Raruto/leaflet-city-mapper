@@ -1,10 +1,15 @@
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { L } from '../globals/L.js';
 import { radians } from '../globals/radians.js';
 import { local } from '../projections/walkerLocalPosition.js';
 import { blocked } from './isWalkBlocked.js';
 
+/**
+ * Move along the walker's heading, maintaining wall clearance and sliding along obstacles.
+ *
+ * @param {number} forward Signed movement direction.
+ * @param {number} dt Frame duration in seconds.
+ */
 export function moveWalker(forward, dt) {
   const metres = forward * this.speed * dt, { lat, lng } = this.state.latlng;
   const { position, scale } = rootByLayer.get(this.layer);

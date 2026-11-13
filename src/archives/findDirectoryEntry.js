@@ -1,3 +1,11 @@
+/**
+ * Find the last directory entry whose tile ID does not exceed the requested ID.
+ *
+ * @param {Object[]} entries Entries sorted by tile ID.
+ * @param {number} id Requested tile ID.
+ *
+ * @returns {Object|undefined} Matching entry, if any.
+ */
 export function findDirectoryEntry(entries, id) {
   let low = 0, high = entries.length - 1, mid;
   while (low <= high) {

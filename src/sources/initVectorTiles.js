@@ -5,6 +5,12 @@ import { readyVectorTiles } from './readyVectorTiles.js';
 import { reportError } from '../raster/reportRasterError.js';
 import { noOperation } from '../utils/noOperation.js';
 
+/**
+ * Configure a vector tile layer asynchronously and report initialization errors.
+ *
+ * @param {L.Layer} layer Layer to initialize.
+ * @param {Object} options Vector tile configuration.
+ */
 export function initVectorTiles(layer, options) {
   kindByLayer.set(layer, 'pending');
   const ready = configureVectorTileLayer(layer, options)

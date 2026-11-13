@@ -4,10 +4,13 @@ import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
 
-
-
-/** Update tooltip content/position and arbitrate cursor ownership across shared layers. */
-
+/**
+ * Update tooltip content and position and arbitrate cursor ownership across shared layers.
+ *
+ * @param {L.Layer} layer Layer whose tooltip is updated.
+ * @param {Object|null} feature Picked feature, or null to hide the tooltip.
+ * @param {MouseEvent} [event] Pointer event used to position a visible tooltip.
+ */
 export function showFeature(layer, feature, event) {
   const tooltip = tooltipByLayer.get(layer);
   if (!tooltip) return;

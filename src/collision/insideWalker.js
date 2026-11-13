@@ -3,12 +3,18 @@ import { layersByLayer } from '../weakmaps/layersByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { sceneByLayer } from '../weakmaps/sceneByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
 import { updateWorldMatrix } from '../transforms/updateWorldMatrix.js';
 import { insideMesh } from './insideMesh.js';
 import { trafficCollision } from './trafficCollision.js';
 import { local } from '../projections/walkerLocalPosition.js';
 
+/**
+ * Check the walker's body heights against scene geometry and current traffic bounds, excluding terrain.
+ *
+ * @param {Object} context Walk control state and reusable collision scratch.
+ *
+ * @returns {boolean} Whether the walker overlaps traffic or is enclosed by a mesh.
+ */
 export function insideWalker(context) {
   const { layer, local: localBuffer, hitData } = context;
   const shared = sharedByLayer.get(layer);

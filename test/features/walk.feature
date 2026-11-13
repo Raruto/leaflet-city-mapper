@@ -28,6 +28,10 @@ Feature: Third-person walk mode
     Given a leaflet map
     Then a long walking step reaches a nearby wall and can move away
 
+  Scenario: Clearance checks do not push the walker through a Paris building
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings"
+    Then clearance checks keep the walker outside the reported Paris facade
+
   Scenario Outline: Walking in Paris preserves <check>
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings"
     Then walking in Paris preserves "<check>" and Esc restores the map

@@ -1,6 +1,18 @@
 import { types } from '../globals/types.js';
 import { readAccessorValues } from './readAccessorValues.js';
 
+/**
+ * Apply sparse glTF accessor values to an existing component array.
+ *
+ * @param {Object} description Decoded glTF document with loaded buffers.
+ * @param {Object} spec glTF accessor specification.
+ * @param {TypedArrayConstructor} Type Component array constructor.
+ * @param {number} size Components per element.
+ * @param {TypedArray} data Destination array to update.
+ *
+ * @throws {Error} If the sparse index type is invalid.
+ * @throws {Error} If the sparse index count or range is invalid.
+ */
 export function readSparseAccessor(description, spec, Type, size, data) {
   const sparse = spec.sparse, Index = types[sparse.indices.componentType];
   if (Index !== Uint8Array && Index !== Uint16Array && Index !== Uint32Array) {

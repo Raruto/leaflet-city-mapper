@@ -1,8 +1,5 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { L } from '../globals/L.js';
-
-
 import { current } from './isCurrentNativeLayer.js';
 import { syncGridLayer } from './syncGridLayer.js';
 import { syncImageOverlay } from './syncImageOverlay.js';

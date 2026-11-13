@@ -1,3 +1,12 @@
+/**
+ * Generate fragment code for base color, alpha and optional roof texture.
+ *
+ * @param {Object} material Material settings.
+ * @param {boolean} hasBase Whether a base texture is bound.
+ * @param {boolean} hasRoof Whether a roof texture is bound.
+ *
+ * @returns {string} WGSL fragment code.
+ */
 export function materialBaseShader(material, hasBase, hasRoof) {
   return /* wgsl */ `
       var normal = normalize(input.normal) * select(-1.0, 1.0, frontFacing);

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { Then } from '@cucumber/cucumber';
 import { local } from '../../src/projections/walkerLocalPosition.js';
 import { insideMesh } from '../../src/collision/insideMesh.js';
+import { countCrossings } from '../../src/collision/countCrossings.js';
 import { trafficCollision } from '../../src/collision/trafficCollision.js';
 import { onAdd as addWalk } from '../../src/walk/onAddWalkControl.js';
 import { onRemove as removeWalk } from '../../src/walk/onRemoveWalkControl.js';
@@ -42,6 +43,62 @@ Then('walk collision detects enclosed instances and moving traffic', function ()
   rotated.worldMatrix[0] = 1; rotated.worldMatrix[2] = 0;
   rotated.worldMatrix[8] = 0; rotated.worldMatrix[10] = 1;
   assert.equal(insideMesh(rotated, 5, 1, 0, seen, intersections), true, 'Changed rotation rebuilds the collider');
+
+  const adjacent = {
+    ...mesh,
+    worldMatrix: identity,
+    geometry: { attributes: {
+      position: mesh.geometry.attributes.position,
+      instanceOffset: { data: new Float32Array([2, 0, 0, 0, 4, 0, 0, positions.length / 3,
+        -5, 0, 0, positions.length * 2 / 3]), size: 4, count: 3 },
+    } },
+    extras: { featureFaces: [{ faceStart: 0, faceEnd: 8 }, { faceStart: 8, faceEnd: 16 }, { faceStart: 16, faceEnd: 24 }] },
+  };
+  assert.equal(insideMesh(adjacent, 0, 1, 0, seen, intersections), false, 'Adjacent buildings do not enclose a walker outside');
+  assert.equal(insideMesh(adjacent, 2, 1, 0, seen, intersections), true, 'A walker inside a building is detected');
+  const batchedPositions = new Float32Array(positions.length * 3);
+  for (let instance = 0; instance < 3; instance++) {
+    for (let i = 0; i < positions.length; i++) {
+      batchedPositions[instance * positions.length + i] = positions[i] + (i % 3 === 0 ? [2, 4, -5][instance] : 0);
+    }
+  }
+  const batched = { ...adjacent, geometry: { attributes: { position: { data: batchedPositions, size: 3 } } } };
+  assert.equal(insideMesh(batched, 0, 1, 0, seen, intersections), false, 'Adjacent batched features do not create a false interior');
+  assert.equal(insideMesh(batched, 2, 1, 0, seen, intersections), true, 'Batched features retain interior detection');
+  adjacent.geometry.attributes.instanceOffset.data[4] = 3;
+  const overlapping = { ...adjacent, geometry: { ...adjacent.geometry } };
+  assert.equal(insideMesh(overlapping, 2.5, 1, 0, seen, intersections), true, 'Overlapping buildings still enclose a walker');
+  const unlabelled = { ...overlapping, extras: undefined, geometry: { ...overlapping.geometry } };
+  assert.equal(insideMesh(unlabelled, 2.5, 1, 0, seen, intersections), true, 'Overlapping instances are checked independently');
+
+  const slopingPositions = new Float32Array(positions.length * 2);
+  for (let i = 0; i < positions.length; i++) {
+    slopingPositions[i] = positions[i] + (i % 3 === 0 ? -5 : 0);
+    slopingPositions[positions.length + i] = positions[i] + (i % 3 === 0 ? 11 : i % 3 === 1 && positions[i - 1] < 0 ? 2 : 0);
+  }
+  const sloping = {
+    ...mesh, worldMatrix: identity,
+    geometry: { attributes: { position: { data: slopingPositions, size: 3 } } },
+    extras: { featureFaces: [{ faceStart: 0, faceEnd: 8, polygon: true }, { faceStart: 8, faceEnd: 16, polygon: true }] },
+  };
+  assert.equal(insideMesh(sloping, 0, 1, 0, seen, intersections), false, 'A distant sloped facade does not enclose the walker');
+  assert.equal(insideMesh(sloping, 11.8, 1, 0, seen, intersections), true, 'The low side of a sloped building still encloses the walker');
+  assert.equal(insideMesh(sloping, 11.8, 5, 0, seen, intersections), false, 'A walker above the building is not enclosed');
+  assert.equal(insideMesh(sloping, 11.8, -1, 0, seen, intersections), false, 'A walker below the building is not enclosed');
+  const holePositions = new Float32Array(positions.length * 2);
+  for (let i = 0; i < positions.length; i++) {
+    holePositions[i] = positions[i] * (i % 3 === 1 ? 1 : 2);
+    holePositions[positions.length + i] = positions[i];
+  }
+  const hole = {
+    ...sloping,
+    geometry: { attributes: { position: { data: holePositions, size: 3 } } },
+    extras: { featureFaces: [{ faceStart: 0, faceEnd: 16, polygon: true }] },
+  };
+  assert.equal(insideMesh(hole, 0, 1, 0, seen, intersections), false, 'A polygon hole does not enclose the walker');
+  assert.equal(insideMesh(hole, 1.5, 1, 0, seen, intersections), true, 'The wall around a polygon hole encloses the walker');
+  assert.equal(countCrossings([0, 18.758875, 1, 18.758875, 1, 18.759043, 1, 39.222207], [{ polygon: true }]), 0,
+    'Near-coincident projected facade triangles count as one crossing');
 
   const traffic = {}, lane = { points: [[5, 0, 0], [15, 0, 0]], lengths: [0, 10], length: 10 };
   rootByLayer.set(traffic, { position: [0, 0, 0], scale: [1, 1, 1] });
@@ -481,6 +538,44 @@ Then('keyboard walking moves toward a wall, stops at it and can move away', { ti
     return state.camera.target[1];
   }), 0, 'Exiting restores the ground-level camera target');
   assert.deepEqual(errors, [], 'Keyboard movement must not throw during collision checks');
+});
+
+Then('clearance checks keep the walker outside the reported Paris facade', { timeout: 30000 }, async function () {
+  const start = { lat: 48.85550953400786, lng: 2.292482845031234 };
+  await this.page.evaluate(start => map.setView(start, 17, { animate: false }), start);
+  await this.page.getByRole('button', { name: 'Walk', exact: true }).click();
+  await this.page.waitForFunction(() => {
+    const buildings = layers._layers.find(entry => entry.name === 'Buildings').layer;
+    return globals.sceneByLayer.get(buildings)._areas.size > 0 && globals.sceneByLayer.get(buildings)._inflight === 0 &&
+      [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
+  });
+  const end = await this.page.evaluate(start => {
+    const context = walk._walk, now = performance.now(), setView = map.setView;
+    cancelAnimationFrame(context.frame);
+    context.state.latlng = new L.LatLng(start.lat, start.lng);
+    context.state.heading = 2.5244659172222907;
+    context.speed = 70;
+    context.keys.add('KeyW');
+    context.nextClearanceCheck = 0;
+    context.last = now - 16.7;
+    map.setView = function () { return this; };
+    try {
+      for (let i = 0; i < 20; i++) {
+        context.step(now + i * 16.7);
+        cancelAnimationFrame(context.frame);
+      }
+      return { ...context.state.latlng };
+    } finally {
+      map.setView = setView;
+      context.keys.clear();
+    }
+  }, start);
+  const east = (end.lng - start.lng) * 111320 * Math.cos(start.lat * Math.PI / 180);
+  const south = (start.lat - end.lat) * 111320;
+  // Signed distance to the reported facade, measured from the initial position.
+  const distance = 4.067 - 0.722769 * east - 0.691089 * south;
+  assert.ok(Math.hypot(east, south) > 3, 'The walker approaches the facade');
+  assert.ok(distance > 0.1 && distance < 0.7, `Expected to stop outside the facade: ${distance} m`);
 });
 
 Then('walking in Paris preserves {string} and Esc restores the map', { timeout: 30000 }, async function (check) {

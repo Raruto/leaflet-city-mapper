@@ -1,9 +1,7 @@
 import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
 import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
-
 import { L } from '../globals/L.js';
 import { touchByContainer } from '../weakmaps/touchByContainer.js';
-
 import { mapStopPitchBearingAnimation } from '../animations/mapStopPitchBearingAnimation.js';
 import { mapGetBearing } from '../camera/mapGetBearing.js';
 import { mapGetPitch } from '../camera/mapGetPitch.js';

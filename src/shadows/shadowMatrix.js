@@ -2,10 +2,17 @@ import { shadowBounds as sharedShadowBounds } from '../globals/shadowBounds.js';
 import { shadowCamera } from '../globals/shadowCamera.js';
 import { shadowLow } from '../globals/shadowLow.js';
 import { shadowHigh } from '../globals/shadowHigh.js';
-
 import { shadowBounds } from '../geometry/shadowBounds.js';
 import { updateCamera } from '../camera/updateSceneCamera.js';
 
+/**
+ * Fit a directional shadow projection to the bounds of the supplied meshes.
+ *
+ * @param {Object[]} meshes Shadow-casting meshes.
+ * @param {Object} sunlight Sunlight direction.
+ *
+ * @returns {Float32Array} Column-major shadow projection-view matrix.
+ */
 export function shadowMatrix(meshes, sunlight) {
   const { min, max } = shadowBounds(meshes, sharedShadowBounds);
   const camera = shadowCamera;

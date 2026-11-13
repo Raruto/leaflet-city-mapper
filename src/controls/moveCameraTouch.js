@@ -1,9 +1,7 @@
 import { touchPitchByMap } from '../weakmaps/touchPitchByMap.js';
 import { touchRotateByMap } from '../weakmaps/touchRotateByMap.js';
-
 import { degrees } from '../globals/degrees.js';
 import { touchByContainer } from '../weakmaps/touchByContainer.js';
-
 import { mapSetPitchAndBearing } from '../camera/mapSetPitchAndBearing.js';
 
 export function moveCameraTouch(event) {

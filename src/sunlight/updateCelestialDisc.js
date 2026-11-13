@@ -1,5 +1,16 @@
 import { projectCelestialBody } from '../projections/projectCelestialBody.js';
 
+/**
+ * Project and position a celestial disc, hiding it when it is below the horizon or outside the sky.
+ *
+ * @param {HTMLElement} disc Sun or moon element.
+ * @param {Object|null|undefined} body Celestial altitude and direction.
+ * @param {HTMLElement|null|undefined} sky Sky container.
+ * @param {L.Point} size Viewport dimensions.
+ * @param {number} pitch Camera pitch in radians.
+ * @param {number} bearing Camera bearing in radians.
+ * @param {Object} projection Reusable projection result.
+ */
 export function updateCelestialDisc(disc, body, sky, size, pitch, bearing, projection) {
   disc.hidden = true;
   if (!sky || !body || body.altitude <= 0) return;

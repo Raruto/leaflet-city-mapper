@@ -4,12 +4,9 @@ import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainZoomByLayer } from '../weakmaps/terrainZoomByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { L } from '../globals/L.js';
 import { HEIGHT } from '../globals/HEIGHT.js';
-
-
 import { computeBounds } from './computeBounds.js';
 import { getElevation } from '../terrain/getElevation.js';
 import { update } from '../scene/scheduleSceneUpdate.js';

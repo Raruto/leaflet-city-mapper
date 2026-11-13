@@ -1,6 +1,13 @@
 import { mapMethods } from '../globals/mapMethods.js';
 
-
+/**
+ * Attempt an animated pan to a center using Leaflet's ground-space offset.
+ *
+ * @param {L.LatLng} center Target center.
+ * @param {Object} [options] Leaflet pan options.
+ *
+ * @returns {boolean} Whether the pan was started.
+ */
 export function mapTryAnimatedPan(center, options) {
   // Leaflet's geographic recentering already supplies ground pixels, not screen pixels.
   const offset = this._getCenterOffset(center)._trunc();

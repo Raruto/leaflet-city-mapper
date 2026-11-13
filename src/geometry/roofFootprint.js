@@ -1,7 +1,6 @@
 import { headerByLayer } from '../weakmaps/headerByLayer.js';
 import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
 import { tileZoomByLayer } from '../weakmaps/tileZoomByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { earthCirc } from '../globals/earthCirc.js';
 

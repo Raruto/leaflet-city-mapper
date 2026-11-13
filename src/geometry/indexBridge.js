@@ -1,6 +1,5 @@
 import { bridgesByLayer } from '../weakmaps/bridgesByLayer.js';
 
-
 export function indexBridge(layer, pixels, triangles) {
   const bridgeTriangles = /* alloc */ [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

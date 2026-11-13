@@ -1,3 +1,8 @@
+/**
+ * Show a single accessible WebGPU-unavailable warning in the map container.
+ *
+ * @param {L.Map} map Map receiving the warning.
+ */
 export function showWebGPUWarning(map) {
   const container = map.getContainer();
   if (container.querySelector('.leaflet-webgpu-warning')) return;

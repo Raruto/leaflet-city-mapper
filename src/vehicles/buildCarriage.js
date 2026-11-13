@@ -3,9 +3,17 @@ import { white } from '../globals/white.js';
 import { tyre } from '../globals/tyre.js';
 import { headlight } from '../globals/headlight.js';
 import { taillight } from '../globals/taillight.js';
-
 import { box } from '../geometry/box.js';
 
+/**
+ * Build a carriage with body, windows, wheels and lights.
+ *
+ * @param {number} center Carriage center along the longitudinal axis.
+ * @param {number} length Carriage length.
+ * @param {number[]} color Body color.
+ *
+ * @returns {Array} Carriage extrusion parts.
+ */
 export function carriage(center, length, color) {
   const front = center - length / 2, rear = center + length / 2;
   return /* alloc */ [

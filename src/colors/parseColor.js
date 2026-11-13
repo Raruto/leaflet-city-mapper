@@ -4,10 +4,13 @@ import { channel } from "./hslChannel.js";
 /**
  * HSL inputs are linear-space to preserve the original building styling.
  * Numeric/CSS/RGB inputs are already sRGB; CSS alpha is not used for extrusion.
+ *
  * @param {number|string|Object} value 0xRRGGBB, CSS color, {r,g,b}, or {h,s,l} in 0..1.
+ *
  * @returns {Object} sRGB {r,g,b} components in 0..1.
+ *
+ * @throws {Error} If the value is not a supported color.
  */
-
 export function parseColor(value) {
   if (value && typeof value === 'object' && 'h' in value) {
     const a = value.s * Math.min(value.l, 1 - value.l);

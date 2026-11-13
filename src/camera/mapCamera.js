@@ -8,9 +8,7 @@ import { popupPan } from '../globals/popupPan.js';
 import { tooltipPosition } from '../globals/tooltipPosition.js';
 import { tiledBounds } from '../globals/tiledBounds.js';
 import { gridEvents } from '../globals/gridEvents.js';
-
 import { initNativeGPU } from '../native/initNativeGPU.js';
-
 import { mapLayerPointToContainerPoint } from './mapLayerPointToContainerPoint.js';
 import { mapContainerPointToLayerPoint } from './mapContainerPointToLayerPoint.js';
 import { mapGetCenterLayerPoint } from './mapGetCenterLayerPoint.js';

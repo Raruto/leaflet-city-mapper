@@ -3,7 +3,6 @@ import { ring } from './createLampRing.js';
 import { lampDirections } from '../globals/lampDirections.js';
 
 /** Schematic support and lamp head; wall-mounted fixtures do not get an invented pole. */
-
 export function lampPostGeometry(point, style, addTriangle) {
   const color = parseColor(0x50565a), radius = style.poleRadius;
   if (!Number.isFinite(radius) || radius <= 0) {

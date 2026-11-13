@@ -6,6 +6,7 @@ import { onBlur } from './onWalkBlur.js';
 import { onPointer } from './onWalkPointer.js';
 import { onTerrain } from './onWalkTerrain.js';
 
+/** Leave walk mode, release walker meshes and listeners, and restore the saved map settings. */
 export function stop() {
   const map = this.layer._map;
   cancelAnimationFrame(this.frame);

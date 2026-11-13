@@ -1,14 +1,17 @@
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { terrain3DByLayer } from '../weakmaps/terrain3DByLayer.js';
-
-
-
 import { destroyTexture } from '../textures/destroyTexture.js';
 import { removeRasterTile } from './removeRasterTile.js';
 import { setParent } from '../scene/setParent.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
 
+/**
+ * Abort and remove a current raster tile, detaching its meshes and releasing its image and texture.
+ *
+ * @param {L.Layer} layer Raster layer.
+ * @param {Object} tile Tile to release.
+ */
 export function releaseRasterTile(layer, tile) {
   const key = `${tile.coords.z}/${tile.coords.x}/${tile.coords.y}`;
   if (rasterTilesByLayer.get(layer).get(key) !== tile) return;

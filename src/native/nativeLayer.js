@@ -1,16 +1,11 @@
 import { nativeGPUBackByMap } from '../weakmaps/nativeGPUBackByMap.js';
 import { nativeGPUOrderByMap } from '../weakmaps/nativeGPUOrderByMap.js';
-
 import { L } from '../globals/L.js';
 import { nativeMethodHandlers } from '../globals/nativeMethodHandlers.js';
 import { nativeRenderByLayer } from '../weakmaps/nativeRenderByLayer.js';
-
 import { createLayer } from '../scene/createLayer.js';
-
-
 import { nativeEvents } from './nativeEvents.js';
 import { update } from '../scene/scheduleSceneUpdate.js';
-
 import { current } from './isCurrentNativeLayer.js';
 import { refreshNativeLayer } from './refreshNativeLayer.js';
 import { refreshNativeEvent } from './refreshNativeEvent.js';

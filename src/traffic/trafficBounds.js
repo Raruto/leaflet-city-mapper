@@ -1,5 +1,10 @@
 import { computeBounds } from '../geometry/computeBounds.js';
 
+/**
+ * Compute conservative traffic mesh bounds from lane points, vehicle dimensions and lateral offset.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function trafficBounds(state) {
   let radius = 20, height = 5;
   let i, lane, x, z, y;

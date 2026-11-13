@@ -1,15 +1,11 @@
 import { kindByLayer } from '../weakmaps/kindByLayer.js';
-
 import { L } from '../globals/L.js';
 import { closestMethods } from '../weakmaps/closestMethods.js';
 import { boundsMethods } from '../weakmaps/boundsMethods.js';
 import { gridInitializers } from '../weakmaps/gridInitializers.js';
-
-
 import { noOperation } from '../utils/noOperation.js';
 import { emptyEvents } from '../scene/emptyEvents.js';
 import { refreshNativeLayerContract } from '../native/refreshNativeLayerContract.js';
-
 import { closestCameraLayerPoint } from './closestCameraLayerPoint.js';
 import { cameraCircleBounds } from './cameraCircleBounds.js';
 import { initializeGridContainer } from './initializeGridContainer.js';
@@ -17,6 +13,7 @@ import { updateGridOpacity } from './updateGridOpacity.js';
 import { addRasterImage } from '../textures/attachRasterImage.js';
 import { redrawPath } from './redrawPath.js';
 
+/** Install camera and GPU integration hooks appropriate to this native Leaflet layer. */
 export function initializeNativeLayer() {
   if (this instanceof L.Polyline || this instanceof L.CircleMarker) {
     this.beforeAdd = this._updateBounds = noOperation;

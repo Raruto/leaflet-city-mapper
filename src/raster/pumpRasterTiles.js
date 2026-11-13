@@ -1,13 +1,14 @@
 import { loadingTilesByLayer } from '../weakmaps/loadingTilesByLayer.js';
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
-
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
-
-
-
 import { comparePendingTiles } from './comparePendingTiles.js';
 import { loadRasterTile } from './loadRasterTile.js';
 
+/**
+ * Start pending raster loads by zoom and distance, with at most four concurrent loads.
+ *
+ * @param {L.Layer} layer Raster layer.
+ */
 export function pumpRasterTiles(layer) {
   const map = layer._map;
   if (!map) return;

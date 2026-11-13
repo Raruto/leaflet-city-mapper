@@ -1,9 +1,17 @@
 import { trafficEmptyList } from '../globals/trafficEmptyList.js';
+
 // GeoJSON (Multi)LineStrings become lanes ({latlngs, properties, elevation?}); prepare() adds `points` ([x, z, ground]),
 // `lengths` and `length` in layer-local metres.
 
 
 
+/**
+ * Convert GeoJSON line and multiline features to lanes, preserving their properties and elevation.
+ *
+ * @param {Object} collection GeoJSON feature collection.
+ *
+ * @returns {Array} Lanes with latitude-longitude points and feature properties.
+ */
 export function toLanes({ features = trafficEmptyList }) {
   const lanes = /* alloc */ [];
   let geometry, properties, lines, line, latlngs, lng, lat, i;

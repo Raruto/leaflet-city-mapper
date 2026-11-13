@@ -1,9 +1,8 @@
 import { L } from '../globals/L.js';
 import { popupPosition } from '../globals/popupPosition.js';
-
-
 import { displayPoint } from '../projections/displayContainerPoint.js';
 
+/** Update this popup's position and apply the camera display offset. */
 export function popupUpdatePosition() {
   popupPosition.value.call(this);
   if (!this._map) return;

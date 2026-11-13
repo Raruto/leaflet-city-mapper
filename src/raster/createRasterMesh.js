@@ -3,7 +3,6 @@ import { rasterGeometryByLayer } from '../weakmaps/rasterGeometryByLayer.js';
 import { rasterProgramByLayer } from '../weakmaps/rasterProgramByLayer.js';
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { rasterTexture } from '../globals/rasterTexture.js';
 import { rasterSampler } from '../globals/rasterSampler.js';
@@ -13,14 +12,16 @@ import { meshCopySize } from '../globals/meshCopySize.js';
 import { rasterPoint } from '../globals/rasterPoint.js';
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
 import { nextId } from '../globals/nextId.js';
-
-
-
 import { createProgram } from "../materials/createProgram.js";
 import { setParent } from "../scene/setParent.js";
-
 import { createGeometry } from '../geometry/createRasterQuadGeometry.js';
 
+/**
+ * Upload a raster tile image and attach its ground quad to the layer scene.
+ *
+ * @param {L.Layer} layer Raster layer.
+ * @param {Object} tile Tile with coordinates and decoded image.
+ */
 export function createRasterMesh(layer, tile) {
   const device = rendererByLayer.get(layer).device;
   const texture = /* alloc */ {

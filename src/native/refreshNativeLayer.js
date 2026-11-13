@@ -1,7 +1,4 @@
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
-
-
 import { nativeImageRefresh } from '../textures/nativeImageRefresh.js';
 import { nativeImageError } from '../textures/nativeImageError.js';
 import { removeImageState } from '../textures/removeImageState.js';

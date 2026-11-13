@@ -1,5 +1,4 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { defaultMaterial } from '../globals/defaultMaterial.js';
 import { vertexShader } from '../globals/vertexShader.js';
 import { fragmentShader } from '../globals/fragmentShader.js';
@@ -12,12 +11,17 @@ import { uVLayout } from '../globals/uVLayout.js';
 import { instanceLayout } from '../globals/instanceLayout.js';
 import { createProgramLayout } from './createProgramLayout.js';
 import { createProgramUniforms } from './createProgramUniforms.js';
-
-
 import { materialShaders } from '../shaders/materialShaders.js';
-
 import { reportCompilation } from '../gpu/reportShaderCompilation.js';
 
+/**
+ * Create shader modules, layouts and uniforms for a layer material.
+ *
+ * @param {L.Layer} layer Layer providing the renderer and shader options.
+ * @param {Object} [material] Material options.
+ *
+ * @returns {Object} Program state and pipeline cache.
+ */
 export function createProgram(layer, material = defaultMaterial) {
   const renderer = rendererByLayer.get(layer), { device } = renderer;
   const shaders = materialShaders(

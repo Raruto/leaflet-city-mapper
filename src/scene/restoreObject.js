@@ -1,12 +1,15 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
-
-
-
 import { createProgram } from '../materials/createProgram.js';
 import { restoreGeometry } from '../geometry/restoreGeometry.js';
 import { restoreMaterialTextures } from '../textures/restoreMaterialTextures.js';
 
+/**
+ * Restore a scene object's GPU resources when it moves to a different device.
+ *
+ * @param {Object} object Scene object to restore.
+ * @param {L.Layer} layer Layer containing the object.
+ */
 export function restoreObject(object, layer) {
   const shared = sharedByLayer.get(layer);
   let texture;

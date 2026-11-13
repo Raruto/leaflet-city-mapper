@@ -1,13 +1,15 @@
 import { sunlightByMap } from '../weakmaps/sunlightByMap.js';
-
-
-
 import { atmosphere } from './atmosphere.js';
 import { moonPosition } from '../astronomy/moonPosition.js';
 import { solarPosition } from '../astronomy/solarPosition.js';
 import { render } from './requestSunlightRender.js';
 import { updateSky } from './updateSky.js';
 
+/**
+ * Update simulation time, solar and lunar positions, sky styling and status.
+ *
+ * @param {Object} state Sunlight and time-control state.
+ */
 export function updateSun(state) {
   const { control, map, date, slider, output, status } = state;
   try {

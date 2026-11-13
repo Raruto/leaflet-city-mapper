@@ -1,6 +1,13 @@
 import { openCog } from '../cog/openCog.js';
 import { workerCogSource } from '../globals/workerCogSource.js';
 
+/**
+ * Read a COG header or tile in the worker, transferring result buffers or reporting the error.
+ *
+ * @param {MessageEvent} event Request containing the COG URL, asset and optional tile coordinates.
+ *
+ * @returns {Promise<void>} Resolves after the response is posted.
+ */
 export async function onCogMessage({ data }) {
   try {
     const key = JSON.stringify(/* alloc */ [data.url, data.asset]);

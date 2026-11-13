@@ -1,7 +1,15 @@
 import { lightGrid } from './lightGrid.js';
 import { worldLights } from './worldLights.js';
 
-/** Keep fixed lamps cached when moving headlights change. */
+/**
+ * Reuse a light grid when its meshes and world-space light snapshots are unchanged.
+ *
+ * @param {Object[]} meshes Meshes containing point lights.
+ * @param {Object} [previous] Previous grid and mesh snapshots, if any.
+ * @param {number} maxBytes Maximum GPU storage size in bytes.
+ *
+ * @returns {Object} Reused or rebuilt light grid and snapshots.
+ */
 export function cacheLightGrid(meshes, previous, maxBytes) {
   let unchanged = previous?.meshes.length === meshes.length;
   let i, mesh, matrix, lights, cache, sameMatrix, j;

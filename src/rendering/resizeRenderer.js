@@ -1,12 +1,15 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { sizeByLayer } from '../weakmaps/sizeByLayer.js';
-
 import { depthTexture as sharedDepthTexture } from '../globals/depthTexture.js';
 import { colorTexture as sharedColorTexture } from '../globals/colorTexture.js';
-
-
 import { destroyTexture } from '../textures/destroyTexture.js';
 
+/**
+ * Resize the renderer's canvas and recreate its color and depth textures when the map size changes.
+ *
+ * @param {L.Layer} layer Rendering layer.
+ * @param {L.Point} size Viewport size in CSS pixels.
+ */
 export function resizeRenderer(layer, size) {
   const renderer = rendererByLayer.get(layer);
   if (!sizeByLayer.get(layer) || !sizeByLayer.get(layer).equals(size)) {

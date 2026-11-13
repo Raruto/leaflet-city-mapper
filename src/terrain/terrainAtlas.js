@@ -1,7 +1,13 @@
 import { copyTerrainTile } from './copyTerrainTile.js';
 
-/** Float32 DEM atlas; missing samples retain the shader no-data sentinel. */
-
+/**
+ * Build a Float32 DEM atlas; missing samples retain the shader no-data sentinel.
+ *
+ * @param {Map} tiles DEM tiles keyed by x/y.
+ * @param {L.Bounds} bounds Tile-coordinate bounds.
+ *
+ * @returns {Object} Atlas elevations and valid minimum and maximum values.
+ */
 export function terrainAtlas(tiles, bounds) {
   const columns = bounds.max.x - bounds.min.x + 1, rows = bounds.max.y - bounds.min.y + 1;
   const elevations = /* alloc */ new Float32Array(columns * rows * 65536).fill(-1e9);

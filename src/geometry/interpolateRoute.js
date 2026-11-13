@@ -1,5 +1,4 @@
 /** Point and unit direction at distance `s` along `points` ([x, z, y?]) with cumulative `lengths`. */
-
 export function along(points, lengths, s, target) {
   let i = 1, end = lengths.length - 1;
   let middle;

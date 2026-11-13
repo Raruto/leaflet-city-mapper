@@ -1,5 +1,29 @@
 Feature: Performance-oriented source style
   @unit
+  Scenario: Import layout checks handle spacing, comments and ordering
+    Then source import layout checks handle these modules:
+      | source                                                                               | violations |
+      | import 'a';\nimport 'b';\n\nexport const value = 1;                                   | 0 |
+      | import 'a';\n\nimport 'b';\n\nexport const value = 1;                                 | 1 |
+      | import 'a'; import 'b';\n\nexport const value = 1;                                    | 1 |
+      | import 'a';\nimport 'b';\nexport const value = 1;                                     | 1 |
+      | import 'a';\nimport 'b';\n\n\nexport const value = 1;                                 | 1 |
+      | export const value = 1;\nimport 'a';                                                  | 1 |
+      | const value = 1;\nimport 'a';                                                         | 1 |
+      | import 'a';\n\nexport const value = 1;\nimport 'b';                                   | 1 |
+      | // Header\nimport 'a';\n// Related import\nimport 'b';\n\n/** Value. */\nexport const value = 1; | 0 |
+      | import 'a'; // Explanation\nimport 'b'; // Explanation\n\nexport const value = 1;     | 0 |
+      | import 'a'; // Explanation\nexport const value = 1;                                   | 1 |
+      | import 'a';\n/** Value. */\nexport const value = 1;                                   | 1 |
+      | import 'a';\nimport 'b';                                                             | 0 |
+      | export { value } from 'a';                                                           | 0 |
+      | const text = "import 'a';";                                                          | 0 |
+
+  @unit
+  Scenario: Source modules place imports together at the top
+    Then source modules place imports together at the top
+
+  @unit
   Scenario: Leaflet binding checks reject implicit globals and alternate global access
     Then Leaflet binding checks handle these modules:
       | file                   | source                                                                                         | violations |
@@ -168,6 +192,140 @@ Feature: Performance-oriented source style
       | src/archives/readArchiveRange.js |
       | src/archives/loadDirectory.js    |
       | src/archives/loadSource.js       |
+
+  @unit
+  Scenario: JSDoc checks associate documentation with declarations
+    Then source documentation checks handle these modules:
+      | source                                                       | violations |
+      | /** Description. */ export function run() {}                 | 0          |
+      | export /** Description. */ function run() {}                 | 0          |
+      | export function run() {}                                     | 1          |
+      | function run() {}                                            | 1          |
+      | /* Ordinary comment. */ export function run() {}             | 1          |
+      | /** */ export function run() {}                              | 1          |
+      | /** Unrelated. */ const other = 1; export function run() {}  | 1          |
+      | /** Description. */ export const value = 1;                  | 0          |
+      | export const value = 1;                                       | 1          |
+      | /** Description. */ const value = 1; export { value };        | 0          |
+      | const value = 1; /** Description. */ export { value };        | 0          |
+      | const value = 1; export { value };                            | 1          |
+      | const value = 1; export { value as renamed };                 | 1          |
+      | const value = 1; export default value;                        | 1          |
+      | /** Description. */ const value = 1; export default value;    | 0          |
+      | /** Description. */ export { value } from './other.js';       | 0          |
+      | export { value } from './other.js';                           | 0          |
+      | export * from './other.js';                                   | 0          |
+      | import { value } from './other.js'; export { value };        | 0          |
+      | import { value } from './other.js'; /** Description. */ export { value }; | 0 |
+      | import value from './other.js'; export default value;          | 0          |
+      | export default 1;                                             | 1          |
+      | /** Description. */ export default 1;                         | 0          |
+      | /** Description. */ export default function () {}             | 0          |
+      | /** Description. */ const run = () => 1;                    | 0          |
+      | class Example { method() {} }                                | 1          |
+      | class Example { /** Description. */ method() {} }             | 0          |
+      | /** File description. */ import './side-effect.js';          | 0          |
+      | import './side-effect.js';                                  | 0          |
+
+  @unit
+  Scenario: JSDoc tags cover parameters, returns, throws and exported variables
+    Then source documentation tag checks handle these modules:
+      | source                                                                                           | violations |
+      | /** Runs. @param {number} x @returns {number} value */ function run(x) { return x; }             | 0          |
+      | /** Runs. */ function run(x) { return x; }                                                       | 2          |
+      | /** Runs. @param {number} other @returns {number} value */ function run(x) { return x; }         | 1          |
+      | /** Runs. @param {number} [x=1] */ function run(x = 1) {}                                        | 0          |
+      | /** Runs. @param {...number} values */ function run(...values) {}                                | 0          |
+      | /** Runs. @param {Object} options @param {number} x */ function run({ a }, x) {}                | 0          |
+      | /** Runs. @param {number} x */ function run({ a }, x) {}                                        | 1          |
+      | /** Runs. @returns {number} value */ const run = () => 1;                                         | 0          |
+      | /** Runs. */ function run() { return; }                                                           | 0          |
+      | /** Runs. */ async function run() {}                                                             | 1          |
+      | /** Runs. */ function* run() {}                                                                  | 1          |
+      | /** Runs. @throws {Error} failed */ function run() { throw new Error(); }                        | 0          |
+      | /** Runs. */ function run() { throw new Error(); }                                                | 1          |
+      | /** Runs. @throws {Error} failed */ function run() { if (x) throw 1; throw 2; }                 | 1          |
+      | /** Runs. @returns */ function run() { return 1; }                                               | 1          |
+      | /** Runs. @param {number} options.value */ function run(options) {}                              | 1          |
+      | /** Runs. */ function run() { function nested() { throw 1; return 2; } }                         | 1          |
+      | /** Value. @type {number} */ export const value = 1;                                             | 0          |
+      | /** Value. @type {{a: {b: number}}} */ export const value = {};                                 | 0          |
+      | /** Value. */ export const value = 1;                                                            | 1          |
+      | /** Value. @type { } */ export const value = 1;                                                 | 1          |
+      | const value = 1; /** Value. @type {number} */ export { value };                                 | 0          |
+      | /** Value. @type {number} */ export default 1;                                                    | 0          |
+      | /** Value. */ export default 1;                                                                  | 1          |
+      | export { value } from './other.js';                                                              | 0          |
+      | import value from './other.js'; export default value;                                            | 0          |
+
+  @unit
+  Scenario: JSDoc sections and functions have consistent spacing
+    Then source documentation spacing checks handle these modules:
+      | source                                                                                                                                                | violations |
+      | /** Runs.\n *\n * @param {number} x\n * @param {number} y\n *\n * @returns {number} result\n *\n * @throws {Error} failure\n */\nexport function run(x, y) {} | 0 |
+      | /** Runs.\n * @param {number} x\n */\nfunction run(x) {}                                                                                             | 1 |
+      | /** Runs.\n *\n * @param {number} x\n * @returns {number} result\n */\nfunction run(x) {}                                                             | 1 |
+      | /** Runs.\n *\n * @return {number} result\n * @throws {Error} failure\n */\nfunction run() {}                                                        | 1 |
+      | /** Runs.\n *\n * @return {number} result\n *\n * @throws {Error} failure\n * @throws {Error} other\n */\nfunction run() {}                          | 0 |
+      | /** Runs.\n *\n *\n * @param {number} x\n */\nfunction run(x) {}                                                                                    | 1 |
+      | /** Runs. @param {number} x */ function run(x) {}                                                                                                     | 1 |
+      | /** Value.\n *\n * @type {number}\n */\nexport const value = 1;                                                                                       | 0 |
+      | /** Value.\n * @type {number}\n */\nexport const value = 1;                                                                                          | 1 |
+      | /** Runs. */\n\nfunction run() {}                                                                                                                    | 1 |
+      | /** Runs. */\n \nexport function run() {}                                                                                                            | 1 |
+      | export /** Runs. */\n\nfunction run() {}                                                                                                             | 1 |
+      | /** Runs. */\n\nconst run = () => 1;                                                                                                                 | 1 |
+      | class Example {\n /** Runs. */\n\n method() {}\n}                                                                                                    | 1 |
+      | /** Runs. */\nfunction run() {}                                                                                                                      | 0 |
+      | /** Runs. */ function run() {}                                                                                                                       | 0 |
+      | export { value } from './other.js';                                                                                                                  | 0 |
+
+  @unit
+  Scenario: Documented source files follow JSDoc spacing rules
+    Then documented source files follow JSDoc spacing rules
+
+  @unit
+  Scenario: Animation and interaction modules document their arguments and results
+    Then JSDoc tag checks accept source directory "src/animations"
+    And JSDoc tag checks accept source directory "src/walk"
+    And JSDoc tag checks accept source directory "src/traffic"
+    And JSDoc tag checks accept source directory "src/vehicles"
+    And JSDoc tag checks accept source directory "src/gpu"
+    And JSDoc tag checks accept source directory "src/utils"
+    And JSDoc tag checks accept source directory "src/camera"
+    And JSDoc tag checks accept source directory "src/models"
+    And JSDoc tag checks accept source directory "src/sources"
+    And JSDoc tag checks accept source directory "src/scene"
+    And JSDoc tag checks accept source directory "src/core"
+
+  @unit
+  Scenario: Rendering modules document their arguments and results
+    Then JSDoc tag checks accept source directory "src/colors"
+    And JSDoc tag checks accept source directory "src/materials"
+    And JSDoc tag checks accept source directory "src/astronomy"
+    And JSDoc tag checks accept source directory "src/shaders"
+    And JSDoc tag checks accept source directory "src/shadows"
+    And JSDoc tag checks accept source directory "src/layer-controls"
+    And JSDoc tag checks accept source directory "src/lighting"
+    And JSDoc tag checks accept source directory "src/rendering"
+    And JSDoc tag checks accept source directory "src/textures"
+    And JSDoc tag checks accept source directory "src/raster"
+
+  @unit
+  Scenario: Geometry and worker modules document their arguments and results
+    Then JSDoc tag checks accept source directory "src/triangulation"
+    And JSDoc tag checks accept source directory "src/archives"
+    And JSDoc tag checks accept source directory "src/terrain"
+    And JSDoc tag checks accept source directory "src/sunlight"
+    And JSDoc tag checks accept source directory "src/picking"
+    And JSDoc tag checks accept source directory "src/workers"
+    And JSDoc tag checks accept source directory "src/projections"
+    And JSDoc tag checks accept source directory "src/transforms"
+    And JSDoc tag checks accept source directory "src/collision"
+
+  @unit
+  Scenario: Source files document functions and exports with JSDoc
+    Then every source file documents its functions and exported variables with JSDoc
 
   @unit
   Scenario: Sources avoid closures and functional iteration

@@ -1,6 +1,15 @@
 import { computeBounds } from '../geometry/computeBounds.js';
 import { nativeStrokeExpansion } from './nativeStrokeExpansion.js';
 
+/**
+ * Cull a mesh against the camera frustum and append it when visible.
+ *
+ * @param {Object} mesh Mesh whose world-space bounding sphere is tested.
+ * @param {ArrayLike<number>} projection Camera projection-view matrix.
+ * @param {Array} frustum Camera frustum planes.
+ * @param {ArrayLike<number>} frustumLengths Lengths of the plane normals.
+ * @param {Array<Object>} candidates Destination for visible meshes.
+ */
 export function collectVisibleMesh(mesh, projection, frustum, frustumLengths, candidates) {
   if (!mesh.geometry.bounds) computeBounds(mesh.geometry);
   const bounds = mesh.geometry.bounds;

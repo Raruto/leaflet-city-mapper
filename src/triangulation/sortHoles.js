@@ -1,6 +1,13 @@
 import { minimumX } from './minimumX.js';
 import { mergeHoles } from './mergeHoles.js';
 
+/**
+ * Stably sort hole rings in place by their minimum x coordinate.
+ *
+ * @param {Object[][]} holes Hole rings.
+ *
+ * @returns {Object[][]} The supplied array of sorted holes.
+ */
 export function sortHoles(holes) {
   if (holes.length < 2) return holes;
   const buffer = /* alloc */ new Array(holes.length);

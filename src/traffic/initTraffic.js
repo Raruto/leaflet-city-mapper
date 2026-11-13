@@ -4,9 +4,18 @@ import { trafficEmptyOptions } from '../globals/trafficEmptyOptions.js';
 import { vehicles } from '../globals/vehicles.js';
 import { trafficShader } from '../globals/trafficShader.js';
 import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
+import { build } from '../geometry/buildGeometryParts.js';
+import { init3D } from '../scene/init3D.js';
+import { tooltip } from './trafficTooltip.js';
+import { addTraffic } from './addTraffic.js';
+import { placeTraffic } from './placeTraffic.js';
+import { removeTraffic } from './removeTraffic.js';
+import { readyTraffic } from './readyTraffic.js';
+import { tickTraffic } from './tickTraffic.js';
+import { updateTraffic } from './updateTraffic.js';
+import { updateTrafficTerrain } from './updateTrafficTerrain.js';
 
-
-﻿/**
+/**
  * Vehicles moving along GeoJSON lanes; a compute pass places them on the GPU every frame.
  * Source options:
  * - `url`: GeoJSON (Multi)LineStrings, or a JS module whose default export `(time, layer, signal)` returns them (time-dependent data);
@@ -16,20 +25,13 @@ import { trafficByLayer } from '../weakmaps/trafficByLayer.js';
  * in metres, `name`/`description` for the default tooltip. The status line (count and vehicle type) sits under the layer's entry in the layers control.
  * L.Control.Time on the same map drives the time; without one, vehicles run live.
  */
-import { build } from '../geometry/buildGeometryParts.js';
-import { init3D } from '../scene/init3D.js';
-import { tooltip } from './trafficTooltip.js';
 
-
-
-import { addTraffic } from './addTraffic.js';
-import { placeTraffic } from './placeTraffic.js';
-import { removeTraffic } from './removeTraffic.js';
-import { readyTraffic } from './readyTraffic.js';
-import { tickTraffic } from './tickTraffic.js';
-import { updateTraffic } from './updateTraffic.js';
-import { updateTrafficTerrain } from './updateTrafficTerrain.js';
-
+/**
+ * Initialize a traffic layer's model, GPU inputs, status and lifecycle handlers.
+ *
+ * @param {L.Layer} layer Traffic layer.
+ * @param {Object} [options] Source URL, vehicle, lane offset, outline and other layer options.
+ */
 export function initTraffic(layer, { url, vehicle = 'car', side, outline, speed: velocity = sharedSpeed, ...options } = trafficEmptyOptions) {
   const { model, lights, side: defaultSide } = vehicles[vehicle];
   side ??= defaultSide;

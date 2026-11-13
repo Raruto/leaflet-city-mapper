@@ -1,13 +1,10 @@
 import { roundProfile } from '../globals/roundProfile.js';
-
-
 import { parseColor } from "../colors/parseColor.js";
 import { ring } from './createTreeRing.js';
 import { surface } from './surface.js';
 import { validateTree } from './validateTree.js';
 
 /** Low-poly tree, sharing the source block's buffers, picking and terrain offset. */
-
 export function treeGeometry(point, style, addTriangle) {
   const { top, bottom = 0, trunkRadius, crownRadius, crownBottom, crownShape = 'round' } = style;
   validateTree(trunkRadius, crownRadius, crownBottom, bottom, top, crownShape);

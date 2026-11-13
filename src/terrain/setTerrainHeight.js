@@ -2,12 +2,13 @@ import { locationByLayer } from '../weakmaps/locationByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrainBaseYByLayer } from '../weakmaps/terrainBaseYByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
-
-
-
-
 import { getElevation } from './getElevation.js';
 
+/**
+ * Position a layer's root at its saved base height plus available terrain elevation.
+ *
+ * @param {L.Layer} layer Layer whose root height should change.
+ */
 export function setTerrainHeight(layer) {
 
   if (!rootByLayer.get(layer) || !locationByLayer.get(layer)) return;

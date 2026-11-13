@@ -1,13 +1,21 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { coreSampler } from '../globals/coreSampler.js';
-
 import { disposeMesh } from '../rendering/disposeMesh.js';
 import { destroyTexture } from './destroyTexture.js';
 import { uploadCanvasTexture } from './uploadCanvasTexture.js';
 import { uploadNativeImage } from './uploadNativeImage.js';
 
-
+/**
+ * Get or create a native raster texture, returning it once its image is uploaded.
+ *
+ * @param {Object} state Native layer state with texture and mesh caches.
+ * @param {string} key Tile or image cache key.
+ * @param {HTMLImageElement|HTMLCanvasElement} image Raster source.
+ *
+ * @returns {Object|undefined} Uploaded texture state, if ready.
+ *
+ * @throws {Error} If the source is neither an image nor a canvas.
+ */
 export function textureFor(state, key, image) {
   if (!(image instanceof HTMLImageElement) && !(image instanceof HTMLCanvasElement)) {
     throw /* alloc */ new Error('WebGPU native raster layers require image or canvas tiles');

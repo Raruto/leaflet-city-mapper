@@ -12,7 +12,7 @@ import { onPointer } from './onWalkPointer.js';
 import { onTerrain } from './onWalkTerrain.js';
 import { resolveWalkerPosition } from './resolveWalkerPosition.js';
 
-
+/** Enter walk mode, saving map settings and installing input and terrain listeners. */
 export function start() {
   const map = this.layer._map;
   if (this.saved || !map) return;

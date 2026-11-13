@@ -4,11 +4,15 @@ import { pruneWantedByLayer } from '../weakmaps/pruneWantedByLayer.js';
 import { rasterTilesByLayer } from '../weakmaps/rasterTilesByLayer.js';
 import { rasterVersionByLayer } from '../weakmaps/rasterVersionByLayer.js';
 import { wantedRasterTilesByLayer } from '../weakmaps/wantedRasterTilesByLayer.js';
-
-
-
 import { releaseRasterTile } from './releaseRasterTile.js';
 
+/**
+ * Release unwanted tiles once they no longer cover pending or fading wanted tiles.
+ *
+ * @param {L.Layer} layer Raster layer.
+ *
+ * @returns {boolean} Whether another prune is needed after a tile fade.
+ */
 export function pruneRasterTiles(layer) {
   const wanted = wantedRasterTilesByLayer.get(layer);
   const now = performance.now();

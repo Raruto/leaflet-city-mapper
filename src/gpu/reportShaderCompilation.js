@@ -1,3 +1,11 @@
+/**
+ * Report shader compilation errors or rejected compilation-info requests to the layer.
+ *
+ * @param {L.Layer} layer Layer receiving error events.
+ * @param {Promise[]} pending Compilation-info promises.
+ *
+ * @returns {Promise<void>} Resolves after reporting the results.
+ */
 export async function reportCompilation(layer, pending) {
   let info, message;
   try {

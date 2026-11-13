@@ -1,9 +1,14 @@
 import { geometryQuaternion } from '../globals/geometryQuaternion.js';
 import { geometryScale } from '../globals/geometryScale.js';
 import { geometryTranslation } from '../globals/geometryTranslation.js';
-/** glTF quaternion/translation/scale to a column-major matrix. */
 
-
+/**
+ * Convert glTF quaternion, translation and scale to a column-major matrix, or copy its explicit matrix.
+ *
+ * @param {Object} spec glTF node transform.
+ *
+ * @returns {number[]} Column-major 4x4 matrix.
+ */
 export function nodeMatrix(spec) {
   if (spec.matrix) return Array.from(spec.matrix);
   // glTF stores quaternions [x,y,z,w]; convert directly to a scaled column-major matrix.

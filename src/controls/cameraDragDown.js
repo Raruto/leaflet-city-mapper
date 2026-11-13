@@ -1,7 +1,5 @@
 import { dragStates } from '../weakmaps/dragStates.js';
 import { cameraFocusOptions } from '../globals/cameraFocusOptions.js';
-
-
 import { editable } from './isEditableTarget.js';
 
 export function cameraDragDown(event) {

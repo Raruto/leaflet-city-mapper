@@ -1,11 +1,8 @@
 import { cameraByLayer } from '../weakmaps/cameraByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { coreMatrixKeys } from '../globals/coreMatrixKeys.js';
 import { markerCameraIconPoint } from '../projections/markerCameraIconPoint.js';
-
 import { localPosition } from '../projections/localPosition.js';
-
 import { transformNativePoint } from '../transforms/transformNativePoint.js';
 import { markerImageBounds } from './markerImageBounds.js';
 import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';

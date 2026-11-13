@@ -1,13 +1,19 @@
 import { types } from '../globals/types.js';
 import { sizes } from '../globals/sizes.js';
-
-
 import { readAccessorValues } from './readAccessorValues.js';
 import { readSparseAccessor } from './readSparseAccessor.js';
 import { normalizeAccessor } from './normalizeAccessor.js';
 
-/** Decode packed, interleaved, normalized or sparse glTF accessor data. */
-
+/**
+ * Decode packed, interleaved, normalized or sparse glTF accessor data.
+ *
+ * @param {Object} description Decoded glTF document with loaded buffers.
+ * @param {number} index Accessor index.
+ *
+ * @returns {Object} Component data and size, plus original integer data when applicable.
+ *
+ * @throws {Error} If the accessor component type, shape or count is invalid.
+ */
 export function readAccessor(description, index) {
   const spec = description.accessors[index], Type = types[spec.componentType], size = sizes[spec.type];
   if (!Type || !size || !Number.isInteger(spec.count) || spec.count < 0) {

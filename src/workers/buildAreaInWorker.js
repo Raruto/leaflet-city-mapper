@@ -1,5 +1,13 @@
 import { runSourceWorker } from './runSourceWorker.js';
 
+/**
+ * Prepare area geometry in a worker, copy the returned ranges and buffers, and release queued jobs.
+ *
+ * @param {Object} context Area preparation state and queued jobs.
+ * @param {AbortSignal} signal Cancellation signal.
+ *
+ * @returns {Promise<void>} Resolves after the geometry is copied into the context.
+ */
 export async function buildAreaInWorker(context, signal) {
   try {
     const data = await runSourceWorker(context.map || context.backend._map, context.backend.options.workerUrl,

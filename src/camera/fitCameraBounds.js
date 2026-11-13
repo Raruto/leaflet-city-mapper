@@ -6,7 +6,15 @@ import { pointOf } from '../projections/toPoint.js';
 import { angles } from '../projections/cameraAngles.js';
 import { verticalGroundY } from '../projections/verticalGroundY.js';
 
-
+/**
+ * Fit geographic bounds in the camera's rotated, perspective ground viewport.
+ *
+ * @param {L.Map} map Map providing camera and zoom settings.
+ * @param {L.LatLngBounds|Array|Object} bounds Geographic bounds or an object providing them.
+ * @param {Object} [options] Padding and maximum zoom options.
+ *
+ * @returns {Object} Fitted center and zoom.
+ */
 export function fitCameraBounds(map, bounds, options = cameraEmptyOptions) {
   bounds = bounds.getBounds ? bounds.getBounds() : bounds instanceof L.LatLngBounds ? bounds
     : /* alloc */ new L.LatLngBounds(bounds);

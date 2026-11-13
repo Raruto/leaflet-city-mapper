@@ -1,11 +1,14 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
-
 import { shadowTexture } from '../globals/shadowTexture.js';
-
-
 import { bindSunlight } from './bindSunlight.js';
 import { destroyTexture } from '../textures/destroyTexture.js';
 
+/**
+ * Replace the shadow depth texture when its required size changes and rebind sunlight.
+ *
+ * @param {L.Layer} layer Layer owning the renderer.
+ * @param {number} size Width and height of the square texture in pixels.
+ */
 export function resizeSunlight(layer, size) {
   const device = rendererByLayer.get(layer).device, sun = rendererByLayer.get(layer).sunlight;
   if (sun.size === size) return;

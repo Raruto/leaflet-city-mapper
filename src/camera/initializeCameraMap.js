@@ -1,9 +1,6 @@
 import { cameraMaps } from '../weakmaps/cameraMaps.js';
 import { cameraReadyByMap } from '../weakmaps/cameraReadyByMap.js';
-
-
 import { mapSetPitchAndBearing } from './mapSetPitchAndBearing.js';
-
 import { updateSky } from './updateSky.js';
 import { constrainCameraToBounds } from './constrainCameraToBounds.js';
 import { cleanupCameraMap } from './cleanupCameraMap.js';
@@ -11,6 +8,7 @@ import { cameraMapReady } from './cameraMapReady.js';
 import { loadCameraControls } from '../controls/loadCameraControls.js';
 import { noOperation } from '../utils/noOperation.js';
 
+/** Initialize this map's camera, lifecycle listeners and optional camera controls. */
 export function initializeCameraMap() {
   cameraMaps.add(this);
   if (!document.getElementById('leaflet-camera-zoom-style')) {

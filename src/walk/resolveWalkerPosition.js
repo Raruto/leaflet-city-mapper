@@ -1,6 +1,11 @@
 import { L } from '../globals/L.js';
 import { insideWalker } from '../collision/insideWalker.js';
 
+/**
+ * Search nearby positions when the active walker is enclosed, restoring the original position if none is clear.
+ *
+ * @returns {boolean} Whether the walker was moved to a clear position.
+ */
 export function resolveWalkerPosition() {
   if (!this.saved || !insideWalker(this)) return false;
   const map = this.layer._map;

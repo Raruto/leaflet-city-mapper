@@ -12,13 +12,9 @@ import { sceneFields } from '../weakmaps/sceneFields.js';
 import { sharedByLayer } from '../weakmaps/sharedByLayer.js';
 import { tooltipByLayer } from '../weakmaps/tooltipByLayer.js';
 import { urlByLayer } from '../weakmaps/urlByLayer.js';
-
 import { L } from '../globals/L.js';
 import { sceneTransferFields } from '../globals/sceneTransferFields.js';
 import { renderers } from '../weakmaps/renderers.js';
-
-
-
 import * as endZoom from '../animations/endZoom.js';
 import * as onMapChange from './onMapChange.js';
 import * as onPointerLeave from '../picking/onPointerLeave.js';
@@ -31,7 +27,12 @@ import { cancelUpdate } from './cancelUpdate.js';
 import { update } from './scheduleSceneUpdate.js';
 import { releaseSharedScene } from './releaseSharedScene.js';
 
-/** Release source meshes/UI; retain manually added objects and model CPU data. */
+/**
+ * Release source meshes and UI, retaining manually added objects and model CPU data.
+ *
+ * @param {L.Layer} layer 3D layer being removed.
+ * @param {L.Map} map Map containing the layer.
+ */
 export function onRemove3DLayer(layer, map) {
   addedByLayer.set(layer, Promise.withResolvers());
   if (containerByLayer.get(layer)) {

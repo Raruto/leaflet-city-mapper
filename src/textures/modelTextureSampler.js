@@ -1,5 +1,10 @@
-/** Translate glTF sampler constants into WebGPU sampler options. */
-
+/**
+ * Translate glTF sampler constants into WebGPU sampler options.
+ *
+ * @param {Object} sampler glTF sampler, if present.
+ *
+ * @returns {Object} WebGPU addressing and filtering options.
+ */
 export function textureSampler(sampler) {
   return /* alloc */ {
     addressModeU: sampler?.wrapS === 33071 ? 'clamp-to-edge' : sampler?.wrapS === 33648 ? 'mirror-repeat' : 'repeat',

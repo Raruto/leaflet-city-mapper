@@ -1,7 +1,18 @@
 import { directoriesByLayer } from '../weakmaps/directoriesByLayer.js';
-
 import { loadDirectory } from './loadDirectory.js';
 
+/**
+ * Load and cache decoded archive directories, evicting failed requests.
+ *
+ * @param {L.Layer} layer Archive layer owning the directory cache.
+ * @param {number} offset Directory byte offset.
+ * @param {number} length Directory byte length.
+ * @param {number} compression PMTiles compression code.
+ *
+ * @returns {Promise<Object[]>} Decoded directory entries.
+ *
+ * @throws {*} If loading the cached directory fails.
+ */
 export async function getDirectoryEntries(layer, offset, length, compression) {
   const directories = directoriesByLayer.get(layer);
   const key = `${offset}:${length}`;

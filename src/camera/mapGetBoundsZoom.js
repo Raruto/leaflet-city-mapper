@@ -1,14 +1,21 @@
 import { L } from '../globals/L.js';
 import { mapMethods } from '../globals/mapMethods.js';
 import { cameraZeroPadding } from '../globals/cameraZeroPadding.js';
-
 import { mapGetPitch } from './mapGetPitch.js';
 import { mapGetBearing } from './mapGetBearing.js';
-
 import { fitCameraBounds } from './fitCameraBounds.js';
 import { pointOf } from '../projections/toPoint.js';
 import { groundBounds } from '../projections/groundBounds.js';
 
+/**
+ * Compute a bounds zoom using the camera ground footprint when rotated or pitched.
+ *
+ * @param {L.LatLngBounds|Array} bounds Geographic bounds.
+ * @param {boolean} inside Whether the viewport must fit inside the bounds.
+ * @param {L.Point|Array} padding Viewport padding.
+ *
+ * @returns {number} Fitted zoom level.
+ */
 export function mapGetBoundsZoom(bounds, inside, padding) {
   if (!mapGetPitch(this) && !mapGetBearing(this)) return mapMethods.value.getBoundsZoom.call(this, bounds, inside, padding);
   if (!inside) return fitCameraBounds(this, bounds,

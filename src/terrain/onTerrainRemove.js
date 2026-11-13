@@ -12,10 +12,7 @@ import { terrainReadyByLayer } from '../weakmaps/terrainReadyByLayer.js';
 import { terrainTilesByLayer } from '../weakmaps/terrainTilesByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
 import { streamTerrainByMap } from '../weakmaps/streamTerrainByMap.js';
-
-
 import { renderEmpty } from '../globals/renderEmpty.js';
-
 import { destroyTexture } from '../textures/destroyTexture.js';
 import { conformModelToTerrain } from '../geometry/conformModelToTerrain.js';
 import { disposeMesh } from '../rendering/disposeMesh.js';
@@ -25,6 +22,12 @@ import { setTerrainHeight } from './setTerrainHeight.js';
 import { onRemove3DLayer } from '../scene/onRemove3DLayer.js';
 import { clearLayerTerrain } from './clearLayerTerrain.js';
 
+/**
+ * Detach terrain from a map and release associated requests and rendering resources.
+ *
+ * @param {L.Layer} layer Terrain layer to remove.
+ * @param {L.Map} map Map containing the terrain.
+ */
 export function onTerrainRemove(layer, map) {
   const stream = streamTerrainByMap.get(map);
   if (stream?.layer === layer) {

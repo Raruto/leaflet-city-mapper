@@ -9,6 +9,15 @@ import { mapElevationOf } from '../terrain/mapElevationOf.js';
 import { animationPoint } from './transformZoomAnimationPoint.js';
 import { project } from './projectCameraPoint.js';
 
+/**
+ * Convert a layer point to container coordinates, accounting for terrain elevation and camera animation.
+ *
+ * @param {L.Map} map Map containing the point.
+ * @param {L.Point} point Layer point to project.
+ * @param {L.LatLng} [location] Geographic position used to sample elevation.
+ *
+ * @returns {L.Point} Display position relative to the map pane.
+ */
 export function displayPoint(map, point, location) {
   const shared = renderers.get(map), origin = shared && sceneOriginByLayer.get(shared);
   if (!streamTerrainByMap.get(map) || !origin) {

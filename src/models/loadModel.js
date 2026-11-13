@@ -4,9 +4,6 @@ import { modelUrlByLayer } from '../weakmaps/modelUrlByLayer.js';
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
 import { terrain3DByMap } from '../weakmaps/terrain3DByMap.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
-
-
-
 import { runSourceWorker } from '../workers/runSourceWorker.js';
 import { setParent } from '../scene/setParent.js';
 import { emptyNode } from '../scene/createSceneNode.js';
@@ -15,10 +12,16 @@ import { createModelContext } from './createModelContext.js';
 import { buildModelNodes } from './buildModelNodes.js';
 import { applyModelTransform } from './applyModelTransform.js';
 
-
-/** glTF/GLB model loading. */
-/** Load the configured GLB/glTF (static triangles) under `root`; GPU resources need attachment. */
-
+/**
+ * Load the configured static GLB/glTF model, attach it to the layer and conform it to terrain.
+ *
+ * @param {L.Layer} layer Layer that owns the model and its scene root.
+ *
+ * @returns {Promise<void>} Completion of the model load.
+ *
+ * @throws {Error} If the glTF scene is missing.
+ * @throws {Error} If the glTF scene has no root nodes.
+ */
 export async function loadModel(layer) {
   await addedByLayer.get(layer).promise;
   const url = /* alloc */ new URL(modelUrlByLayer.get(layer), document.baseURI).href;

@@ -5,18 +5,19 @@ import { connectHole } from './connectHole.js';
 import { clipEars } from './clipEars.js';
 import { validateArea } from './validateArea.js';
 
-
 /**
  * Triangulates a polygon given as `{x, y}` points.
  * Rings omit the repeated closing point; winding is normalized internally.
  * Vertex indices remain relative to the original inputs after duplicate/collinear
  * cleanup. Hole bridges duplicate endpoints, not source vertices.
+ *
  * @param {Object[]} contour Outer boundary.
  * @param {Object[][]} [holes] Interior boundaries.
  *
  * @returns {number[][]} Triangles as indices in `[...contour, ...holes.flat()]`.
+ *
+ * @throws {Error} If a polygon coordinate is not finite.
  */
-
 export function triangulate(contour, holes = geometryEmpty) {
   const paths = /* alloc */ [contour, ...holes];
   const points = paths.flat();

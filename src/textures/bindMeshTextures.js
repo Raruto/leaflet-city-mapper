@@ -6,6 +6,13 @@ import { drawTerrainEntry } from '../globals/drawTerrainEntry.js';
 import { drawTextureEntries } from '../globals/drawTextureEntries.js';
 import { drawSamplerEntries } from '../globals/drawSamplerEntries.js';
 
+/**
+ * Create the mesh bind group for frame uniforms, terrain and material textures.
+ *
+ * @param {Object} renderer Renderer providing the device and uniform buffer.
+ * @param {Object} mesh Mesh whose bind group is updated.
+ * @param {Array<Object>} textures Texture and sampler pairs in program binding order.
+ */
 export function bindMeshTextures(renderer, mesh, textures) {
   const { program } = mesh;
   const entries = drawEntries;

@@ -1,8 +1,12 @@
 import { rootByLayer } from '../weakmaps/rootByLayer.js';
-
 import { readyTerrainOf } from '../terrain/readyTerrainOf.js';
 import { mapElevationOf } from '../terrain/mapElevationOf.js';
 
+/**
+ * Update lane point heights from ready terrain or explicit elevations and invalidate GPU lane data.
+ *
+ * @param {Object} state Traffic layer state.
+ */
 export function groundTraffic(state) {
   const { layer, lanes } = state;
   const terrain = readyTerrainOf(layer._map);

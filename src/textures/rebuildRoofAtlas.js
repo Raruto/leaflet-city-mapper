@@ -1,20 +1,25 @@
 import { rendererByLayer } from '../weakmaps/rendererByLayer.js';
 import { roofRasterByLayer } from '../weakmaps/roofRasterByLayer.js';
 import { sceneOriginByLayer } from '../weakmaps/sceneOriginByLayer.js';
-
 import { radians } from '../globals/radians.js';
 import { earthCirc } from '../globals/earthCirc.js';
 import { roofTiles } from '../globals/roofTiles.js';
 import { TILE_SIZE } from '../globals/TILE_SIZE.js';
 import { roofMin } from '../globals/roofMin.js';
 import { roofSize } from '../globals/roofSize.js';
-
-
 import { ensureRoofBlit } from './ensureRoofBlit.js';
 import { composeRoofAtlas } from './composeRoofAtlas.js';
 import { collectRoofTiles } from './collectRoofTiles.js';
 import { resizeRoofTexture } from './resizeRoofTexture.js';
 
+/**
+ * Rebuild the roof atlas from available raster tiles and update its scene-to-atlas matrix.
+ *
+ * @param {L.Layer} layer Rendering layer owning the atlas.
+ * @param {Array<L.Layer>} rasters Raster layers to composite.
+ * @param {string} signature Raster state signature.
+ * @param {number} now Current frame time in milliseconds.
+ */
 export function rebuildRoofAtlas(layer, rasters, signature, now) {
   const map = layer._map, renderer = rendererByLayer.get(layer);
   const tiles = roofTiles;

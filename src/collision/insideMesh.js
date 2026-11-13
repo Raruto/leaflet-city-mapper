@@ -1,10 +1,21 @@
 import { CELL } from '../globals/CELL.js';
-
 import { collider } from './collider.js';
 import { computeBounds } from '../geometry/computeBounds.js';
 import { collectIntersections } from './collectIntersections.js';
 import { countCrossings } from './countCrossings.js';
 
+/**
+ * Test a world-space point against visible mesh features, reusing the supplied intersection scratch buffers.
+ *
+ * @param {Object} mesh Mesh to test.
+ * @param {number} x World-space x coordinate.
+ * @param {number} y World-space y coordinate.
+ * @param {number} z World-space z coordinate.
+ * @param {Set<number>} seen Reusable set of visited triangle indices.
+ * @param {number[]} intersections Reusable array of crossing data.
+ *
+ * @returns {boolean} Whether a feature encloses the point.
+ */
 export function insideMesh(mesh, x, y, z, seen, intersections) {
   const geometry = mesh.geometry;
   if (!mesh.visible || !geometry?.attributes?.position?.data || mesh.program?.depthTest === false) return false;
@@ -32,5 +43,5 @@ export function insideMesh(mesh, x, y, z, seen, intersections) {
   hits.length = 0;
   seen.clear();
   collectIntersections(shape, x, y, z, seen, hits, end, iz);
-  return countCrossings(hits) % 2 === 1;
+  return countCrossings(hits, shape.ranges) > 0;
 }

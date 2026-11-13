@@ -4,13 +4,17 @@ import { sceneFields } from '../weakmaps/sceneFields.js';
 import { zoomTransitionsByLayer } from '../weakmaps/zoomTransitionsByLayer.js';
 import { zoomViewByLayer } from '../weakmaps/zoomViewByLayer.js';
 import { cameraViewByMap } from '../weakmaps/cameraViewByMap.js';
-
-
 import { renderers } from '../weakmaps/renderers.js';
 import { sceneCleanupFields } from '../globals/sceneCleanupFields.js';
 import { destroyTexture } from '../textures/destroyTexture.js';
 import { releaseRenderer } from '../gpu/releaseRenderer.js';
 
+/**
+ * Release the map's shared renderer, roof texture and scene lifecycle state.
+ *
+ * @param {L.Layer} layer Shared scene owner.
+ * @param {L.Map} map Map owning the scene.
+ */
 export function releaseSharedScene(layer, map) {
   if (roofRasterByLayer.get(layer)) destroyTexture(layer, roofRasterByLayer.get(layer).texture.texture);
   roofRasterByLayer.set(layer, null);

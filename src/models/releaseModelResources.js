@@ -1,3 +1,8 @@
+/**
+ * Destroy geometry buffers and clear pipeline caches tracked by a model context.
+ *
+ * @param {Object} context Model context containing allocated resources.
+ */
 export function releaseModelResources(context) {
   let resource, attribute;
   for (resource of context.resources) {
