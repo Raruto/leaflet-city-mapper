@@ -9,8 +9,8 @@ if (!/localhost|127.0.0.1|raruto.github.io/.test(location.hostname))
 
 const openlayers = new URLSearchParams(location.search).get('engine') === 'openlayers';
 document.write((openlayers
-  ? '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">' +
-    '<script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"><\/script>' +
+  ? '<link rel="stylesheet" href="https://unpkg.com/ol@10.6.1/ol.css">' +
+    '<script src="https://unpkg.com/ol@10.6.1/dist/ol.js"><\/script>' +
     '<script src="https://unpkg.com/leaflet-city-mapper@0.1.0/libs/openlayers-bindings.min.js"><\/script>'
   : '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9/dist/leaflet-src.js"><\/script>'));
 

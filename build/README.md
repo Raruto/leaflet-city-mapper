@@ -21,7 +21,10 @@ flowchart LR
 [build.js](./build.js) also produces source maps; WGSL minification applies to
 annotated shader templates in the minified main bundle.
 [dev.js](./dev.js) watches builds and starts [server.js](./server.js), which
-serves local files and byte ranges. See [test.js](./test.js) and the
+serves local files and byte ranges. With `watch: true`, the server rewrites this
+package's CDN URLs to local paths in HTML responses without changing examples
+on disk. Smoke tests enable the same mode and check that plugin assets stay local.
+See [test.js](./test.js) and the
 [test guide](../test/README.md) for scenario selection and version differences.
 
 ## Data and releases

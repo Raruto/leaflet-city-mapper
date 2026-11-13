@@ -12,7 +12,7 @@ for (const version of ['1.9.4', '2.0.0-beta.3']) {
   }
 }
 for (const file of ['dist/ol.js', 'ol.css']) {
-  files.set(`https://cdn.jsdelivr.net/npm/ol@10.6.1/${file}`, new URL(`ol-10.6.1/${file}`, cache));
+  files.set(`https://unpkg.com/ol@10.6.1/${file}`, new URL(`ol-10.6.1/${file}`, cache));
 }
 for (const file of ['maplibre-gl.js', 'maplibre-gl.css']) {
   files.set(`https://unpkg.com/maplibre-gl@5.24.0/dist/${file}`, new URL(`maplibre-gl-5.24.0/${file}`, cache));

@@ -6,6 +6,9 @@ Feature: Example smoke tests
   Scenario: Cancelled archive requests are not mistaken for network failures
     Then smoke tests distinguish cancelled archive requests from network failures
 
+  Scenario: Development URLs are rewritten only in served HTML
+    Then development pages rewrite CDN URLs without changing files
+
   Scenario Outline: An example loads without browser errors
     Then the example "<example>" loads without browser errors
 

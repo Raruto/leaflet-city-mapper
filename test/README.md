@@ -35,6 +35,11 @@ with Leaflet 1; custom selections omit only `@smoke` for Leaflet 2. See
 
 ## Find your way
 
+Smoke tests use the development server's CDN rewriting (`watch: true`), not
+browser interception of plugin assets. A focused scenario checks served HTML,
+unchanged example files and local asset contents; browser checks reject requests
+for this package on the CDN.
+
 - [features](./features/README.md): scenarios, tags and behavior.
 - [steps](./steps/README.md): assertions and scenario code.
 - [fixtures](./fixtures/README.md): deterministic data and browser environment.
