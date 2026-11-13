@@ -2,7 +2,7 @@ import * as globals from '../fixtures/globals.js';
 
 
 import assert from 'node:assert/strict';
-import { Then, When } from '@cucumber/cucumber';
+import { Given, Then, When } from '@cucumber/cucumber';
 
 When('I pan the shared WebGPU renderer', { timeout: 30000 }, async function () {
   const pageErrors = [];
@@ -301,6 +301,18 @@ Then('WebGPU {string} preserves its rendering invariants', function (check) {
   assert.deepEqual(result.pageErrors, [], details);
 });
 
+Given('a raster edge is ready for pruning', async function () {
+  await waitForWebGPUScene(this.page);
+  await this.page.evaluate(() => {
+    const raster = Object.values(map._layers).find(layer => globals.sceneByLayer.get(layer)?.kind === 'raster');
+    const state = globals.sceneByLayer.get(raster);
+    const maxX = Math.max(...[...state._rasterTiles.values()].filter(tile => tile.done).map(tile => tile.coords.x));
+    state._wantedRasterTiles = new Set([...state._wantedRasterTiles].filter(key => Number(key.split('/')[1]) !== maxX));
+    state._pruneVersion = -1;
+    for (const tile of state._rasterTiles.values()) tile.loadedAt = 0;
+  });
+});
+
 When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
   const pageErrors = [];
   const onPageError = error => pageErrors.push(error.message);
@@ -311,6 +323,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
       const owner = globals.renderers.get(map);
       const terrain = globals.cameraByMap.get(map)._terrain3D;
       const { device } = globals.sceneByLayer.get(owner).renderer;
+      const rasters = Object.values(map._layers).filter(layer => globals.sceneByLayer.get(layer)?.kind === 'raster');
       const gpuErrors = [];
       const onGpuError = event => gpuErrors.push(event.error.message);
       device.addEventListener('uncapturederror', onGpuError);
@@ -325,10 +338,15 @@ When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
       device.createTexture = function (descriptor) {
         return createTexture.call(this, { ...descriptor, usage: descriptor.usage | GPUTextureUsage.COPY_SRC });
       };
+      let versions, rebuilds = 0;
       try {
-        nativeChecks.gpu.destroyTexture(owner, globals.sceneByLayer.get(owner)._roofRaster.texture.texture);
-        globals.sceneByLayer.get(owner)._roofRaster = null;
-        nativeChecks.render.render(owner);
+        do {
+          versions = rasters.map(layer => globals.sceneByLayer.get(layer)._rasterVersion);
+          nativeChecks.gpu.destroyTexture(owner, globals.sceneByLayer.get(owner)._roofRaster.texture.texture);
+          globals.sceneByLayer.get(owner)._roofRaster = null;
+          nativeChecks.render.render(owner);
+          rebuilds++;
+        } while (rasters.some((layer, i) => globals.sceneByLayer.get(layer)._rasterVersion !== versions[i]));
       } finally {
         delete device.createTexture;
         delete device.queue.copyExternalImageToTexture;
@@ -396,6 +414,7 @@ When('I rebuild the WebGPU roof atlas', { timeout: 30000 }, async function () {
       device.removeEventListener('uncapturederror', onGpuError);
       const terrainTiles = tiles.filter(({ tile }) => globals.sceneByLayer.get(terrain)._rasterTiles.has(tile));
       return {
+        rebuilds,
         image: atlas.image,
         atlasSize: [atlas.width, atlas.height],
         uploads,
@@ -429,6 +448,10 @@ Then('the roof atlas matches its raster tiles without uploading a canvas', funct
   assert.equal(result.alpha, 255, details);
   assert.deepEqual(result.gpuErrors, [], details);
   assert.deepEqual(result.pageErrors, [], details);
+});
+
+Then('raster tiles were pruned during the atlas rebuild', function () {
+  assert.ok(this.webgpuAtlas.rebuilds > 1, JSON.stringify(this.webgpuAtlas));
 });
 
 When('I inspect the WebGPU terrain tiles', { timeout: 30000 }, async function () {

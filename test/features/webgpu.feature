@@ -22,6 +22,13 @@ Feature: Shared WebGPU renderer
     When I rebuild the WebGPU roof atlas
     Then the roof atlas matches its raster tiles without uploading a canvas
 
+  Scenario: The roof atlas matches raster tiles after pruning during a rebuild
+    Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Buildings, Time"
+    And a raster edge is ready for pruning
+    When I rebuild the WebGPU roof atlas
+    Then the roof atlas matches its raster tiles without uploading a canvas
+    And raster tiles were pruned during the atlas rebuild
+
   Scenario: Terrain tiles are uploaded on arrival and follow the projected DEM grid
     Given the offline Paris example loads only "Orthophoto IGN, Terrain (3D), Time"
     When I inspect the WebGPU terrain tiles
