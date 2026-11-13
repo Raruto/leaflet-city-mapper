@@ -1,4 +1,8 @@
-// [part, pivot x, pivot y, swing sign]
+/**
+ * Walker part names, pivot coordinates and swing signs.
+ *
+ * @type {Array<Array>}
+ */
 export const limbs = [
   ['body', 0, 0, 0],
   ['leg', -0.09, 0.9, 1],

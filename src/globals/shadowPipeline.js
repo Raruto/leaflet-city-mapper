@@ -1,3 +1,8 @@
+/**
+ * Reusable depth render pipeline descriptor for shadow meshes.
+ *
+ * @type {Object}
+ */
 export const shadowPipeline = {
   layout: null,
   vertex: {

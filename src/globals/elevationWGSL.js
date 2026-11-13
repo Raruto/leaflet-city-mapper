@@ -1,6 +1,8 @@
 /**
  * WGSL twin of getElevation for the vertex shader: bilinear DEM pixels, or the first valid
  * neighbour near no-data (stored as -1e9), else `base`. Expects `dem: texture_2d<f32>`.
+ *
+ * @type {string}
  */
 export const elevationWGSL = /* wgsl */`
   fn demSample(pixel: vec2<i32>) -> f32 {

@@ -1,3 +1,8 @@
+/**
+ * Reusable render pass descriptor for composing the roof atlas.
+ *
+ * @type {Object}
+ */
 export const roofPass = {
   colorAttachments: [{
     view: null,

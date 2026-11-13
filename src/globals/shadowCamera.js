@@ -1,3 +1,8 @@
+/**
+ * Reusable camera and matrix state for sunlight shadow projection.
+ *
+ * @type {Object}
+ */
 export const shadowCamera = {
   position: [0, 0, 0],
   target: [0, 0, 0],

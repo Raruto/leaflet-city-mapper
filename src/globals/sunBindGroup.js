@@ -1,3 +1,8 @@
+/**
+ * Reusable bind group descriptor for sunlight uniforms, shadow texture and lights.
+ *
+ * @type {Object}
+ */
 export const sunBindGroup = {
   layout: null,
   entries: [{

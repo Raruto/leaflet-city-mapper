@@ -4,6 +4,11 @@ import { shirt as sharedShirt } from './shirt.js';
 import { skin as sharedSkin } from './skin.js';
 import { dark as sharedDark } from './dark.js';
 
+/**
+ * Extruded body, leg and arm parts shared by walker and pedestrian models.
+ *
+ * @type {Object<string, Array>}
+ */
 export const parts = {
   body: [
     [box(-0.17, 0.17, -0.1, 0.1), 0.82, 0.95, sharedTrousers],

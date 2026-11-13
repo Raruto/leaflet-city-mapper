@@ -1,3 +1,8 @@
+/**
+ * Octagonal ring directions and face normals used for tree geometry.
+ *
+ * @type {Array<Object>}
+ */
 export const ringDirections = [{
     x: Math.cos(0 * Math.PI / 4),
     y: Math.sin(0 * Math.PI / 4),

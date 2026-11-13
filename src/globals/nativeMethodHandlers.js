@@ -13,6 +13,11 @@ import { nativeSetZIndexOffset } from '../native/nativeSetZIndexOffset.js';
 import { nativeBringToFront } from '../native/nativeBringToFront.js';
 import { nativeBringToBack } from '../native/nativeBringToBack.js';
 
+/**
+ * Native layer method wrappers indexed by the Leaflet method they replace.
+ *
+ * @type {Object<string, Function>}
+ */
 export const nativeMethodHandlers = {
   setLatLng: nativeSetLatLng,
   setLatLngs: nativeSetLatLngs,

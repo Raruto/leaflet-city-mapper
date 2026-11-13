@@ -1,4 +1,8 @@
-// W/S (↑/↓) run forward/back along the heading, A/D (←/→) turn: [forward, turn].
+/**
+ * Walking key bindings as forward and turn multipliers: W/S move and A/D turn.
+ *
+ * @type {Object<string, Array<number>>}
+ */
 export const moves = {
   KeyW: [1, 0],
   ArrowUp: [1, 0],

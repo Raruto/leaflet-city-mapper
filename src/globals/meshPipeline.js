@@ -1,3 +1,8 @@
+/**
+ * Reusable WebGPU render pipeline descriptor for scene meshes.
+ *
+ * @type {Object}
+ */
 export const meshPipeline = {
   layout: null,
   vertex: {

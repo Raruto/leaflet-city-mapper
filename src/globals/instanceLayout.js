@@ -1,3 +1,8 @@
+/**
+ * WebGPU vertex layout for four-component per-instance offsets.
+ *
+ * @type {Object}
+ */
 export const instanceLayout = Object.freeze({
   arrayStride: 16,
   stepMode: 'instance',

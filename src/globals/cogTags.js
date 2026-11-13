@@ -1,1 +1,6 @@
+/**
+ * TIFF tag identifiers read from COG image directories.
+ *
+ * @type {Array<number>}
+ */
 export const cogTags = [256, 257, 258, 259, 262, 277, 284, 317, 322, 323, 324, 325, 339, 33550, 33922, 34735];

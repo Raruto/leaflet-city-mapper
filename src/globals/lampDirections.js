@@ -1,3 +1,8 @@
+/**
+ * Ring vertex directions and face normals for lamp geometry.
+ *
+ * @type {Array<Object>}
+ */
 export const lampDirections = [
   { x: Math.cos(0 * Math.PI / 3), y: Math.sin(0 * Math.PI / 3), nx: Math.cos(0.5 * Math.PI / 3), nz: -Math.sin(0.5 * Math.PI / 3) },
   { x: Math.cos(1 * Math.PI / 3), y: Math.sin(1 * Math.PI / 3), nx: Math.cos(1.5 * Math.PI / 3), nz: -Math.sin(1.5 * Math.PI / 3) },

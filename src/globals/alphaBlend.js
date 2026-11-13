@@ -1,3 +1,8 @@
+/**
+ * WebGPU blend configuration for transparent material color and alpha.
+ *
+ * @type {Object}
+ */
 export const alphaBlend = {
   color: {
     srcFactor: 'src-alpha',

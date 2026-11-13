@@ -341,6 +341,10 @@ Feature: Performance-oriented source style
     Then JSDoc tag checks accept source directory "src/vector-tiles"
 
   @unit
+  Scenario: Weak map modules document their exported state
+    Then JSDoc tag checks accept source directory "src/weakmaps"
+
+  @unit
   Scenario: Sources avoid closures and functional iteration
     Then no source file defines arrows, nested functions or callback array methods
 

@@ -1,3 +1,7 @@
-// Walls (non-horizontal triangles) of a mesh in world space, bucketed by 8 m cells; `origin` is the world translation
-// at build time, since layer roots only move vertically with the terrain afterwards.
+/**
+ * Collision grid cell size in meters for world-space wall triangles. The cached
+ * origin is the build-time world translation; layer roots subsequently move only vertically.
+ *
+ * @type {number}
+ */
 export const CELL = 8;

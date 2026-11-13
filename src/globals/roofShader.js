@@ -1,3 +1,8 @@
+/**
+ * Shader module descriptor for compositing roof tiles with opacity.
+ *
+ * @type {Object}
+ */
 export const roofShader = {
   code: /* wgsl */`
       @group(0) @binding(0) var source: texture_2d<f32>;

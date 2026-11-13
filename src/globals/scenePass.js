@@ -1,3 +1,8 @@
+/**
+ * Reusable render pass descriptor for the multisampled scene and depth attachments.
+ *
+ * @type {Object}
+ */
 export const scenePass = {
   colorAttachments: [{
     view: null,

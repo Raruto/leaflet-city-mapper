@@ -1,3 +1,8 @@
+/**
+ * Boat hull footprint used to construct the vessel model.
+ *
+ * @type {Array<Array<number>>}
+ */
 export const hull = [
   [-5.5, 30],
   [5.5, 30],

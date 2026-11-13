@@ -1,3 +1,8 @@
+/**
+ * Reusable pipeline descriptor for alpha-blended roof tile composition.
+ *
+ * @type {Object}
+ */
 export const roofPipeline = {
   layout: 'auto',
   vertex: {

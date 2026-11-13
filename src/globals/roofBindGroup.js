@@ -1,3 +1,8 @@
+/**
+ * Reusable bind group descriptor for compositing roof raster tiles.
+ *
+ * @type {Object}
+ */
 export const roofBindGroup = {
   layout: null,
   entries: [{

@@ -1,3 +1,8 @@
+/**
+ * Sun elevation stops with sky, horizon and light colors for atmospheric interpolation.
+ *
+ * @type {Array}
+ */
 export const atmosphereStops = [
   [-18, [3, 7, 20],
     [17, 28, 54],
