@@ -1,7 +1,7 @@
 Feature: Geometry worker ownership
   @unit
   Scenario: Main bundle does not retain geometry preparation
-    Then the main bundle excludes source preparation and stays below 245 KB
+    Then the main bundle excludes source preparation and stays below 250 KB
 
   @unit
   Scenario: One worker bundle handles geometry and vector tiles

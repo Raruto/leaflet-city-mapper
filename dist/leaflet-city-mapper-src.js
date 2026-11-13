@@ -11396,6 +11396,28 @@
   // src/weakmaps/colliders.js
   var colliders = /* @__PURE__ */ new WeakMap();
 
+  // src/collision/advanceFeature.js
+  function advanceFeature(ranges, feature, face) {
+    while (ranges && feature < ranges.length && face >= ranges[feature].faceEnd) feature++;
+    return feature;
+  }
+
+  // src/collision/cachedCollider.js
+  function cachedCollider(mesh) {
+    const c = colliders.get(mesh), m = mesh.worldMatrix;
+    if (!c || c.geometry !== mesh.geometry) return void 0;
+    let i;
+    for (i = 0; i < 12; i++) {
+      if (i % 4 !== 3 && c.matrix[i] !== m[i]) return void 0;
+    }
+    return c;
+  }
+
+  // src/collision/flipsNormal.js
+  function flipsNormal(m, data, j, nx, nz) {
+    return (m[0] * data[j] + m[4] * data[j + 1] + m[8] * data[j + 2]) * nx + (m[2] * data[j] + m[6] * data[j + 1] + m[10] * data[j + 2]) * nz < 0;
+  }
+
   // src/collision/indexTriangle.js
   function indexTriangle(cells, v, t) {
     let ix, iz, key;
@@ -11411,16 +11433,22 @@
       }
   }
 
+  // src/collision/transformVertices.js
+  function transformVertices(v, a, b, d, m) {
+    let k, p;
+    for (k = 0; k < 3; k++) {
+      p = k === 0 ? a : k === 1 ? b : d;
+      v[k * 3] = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+      v[k * 3 + 1] = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+      v[k * 3 + 2] = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
+    }
+  }
+
   // src/collision/collider.js
   function collider(mesh) {
     const m = mesh.worldMatrix;
-    let c = colliders.get(mesh), i;
-    if (c && c.geometry === mesh.geometry) {
-      for (i = 0; i < 12; i++) {
-        if (i % 4 !== 3 && c.matrix[i] !== m[i]) break;
-      }
-      if (i === 12) return c;
-    }
+    const cached = cachedCollider(mesh);
+    if (cached) return cached;
     const { position, index, normal, uv, instanceOffset } = mesh.geometry.attributes;
     const vertices = vertexCount(position, index);
     const count = vertices * (instanceOffset?.count ?? 1);
@@ -11455,23 +11483,15 @@
       []
     );
     const ranges = mesh.extras?.featureFaces;
-    let first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, feature = 0, maxX = -Infinity;
+    let i, first, j, ex, ey, ez, fx, fy, fz, nx, nz, ny, length, h, t, feature = 0, maxX = -Infinity;
     for (i = 0; i < count; i += 3) {
-      while (ranges && feature < ranges.length && i / 3 >= ranges[feature].faceEnd) feature++;
+      feature = advanceFeature(ranges, feature, i / 3);
       first = index ? index.data[i % vertices] : i % vertices;
       if (mesh.program.nightLight && uv && uv.data[first * 2] <= 2) {
         continue;
       }
       readTriangle(mesh, i, a, b, d);
-      v[0] = m[0] * a[0] + m[4] * a[1] + m[8] * a[2] + m[12];
-      v[1] = m[1] * a[0] + m[5] * a[1] + m[9] * a[2] + m[13];
-      v[2] = m[2] * a[0] + m[6] * a[1] + m[10] * a[2] + m[14];
-      v[3] = m[0] * b[0] + m[4] * b[1] + m[8] * b[2] + m[12];
-      v[4] = m[1] * b[0] + m[5] * b[1] + m[9] * b[2] + m[13];
-      v[5] = m[2] * b[0] + m[6] * b[1] + m[10] * b[2] + m[14];
-      v[6] = m[0] * d[0] + m[4] * d[1] + m[8] * d[2] + m[12];
-      v[7] = m[1] * d[0] + m[5] * d[1] + m[9] * d[2] + m[13];
-      v[8] = m[2] * d[0] + m[6] * d[1] + m[10] * d[2] + m[14];
+      transformVertices(v, a, b, d, m);
       ex = v[3] - v[0], ey = v[4] - v[1], ez = v[5] - v[2], fx = v[6] - v[0], fy = v[7] - v[1], fz = v[8] - v[2];
       nx = ey * fz - ez * fy, nz = ex * fy - ey * fx;
       ny = ez * fx - ex * fz, length = Math.hypot(nx, ny, nz);
@@ -11480,7 +11500,7 @@
       }
       if (normal) {
         j = first * 3;
-        if ((m[0] * normal.data[j] + m[4] * normal.data[j + 1] + m[8] * normal.data[j + 2]) * nx + (m[2] * normal.data[j] + m[6] * normal.data[j + 1] + m[10] * normal.data[j + 2]) * nz < 0) {
+        if (flipsNormal(m, normal.data, j, nx, nz)) {
           nx = -nx;
           nz = -nz;
         }
@@ -11492,21 +11512,23 @@
       features.push(ranges ? feature : instanceOffset ? Math.floor(i / vertices) : 0);
       indexTriangle(cells, v, t);
     }
-    c = /* alloc */
-    {
-      tri: Float32Array.from(tri),
-      nrm: Float32Array.from(nrm),
-      features: Uint32Array.from(features),
-      ranges,
-      cells,
-      maxX,
-      geometry: mesh.geometry,
-      matrix: Array.from(m),
-      origin: (
-        /* alloc */
-        [m[12], m[13], m[14]]
-      )
-    };
+    const c = (
+      /* alloc */
+      {
+        tri: Float32Array.from(tri),
+        nrm: Float32Array.from(nrm),
+        features: Uint32Array.from(features),
+        ranges,
+        cells,
+        maxX,
+        geometry: mesh.geometry,
+        matrix: Array.from(m),
+        origin: (
+          /* alloc */
+          [m[12], m[13], m[14]]
+        )
+      }
+    );
     colliders.set(mesh, c);
     return c;
   }
@@ -11552,8 +11574,13 @@
     }
   }
 
-  // src/collision/countCrossings.js
-  function countCrossings(hits, ranges) {
+  // src/collision/enclosesOrigin.js
+  function enclosesOrigin(height, footprint, ranges, feature) {
+    return Boolean(height && (!ranges?.[feature]?.polygon || footprint));
+  }
+
+  // src/collision/sortCrossings.js
+  function sortCrossings(hits) {
     let ix, j, feature, distance;
     for (ix = 2; ix < hits.length; ix += 2) {
       feature = hits[ix], distance = hits[ix + 1];
@@ -11564,21 +11591,25 @@
       }
       hits[j + 2] = feature, hits[j + 3] = distance;
     }
-    let crossings = 0, enclosed = 0, previous = -Infinity, previousKey = -1, previousFeature = -1, height = 0, footprint = 0, key;
+  }
+
+  // src/collision/countCrossings.js
+  function countCrossings(hits, ranges) {
+    sortCrossings(hits);
+    let crossings = 0, enclosed = 0, previous = -Infinity, previousKey = -1, previousFeature = -1, height = 0, footprint = 0;
+    let ix, key, feature, distance;
     for (ix = 0; ix <= hits.length; ix += 2) {
       key = ix < hits.length ? hits[ix] : -1;
       feature = Math.floor(key / 2);
-      if (key !== previousKey) {
-        if (previousKey >= 0) {
-          if (previousKey % 2) footprint = crossings % 2;
-          else height = crossings % 2;
-          if (feature !== previousFeature) {
-            if (height && (!ranges?.[previousFeature]?.polygon || footprint)) enclosed++;
-            height = 0, footprint = 0;
-          }
-        }
-        crossings = 0, previous = -Infinity, previousKey = key, previousFeature = feature;
+      if (key !== previousKey && previousKey >= 0) {
+        if (previousKey % 2) footprint = crossings % 2;
+        else height = crossings % 2;
       }
+      if (key !== previousKey && previousKey >= 0 && feature !== previousFeature) {
+        enclosed += Number(enclosesOrigin(height, footprint, ranges, previousFeature));
+        height = 0, footprint = 0;
+      }
+      if (key !== previousKey) crossings = 0, previous = -Infinity, previousKey = key, previousFeature = feature;
       if (ix === hits.length) break;
       distance = hits[ix + 1];
       if (distance - previous > (key % 2 ? 1e-3 : 1e-4)) crossings++;
@@ -11618,96 +11649,128 @@
     return countCrossings(hits, shape.ranges) > 0;
   }
 
+  // src/collision/boxNormal.js
+  function boxNormal(entry, xFirst, ox, oz, ux, uz, bounds, margin, out) {
+    if (entry >= 0) {
+      out[0] = xFirst ? -Math.sign(ux) : 0;
+      out[1] = xFirst ? 0 : -Math.sign(uz);
+      return;
+    }
+    let nearest = ox - (bounds.minX - margin);
+    out[0] = -1;
+    out[1] = 0;
+    if (bounds.maxX + margin - ox < nearest) {
+      nearest = bounds.maxX + margin - ox;
+      out[0] = 1;
+    }
+    if (oz - (bounds.minZ - margin) < nearest) {
+      nearest = oz - (bounds.minZ - margin);
+      out[0] = 0;
+      out[1] = -1;
+    }
+    if (bounds.maxZ + margin - oz < nearest) {
+      out[0] = 0;
+      out[1] = 1;
+    }
+  }
+
+  // src/collision/trafficRay.js
+  function trafficRay(root, position, x, z, dx, dz, px, pz, out) {
+    const rx = (x - root.position[0]) / root.scale[0] - px;
+    const rz = (z - root.position[2]) / root.scale[2] - pz;
+    out[0] = -rx * position.dz + rz * position.dx;
+    out[1] = -rx * position.dx - rz * position.dz;
+    out[2] = -dx / root.scale[0] * position.dz + dz / root.scale[2] * position.dx;
+    out[3] = -dx / root.scale[0] * position.dx - dz / root.scale[2] * position.dz;
+  }
+
+  // src/collision/missesBox.js
+  function missesBox(entry, exit, reach, best) {
+    return entry > exit || exit < 0 || entry > reach || reach && Math.max(0, entry) >= best;
+  }
+
+  // src/collision/slabDistance.js
+  function slabDistance(origin, velocity, low, high, parallel) {
+    return velocity ? ((velocity > 0 ? low : high) - origin) / velocity : parallel;
+  }
+
+  // src/collision/slabMiss.js
+  function slabMiss(origin, velocity, min, max, margin) {
+    return !velocity && (origin <= min - margin || origin >= max + margin);
+  }
+
+  // src/collision/collideTrip.js
+  function collideTrip(state, trip, root, bounds, x, y, z, dx, dz, reach, data) {
+    const position = state.position ||= /* alloc */
+    {};
+    const ray = state.ray ||= /* alloc */
+    [0, 0, 0, 0];
+    const normal = state.localNormal ||= /* alloc */
+    [0, 0];
+    const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
+    const margin = 0.35 / scale;
+    const { x: px, y: py, z: pz } = locateTraffic(state, trip, position);
+    const bottom = root.position[1] + (py + bounds.minY) * root.scale[1];
+    const top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
+    if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) return;
+    trafficRay(root, position, x, z, dx, dz, px, pz, ray);
+    const ox = ray[0], oz = ray[1], ux = ray[2], uz = ray[3];
+    if (slabMiss(ox, ux, bounds.minX, bounds.maxX, margin) || slabMiss(oz, uz, bounds.minZ, bounds.maxZ, margin)) return;
+    const nearX = slabDistance(ox, ux, bounds.minX - margin, bounds.maxX + margin, -Infinity);
+    const farX = slabDistance(ox, ux, bounds.maxX + margin, bounds.minX - margin, Infinity);
+    const nearZ = slabDistance(oz, uz, bounds.minZ - margin, bounds.maxZ + margin, -Infinity);
+    const farZ = slabDistance(oz, uz, bounds.maxZ + margin, bounds.minZ - margin, Infinity);
+    const entry = Math.max(nearX, nearZ);
+    if (missesBox(entry, Math.min(farX, farZ), reach, data.best)) return;
+    if (!reach) {
+      data.found = true;
+      return;
+    }
+    boxNormal(entry, nearX > nearZ, ox, oz, ux, uz, bounds, margin, normal);
+    const worldX = (-normal[0] * position.dz - normal[1] * position.dx) / root.scale[0];
+    const worldZ = (normal[0] * position.dx - normal[1] * position.dz) / root.scale[2];
+    if (entry < 0 && dx * worldX + dz * worldZ >= 0) return;
+    const length = Math.hypot(worldX, worldZ);
+    data.best = Math.max(0, entry);
+    data.found = true;
+    data.normal[0] = worldX / length;
+    data.normal[1] = worldZ / length;
+  }
+
+  // src/collision/trafficBounds.js
+  function trafficBounds(state) {
+    if (state.collisionBounds) return state.collisionBounds;
+    const bounds = state.collisionBounds = /* alloc */
+    {
+      minX: Infinity,
+      maxX: -Infinity,
+      minY: Infinity,
+      maxY: -Infinity,
+      minZ: Infinity,
+      maxZ: -Infinity
+    };
+    const position = state.template.position;
+    let i;
+    for (i = 0; i < position.length; i += 3) {
+      bounds.minX = Math.min(bounds.minX, position[i]);
+      bounds.maxX = Math.max(bounds.maxX, position[i]);
+      bounds.minY = Math.min(bounds.minY, position[i + 1]);
+      bounds.maxY = Math.max(bounds.maxY, position[i + 1]);
+      bounds.minZ = Math.min(bounds.minZ, position[i + 2]);
+      bounds.maxZ = Math.max(bounds.maxZ, position[i + 2]);
+    }
+    return bounds;
+  }
+
   // src/collision/trafficCollision.js
   function trafficCollision(layer, x, y, z, dx, dz, reach, data) {
     const state = trafficByLayer.get(layer);
     if (!state?.mesh || !state.trips.length) return false;
-    let bounds = state.collisionBounds;
-    if (!bounds) {
-      bounds = state.collisionBounds = /* alloc */
-      {
-        minX: Infinity,
-        maxX: -Infinity,
-        minY: Infinity,
-        maxY: -Infinity,
-        minZ: Infinity,
-        maxZ: -Infinity
-      };
-      let i, px2, py, pz2;
-      for (i = 0; i < state.template.position.length; i += 3) {
-        px2 = state.template.position[i];
-        py = state.template.position[i + 1];
-        pz2 = state.template.position[i + 2];
-        bounds.minX = Math.min(bounds.minX, px2);
-        bounds.maxX = Math.max(bounds.maxX, px2);
-        bounds.minY = Math.min(bounds.minY, py);
-        bounds.maxY = Math.max(bounds.maxY, py);
-        bounds.minZ = Math.min(bounds.minZ, pz2);
-        bounds.maxZ = Math.max(bounds.maxZ, pz2);
-      }
-    }
-    const root = rootByLayer.get(layer), position = state.position ||= /* alloc */
-    {};
-    const scale = Math.max(root.scale[0], root.scale[1], root.scale[2]);
-    const margin = 0.35 / scale;
-    let trip, bottom, top, px, pz, rx, rz, ox, oz, ux, uz, nearX, farX, nearZ, farZ;
-    let entry, exit, nx, nz, normalLength, worldX, worldZ, nearest;
+    const root = rootByLayer.get(layer), bounds = trafficBounds(state);
+    let trip;
     for (trip of state.trips) {
-      ({ x: px, y: bottom, z: pz } = locateTraffic(state, trip, position));
-      bottom = root.position[1] + (bottom + bounds.minY) * root.scale[1];
-      top = root.position[1] + (position.y + bounds.maxY) * root.scale[1];
-      if (bottom > y + 1.7 * scale || top < y + 0.2 * scale) continue;
-      rx = (x - root.position[0]) / root.scale[0] - px;
-      rz = (z - root.position[2]) / root.scale[2] - pz;
-      ox = -rx * position.dz + rz * position.dx;
-      oz = -rx * position.dx - rz * position.dz;
-      ux = -dx / root.scale[0] * position.dz + dz / root.scale[2] * position.dx;
-      uz = -dx / root.scale[0] * position.dx - dz / root.scale[2] * position.dz;
-      if (!ux && (ox <= bounds.minX - margin || ox >= bounds.maxX + margin) || !uz && (oz <= bounds.minZ - margin || oz >= bounds.maxZ + margin)) continue;
-      nearX = ux ? ((ux > 0 ? bounds.minX - margin : bounds.maxX + margin) - ox) / ux : -Infinity;
-      farX = ux ? ((ux > 0 ? bounds.maxX + margin : bounds.minX - margin) - ox) / ux : Infinity;
-      nearZ = uz ? ((uz > 0 ? bounds.minZ - margin : bounds.maxZ + margin) - oz) / uz : -Infinity;
-      farZ = uz ? ((uz > 0 ? bounds.maxZ + margin : bounds.minZ - margin) - oz) / uz : Infinity;
-      entry = Math.max(nearX, nearZ);
-      exit = Math.min(farX, farZ);
-      if (entry > exit || exit < 0 || entry > reach || reach && Math.max(0, entry) >= data.best) continue;
-      if (!reach) {
-        data.found = true;
-        return true;
-      }
-      if (entry < 0) {
-        nearest = ox - (bounds.minX - margin);
-        nx = -1;
-        nz = 0;
-        if (bounds.maxX + margin - ox < nearest) {
-          nearest = bounds.maxX + margin - ox;
-          nx = 1;
-        }
-        if (oz - (bounds.minZ - margin) < nearest) {
-          nearest = oz - (bounds.minZ - margin);
-          nx = 0;
-          nz = -1;
-        }
-        if (bounds.maxZ + margin - oz < nearest) {
-          nx = 0;
-          nz = 1;
-        }
-      } else if (nearX > nearZ) {
-        nx = -Math.sign(ux);
-        nz = 0;
-      } else {
-        nx = 0;
-        nz = -Math.sign(uz);
-      }
-      worldX = (-nx * position.dz - nz * position.dx) / root.scale[0];
-      worldZ = (nx * position.dx - nz * position.dz) / root.scale[2];
-      normalLength = Math.hypot(worldX, worldZ);
-      if (entry < 0 && dx * worldX + dz * worldZ >= 0) continue;
-      entry = Math.max(0, entry);
-      data.best = entry;
-      data.found = true;
-      data.normal[0] = worldX / normalLength;
-      data.normal[1] = worldZ / normalLength;
+      collideTrip(state, trip, root, bounds, x, y, z, dx, dz, reach, data);
+      if (!reach && data.found) break;
     }
     return data.found;
   }
@@ -16199,7 +16262,7 @@
   }
 
   // src/traffic/trafficBounds.js
-  function trafficBounds(state) {
+  function trafficBounds2(state) {
     let radius = 20, height = 5;
     let i, lane, x, z, y;
     for (i = 0; i < state.template.position.length; i += 3) {
@@ -16282,7 +16345,7 @@
     );
     state.mesh.geometry.drawRange.count = count;
     state.mesh.extras.dynamicLights = true;
-    trafficBounds(state);
+    trafficBounds2(state);
   }
 
   // src/traffic/trafficStorage.js
@@ -16688,7 +16751,7 @@
     groundTraffic(state);
     disposeTrafficObject(state, state.route);
     state.route = null;
-    if (state.mesh) trafficBounds(state);
+    if (state.mesh) trafficBounds2(state);
     if (!state.frame) state.tick();
   }
 

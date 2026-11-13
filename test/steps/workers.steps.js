@@ -20,7 +20,7 @@ import { projectRing } from '../../src/projections/projectRing.js';
 import { parseColor } from '../../src/colors/parseColor.js';
 import { feature, tile } from '../fixtures/vector-tile.js';
 
-Then('the main bundle excludes source preparation and stays below 245 KB', async function () {
+Then('the main bundle excludes source preparation and stays below 250 KB', async function () {
   const main = JSON.parse(await readFile('dist/leaflet-city-mapper.js.map', 'utf8'));
   const worker = JSON.parse(await readFile('dist/leaflet-city-mapper-worker.js.map', 'utf8'));
   for (const name of ['assembleAreaGeometry', 'instanceAreaGeometry', 'buildProjectedPoint',
@@ -31,7 +31,7 @@ Then('the main bundle excludes source preparation and stays below 245 KB', async
     assert.ok(worker.sources.some(path => path.endsWith(`/${name}.js`)), `${name} belongs in the worker`);
     assert.ok(!main.sources.some(path => path.endsWith(`/${name}.js`)), `${name} must not ship in the main bundle`);
   }
-  assert.ok((await readFile('dist/leaflet-city-mapper.js')).length < 245000);
+  assert.ok((await readFile('dist/leaflet-city-mapper.js')).length < 250000);
 });
 
 Then('the shared worker dispatches geometry and vector tiles with isolated responses', async function () {

@@ -719,7 +719,7 @@ Then('module constants and state use dedicated global modules', { timeout: 30000
   assert.ok(!(await readdir('src')).includes('constants'), 'src/constants must not be reintroduced');
   assert.ok(!(await readdir('src')).includes('state.js'), 'The shared state aggregator must not be reintroduced');
   for (const directory of ['globals', 'weakmaps']) {
-    for (const file of await readdir(`src/${directory}`)) {
+    for (const file of (await readdir(`src/${directory}`)).filter(name => name.endsWith('.js'))) {
       const module = await import(`../../src/${directory}/${file}`);
       assert.deepEqual(Object.keys(module), [file.replace(/\.js$/, '')]);
     }
