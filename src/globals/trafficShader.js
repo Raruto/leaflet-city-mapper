@@ -1,4 +1,8 @@
-// One workgroup per vehicle shares its lane lookup and pose across all model vertices.
+/**
+ * Compute shader for vehicle poses; one workgroup shares lane lookup across model vertices.
+ *
+ * @type {string}
+ */
 export const trafficShader = /* wgsl */`
   struct Params { seconds: f32, side: f32, vertices: u32, total: u32 }
   struct Vehicle { start: u32, count: u32, base: f32, speed: f32 }

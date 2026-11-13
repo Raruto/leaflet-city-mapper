@@ -1,3 +1,8 @@
+/**
+ * Typed array constructors indexed by glTF accessor component type.
+ *
+ * @type {Object<number, Function>}
+ */
 export const types = {
   5120: Int8Array,
   5121: Uint8Array,

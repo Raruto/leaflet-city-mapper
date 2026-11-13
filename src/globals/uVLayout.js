@@ -1,3 +1,8 @@
+/**
+ * WebGPU vertex buffer layout for two-component texture coordinates.
+ *
+ * @type {Object}
+ */
 export const uVLayout = Object.freeze({
   arrayStride: 8,
   attributes: Object.freeze([Object.freeze({

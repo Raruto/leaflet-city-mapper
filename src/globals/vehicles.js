@@ -9,6 +9,8 @@ import { boatModel } from '../vehicles/boatModel.js';
 /**
  * `side`: default offset (metres) to the right of the lane centreline. `model(i)` gives the prisms of the i-th vehicle.
  * `lights`: night point lights in model space (see the night lighting grid), e.g. the pool cast by the headlights.
+ *
+ * @type {Object<string, Object>}
  */
 export const vehicles = {
   bicycle: {

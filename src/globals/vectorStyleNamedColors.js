@@ -1,3 +1,8 @@
+/**
+ * Supported named vector style colors as red, green, blue and alpha values.
+ *
+ * @type {Object<string, Array<number>>}
+ */
 export const vectorStyleNamedColors = {
   black: [0, 0, 0, 1],
   white: [255, 255, 255, 1],
