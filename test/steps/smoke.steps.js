@@ -44,7 +44,7 @@ async function trackArchiveCancellations(page) {
 }
 
 async function unexpectedRequestFailures(page, failures) {
-  const cancelled = new Set(await page.evaluate(() => globalThis.smokeCancelledArchives));
+  const cancelled = new Set(await page.evaluate(() => globalThis.smokeCancelledArchives || []));
   return failures.filter(({ type, error, id }) =>
     !(type === 'image' && error === 'net::ERR_ABORTED') &&
     !(type === 'fetch' && error === 'net::ERR_ABORTED' && id && cancelled.has(id)))
@@ -146,11 +146,12 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
       page.locator('.leaflet-container').first().waitFor({ state: 'attached', timeout: 8000 }),
     ]);
     await page.waitForTimeout(1000);
-    errors.push(...await unexpectedRequestFailures(page, failures));
-    assert.ok(!errors.length, errors.join('\n'));
+    const allErrors = [...errors, ...await unexpectedRequestFailures(page, failures)];
+    assert.ok(!allErrors.length, allErrors.join('\n'));
     if (googleKeyWarning) console.log('Google Maps API-key warning ignored: API key not configured');
   } catch (error) {
-    if (errors.length) throw new Error(`${error.message}\n${errors.join('\n')}`, { cause: error });
+    const allErrors = [...errors, ...await unexpectedRequestFailures(page, failures)];
+    if (allErrors.length) throw new Error(`${error.message}\n${allErrors.join('\n')}`, { cause: error });
     throw error;
   } finally {
     page.removeAllListeners();
