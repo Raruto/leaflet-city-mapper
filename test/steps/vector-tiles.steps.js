@@ -205,7 +205,9 @@ Then('vector tile sources switch without mixing layers or requests', { timeout: 
       const source = Object.values(map._layers).find(layer => layer.tiles);
       return source && source.options.attribution === 'OpenFreeMap test' && !source.inflight &&
         source.labelsReady && source.labels.size &&
-        [...source.tiles.values()].every(tile => tile.group);
+        [...source.tiles.values()].every(tile => tile.group) &&
+        [...source.tiles.values()].some(tile => tile.group.getLayers().some(layer =>
+          layer instanceof L.Polygon && globals.sceneByLayer.get(layer).renderer));
     });
     const switched = await this.page.evaluate(() => {
       const source = Object.values(map._layers).find(layer => layer.tiles);

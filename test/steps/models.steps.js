@@ -411,6 +411,15 @@ Then('the failed model has no attached geometry', function () {
 });
 
 When('I hover and click the Eiffel Tower in the 3D example', { timeout: 30000 }, async function () {
+  await this.page.waitForFunction(() => {
+    const tower = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer).model)?.layer;
+    if (!tower || !globals.sceneByLayer.get(tower).renderer) return false;
+    let visible = false;
+    nativeChecks.graph.traverse(globals.sceneByLayer.get(tower).model, mesh => {
+      if (mesh.geometry && mesh.visible && mesh._appearance > 0) visible = true;
+    });
+    return visible;
+  });
   const target = await this.page.evaluate(() => {
     const tower = layers._layers.find(entry => globals.sceneByLayer.get(entry.layer).model).layer;
     nativeChecks.render.render(globals.sceneByLayer.get(tower)._shared);
