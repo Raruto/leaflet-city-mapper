@@ -1,5 +1,13 @@
 Feature: Standalone WebGPU camera with Leaflet as its only dependency
   @unit
+  Scenario: Camera depth distinguishes terrain overlays at overview zoom
+    Then camera depth separates metre-offset terrain and retains close-up clipping
+
+  Scenario: Terrain overlays retain their rendered coverage at overview zoom
+    Given the Matterhorn example is open with flat offline elevation and satellite tiles
+    Then a metre-offset track preserves its pixels with terrain depth testing
+
+  @unit
   Scenario: Direct camera state updates retain the scheduled animation
     Then the camera WeakMap stores the same animation that is scheduled
 

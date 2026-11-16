@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { AfterAll, Before, Then } from '@cucumber/cucumber';
 import { startServer } from '../../build/server.js';
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { swiftShaderArgs } from '../fixtures/browser-environment.js';
 
 const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -55,7 +57,9 @@ Before({ tags: '@smoke', timeout: 30000 }, async function () {
     server = await startServer(0, { watch: true });
     base = `http://127.0.0.1:${server.address().port}`;
     browser = await chromium.launch({
-      args: process.platform === 'linux' && process.env.CI ? swiftShaderArgs
+      ...(process.platform === 'win32' ? { channel: 'chromium' } : {}),
+      args: process.platform === 'win32' ? ['--disable-gpu-process-for-dx12-info-collection']
+        : process.platform === 'linux' && process.env.CI ? swiftShaderArgs
         : ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
     });
   }
@@ -119,6 +123,27 @@ Then('development pages rewrite CDN URLs without changing files', { timeout: 300
 
 Then('the example {string} loads without browser errors', { timeout: 30000 }, async function (example) {
   const page = await browser.newPage();
+  if (example === 'leaflet-city-mapper-elevation.html') {
+    const tile = new PNG({ width: 512, height: 512 });
+    for (let i = 0; i < tile.data.length; i += 4) tile.data.set([128, 0, 0, 255], i);
+    const image = PNG.sync.write(tile);
+    await page.route(/^https:\/\/(?!unpkg\.com\/)/, route => route.fulfill({
+      contentType: 'image/png', body: image, headers: { 'access-control-allow-origin': '*' },
+    }));
+    await page.route('https://raruto.github.io/leaflet-elevation/examples/demo.geojson', route =>
+      process.env.LEAFLET_ELEVATION_FOLDER
+        ? route.fulfill({ path: path.join(process.env.LEAFLET_ELEVATION_FOLDER, 'examples', 'demo.geojson'),
+          headers: { 'access-control-allow-origin': '*' } })
+        : route.continue());
+    if (process.env.LEAFLET_ELEVATION_FOLDER) {
+      const { useCachedUnpkg } = await import(pathToFileURL(path.join(process.env.LEAFLET_ELEVATION_FOLDER, 'test', 'support', 'unpkg.js')).href);
+      await useCachedUnpkg(page);
+      await page.route(/^https:\/\/unpkg\.com\/@raruto\/leaflet-elevation@[^/]+\//, route => route.fulfill({
+        path: path.join(process.env.LEAFLET_ELEVATION_FOLDER, new URL(route.request().url()).pathname.replace(/^\/@raruto\/leaflet-elevation@[^/]+\//, '')),
+        headers: { 'access-control-allow-origin': '*' },
+      }));
+    }
+  }
   const errors = [];
   const failures = await trackArchiveCancellations(page);
   let googleKeyWarning = false;
@@ -153,6 +178,11 @@ Then('the example {string} loads without browser errors', { timeout: 30000 }, as
       page.locator('.leaflet-container').first().waitFor({ state: 'attached', timeout: 8000 }),
     ]);
     await page.waitForTimeout(1000);
+    if (example === 'leaflet-city-mapper-elevation.html') {
+      await page.waitForFunction(() => window.controlElevation?._data.length > 0 &&
+        controlElevation._chart?._paths.altitude.getAttribute('d').includes('L') &&
+        document.querySelector('#map canvas.leaflet-3d'), null, { timeout: 8000 });
+    }
     const allErrors = [...errors, ...await unexpectedRequestFailures(page, failures)];
     assert.ok(!allErrors.length, allErrors.join('\n'));
     if (googleKeyWarning) console.log('Google Maps API-key warning ignored: API key not configured');

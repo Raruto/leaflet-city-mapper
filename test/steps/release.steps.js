@@ -1,9 +1,61 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import childProcess, { spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Then } from '@cucumber/cucumber';
+import { prepareIntegration } from '../../build/prepareIntegration.js';
+
+Then('integration preparation builds elevation once and propagates setup failures', async function () {
+  const keys = ['CI', 'LEAFLET_ELEVATION_FOLDER', 'LEAFLET_CITY_MAPPER_FOLDER', 'INTEGRATION_CACHE_READY'];
+  const saved = new Map(keys.map(key => [key, process.env[key]]));
+  const spawn = childProcess.spawnSync, folders = [], calls = [];
+  let failed = false;
+  childProcess.spawnSync = (command, args, options) => {
+    calls.push({ command, args, options });
+    if (command === 'git') {
+      const folder = args.at(-1);
+      folders.push(folder);
+      mkdirSync(join(folder, 'test', 'support'), { recursive: true });
+      writeFileSync(join(folder, 'package.json'), '{"type":"module"}');
+      writeFileSync(join(folder, 'test', 'support', 'unpkg.js'),
+        'export async function downloadAssets() { if (!process.env.LEAFLET_CITY_MAPPER_FOLDER) throw new Error("Missing local city mapper"); process.env.INTEGRATION_CACHE_READY = "true"; }');
+    }
+    return { status: failed ? 1 : 0 };
+  };
+  syncBuiltinESMExports();
+  try {
+    for (const key of keys) delete process.env[key];
+    await prepareIntegration();
+    assert.equal(calls.length, 0);
+    process.env.CI = 'true';
+    await prepareIntegration();
+    assert.equal(calls.length, 3);
+    assert.deepEqual(calls[0].args.slice(0, -1), [
+      'clone', '--depth', '1', '--branch', 'master', 'https://github.com/Raruto/leaflet-elevation.git',
+    ]);
+    assert.deepEqual(calls.slice(1).map(call => call.args), [['ci'], ['run', 'build']]);
+    assert.ok(calls.slice(1).every(call => call.options.cwd === folders[0]));
+    assert.equal(process.env.LEAFLET_ELEVATION_FOLDER, folders[0]);
+    assert.equal(process.env.INTEGRATION_CACHE_READY, 'true');
+    await prepareIntegration();
+    assert.equal(calls.length, 3, 'Explicit checkouts must not be cloned or rebuilt');
+    delete process.env.LEAFLET_ELEVATION_FOLDER;
+    failed = true;
+    await assert.rejects(prepareIntegration(), /Integration setup failed: git/);
+    assert.equal(process.env.LEAFLET_ELEVATION_FOLDER, undefined);
+  } finally {
+    childProcess.spawnSync = spawn;
+    syncBuiltinESMExports();
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    for (const folder of folders) await rm(folder, { recursive: true, force: true });
+  }
+});
 
 Then('npm version fails without changing the package unless scripts are explicitly disabled', async function () {
   const root = await mkdtemp(join(tmpdir(), 'city-mapper-version-'));

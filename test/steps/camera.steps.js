@@ -11,6 +11,61 @@ import { mapAnimateCamera } from '../../src/animations/mapAnimateCamera.js';
 import { cancelCameraAnimation } from '../../src/animations/cancelCameraAnimation.js';
 import { cameraAnimationByMap } from '../../src/weakmaps/cameraAnimationByMap.js';
 import { cameraFrameByMap } from '../../src/weakmaps/cameraFrameByMap.js';
+import { updateMapCamera } from '../../src/camera/updateMapCamera.js';
+import { cameraByLayer } from '../../src/weakmaps/cameraByLayer.js';
+import { sceneOriginByLayer } from '../../src/weakmaps/sceneOriginByLayer.js';
+import { cameraPitchByMap } from '../../src/weakmaps/cameraPitchByMap.js';
+import { mapMethods } from '../../src/globals/mapMethods.js';
+
+Then('camera depth separates metre-offset terrain and retains close-up clipping', function () {
+  // Only projection depth is under test; view-matrix operations are not consumed.
+  class ViewMatrix {
+    invertSelf() { return this; }
+    multiplySelf() { return this; }
+  }
+  const previousMatrix = Object.getOwnPropertyDescriptor(globalThis, 'DOMMatrix');
+  const previousMethods = mapMethods.value;
+  const layer = {}, origin = { lat: 45, lng: 0 };
+  let zoom;
+  const map = { options: { crs: { scale: zoom => 256 * 2 ** zoom } },
+    getZoom: () => zoom, getCenter: () => origin, getPixelOrigin: () => ({ x: 0, y: 0 }),
+    project: () => ({ subtract: () => ({ x: 0, y: 0 }) }) };
+  layer._map = map;
+  const camera = { position: [0, 0, 0], target: [0, 0, 0], up: [0, 0, 0],
+    viewMatrix: new Float64Array(16), projectionMatrix: new Float64Array(16),
+    projectionViewMatrix: new Float64Array(16) };
+  Object.defineProperty(globalThis, 'DOMMatrix', { configurable: true, value: ViewMatrix });
+  mapMethods.value = { layerPointToContainerPoint: point => point };
+  sceneOriginByLayer.set(layer, origin);
+  cameraByLayer.set(layer, camera);
+  cameraPitchByMap.set(map, 45);
+  try {
+    for (zoom of [10, 13, 18, 24]) {
+      if (zoom === 24) globals.walkByMap.set(map, { control: { _walk: { saved: true, state: { height: 1.7 } } } });
+      updateMapCamera(layer, { x: 640, y: 480 });
+      const projection = Float32Array.from(camera.projectionMatrix);
+      const distance = Math.hypot(...camera.position.map((value, i) => value - camera.target[i]));
+      const groundDepth = -projection[10] + projection[14] / distance;
+      const overlayDepth = -projection[10] + projection[14] / (distance - Math.SQRT1_2);
+      assert.ok(groundDepth > 0 && groundDepth < 1 && overlayDepth > 0 && overlayDepth < groundDepth);
+      assert.ok((groundDepth - overlayDepth) * (2 ** 24 - 1) > 1,
+        `one metre of terrain clearance loses depth precision at zoom ${zoom}`);
+      if (zoom === 24) {
+        const closeDepth = -projection[10] + projection[14] / 0.2;
+        assert.ok(closeDepth > 0 && closeDepth < 1, 'nearby walking geometry must remain inside the frustum');
+        assert.equal(camera.target[1], 1.7);
+      }
+    }
+  } finally {
+    cameraByLayer.delete(layer);
+    sceneOriginByLayer.delete(layer);
+    cameraPitchByMap.delete(map);
+    globals.walkByMap.delete(map);
+    mapMethods.value = previousMethods;
+    if (previousMatrix) Object.defineProperty(globalThis, 'DOMMatrix', previousMatrix);
+    else delete globalThis.DOMMatrix;
+  }
+});
 
 Then('the camera WeakMap stores the same animation that is scheduled', function () {
   const names = ['matchMedia', 'requestAnimationFrame', 'cancelAnimationFrame'];

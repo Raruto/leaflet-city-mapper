@@ -10,14 +10,14 @@ import { nativeTerrainElevation } from './nativeTerrainElevation.js';
  * @returns {number|null} Elevation, or null when no sample is available.
  */
 export function gridTerrainElevation(state, location) {
+  const rendered = nativeTerrainElevation(state, location);
+  if (Number.isFinite(rendered)) return rendered;
   let z = Math.max(0, Math.min(24, Math.round(state.map.getZoom())));
   const tiles = /* alloc */ new Map();
   let point, limit, x, y, index, dx, dy, tx, ty, entry, elevation;
   for (; z >= 0; z--) {
     point = state.map.project(location, z), limit = 2 ** z;
     x = Math.floor(point.x / 256), y = Math.floor(point.y / 256);
-    elevation = nativeTerrainElevation(state, point, x, y, z);
-    if (Number.isFinite(elevation)) return elevation;
     tiles.clear();
     for (index = 0; index < 9; index++) {
       dx = index % 3 - 1;

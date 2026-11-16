@@ -1,3 +1,7 @@
+import { geometryPixelStates } from '../globals/geometryPixelStates.js';
+import { localPixelForGeometry } from '../projections/localPixelForGeometry.js';
+import { appendTerrainTriangle } from './appendTerrainTriangle.js';
+
 /**
  * Project three native vertices and append them to a destination array.
  *
@@ -13,5 +17,9 @@
  * @returns {number} New destination length.
  */
 export function triangle(point, target, a, b, c, anchorA, anchorB, anchorC) {
+  const state = geometryPixelStates[geometryPixelStates.length - 1];
+  if (state?.terrainBounds && point === localPixelForGeometry) {
+    return appendTerrainTriangle(state, point, target, a, b, c);
+  }
   return target.push(...point(a, anchorA), ...point(b, anchorB), ...point(c, anchorC));
 }

@@ -9,12 +9,13 @@ Feature: Example smoke tests
   Scenario: Development URLs are rewritten only in served HTML
     Then development pages rewrite CDN URLs without changing files
 
-  Scenario Outline: An example loads without browser errors
+  Scenario Outline: An example loads without browser errors (<example>)
     Then the example "<example>" loads without browser errors
 
     Examples:
       | example |
       | leaflet-city-mapper.html |
+      | leaflet-city-mapper-elevation.html |
       | leaflet-city-mapper-matterhorn.html |
       | leaflet-city-mapper-native.html |
       | leaflet-city-mapper-rome.html |

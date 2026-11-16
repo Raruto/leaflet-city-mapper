@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { build } from './build.js';
+import { prepareIntegration } from './prepareIntegration.js';
 import { prepareDependencies } from '../test/fixtures/dependencies.js';
 
 await prepareDependencies({ download: true });
 await build();
+await prepareIntegration();
 const args = process.argv.slice(2);
 
 for (const version of ['1', '2']) {

@@ -25,11 +25,208 @@ async function waitForTerrain(page) {
     });
 }
 
-Given('the Matterhorn example is open with offline elevation and satellite tiles', { timeout: 30000 }, async function () {
+async function terrainTrackClearance(zoom) {
+  if (Number.isFinite(zoom)) {
+    return new Promise((resolve, reject) => {
+      map.once('zoomanim', () => requestAnimationFrame(() => terrainTrackClearance().then(resolve, reject)));
+      map.setZoom(zoom, { animate: true });
+    });
+  }
+  const animating = Boolean(map._animatingZoom);
+  const state = globals.sceneByLayer.get(terrainTrack)._nativeGPU;
+  const positions = state.meshes.get('stroke').geometry.attributes.position.data;
+  const location = testWeakmaps.locationByLayer.get(state.backend);
+  const origin = map.options.crs.project(location), metres = Math.cos(location.lat * Math.PI / 180);
+  const root = testWeakmaps.rootByLayer.get(state.backend);
+  const gridLayer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+  const grid = globals.sceneByLayer.get(gridLayer)._nativeGPU;
+  const groundRoot = testWeakmaps.rootByLayer.get(grid.backend);
+  let minGap = Infinity, maxGap = -Infinity, samples = 0;
+  for (let i = 0; i < positions.length; i += 9) {
+    const x = (positions[i] + positions[i + 3] + positions[i + 6]) / 3;
+    const y = (positions[i + 1] + positions[i + 4] + positions[i + 7]) / 3;
+    const z = (positions[i + 2] + positions[i + 5] + positions[i + 8]) / 3;
+    const latlng = map.options.crs.unproject(new L.Point(origin.x + x / metres, origin.y - z / metres));
+    let ground = -Infinity;
+    for (const mesh of grid.meshes.values()) {
+      if (!mesh._terrainRequest) continue;
+      const tile = mesh._terrainRequest.tile.coords, pixel = map.project(latlng, tile.z);
+      const tx = pixel.x - tile.x * 256, ty = pixel.y - tile.y * 256;
+      if (tx < 0 || tx > 256 || ty < 0 || ty > 256) continue;
+      const col = Math.min(31, Math.floor(tx / 8)), row = Math.min(31, Math.floor(ty / 8));
+      const u = tx / 8 - col, v = ty / 8 - row, values = mesh.geometry.attributes.position.data;
+      const index = (row * 32 + col) * 18;
+      const elevation = u + v <= 1 ?
+        values[index + 1] * (1 - u - v) + values[index + 4] * v + values[index + 7] * u :
+        values[index + 10] * (1 - v) + values[index + 13] * (1 - u) + values[index + 16] * (u + v - 1);
+      ground = Math.max(ground, groundRoot.position[1] + elevation * groundRoot.scale[1]);
+    }
+    if (!Number.isFinite(ground)) continue;
+    const gap = root.position[1] + y * root.scale[1] - ground;
+    minGap = Math.min(minGap, gap);
+    maxGap = Math.max(maxGap, gap);
+    samples++;
+  }
+  const pixels = await nativeChecks.pixels(globals.renderers.get(map));
+  let red = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i] > 200 && pixels[i + 1] < 80 && pixels[i + 2] < 80) red++;
+  }
+  return { minGap, maxGap, samples, red, animating,
+    levels: [...new Set([...grid.meshes.values()].filter(mesh => mesh._terrainRequest)
+      .map(mesh => mesh._terrainRequest.tile.coords.z))] };
+}
+
+Then('a native track remains visible on the streamed terrain', { timeout: 30000 }, async function () {
+    await waitForTerrain(this.page);
+    await this.page.evaluate(() => {
+      window.terrainTrack = new L.Polyline([[45.972, 7.645], [45.980, 7.675]],
+        { color: '#ff0000', weight: 8, opacity: 1 }).addTo(map);
+    });
+    await this.page.waitForFunction(() => {
+      const state = globals.sceneByLayer.get(terrainTrack)._nativeGPU;
+      return state?.meshes?.get('stroke')?.geometry.attributes.position.data.length > 0;
+    });
+    await this.page.evaluate(async () => {
+      const state = globals.sceneByLayer.get(terrainTrack)._nativeGPU;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await globals.sceneByLayer.get(state.backend).renderer.device.queue.onSubmittedWorkDone();
+    });
+    const result = await this.page.evaluate(async () => {
+      const state = globals.sceneByLayer.get(terrainTrack)._nativeGPU;
+      const heights = state.meshes.get('stroke').geometry.attributes.position.data.filter((_, i) => i % 3 === 1);
+      const positions = state.meshes.get('stroke').geometry.attributes.position.data;
+      const origin = map.options.crs.project(testWeakmaps.locationByLayer.get(state.backend));
+      const metres = Math.cos(testWeakmaps.locationByLayer.get(state.backend).lat * Math.PI / 180);
+      const root = testWeakmaps.rootByLayer.get(state.backend);
+      let error = 0;
+      for (let i = 0; i < positions.length; i += 9) {
+        const x = (positions[i] + positions[i + 3] + positions[i + 6]) / 3;
+        const y = (positions[i + 1] + positions[i + 4] + positions[i + 7]) / 3;
+        const z = (positions[i + 2] + positions[i + 5] + positions[i + 8]) / 3;
+        const location = map.options.crs.unproject(new L.Point(origin.x + x / metres, origin.y - z / metres));
+        const ground = nativeCheckModules.mapElevationOf(map, location);
+        error = Math.max(error, Math.abs(root.position[1] + y * root.scale[1] - ground - 1));
+      }
+      const pixels = await nativeChecks.pixels(globals.renderers.get(map));
+      let red = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] > 200 && pixels[i + 1] < 80 && pixels[i + 2] < 80) red++;
+      }
+      return { min: Math.min(...heights), max: Math.max(...heights), red, error, vertices: positions.length / 3 };
+    });
+    assert.ok(result.min !== 0 || result.max !== 0, `track stayed on the flat plane: ${JSON.stringify(result)}`);
+    assert.ok(result.red > 20, `track is hidden by the terrain: ${JSON.stringify(result)}`);
+    assert.ok(result.error < 0.1, `track triangles cut through the rendered terrain: ${JSON.stringify(result)}`);
+});
+
+Then('native tracks stay on terrain when basemaps use different latitude origins', { timeout: 30000 }, async function () {
+  for (const latitude of [46.25, 45.75]) {
+    await this.page.evaluate(latitude => {
+      if (window.terrainTrack) terrainTrack.remove();
+      const previous = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+      map.setView([latitude, 7.6586], 13, { animate: false });
+      previous.remove();
+      new L.TileLayer(previous._url, { ...previous.options }).addTo(map);
+    }, latitude);
+    await waitForTerrain(this.page);
+    const scale = await this.page.evaluate(() => {
+      const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+      const state = globals.sceneByLayer.get(layer)._nativeGPU;
+      const center = map.getCenter();
+      window.terrainTrack = new L.Polyline([[center.lat - 0.004, center.lng - 0.012],
+        [center.lat + 0.004, center.lng + 0.012]], { color: '#ff0000', weight: 8, opacity: 1 }).addTo(map);
+      return testWeakmaps.rootByLayer.get(state.backend).scale[1];
+    });
+    assert.ok(Math.abs(scale - 1) > 0.003, `the basemap must have a different origin: ${scale}`);
+    await this.page.waitForFunction(() => globals.sceneByLayer.get(terrainTrack)._nativeGPU?.meshes?.has('stroke'));
+    const result = await this.page.evaluate(terrainTrackClearance);
+    assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
+      `latitude scaling changed the rendered terrain height: ${JSON.stringify({ latitude, scale, ...result })}`);
+    assert.ok(result.red > 20, `the basemap hides the track: ${JSON.stringify(result)}`);
+  }
+});
+
+Then('a native track follows rendered terrain throughout zoom transitions', { timeout: 30000 }, async function () {
+  await waitForTerrain(this.page);
+  await this.page.evaluate(() => {
+    window.terrainTrack = new L.Polyline([[45.972, 7.645], [45.980, 7.675]],
+      { color: '#ff0000', weight: 8, opacity: 1 }).addTo(map);
+  });
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(terrainTrack)._nativeGPU?.meshes?.has('stroke'));
+  this.matterhornDetail.delayed = true;
+  const initialZoom = await this.page.evaluate(() => map.getZoom());
+  this.matterhornDetail.delayColumn = await this.page.evaluate(zoom =>
+    Math.floor(map.project(map.getCenter(), zoom).x / 256), initialZoom);
+  for (const zoom of [initialZoom + 1, initialZoom]) {
+    const first = await this.page.evaluate(terrainTrackClearance, zoom);
+    assert.ok(first.animating, 'the check must cover the active zoom animation');
+    for (let i = 0; i < 6; i++) {
+      await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const result = await this.page.evaluate(terrainTrackClearance);
+      assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
+        `track does not follow rendered terrain during zoom ${zoom}: ${JSON.stringify(result)}`);
+      assert.ok(result.red > 20, `track disappeared during zoom ${zoom}: ${JSON.stringify(result)}`);
+      assert.equal(result.levels.length, 1, 'overlapping terrain levels must not occlude the replacement track');
+    }
+    if (zoom > initialZoom) {
+      await this.page.waitForFunction(zoom => {
+        const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+        const requests = [...globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests.values()]
+          .filter(request => request.tile.coords.z === zoom);
+        return requests.some(request => request.tiles) && requests.some(request => !request.tiles);
+      }, zoom);
+      const partial = await this.page.evaluate(terrainTrackClearance);
+      assert.deepEqual(partial.levels, [initialZoom], 'partial replacements must leave the outgoing terrain intact');
+      assert.ok(partial.minGap > 0.8 && partial.maxGap < 1.2 && partial.red > 20,
+        `track detached while only part of the incoming terrain was ready: ${JSON.stringify(partial)}`);
+    }
+    await waitForTerrain(this.page);
+    const result = await this.page.evaluate(terrainTrackClearance);
+    assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
+      `track does not follow replacement terrain: ${JSON.stringify(result)}`);
+  }
+});
+
+Then('a metre-offset track preserves its pixels with terrain depth testing', { timeout: 30000 }, async function () {
+  await this.page.evaluate(() => map.setZoom(10, { animate: false }));
+  await waitForTerrain(this.page);
+  await this.page.evaluate(() => {
+    const center = map.getCenter();
+    window.terrainTrack = new L.Polyline([[center.lat - 0.06, center.lng - 0.12],
+      [center.lat + 0.06, center.lng + 0.12]], { color: '#ff0000', weight: 8, opacity: 1 }).addTo(map);
+  });
+  await this.page.waitForFunction(() => globals.sceneByLayer.get(terrainTrack)._nativeGPU?.meshes?.has('stroke'));
+  const result = await this.page.evaluate(async () => {
+    const owner = globals.renderers.get(map);
+    const program = globals.sceneByLayer.get(terrainTrack)._nativeGPU.meshes.get('stroke').program;
+    const actual = await nativeChecks.pixels(owner), original = program.depthTest;
+    let reference;
+    try {
+      program.depthTest = false;
+      reference = await nativeChecks.pixels(owner);
+    } finally {
+      program.depthTest = original;
+      nativeChecks.render.render(owner);
+    }
+    let expected = 0, retained = 0;
+    for (let i = 0; i < reference.length; i += 4) {
+      if (reference[i] <= 200 || reference[i + 1] >= 40 || reference[i + 2] >= 40) continue;
+      expected++;
+      if (actual[i] > 200 && actual[i + 1] < 40 && actual[i + 2] < 40) retained++;
+    }
+    return { expected, retained, coverage: retained / expected };
+  });
+  assert.ok(result.expected > 100, `the reference must contain a visible track: ${JSON.stringify(result)}`);
+  assert.ok(result.coverage > 0.99, `depth quantization fragments the track: ${JSON.stringify(result)}`);
+});
+
+Given(/^the Matterhorn example is open with (flat )?offline elevation and satellite tiles$/, { timeout: 30000 }, async function (flat) {
     await this.page.setViewportSize({ width: 640, height: 480 });
     const terrain = new PNG({ width: 512, height: 512 });
     for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
-      terrain.data.set([128 + Math.floor(x / 256) + 2 * Math.floor(y / 256), 10, 128, 255], (y * 512 + x) * 4);
+      terrain.data.set(flat ? [129, 244, 0, 255] :
+        [128 + Math.floor(x / 256) + 2 * Math.floor(y / 256), 10, 128, 255], (y * 512 + x) * 4);
     }
     const ground = new PNG({ width: 256, height: 256 });
     ground.data.fill(255);
@@ -45,7 +242,10 @@ Given('the Matterhorn example is open with offline elevation and satellite tiles
       requests.push(route.request().url());
       if (route.request().url().endsWith('/0/0/0.webp')) return route.fulfill({ status: 503 });
       if (this.matterhornDetail.delayed && /\/14\/\d+\/\d+\.webp$/.test(route.request().url())) {
-        await new Promise(resolve => setTimeout(resolve, 3500));
+        const column = Number(route.request().url().split('/').at(-2));
+        if (this.matterhornDetail.delayColumn === undefined || column >= this.matterhornDetail.delayColumn) {
+          await new Promise(resolve => setTimeout(resolve, 3500));
+        }
       }
       return route.fulfill({ contentType: 'image/png', body: terrainImage, headers: { 'Access-Control-Allow-Origin': '*' } });
     });

@@ -14,6 +14,7 @@ _For a working example see one of the following demos:_
 - [City of Paris in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper.html)
 - [Ancient Rome in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-rome.html)
 - [Matterhorn in 3D](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-matterhorn.html)
+- [Elevation profile on a 3D map](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-elevation.html)
 - [Native Leaflet layers on WebGPU](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-native.html)
 - [Vector tiles](https://raruto.github.io/leaflet-city-mapper/examples/leaflet-city-mapper-vector-tiles.html)
 
@@ -90,7 +91,7 @@ After that you can start developing inside the `src` folder (eg. open "http://lo
 
 ### Repository guidance
 
-Folders structure and other conventions are documented in [here](.github/copilot-instructions.md).
+Repository layout and contributor conventions are documented in [AGENTS.md](./AGENTS.md).
 
 ---
 

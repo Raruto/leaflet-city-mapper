@@ -25,7 +25,6 @@ export async function loadGridTerrain(state, key, tile, request) {
     for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) tiles.set(`${x + dx}/${y + dy}`, values[i++]);
     request.tiles = tiles;
     refreshNativeLayer(state);
-    state.map.fire('terrainchange');
     state.source._update();
   } catch (error) {
     if (!state.disposed && !stream.terrainController.signal.aborted && state.source._tiles[key] === tile) {

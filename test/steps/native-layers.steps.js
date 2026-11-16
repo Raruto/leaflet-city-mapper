@@ -13,6 +13,124 @@ import { nativeGPUOrderByMap } from '../../src/weakmaps/nativeGPUOrderByMap.js';
 import { nativeGPUBackByMap } from '../../src/weakmaps/nativeGPUBackByMap.js';
 import { eventMapByLayer } from '../../src/weakmaps/eventMapByLayer.js';
 import { eventsByLayer } from '../../src/weakmaps/eventsByLayer.js';
+import { appendTerrainTriangle } from '../../src/geometry/appendTerrainTriangle.js';
+import { gridTerrainElevation } from '../../src/native/gridTerrainElevation.js';
+import { terrainGridMesh } from '../../src/native/terrainGridMesh.js';
+import { rootByLayer } from '../../src/weakmaps/rootByLayer.js';
+import { locationByLayer } from '../../src/weakmaps/locationByLayer.js';
+
+Then('native terrain mesh heights ignore latitude scaling and root altitude', function () {
+  class GridLayer { constructor() { this.options = {}; } }
+  class Image { constructor() { this.src = 'terrain.png'; } }
+  const previous = mockLeaflet({ GridLayer });
+  const previousImage = Object.getOwnPropertyDescriptor(globalThis, 'HTMLImageElement');
+  Object.defineProperty(globalThis, 'HTMLImageElement', { configurable: true, value: Image });
+  const backend = {}, image = new Image(), key = '0:0:1';
+  const texture = { image, uploaded: image, url: image.src };
+  const mesh = { geometry: { attributes: { position: { data: new Float32Array(32 * 32 * 6 * 3) } } },
+    program: { depthWrite: true, _layerMaterial: {}, uniforms: {
+      baseTexture: { value: texture }, baseColor: {}, opacity: {},
+    } } };
+  const state = { backend, source: new GridLayer(), paneOrder: 0, order: 0,
+    textures: new Map([[key, texture]]), meshes: new Map([[key, mesh]]),
+    map: { options: { crs: { project: point => ({ x: point.lng, y: point.lat }) } },
+      unproject: point => ({ lat: point[1], lng: point[0] }) } };
+  const tiles = new Map(), data = new Float32Array(256 * 256).fill(800);
+  for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) tiles.set(`${x}/${y}`, data);
+  const tile = { el: image, coords: { x: 0, y: 0, z: 1 } }, request = { tile, tiles };
+  locationByLayer.set(backend, { lat: 45, lng: 0 });
+  try {
+    for (const scale of [1, 1.005, 0.995]) {
+      const root = { position: [0, 25, 0], scale: [scale, scale, scale] };
+      rootByLayer.set(backend, root);
+      assert.equal(terrainGridMesh(state, key, tile, request, 1), mesh);
+      const positions = mesh.geometry.attributes.position.data;
+      for (let i = 1; i < positions.length; i += 3) {
+        assert.ok(Math.abs(root.position[1] + positions[i] * scale - 800) < 0.0001,
+          `terrain height changed at root scale ${scale}: ${positions[i]}`);
+      }
+    }
+  } finally {
+    rootByLayer.delete(backend);
+    locationByLayer.delete(backend);
+    mockLeaflet(previous);
+    if (previousImage) Object.defineProperty(globalThis, 'HTMLImageElement', previousImage);
+    else delete globalThis.HTMLImageElement;
+  }
+});
+
+Then('native terrain sampling keeps retained surfaces until their replacement is rendered', function () {
+  const layer = { _tiles: {} };
+  const map = { _layers: { grid: layer }, getZoom: () => 15,
+    project: (location, zoom) => ({ x: location.x * 2 ** (zoom - 14), y: location.y * 2 ** (zoom - 14) }) };
+  const state = { map, terrainCache: new Map() };
+  const coarse = { tile: { coords: { x: 0, y: 0, z: 14 } },
+    tiles: new Map([['0/0', new Float32Array(256 * 256).fill(100)]]) };
+  const fine = { tile: { coords: { x: 0, y: 0, z: 15 } },
+    tiles: new Map([['0/0', new Float32Array(256 * 256).fill(200)]]) };
+  const native = { terrainStream: state, meshes: new Map([['coarse', { _terrainRequest: coarse }]]),
+    terrainRequests: new Map([['0:0:15', fine]]) };
+  nativeGPUByLayer.set(layer, native);
+  try {
+    state.terrainCache.set('15/0/0', { data: fine.tiles.get('0/0') });
+    const location = { x: 20, y: 20 };
+    assert.equal(gridTerrainElevation(state, location), 100, 'pending fine data must not replace rendered coarse terrain');
+    native.meshes.set('fine', { _terrainRequest: fine });
+    assert.equal(gridTerrainElevation(state, location), 200);
+    map.getZoom = () => 14;
+    native.terrainRequests.clear();
+    assert.equal(gridTerrainElevation(state, location), 200, 'zooming out must still sample retained higher-detail meshes');
+    native.meshes.delete('fine');
+    assert.equal(gridTerrainElevation(state, location), 100);
+    native.meshes.clear();
+    map.getZoom = () => 15;
+    assert.equal(gridTerrainElevation(state, location), 200, 'raw DEM remains the fallback without rendered coverage');
+    native.disposed = true;
+    native.meshes.set('coarse', { _terrainRequest: coarse });
+    assert.equal(gridTerrainElevation(state, location), 200, 'disposed grids must not supply elevation');
+  } finally {
+    nativeGPUByLayer.delete(layer);
+  }
+});
+
+Then('terrain path triangles preserve the surface across grid edges and clip offscreen geometry', function () {
+  class Point {
+    constructor(x, y) { this.x = x; this.y = y; }
+  }
+  const previous = mockLeaflet({ Point });
+  try {
+    const state = { map: { getZoom: () => 14 }, terrainBounds: { min: new Point(0, 0), max: new Point(32, 32) } };
+    const surface = (x, y) => {
+      const size = 8 * 2 ** (14 - state.terrainZoom);
+      return Math.abs(x - size * 2) * 3 + Math.abs(y - size * 2) * 2 + Math.abs(x + y - size * 3);
+    };
+    const project = p => [p.x, surface(p.x, p.y) + 1, p.y];
+    for (state.terrainZoom of [14, 15]) {
+      for (const vertices of [
+        [new Point(0, 0), new Point(32, 0), new Point(0, 32)],
+        [new Point(-1e9, 0), new Point(1e9, 0), new Point(0, 32)],
+      ]) {
+        const positions = [];
+        appendTerrainTriangle(state, project, positions, ...vertices);
+        assert.ok(positions.length > 9 && positions.length < 3000 * 4 ** (state.terrainZoom - 14),
+          `Unexpected tessellation size: ${positions.length}`);
+        let area = 0;
+        for (let i = 0; i < positions.length; i += 9) {
+          const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(i, i + 9);
+          assert.ok(Math.abs((ay + by + cy) / 3 - surface((ax + bx + cx) / 3, (az + bz + cz) / 3) - 1) < 1e-5);
+          area += Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2;
+          for (const coordinate of [ax, az, bx, bz, cx, cz]) assert.ok(coordinate >= 0 && coordinate <= 32);
+        }
+        assert.ok(Math.abs(area - (vertices[0].x === 0 ? 512 : 1024)) < 1e-3, `Draping changed triangle coverage: ${area}`);
+      }
+    }
+    const outside = [];
+    appendTerrainTriangle(state, project, outside, new Point(-10, -10), new Point(-5, -10), new Point(-10, -5));
+    assert.deepEqual(outside, []);
+  } finally {
+    mockLeaflet(previous);
+  }
+});
 
 Then('native WeakMap counters and event cleanup preserve their values', function () {
   const previousLeaflet = mockLeaflet({ Marker: class {}, GridLayer: class {} });

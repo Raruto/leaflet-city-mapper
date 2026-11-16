@@ -1,6 +1,18 @@
 @coverage
 Feature: Native Leaflet layers rendered automatically with WebGPU
   @unit
+  Scenario: Terrain grid meshes preserve absolute heights across layer root transforms
+    Then native terrain mesh heights ignore latitude scaling and root altitude
+
+  @unit
+  Scenario: Terrain sampling follows rendered zoom levels instead of pending DEM tiles
+    Then native terrain sampling keeps retained surfaces until their replacement is rendered
+
+  @unit
+  Scenario: Terrain path triangles follow slopes without unbounded offscreen subdivision
+    Then terrain path triangles preserve the surface across grid edges and clip offscreen geometry
+
+  @unit
   Scenario: Direct WeakMap updates preserve native stacking and event cleanup
     Then native WeakMap counters and event cleanup preserve their values
 

@@ -44,6 +44,7 @@ import { triangulate } from '../../src/triangulation/triangulate.js';
 import { lampPostGeometry } from '../../src/geometry/lampPostGeometry.js';
 import { lightGeometry } from '../../src/geometry/lightGeometry.js';
 import { getElevation } from '../../src/terrain/getElevation.js';
+import { mapElevationOf } from '../../src/terrain/mapElevationOf.js';
 import { local } from '../../src/projections/walkerLocalPosition.js';
 import { hit } from '../../src/picking/hit.js';
 import { attachAreaMesh } from '../../src/sources/attachAreaMesh.js';
@@ -73,6 +74,7 @@ globalThis.nativeCheckModules = {
     bindSunlight, intersectMeshes, setHighlight, releaseArea, restoreObject, computeBounds,
   },
   getElevation,
+  mapElevationOf,
 };
 
 globalThis.testOperations = {

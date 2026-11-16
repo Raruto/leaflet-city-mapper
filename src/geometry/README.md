@@ -21,6 +21,9 @@ flowchart LR
 Half-open ranges identify features without one mesh per triangle; instancing
 is used where suitable. Polygon triangulation lives in
 [triangulation](../triangulation/README.md); native paths use a separate path.
+On streamed terrain, native triangles are clipped to raster coverage and split
+along the terrain grid before elevation projection. Row-wise clipping avoids
+subdividing the full bounding rectangle of long, thin or mostly offscreen paths.
 
 - [assembleAreaGeometry.js](./assembleAreaGeometry.js): assemble source area geometry.
 - [computeBounds.js](./computeBounds.js): compute bounds and radius for geometry.

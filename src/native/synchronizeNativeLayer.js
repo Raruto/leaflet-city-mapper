@@ -18,12 +18,13 @@ export function synchronizeNativeLayer(state) {
   if (!state.dirty && (!state.marker || !state.viewDirty)) return;
   state.dirty = false;
   state.viewDirty = false;
-  let mesh, texture;
+  let mesh, texture, terrainChanged = false;
   for (mesh of meshes.values()) mesh._nativeUsed = false;
   for (texture of textures.values()) texture.used = false;
-  if (source instanceof L.GridLayer) syncGridLayer(state);
+  if (source instanceof L.GridLayer) terrainChanged = syncGridLayer(state);
   else if (source instanceof L.ImageOverlay) syncImageOverlay(state);
   else if (state.marker) syncMarker(state);
   else syncVectorLayer(state);
   pruneNativeResources(state);
+  if (terrainChanged) state.map.fire('terrainchange');
 }

@@ -15,7 +15,8 @@ flowchart LR
   Dev --> Server["Local server :8080"]
   Test["npm test"] --> Cache["Prepare browser dependencies"]
   Cache --> Build["Build bundles"]
-  Build --> Cucumber["Leaflet 1 + 2 scenarios"]
+  Build --> Integration["Prepare local counterpart in CI"]
+  Integration --> Cucumber["Leaflet 1 + 2 scenarios"]
 ```
 
 [build.js](./build.js) also produces source maps; WGSL minification applies to
@@ -26,6 +27,9 @@ package's CDN URLs to local paths in HTML responses without changing examples
 on disk. Smoke tests enable the same mode and check that plugin assets stay local.
 See [test.js](./test.js) and the
 [test guide](../test/README.md) for scenario selection and version differences.
+CI and release tests prepare the complementary library from source through
+[prepareIntegration.js](./prepareIntegration.js), avoiding a dependency on
+unpublished CDN versions. See [agent guidance](../AGENTS.md) for local overrides.
 
 ## Data and releases
 

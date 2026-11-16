@@ -1756,22 +1756,60 @@
   }
 
   // src/native/nativeTerrainElevation.js
-  function nativeTerrainElevation(state, point, x, y, z) {
-    let layer, native, request, elevation;
-    const key = `${x}:${y}:${z}`;
+  function nativeTerrainElevation(state, location2) {
+    let layer, native, mesh, request, coords, point, selected, x, y, col, row, u, v, a, b, c, d;
+    let zoom = -1, projectedZoom;
     for (layer of Object.values(state.map._layers)) {
       native = nativeGPUByLayer.get(layer);
       if (native?.disposed || native?.terrainStream !== state) continue;
-      request = native.terrainRequests?.get(key);
-      if (!request?.tiles || layer._tiles[key] !== request.tile) continue;
-      elevation = terrainElevation(point, request.tiles);
-      if (Number.isFinite(elevation)) return elevation;
+      for (mesh of native.meshes.values()) {
+        request = mesh._terrainRequest;
+        if (!request?.tiles || request.tile.coords.z <= zoom) continue;
+        coords = request.tile.coords;
+        if (projectedZoom !== coords.z) {
+          point = state.map.project(location2, coords.z);
+          projectedZoom = coords.z;
+        }
+        if (point.x < coords.x * 256 || point.x > (coords.x + 1) * 256 || point.y < coords.y * 256 || point.y > (coords.y + 1) * 256) continue;
+        selected = request;
+        zoom = coords.z;
+      }
     }
-    return null;
+    if (!selected) return null;
+    point = state.map.project(location2, zoom);
+    ({ x, y } = selected.tile.coords);
+    col = Math.max(0, Math.min(31, Math.floor((point.x - x * 256) / 8)));
+    row = Math.max(0, Math.min(31, Math.floor((point.y - y * 256) / 8)));
+    u = (point.x - x * 256 - col * 8) / 8;
+    v = (point.y - y * 256 - row * 8) / 8;
+    a = terrainElevation(
+      /* alloc */
+      { x: x * 256 + col * 8, y: y * 256 + row * 8 },
+      selected.tiles
+    );
+    b = terrainElevation(
+      /* alloc */
+      { x: x * 256 + (col + 1) * 8, y: y * 256 + row * 8 },
+      selected.tiles
+    );
+    c = terrainElevation(
+      /* alloc */
+      { x: x * 256 + col * 8, y: y * 256 + (row + 1) * 8 },
+      selected.tiles
+    );
+    d = terrainElevation(
+      /* alloc */
+      { x: x * 256 + (col + 1) * 8, y: y * 256 + (row + 1) * 8 },
+      selected.tiles
+    );
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || !Number.isFinite(d)) return null;
+    return u + v <= 1 ? a * (1 - u - v) + b * u + c * v : b * (1 - v) + c * (1 - u) + d * (u + v - 1);
   }
 
   // src/native/gridTerrainElevation.js
   function gridTerrainElevation(state, location2) {
+    const rendered = nativeTerrainElevation(state, location2);
+    if (Number.isFinite(rendered)) return rendered;
     let z = Math.max(0, Math.min(24, Math.round(state.map.getZoom())));
     const tiles = (
       /* alloc */
@@ -1781,8 +1819,6 @@
     for (; z >= 0; z--) {
       point = state.map.project(location2, z), limit = 2 ** z;
       x = Math.floor(point.x / 256), y = Math.floor(point.y / 256);
-      elevation = nativeTerrainElevation(state, point, x, y, z);
-      if (Number.isFinite(elevation)) return elevation;
       tiles.clear();
       for (index = 0; index < 9; index++) {
         dx = index % 3 - 1;
@@ -1911,7 +1947,7 @@
     const camera = cameraByLayer.get(layer);
     camera.fov = cameraFov;
     camera.aspect = size.x / size.y;
-    camera.near = Math.max(0.1, distance / 1e4);
+    camera.near = Math.max(0.1, distance / 100);
     camera.far = Math.max(1e4, distance * 10);
     camera.position[0] = targetX + sinBearing * sinPitch * distance;
     camera.position[1] = targetY + cosPitch * distance;
@@ -3987,6 +4023,80 @@
     return nativeGPUByLayer.get(state.source) === state && state.map.hasLayer(state.source);
   }
 
+  // src/native/getGridTerrainTile.js
+  async function getGridTerrainTile(state, z, x, y) {
+    const limit = 2 ** z;
+    x = (x % limit + limit) % limit;
+    y = Math.max(0, Math.min(limit - 1, y));
+    const key = `${z}/${x}/${y}`;
+    let entry = state.terrainCache.get(key);
+    if (!entry) {
+      entry = /* alloc */
+      { promise: state.layer.options.getTile(z, x, y, state.terrainController.signal) };
+      state.terrainCache.set(key, entry);
+    } else {
+      state.terrainCache.delete(key);
+      state.terrainCache.set(key, entry);
+    }
+    try {
+      if (!entry.data) entry.data = await entry.promise;
+      if (!(entry.data instanceof Float32Array) || entry.data.length !== 65536) {
+        throw (
+          /* alloc */
+          new Error(`Invalid elevation tile ${key}: expected 256x256 Float32Array`)
+        );
+      }
+      if (!entry.range) {
+        let minimum = Infinity, maximum = -Infinity, elevation;
+        for (elevation of entry.data) {
+          if (!Number.isFinite(elevation) || elevation <= -1e3) continue;
+          minimum = Math.min(minimum, elevation);
+          maximum = Math.max(maximum, elevation);
+        }
+        entry.range = /* alloc */
+        [minimum, maximum];
+      }
+    } catch (error) {
+      if (state.terrainCache.get(key) === entry) state.terrainCache.delete(key);
+      throw error;
+    }
+    while (state.terrainCache.size > 256) state.terrainCache.delete(state.terrainCache.keys().next().value);
+    return entry.data;
+  }
+
+  // src/native/loadGridTerrain.js
+  async function loadGridTerrain(state, key, tile, request) {
+    const { x, y, z } = tile.coords, stream = request.stream;
+    const jobs = (
+      /* alloc */
+      []
+    ), tiles = (
+      /* alloc */
+      /* @__PURE__ */ new Map()
+    );
+    let dx, dy, i = 0;
+    try {
+      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) {
+        jobs.push(getGridTerrainTile(stream, z, x + dx, y + dy));
+      }
+      const values = await Promise.all(jobs);
+      if (state.disposed || stream.terrainController.signal.aborted || state.source._tiles[key] !== tile || state.terrainRequests.get(key) !== request) return;
+      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) tiles.set(`${x + dx}/${y + dy}`, values[i++]);
+      request.tiles = tiles;
+      refreshNativeLayer(state);
+      state.source._update();
+    } catch (error) {
+      if (!state.disposed && !stream.terrainController.signal.aborted && state.source._tiles[key] === tile) {
+        request.error = error;
+        stream.layer.fire(
+          "error",
+          /* alloc */
+          { error, coords: tile.coords }
+        );
+      }
+    }
+  }
+
   // src/native/prepareGridTerrainRequests.js
   function prepareGridTerrainRequests(state) {
     const stream = streamTerrainByMap.get(state.map);
@@ -3998,9 +4108,19 @@
       ) : null;
     }
     if (state.terrainRequests) {
-      let key;
+      let key, tile, request;
       for (key of state.terrainRequests.keys()) {
         if (!state.source._tiles[key]) state.terrainRequests.delete(key);
+      }
+      for (key in state.source._tiles) {
+        tile = state.source._tiles[key];
+        if (tile.coords.z !== state.source._tileZoom) continue;
+        request = state.terrainRequests.get(key);
+        if (request?.tile === tile) continue;
+        request = /* alloc */
+        { tile, stream };
+        state.terrainRequests.set(key, request);
+        loadGridTerrain(state, key, tile, request);
       }
     }
     return stream;
@@ -5160,81 +5280,6 @@
     );
   }
 
-  // src/native/getGridTerrainTile.js
-  async function getGridTerrainTile(state, z, x, y) {
-    const limit = 2 ** z;
-    x = (x % limit + limit) % limit;
-    y = Math.max(0, Math.min(limit - 1, y));
-    const key = `${z}/${x}/${y}`;
-    let entry = state.terrainCache.get(key);
-    if (!entry) {
-      entry = /* alloc */
-      { promise: state.layer.options.getTile(z, x, y, state.terrainController.signal) };
-      state.terrainCache.set(key, entry);
-    } else {
-      state.terrainCache.delete(key);
-      state.terrainCache.set(key, entry);
-    }
-    try {
-      if (!entry.data) entry.data = await entry.promise;
-      if (!(entry.data instanceof Float32Array) || entry.data.length !== 65536) {
-        throw (
-          /* alloc */
-          new Error(`Invalid elevation tile ${key}: expected 256x256 Float32Array`)
-        );
-      }
-      if (!entry.range) {
-        let minimum = Infinity, maximum = -Infinity, elevation;
-        for (elevation of entry.data) {
-          if (!Number.isFinite(elevation) || elevation <= -1e3) continue;
-          minimum = Math.min(minimum, elevation);
-          maximum = Math.max(maximum, elevation);
-        }
-        entry.range = /* alloc */
-        [minimum, maximum];
-      }
-    } catch (error) {
-      if (state.terrainCache.get(key) === entry) state.terrainCache.delete(key);
-      throw error;
-    }
-    while (state.terrainCache.size > 256) state.terrainCache.delete(state.terrainCache.keys().next().value);
-    return entry.data;
-  }
-
-  // src/native/loadGridTerrain.js
-  async function loadGridTerrain(state, key, tile, request) {
-    const { x, y, z } = tile.coords, stream = request.stream;
-    const jobs = (
-      /* alloc */
-      []
-    ), tiles = (
-      /* alloc */
-      /* @__PURE__ */ new Map()
-    );
-    let dx, dy, i = 0;
-    try {
-      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) {
-        jobs.push(getGridTerrainTile(stream, z, x + dx, y + dy));
-      }
-      const values = await Promise.all(jobs);
-      if (state.disposed || stream.terrainController.signal.aborted || state.source._tiles[key] !== tile || state.terrainRequests.get(key) !== request) return;
-      for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) tiles.set(`${x + dx}/${y + dy}`, values[i++]);
-      request.tiles = tiles;
-      refreshNativeLayer(state);
-      state.map.fire("terrainchange");
-      state.source._update();
-    } catch (error) {
-      if (!state.disposed && !stream.terrainController.signal.aborted && state.source._tiles[key] === tile) {
-        request.error = error;
-        stream.layer.fire(
-          "error",
-          /* alloc */
-          { error, coords: tile.coords }
-        );
-      }
-    }
-  }
-
   // src/native/terrainGridMesh.js
   function terrainGridMesh(state, key, tile, request, opacity) {
     const texture = textureFor(state, key, tile.el);
@@ -5260,7 +5305,7 @@
       /* alloc */
       []
     );
-    const base = rootByLayer.get(state.backend).position[1];
+    const root = rootByLayer.get(state.backend);
     let row, col, u, v, elevation, a, b, c, d, index;
     for (row = 0; row <= divisions; row++) for (col = 0; col <= divisions; col++) {
       u = col / divisions;
@@ -5278,7 +5323,7 @@
         /* alloc */
         [
           northwest[0] + (southeast[0] - northwest[0]) * u,
-          elevation - base,
+          (elevation - root.position[1]) / root.scale[1],
           northwest[2] + (southeast[2] - northwest[2]) * v,
           u,
           v
@@ -5307,13 +5352,7 @@
   // src/native/syncTerrainGridTile.js
   function syncTerrainGridTile(state, key, tile, opacity) {
     const retained = state.textures.get(key), mesh = state.meshes.get(key);
-    let request = state.terrainRequests.get(key);
-    if (!request || request.tile !== tile) {
-      request = /* alloc */
-      { tile, stream: state.terrainStream };
-      state.terrainRequests.set(key, request);
-      loadGridTerrain(state, key, tile, request);
-    }
+    const request = state.terrainRequests.get(key);
     if (!request.tiles) {
       if (mesh && retained?.image === tile.el) {
         retained.used = true;
@@ -5333,7 +5372,7 @@
   function retainGridTerrain(state) {
     let key, mesh, retained;
     for ([key, mesh] of state.meshes) {
-      if (state.source._tiles[key] || !mesh._terrainRequest) continue;
+      if (!mesh._terrainRequest) continue;
       retained = state.textures.get(key);
       if (!retained) continue;
       retained.used = true;
@@ -5345,22 +5384,40 @@
   function syncGridLayer(state) {
     const { source } = state;
     const stream = prepareGridTerrainRequests(state);
-    let key, tile, opacity, mesh, pending = false;
+    let key, tile, opacity, mesh, previous, pending = false, transitioning = false, changed = false;
+    if (stream) {
+      for (mesh of state.meshes.values()) {
+        if (mesh._terrainRequest && mesh._terrainRequest.tile.coords.z !== source._tileZoom) transitioning = true;
+      }
+      for (key in source._tiles) {
+        tile = source._tiles[key];
+        if (tile.coords.z !== source._tileZoom) continue;
+        if (!tile.loaded || (tile._gpuOpacity ?? 1) < 1 || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth || !state.terrainRequests.get(key)?.tiles) pending = true;
+      }
+      if (transitioning && pending) {
+        retainGridTerrain(state);
+        return false;
+      }
+    }
     for (key in source._tiles) {
       if (!Object.hasOwn(source._tiles, key)) continue;
       tile = source._tiles[key];
+      if (stream && tile.coords.z !== source._tileZoom) continue;
       if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) {
-        pending = Boolean(stream);
+        pending ||= Boolean(stream);
         continue;
       }
       opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
+      previous = state.meshes.get(key);
       mesh = state.terrainRequests ? syncTerrainGridTile(state, key, tile, opacity) : syncGridTile(state, key, tile, opacity);
       if (state.terrainRequests && !state.terrainRequests.get(key).tiles) pending = true;
       if (mesh) mesh.renderOrder += tile.coords.z / 100;
+      if (stream && mesh && mesh !== previous) changed = true;
     }
     if (stream && (pending || !Object.keys(source._tiles).length)) {
       retainGridTerrain(state);
     }
+    return changed;
   }
 
   // src/native/syncImageOverlay.js
@@ -5613,8 +5670,107 @@
   // src/geometry/segment.js
   init_L();
 
+  // src/projections/localPixel.js
+  function localPixel(state, point) {
+    if (state.pixelProjection) {
+      const { transformation, scale, origin, metres } = state.pixelProjection;
+      const projected = transformation.untransform(point, scale);
+      return (
+        /* alloc */
+        [(projected.x - origin.x) * metres, 0, -(projected.y - origin.y) * metres]
+      );
+    }
+    return localPosition(state, state.map.unproject(point));
+  }
+
+  // src/projections/localPixelForGeometry.js
+  function localPixelForGeometry(point, anchor) {
+    const state = geometryPixelStates[geometryPixelStates.length - 1];
+    const result = localPixel(state, point), origin = anchor || point;
+    const elevation = streamTerrainByMap.get(state.map) || terrain3DByMap.get(state.map) ? mapElevationOf(state.map, state.map.unproject(origin)) : null;
+    const root = rootByLayer.get(state.backend);
+    if (Number.isFinite(elevation) && root) result[1] = (elevation - root.position[1] + 1) / root.scale[1];
+    if (anchor && state.strokeAnchors) {
+      const projected = localPixel(state, anchor);
+      projected[1] = result[1];
+      state.strokeAnchors.push(...projected);
+    }
+    return result;
+  }
+
+  // src/geometry/clipTerrainPolygon.js
+  init_L();
+  function clipTerrainPolygon(polygon2, axis, boundary, greater) {
+    const result = (
+      /* alloc */
+      []
+    );
+    let previous = polygon2.at(-1), current2, a, b, t;
+    for (current2 of polygon2) {
+      a = (axis === 0 ? previous.x : axis === 1 ? previous.y : previous.x + previous.y) - boundary;
+      b = (axis === 0 ? current2.x : axis === 1 ? current2.y : current2.x + current2.y) - boundary;
+      if ((greater ? a >= 0 : a <= 0) !== (greater ? b >= 0 : b <= 0)) {
+        t = a / (a - b);
+        result.push(
+          /* alloc */
+          new L.Point(
+            previous.x + (current2.x - previous.x) * t,
+            previous.y + (current2.y - previous.y) * t
+          )
+        );
+      }
+      if (greater ? b >= 0 : b <= 0) result.push(current2);
+      previous = current2;
+    }
+    return result;
+  }
+
+  // src/geometry/appendTerrainTriangle.js
+  function appendTerrainTriangle(state, point, target, a, b, c) {
+    const bounds = state.terrainBounds;
+    const size = 8 * 2 ** (state.map.getZoom() - (state.terrainZoom ?? Math.round(state.map.getZoom())));
+    let polygon2 = (
+      /* alloc */
+      [a, b, c]
+    );
+    polygon2 = clipTerrainPolygon(polygon2, 0, bounds.min.x, true);
+    polygon2 = clipTerrainPolygon(polygon2, 0, bounds.max.x, false);
+    polygon2 = clipTerrainPolygon(polygon2, 1, bounds.min.y, true);
+    polygon2 = clipTerrainPolygon(polygon2, 1, bounds.max.y, false);
+    let minY = Infinity, maxY = -Infinity, minX, maxX, vertex, row, col, strip, cell, half, part, i;
+    for (vertex of polygon2) {
+      minY = Math.min(minY, vertex.y);
+      maxY = Math.max(maxY, vertex.y);
+    }
+    for (row = Math.floor(minY / size); row < Math.ceil(maxY / size); row++) {
+      strip = clipTerrainPolygon(polygon2, 1, row * size, true);
+      strip = clipTerrainPolygon(strip, 1, (row + 1) * size, false);
+      minX = Infinity;
+      maxX = -Infinity;
+      for (vertex of strip) {
+        minX = Math.min(minX, vertex.x);
+        maxX = Math.max(maxX, vertex.x);
+      }
+      for (col = Math.floor(minX / size); col < Math.ceil(maxX / size); col++) {
+        cell = clipTerrainPolygon(strip, 0, col * size, true);
+        cell = clipTerrainPolygon(cell, 0, (col + 1) * size, false);
+        for (half = 0; half < 2; half++) {
+          part = clipTerrainPolygon(cell, 2, (col + row + 1) * size, Boolean(half));
+          for (i = 1; i < part.length - 1; i++) {
+            target.push(...point(part[0]), ...point(part[i]), ...point(part[i + 1]));
+          }
+        }
+      }
+    }
+    return target.length;
+  }
+
   // src/geometry/appendNativeTriangle.js
   function triangle(point, target, a, b, c, anchorA, anchorB, anchorC) {
+    const state = geometryPixelStates[geometryPixelStates.length - 1];
+    if (state?.terrainBounds && point === localPixelForGeometry) {
+      return appendTerrainTriangle(state, point, target, a, b, c);
+    }
     return target.push(...point(a, anchorA), ...point(b, anchorB), ...point(c, anchorC));
   }
 
@@ -6230,33 +6386,47 @@
     );
   }
 
-  // src/projections/localPixel.js
-  function localPixel(state, point) {
-    if (state.pixelProjection) {
-      const { transformation, scale, origin, metres } = state.pixelProjection;
-      const projected = transformation.untransform(point, scale);
-      return (
-        /* alloc */
-        [(projected.x - origin.x) * metres, 0, -(projected.y - origin.y) * metres]
-      );
-    }
-    return localPosition(state, state.map.unproject(point));
-  }
-
-  // src/projections/localPixelForGeometry.js
-  function localPixelForGeometry(point, anchor) {
-    const state = geometryPixelStates[geometryPixelStates.length - 1];
-    if (anchor && state.strokeAnchors) state.strokeAnchors.push(...localPixel(state, anchor));
-    return localPixel(state, point);
-  }
-
   // src/native/nativeVectorGeometry.js
   init_radians();
   init_L();
+
+  // src/native/nativeTerrainBounds.js
+  init_L();
+  function nativeTerrainBounds(state) {
+    state.terrainZoom = 0;
+    if (!streamTerrainByMap.get(state.map)) return null;
+    const bounds = (
+      /* alloc */
+      new L.Bounds()
+    );
+    let layer, native, mesh, tile, scale;
+    for (layer of Object.values(state.map._layers)) {
+      native = nativeGPUByLayer.get(layer);
+      if (!native?.terrainStream || native.disposed) continue;
+      for (mesh of native.meshes.values()) {
+        tile = mesh._terrainRequest?.tile;
+        if (!tile) continue;
+        state.terrainZoom = Math.max(state.terrainZoom, tile.coords.z);
+        scale = 2 ** (state.map.getZoom() - tile.coords.z);
+        bounds.extend(
+          /* alloc */
+          [tile.coords.x * 256 * scale, tile.coords.y * 256 * scale]
+        );
+        bounds.extend(
+          /* alloc */
+          [(tile.coords.x + 1) * 256 * scale, (tile.coords.y + 1) * 256 * scale]
+        );
+      }
+    }
+    return bounds.isValid() ? bounds : null;
+  }
+
+  // src/native/nativeVectorGeometry.js
   function nativeVectorGeometry(state) {
     const { source } = state;
+    state.terrainBounds = nativeTerrainBounds(state);
     state.strokeCoordinates = null;
-    state.strokeAnchors = source instanceof L.Polyline && !source.options.dashArray ? (
+    state.strokeAnchors = source instanceof L.Polyline && !source.options.dashArray && !state.terrainBounds ? (
       /* alloc */
       []
     ) : null;
@@ -6352,14 +6522,15 @@
     if (!state.dirty && (!state.marker || !state.viewDirty)) return;
     state.dirty = false;
     state.viewDirty = false;
-    let mesh, texture;
+    let mesh, texture, terrainChanged = false;
     for (mesh of meshes.values()) mesh._nativeUsed = false;
     for (texture of textures.values()) texture.used = false;
-    if (source instanceof L.GridLayer) syncGridLayer(state);
+    if (source instanceof L.GridLayer) terrainChanged = syncGridLayer(state);
     else if (source instanceof L.ImageOverlay) syncImageOverlay(state);
     else if (state.marker) syncMarker(state);
     else syncVectorLayer(state);
     pruneNativeResources(state);
+    if (terrainChanged) state.map.fire("terrainchange");
   }
 
   // src/native/beforeNativeRender.js

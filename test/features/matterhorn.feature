@@ -17,3 +17,12 @@ Feature: Mapterhorn terrain example
 
   Scenario: Matterhorn navigation and elevation lifecycle stay independent
     Then Matterhorn streams a new region and releases and restores its elevation layer
+
+  Scenario: Native tracks follow streamed terrain
+    Then a native track remains visible on the streamed terrain
+
+  Scenario: Native tracks follow terrain during animated zoom
+    Then a native track follows rendered terrain throughout zoom transitions
+
+  Scenario: Changing the basemap after navigation preserves terrain elevation
+    Then native tracks stay on terrain when basemaps use different latitude origins

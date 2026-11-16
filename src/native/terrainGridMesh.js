@@ -25,13 +25,13 @@ export function terrainGridMesh(state, key, tile, request, opacity) {
   const northwest = localPosition(state, state.map.unproject(/* alloc */ [x * 256, y * 256], z));
   const southeast = localPosition(state, state.map.unproject(/* alloc */ [(x + 1) * 256, (y + 1) * 256], z));
   const vertices = /* alloc */ [], position = /* alloc */ [], uv = /* alloc */ [];
-  const base = rootByLayer.get(state.backend).position[1];
+  const root = rootByLayer.get(state.backend);
   let row, col, u, v, elevation, a, b, c, d, index;
   for (row = 0; row <= divisions; row++) for (col = 0; col <= divisions; col++) {
     u = col / divisions; v = row / divisions;
     elevation = terrainElevation(/* alloc */ { x: (x + u) * 256, y: (y + v) * 256 }, request.tiles);
     if (!Number.isFinite(elevation)) throw /* alloc */ new Error(`Missing elevation sample in ${z}/${x}/${y}`);
-    vertices.push(/* alloc */ [northwest[0] + (southeast[0] - northwest[0]) * u, elevation - base,
+    vertices.push(/* alloc */ [northwest[0] + (southeast[0] - northwest[0]) * u, (elevation - root.position[1]) / root.scale[1],
       northwest[2] + (southeast[2] - northwest[2]) * v, u, v]);
   }
   for (row = 0; row < divisions; row++) for (col = 0; col < divisions; col++) {

@@ -40,7 +40,8 @@ export function updateMapCamera(layer, size) {
   const camera = cameraByLayer.get(layer);
   camera.fov = cameraFov;
   camera.aspect = size.x / size.y;
-  camera.near = Math.max(0.1, distance / 10000);
+  // Preserve depth precision for metre-separated terrain overlays at overview zooms.
+  camera.near = Math.max(0.1, distance / 100);
   camera.far = Math.max(10000, distance * 10);
   camera.position[0] = targetX + sinBearing * sinPitch * distance;
   camera.position[1] = targetY + cosPitch * distance;
