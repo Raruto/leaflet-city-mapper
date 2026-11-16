@@ -46,7 +46,7 @@ Then('culling spheres follow bounds and transforms while reusing unchanged world
       (projection[3] * center[0] + projection[7] * center[1] + projection[11] * center[2] + projection[15]);
     assert.equal(mesh._visibleInFrame, expected);
     assert.deepEqual(candidates, expected ? [mesh] : []);
-    assert.equal(mesh._sortDepth, depth);
+    assert.equal(mesh._sortDepth, -depth);
   };
   try {
     check(3);

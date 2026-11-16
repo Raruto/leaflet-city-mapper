@@ -5,7 +5,7 @@
  */
 export const depthTexture = {
   size: [null, null],
-  format: 'depth24plus',
+  format: 'depth32float',
   sampleCount: 4,
   usage: null
 };

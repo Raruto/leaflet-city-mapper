@@ -24,6 +24,9 @@ is used where suitable. Polygon triangulation lives in
 On streamed terrain, native triangles are clipped to raster coverage and split
 along the terrain grid before elevation projection. Row-wise clipping avoids
 subdividing the full bounding rectangle of long, thin or mostly offscreen paths.
+[appendTerrainTriangle.js](./appendTerrainTriangle.js) selects intersecting cells;
+[appendTerrainCell.js](./appendTerrainCell.js) clips and triangulates each cell's
+two terrain halves.
 
 - [assembleAreaGeometry.js](./assembleAreaGeometry.js): assemble source area geometry.
 - [computeBounds.js](./computeBounds.js): compute bounds and radius for geometry.

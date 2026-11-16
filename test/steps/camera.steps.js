@@ -45,10 +45,12 @@ Then('camera depth separates metre-offset terrain and retains close-up clipping'
       updateMapCamera(layer, { x: 640, y: 480 });
       const projection = Float32Array.from(camera.projectionMatrix);
       const distance = Math.hypot(...camera.position.map((value, i) => value - camera.target[i]));
-      const groundDepth = -projection[10] + projection[14] / distance;
-      const overlayDepth = -projection[10] + projection[14] / (distance - Math.SQRT1_2);
-      assert.ok(groundDepth > 0 && groundDepth < 1 && overlayDepth > 0 && overlayDepth < groundDepth);
-      assert.ok((groundDepth - overlayDepth) * (2 ** 24 - 1) > 1,
+      const depth = distance => Math.fround(Math.fround(
+        Math.fround(-projection[10] * Math.fround(distance)) + projection[14]) / Math.fround(distance));
+      const groundDepth = depth(distance), overlayDepth = depth(distance - Math.SQRT1_2);
+      assert.ok(groundDepth > 0 && overlayDepth > groundDepth && overlayDepth < 1);
+      const bits = new Uint32Array(Float32Array.of(overlayDepth, groundDepth).buffer);
+      assert.ok(bits[0] - bits[1] > 1,
         `one metre of terrain clearance loses depth precision at zoom ${zoom}`);
       if (zoom === 24) {
         const closeDepth = -projection[10] + projection[14] / 0.2;

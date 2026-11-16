@@ -30,7 +30,7 @@ When('I pan the shared WebGPU renderer', { timeout: 30000 }, async function () {
         const sortedPoint = new DOMPoint(...probe.geometry.bounds.center, 1)
           .matrixTransform(new DOMMatrix(probe.worldMatrix))
           .matrixTransform(new DOMMatrix(globals.sceneByLayer.get(owner).camera.projectionViewMatrix));
-        sortDepthError = Math.abs(probe._sortDepth - sortedPoint.z / sortedPoint.w);
+        sortDepthError = Math.abs(probe._sortDepth + sortedPoint.z / sortedPoint.w);
       } finally {
         probe.program.transparent = transparent;
       }

@@ -1201,8 +1201,8 @@ Then('standalone browser math preserves scene transforms and picking', async fun
   assert.deepEqual(result.position, [12, 26, 42]);
   assert.equal(result.cached, true);
   assert.equal(result.updated, true);
-  assert.ok(Math.abs(result.projection[0]) < 1e-10);
-  assert.ok(Math.abs(result.projection[1] - 1) < 1e-10);
+  assert.ok(Math.abs(result.projection[0] - 1) < 1e-10);
+  assert.ok(Math.abs(result.projection[1]) < 1e-10);
   assert.deepEqual(result.hits, [
     { distance: 5, point: [0, 0, -5], faceIndex: 0 },
     { distance: 10, point: [0, 0, -10], faceIndex: 0 },

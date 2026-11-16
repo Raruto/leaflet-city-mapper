@@ -304,7 +304,7 @@ Then('fading terrain detail preserves {string}', { timeout: 30000 }, async funct
       pruneRasterTiles(raster);
       nativeChecks.render.render(globals.sceneByLayer.get(raster)._shared);
       const steadyDepth = !globals.sceneByLayer.get(raster).renderer.groundOverlap &&
-        globals.sceneByLayer.get(terrain)._rasterProgram.pipelineCache.has('back:ccw:less-equal');
+        globals.sceneByLayer.get(terrain)._rasterProgram.pipelineCache.has('back:ccw:greater-equal');
       return { failures, above, steadyDepth };
     }, check);
   } finally {

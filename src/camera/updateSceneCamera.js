@@ -1,7 +1,7 @@
 import { halfRadians } from '../globals/halfRadians.js';
 
 /**
- * Refresh the camera's orthonormal view basis and perspective matrices.
+ * Refresh the camera's view basis and reversed-Z perspective matrices.
  *
  * @param {Object} camera Camera position, target, up vector and matrix state.
  *
@@ -43,8 +43,8 @@ export function updateCamera(camera) {
   const f = 1 / Math.tan(camera.fov * halfRadians), n = camera.near, r = camera.far;
   projectionMatrix[0] = f / camera.aspect, projectionMatrix[1] = 0, projectionMatrix[2] = 0, projectionMatrix[3] = 0;
   projectionMatrix[4] = 0, projectionMatrix[5] = f, projectionMatrix[6] = 0, projectionMatrix[7] = 0;
-  projectionMatrix[8] = 0, projectionMatrix[9] = 0, projectionMatrix[10] = r / (n - r), projectionMatrix[11] = -1;
-  projectionMatrix[12] = 0, projectionMatrix[13] = 0, projectionMatrix[14] = r * n / (n - r), projectionMatrix[15] = 0;
+  projectionMatrix[8] = 0, projectionMatrix[9] = 0, projectionMatrix[10] = n / (r - n), projectionMatrix[11] = -1;
+  projectionMatrix[12] = 0, projectionMatrix[13] = 0, projectionMatrix[14] = r * n / (r - n), projectionMatrix[15] = 0;
   const projectionTransform = camera.projectionTransform;
   projectionTransform.m11 = projectionMatrix[0], projectionTransform.m12 = projectionMatrix[1], projectionTransform.m13 = projectionMatrix[2], projectionTransform.m14 = projectionMatrix[3];
   projectionTransform.m21 = projectionMatrix[4], projectionTransform.m22 = projectionMatrix[5], projectionTransform.m23 = projectionMatrix[6], projectionTransform.m24 = projectionMatrix[7];

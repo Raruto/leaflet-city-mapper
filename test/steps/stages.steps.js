@@ -241,7 +241,7 @@ Then('frame optimizations preserve buffer isolation, directions and winding', { 
       uniforms: { baseColor: { value: [1, 1, 1] }, metallic: { value: 0 }, roughness: { value: 1 },
         opacity: { value: 1 }, alphaCutoff: { value: 0 }, emissive: { value: [0, 0, 0] },
         occlusionStrength: { value: 1 } },
-      cullMode: 'back', bindings: [], pipelineCache: new Map([['back:ccw:less-equal', {}], ['back:cw:less-equal', {}]]),
+      cullMode: 'back', bindings: [], pipelineCache: new Map([['back:ccw:greater-equal', {}], ['back:cw:greater-equal', {}]]),
     }, geometry: { attributes: { position: { buffer: {} }, normal: { buffer: {} } }, drawRange: { start: 0, count: 3 } } };
     updateWorldMatrix(mesh);
     let reads = 0;

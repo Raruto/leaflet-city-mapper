@@ -117,7 +117,7 @@ Then('instanced sources preserve rendered pixels, shadows, picking and resource 
           context: { getCurrentTexture: () => color },
           colorTexture: gpu.createTexture({ size: [64, 64], format: 'rgba8unorm',
             sampleCount: 4, usage: GPUTextureUsage.RENDER_ATTACHMENT }),
-          depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth24plus',
+          depthTexture: gpu.createTexture({ size: [64, 64], format: 'depth32float',
             sampleCount: 4, usage: GPUTextureUsage.RENDER_ATTACHMENT }) },
       };
       globals.sceneByLayer.set(backend, backend);

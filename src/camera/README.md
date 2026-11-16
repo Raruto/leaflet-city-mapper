@@ -23,10 +23,12 @@ map state, including intermediate zoom views; elevated geometry uses the GPU
 camera, not a CSS transform. Ground conversion lives in
 [projections](../projections/README.md).
 
-The near plane follows one percent of the camera's focus distance, with a
-10 cm minimum for close-up and walking views. Keeping it proportional avoids
-losing the depth separation between terrain and metre-offset overlays when
-zooming out. The far plane and terrain depth testing remain unchanged.
+The perspective maps the near plane to depth 1 and the far plane to depth 0.
+The scene uses `depth32float`, clears to 0 and compares `greater-equal` so
+metre-offset overlays keep their depth separation even at overview zoom.
+The near plane follows one percent of the focus distance, with a 10 cm minimum
+for close-up and walking views. Frustum distances are unchanged; shadow maps
+keep their independent orthographic projection and forward depth convention.
 
 - [mapCamera.js](./mapCamera.js): install camera-related map integration.
 - [mapSetPitchAndBearing.js](./mapSetPitchAndBearing.js): validate and update camera angles.

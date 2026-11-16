@@ -16,7 +16,7 @@ export function drawPipeline(renderer, mesh, cullMode, frontFace) {
   // Mixed-LOD imagery composites coarse-to-fine; its depth still occludes later 3D objects.
   // ponytail: self-occlusion during LOD blending needs separate per-LOD depth passes.
   const depthCompare = program.depthTest === false || (mesh.ground && renderer.groundOverlap)
-    ? 'always' : 'less-equal';
+    ? 'always' : 'greater-equal';
   const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}`;
   let pipeline = program.pipelineCache.get(pipelineKey);
   if (!pipeline) {

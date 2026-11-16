@@ -25,6 +25,11 @@ draws double-sided transparent non-native meshes in two passes. Buffers,
 programs and textures have different lifetimes; see
 [disposeMesh.js](./disposeMesh.js) and [textures](../textures/README.md).
 
+The scene uses reversed-Z floating-point depth; pipeline comparison and depth
+clearing must match the [camera projection](../camera/README.md). Culling keeps
+the same clip volume. Sorting negates projected depth so existing front-to-back
+and transparent back-to-front ordering is preserved. Shadow depth is independent.
+
 - [render.js](./render.js): orchestrate a frame.
 - [createMesh.js](./createMesh.js) and [disposeMesh.js](./disposeMesh.js): manage mesh resources.
 - [drawSceneMeshes.js](./drawSceneMeshes.js): issue scene draw commands.

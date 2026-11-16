@@ -18,7 +18,7 @@ export const scenePass = {
   }],
   depthStencilAttachment: {
     view: null,
-    depthClearValue: 1,
+    depthClearValue: 0,
     depthLoadOp: 'clear',
     depthStoreOp: 'store'
   }

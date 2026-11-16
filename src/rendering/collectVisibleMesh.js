@@ -36,7 +36,7 @@ export function collectVisibleMesh(mesh, projection, frustum, frustumLengths, ca
   const radius = sphere.radius + nativeStrokeExpansion(mesh) * sphere.scale;
   const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
   const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
-  mesh._sortDepth = clipZ / clipW;
+  mesh._sortDepth = -clipZ / clipW;
   mesh._visibleInFrame =
     frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] &&
     frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] &&

@@ -1618,7 +1618,7 @@
   // src/globals/depthTexture.js
   var depthTexture = {
     size: [null, null],
-    format: "depth24plus",
+    format: "depth32float",
     sampleCount: 4,
     usage: null
   };
@@ -1755,10 +1755,10 @@
     return bridgeElevation(point, bridgesByLayer.get(layer)) ?? terrainElevation(point, terrainTilesByLayer.get(layer));
   }
 
-  // src/native/nativeTerrainElevation.js
-  function nativeTerrainElevation(state, location2) {
-    let layer, native, mesh, request, coords, point, selected, x, y, col, row, u, v, a, b, c, d;
-    let zoom = -1, projectedZoom;
+  // src/native/nativeTerrainRequest.js
+  function nativeTerrainRequest(state, location2) {
+    let layer, native, mesh, request, coords, point, selected, projectedZoom;
+    let zoom = -1;
     for (layer of Object.values(state.map._layers)) {
       native = nativeGPUByLayer.get(layer);
       if (native?.disposed || native?.terrainStream !== state) continue;
@@ -1775,29 +1775,35 @@
         zoom = coords.z;
       }
     }
+    return selected;
+  }
+
+  // src/native/nativeTerrainElevation.js
+  function nativeTerrainElevation(state, location2) {
+    const selected = nativeTerrainRequest(state, location2);
     if (!selected) return null;
-    point = state.map.project(location2, zoom);
-    ({ x, y } = selected.tile.coords);
-    col = Math.max(0, Math.min(31, Math.floor((point.x - x * 256) / 8)));
-    row = Math.max(0, Math.min(31, Math.floor((point.y - y * 256) / 8)));
-    u = (point.x - x * 256 - col * 8) / 8;
-    v = (point.y - y * 256 - row * 8) / 8;
-    a = terrainElevation(
+    const { x, y, z } = selected.tile.coords;
+    const point = state.map.project(location2, z);
+    const col = Math.max(0, Math.min(31, Math.floor((point.x - x * 256) / 8)));
+    const row = Math.max(0, Math.min(31, Math.floor((point.y - y * 256) / 8)));
+    const u = (point.x - x * 256 - col * 8) / 8;
+    const v = (point.y - y * 256 - row * 8) / 8;
+    const a = terrainElevation(
       /* alloc */
       { x: x * 256 + col * 8, y: y * 256 + row * 8 },
       selected.tiles
     );
-    b = terrainElevation(
+    const b = terrainElevation(
       /* alloc */
       { x: x * 256 + (col + 1) * 8, y: y * 256 + row * 8 },
       selected.tiles
     );
-    c = terrainElevation(
+    const c = terrainElevation(
       /* alloc */
       { x: x * 256 + col * 8, y: y * 256 + (row + 1) * 8 },
       selected.tiles
     );
-    d = terrainElevation(
+    const d = terrainElevation(
       /* alloc */
       { x: x * 256 + (col + 1) * 8, y: y * 256 + (row + 1) * 8 },
       selected.tiles
@@ -1898,8 +1904,8 @@
     const f = 1 / Math.tan(camera.fov * halfRadians), n = camera.near, r = camera.far;
     projectionMatrix[0] = f / camera.aspect, projectionMatrix[1] = 0, projectionMatrix[2] = 0, projectionMatrix[3] = 0;
     projectionMatrix[4] = 0, projectionMatrix[5] = f, projectionMatrix[6] = 0, projectionMatrix[7] = 0;
-    projectionMatrix[8] = 0, projectionMatrix[9] = 0, projectionMatrix[10] = r / (n - r), projectionMatrix[11] = -1;
-    projectionMatrix[12] = 0, projectionMatrix[13] = 0, projectionMatrix[14] = r * n / (n - r), projectionMatrix[15] = 0;
+    projectionMatrix[8] = 0, projectionMatrix[9] = 0, projectionMatrix[10] = n / (r - n), projectionMatrix[11] = -1;
+    projectionMatrix[12] = 0, projectionMatrix[13] = 0, projectionMatrix[14] = r * n / (r - n), projectionMatrix[15] = 0;
     const projectionTransform = camera.projectionTransform;
     projectionTransform.m11 = projectionMatrix[0], projectionTransform.m12 = projectionMatrix[1], projectionTransform.m13 = projectionMatrix[2], projectionTransform.m14 = projectionMatrix[3];
     projectionTransform.m21 = projectionMatrix[4], projectionTransform.m22 = projectionMatrix[5], projectionTransform.m23 = projectionMatrix[6], projectionTransform.m24 = projectionMatrix[7];
@@ -2136,7 +2142,7 @@
     const radius = sphere.radius + nativeStrokeExpansion(mesh) * sphere.scale;
     const clipZ = projection[2] * x + projection[6] * y + projection[10] * z + projection[14];
     const clipW = projection[3] * x + projection[7] * y + projection[11] * z + projection[15];
-    mesh._sortDepth = clipZ / clipW;
+    mesh._sortDepth = -clipZ / clipW;
     mesh._visibleInFrame = frustum[0][0] * x + frustum[0][1] * y + frustum[0][2] * z + frustum[0][3] >= -radius * frustumLengths[0] && frustum[1][0] * x + frustum[1][1] * y + frustum[1][2] * z + frustum[1][3] >= -radius * frustumLengths[1] && frustum[2][0] * x + frustum[2][1] * y + frustum[2][2] * z + frustum[2][3] >= -radius * frustumLengths[2] && frustum[3][0] * x + frustum[3][1] * y + frustum[3][2] * z + frustum[3][3] >= -radius * frustumLengths[3] && frustum[4][0] * x + frustum[4][1] * y + frustum[4][2] * z + frustum[4][3] >= -radius * frustumLengths[4] && frustum[5][0] * x + frustum[5][1] * y + frustum[5][2] * z + frustum[5][3] >= -radius * frustumLengths[5];
     if (mesh._visibleInFrame) candidates.push(mesh);
   }
@@ -3094,7 +3100,7 @@
     }],
     depthStencilAttachment: {
       view: null,
-      depthClearValue: 1,
+      depthClearValue: 0,
       depthLoadOp: "clear",
       depthStoreOp: "store"
     }
@@ -3127,7 +3133,7 @@
     },
     multisample: { count: 4 },
     depthStencil: {
-      format: "depth24plus",
+      format: "depth32float",
       depthWriteEnabled: null,
       depthCompare: null
     }
@@ -3150,7 +3156,7 @@
   // src/rendering/drawPipeline.js
   function drawPipeline(renderer, mesh, cullMode, frontFace) {
     const { program } = mesh;
-    const depthCompare = program.depthTest === false || mesh.ground && renderer.groundOverlap ? "always" : "less-equal";
+    const depthCompare = program.depthTest === false || mesh.ground && renderer.groundOverlap ? "always" : "greater-equal";
     const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}`;
     let pipeline = program.pipelineCache.get(pipelineKey);
     if (!pipeline) {
@@ -4124,6 +4130,45 @@
       }
     }
     return stream;
+  }
+
+  // src/native/retainGridTerrain.js
+  function retainGridTerrain(state) {
+    let key, mesh, retained;
+    for ([key, mesh] of state.meshes) {
+      if (!mesh._terrainRequest) continue;
+      retained = state.textures.get(key);
+      if (!retained) continue;
+      retained.used = true;
+      mesh._nativeUsed = true;
+    }
+  }
+
+  // src/native/gridTileLoaded.js
+  function gridTileLoaded(tile) {
+    return Boolean(tile.loaded && (!(tile.el instanceof HTMLImageElement) || tile.el.naturalWidth));
+  }
+
+  // src/native/gridTerrainPending.js
+  function gridTerrainPending(state, includeFade) {
+    const { source } = state;
+    let key, tile;
+    for (key in source._tiles) {
+      tile = source._tiles[key];
+      if (tile.coords.z !== source._tileZoom) continue;
+      if (!gridTileLoaded(tile) || !state.terrainRequests.get(key)?.tiles) return true;
+      if (includeFade && (tile._gpuOpacity ?? 1) < 1) return true;
+    }
+    return !Object.keys(source._tiles).length;
+  }
+
+  // src/native/gridTerrainTransition.js
+  function gridTerrainTransition(state) {
+    let mesh;
+    for (mesh of state.meshes.values()) {
+      if (mesh._terrainRequest && mesh._terrainRequest.tile.coords.z !== state.source._tileZoom) return true;
+    }
+    return false;
   }
 
   // src/native/syncGridTile.js
@@ -5368,53 +5413,32 @@
     return terrainGridMesh(state, key, tile, request, opacity);
   }
 
-  // src/native/retainGridTerrain.js
-  function retainGridTerrain(state) {
-    let key, mesh, retained;
-    for ([key, mesh] of state.meshes) {
-      if (!mesh._terrainRequest) continue;
-      retained = state.textures.get(key);
-      if (!retained) continue;
-      retained.used = true;
-      mesh._nativeUsed = true;
-    }
+  // src/native/syncLoadedGridTile.js
+  function syncLoadedGridTile(state, key, tile) {
+    const opacity = (state.source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
+    const previous = state.meshes.get(key);
+    const mesh = state.terrainRequests ? syncTerrainGridTile(state, key, tile, opacity) : syncGridTile(state, key, tile, opacity);
+    if (mesh) mesh.renderOrder += tile.coords.z / 100;
+    return Boolean(mesh && mesh !== previous);
   }
 
   // src/native/syncGridLayer.js
   function syncGridLayer(state) {
     const { source } = state;
     const stream = prepareGridTerrainRequests(state);
-    let key, tile, opacity, mesh, previous, pending = false, transitioning = false, changed = false;
-    if (stream) {
-      for (mesh of state.meshes.values()) {
-        if (mesh._terrainRequest && mesh._terrainRequest.tile.coords.z !== source._tileZoom) transitioning = true;
-      }
-      for (key in source._tiles) {
-        tile = source._tiles[key];
-        if (tile.coords.z !== source._tileZoom) continue;
-        if (!tile.loaded || (tile._gpuOpacity ?? 1) < 1 || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth || !state.terrainRequests.get(key)?.tiles) pending = true;
-      }
-      if (transitioning && pending) {
-        retainGridTerrain(state);
-        return false;
-      }
+    let key, tile, changed = false;
+    if (stream && gridTerrainTransition(state) && gridTerrainPending(state, true)) {
+      retainGridTerrain(state);
+      return false;
     }
     for (key in source._tiles) {
       if (!Object.hasOwn(source._tiles, key)) continue;
       tile = source._tiles[key];
       if (stream && tile.coords.z !== source._tileZoom) continue;
-      if (!tile.loaded || tile.el instanceof HTMLImageElement && !tile.el.naturalWidth) {
-        pending ||= Boolean(stream);
-        continue;
-      }
-      opacity = (source.options.opacity ?? 1) * (tile._gpuOpacity ?? 1);
-      previous = state.meshes.get(key);
-      mesh = state.terrainRequests ? syncTerrainGridTile(state, key, tile, opacity) : syncGridTile(state, key, tile, opacity);
-      if (state.terrainRequests && !state.terrainRequests.get(key).tiles) pending = true;
-      if (mesh) mesh.renderOrder += tile.coords.z / 100;
-      if (stream && mesh && mesh !== previous) changed = true;
+      if (!gridTileLoaded(tile)) continue;
+      if (syncLoadedGridTile(state, key, tile) && stream) changed = true;
     }
-    if (stream && (pending || !Object.keys(source._tiles).length)) {
+    if (stream && gridTerrainPending(state, false)) {
       retainGridTerrain(state);
     }
     return changed;
@@ -5725,6 +5749,17 @@
     return result;
   }
 
+  // src/geometry/appendTerrainCell.js
+  function appendTerrainCell(point, target, cell, diagonal) {
+    let half, part, i;
+    for (half = 0; half < 2; half++) {
+      part = clipTerrainPolygon(cell, 2, diagonal, Boolean(half));
+      for (i = 1; i < part.length - 1; i++) {
+        target.push(...point(part[0]), ...point(part[i]), ...point(part[i + 1]));
+      }
+    }
+  }
+
   // src/geometry/appendTerrainTriangle.js
   function appendTerrainTriangle(state, point, target, a, b, c) {
     const bounds = state.terrainBounds;
@@ -5737,7 +5772,7 @@
     polygon2 = clipTerrainPolygon(polygon2, 0, bounds.max.x, false);
     polygon2 = clipTerrainPolygon(polygon2, 1, bounds.min.y, true);
     polygon2 = clipTerrainPolygon(polygon2, 1, bounds.max.y, false);
-    let minY = Infinity, maxY = -Infinity, minX, maxX, vertex, row, col, strip, cell, half, part, i;
+    let minY = Infinity, maxY = -Infinity, minX, maxX, vertex, row, col, strip, cell;
     for (vertex of polygon2) {
       minY = Math.min(minY, vertex.y);
       maxY = Math.max(maxY, vertex.y);
@@ -5754,12 +5789,7 @@
       for (col = Math.floor(minX / size); col < Math.ceil(maxX / size); col++) {
         cell = clipTerrainPolygon(strip, 0, col * size, true);
         cell = clipTerrainPolygon(cell, 0, (col + 1) * size, false);
-        for (half = 0; half < 2; half++) {
-          part = clipTerrainPolygon(cell, 2, (col + row + 1) * size, Boolean(half));
-          for (i = 1; i < part.length - 1; i++) {
-            target.push(...point(part[0]), ...point(part[i]), ...point(part[i + 1]));
-          }
-        }
+        appendTerrainCell(point, target, cell, (col + row + 1) * size);
       }
     }
     return target.length;

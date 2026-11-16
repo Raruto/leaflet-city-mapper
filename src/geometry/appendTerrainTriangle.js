@@ -1,4 +1,5 @@
 import { clipTerrainPolygon } from './clipTerrainPolygon.js';
+import { appendTerrainCell } from './appendTerrainCell.js';
 
 /**
  * Drape a path triangle by clipping it to the streamed terrain's grid triangles.
@@ -20,7 +21,7 @@ export function appendTerrainTriangle(state, point, target, a, b, c) {
   polygon = clipTerrainPolygon(polygon, 0, bounds.max.x, false);
   polygon = clipTerrainPolygon(polygon, 1, bounds.min.y, true);
   polygon = clipTerrainPolygon(polygon, 1, bounds.max.y, false);
-  let minY = Infinity, maxY = -Infinity, minX, maxX, vertex, row, col, strip, cell, half, part, i;
+  let minY = Infinity, maxY = -Infinity, minX, maxX, vertex, row, col, strip, cell;
   for (vertex of polygon) {
     minY = Math.min(minY, vertex.y);
     maxY = Math.max(maxY, vertex.y);
@@ -36,12 +37,7 @@ export function appendTerrainTriangle(state, point, target, a, b, c) {
     for (col = Math.floor(minX / size); col < Math.ceil(maxX / size); col++) {
       cell = clipTerrainPolygon(strip, 0, col * size, true);
       cell = clipTerrainPolygon(cell, 0, (col + 1) * size, false);
-      for (half = 0; half < 2; half++) {
-        part = clipTerrainPolygon(cell, 2, (col + row + 1) * size, Boolean(half));
-        for (i = 1; i < part.length - 1; i++) {
-          target.push(...point(part[0]), ...point(part[i]), ...point(part[i + 1]));
-        }
-      }
+      appendTerrainCell(point, target, cell, (col + row + 1) * size);
     }
   }
   return target.length;

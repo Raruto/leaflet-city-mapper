@@ -31,6 +31,10 @@ An outgoing zoom level is replaced only when the incoming visible tiles have
 both imagery and terrain. Levels are not overlapped: a higher outgoing surface
 would otherwise occlude paths already draped on the replacement. `terrainchange`
 is emitted after the new meshes are installed and outgoing meshes are pruned.
+[nativeTerrainRequest.js](./nativeTerrainRequest.js) selects rendered coverage;
+[nativeTerrainElevation.js](./nativeTerrainElevation.js) interpolates its surface.
+[syncGridLayer.js](./syncGridLayer.js) gates zoom-level replacement on imagery,
+fade and DEM readiness before synchronizing individual loaded tiles.
 Terrain heights are absolute scene metres: subtract the root's vertical offset
 and divide by its vertical scale before storing local vertices, as for paths
 and markers. A basemap created at a different latitude must not scale DEM heights.

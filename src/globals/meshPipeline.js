@@ -26,7 +26,7 @@ export const meshPipeline = {
   },
   multisample: { count: 4 },
   depthStencil: {
-    format: 'depth24plus',
+    format: 'depth32float',
     depthWriteEnabled: null,
     depthCompare: null
   }
