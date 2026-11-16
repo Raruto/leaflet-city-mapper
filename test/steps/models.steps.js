@@ -266,7 +266,7 @@ Then('a configured 3D model loads with its transforms and attribution', { timeou
       return point.z / point.w;
     });
     const transparentOrder = depths.length > 1 && depths.every((depth, i) =>
-      !i || depths[i - 1] >= depth) && Math.max(...depths) > Math.min(...depths);
+      !i || depths[i - 1] <= depth) && Math.max(...depths) > Math.min(...depths);
     const doubleSidedPasses = list.length > 0 && list.every(mesh =>
       mesh.program._layerMaterial.doubleSided && !mesh.program.depthWrite && mesh.program.cullMode === 'none');
     for (const [mesh, program] of programs) {
