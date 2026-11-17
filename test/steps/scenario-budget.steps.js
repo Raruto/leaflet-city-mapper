@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { Then } from '@cucumber/cucumber';
-import { scenarioTimeout, withScenarioBudget } from '../support/scenario-budget.js';
+import { scenarioTimeout, withScenarioBudget, withoutScenarioBudget } from '../support/scenario-budget.js';
 import { focusParisLayers } from '../fixtures/focused-paris.js';
 
 Then('scenario steps share one deadline without preventing cleanup', async function () {
@@ -15,7 +15,9 @@ Then('scenario steps share one deadline without preventing cleanup', async funct
     this.scenarioStarted -= scenarioTimeout + 1;
   }).call(world), /30-second budget/, 'Synchronous work must not silently exceed the budget');
   assert.equal(called, false);
-  assert.equal(await withScenarioBudget(action, { cleanup: true }).call(world), 42);
+  const cleanup = withoutScenarioBudget(function () { return action(); });
+  assert.equal(withScenarioBudget(cleanup), cleanup, 'Cucumber wraps hooks without forwarding wrapper options');
+  assert.equal(await withScenarioBudget(cleanup).call(world), 42);
   assert.equal(await withScenarioBudget(action).call({}), 42, 'Global setup has its own timeout');
   world.scenarioStarted = performance.now();
   assert.equal(await withScenarioBudget(action).call(world), 42);

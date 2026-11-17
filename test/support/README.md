@@ -25,3 +25,5 @@ if WebGPU is unavailable, the 3D scenarios fail rather than opening a window.
 30-second deadline. Global hooks and cleanup are exempt; split independent
 checks instead of increasing the budget. The hooks also report the slowest
 scenarios, including setup and cleanup.
+Cleanup callbacks use `withoutScenarioBudget` explicitly because Cucumber does
+not forward hook options to its definition wrapper.

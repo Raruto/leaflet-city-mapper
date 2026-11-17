@@ -7,7 +7,7 @@ import { startServer } from '../../build/server.js';
 import { fulfillTrafficRoute } from '../fixtures/traffic-data.js';
 import { prepareDependencies } from '../fixtures/dependencies.js';
 import { createTestContext, createTestPage, fetchLocal, resetTestContext, swiftShaderArgs } from '../fixtures/browser-environment.js';
-import { withScenarioBudget } from './scenario-budget.js';
+import { withScenarioBudget, withoutScenarioBudget } from './scenario-budget.js';
 import { focusParisLayers } from '../fixtures/focused-paris.js';
 
 setDefaultTimeout(10000);
@@ -21,11 +21,11 @@ Before(function () {
   this.scenarioStarted = performance.now();
 });
 
-After({ wrapperOptions: { cleanup: true } }, function ({ pickle, result }) {
+After(withoutScenarioBudget(function ({ pickle, result }) {
   scenarioTimings.push({
     name: pickle.name, status: result.status,
     seconds: (performance.now() - this.scenarioStarted) / 1000,
-  });
+  }));
 });
 
 AfterAll(function () {
@@ -41,7 +41,7 @@ Before({ tags: '@coverage and not @unit' }, async function () {
   }
 });
 
-After({ tags: '@coverage and not @unit', wrapperOptions: { cleanup: true } }, async function () {
+After({ tags: '@coverage and not @unit' }, withoutScenarioBudget(async function () {
   if (!process.env.COVERAGE_3D) return;
   const entries = await this.page.coverage.stopJSCoverage();
   for (const entry of entries.filter(entry => entry.url.includes('/dist/'))) {
@@ -54,7 +54,7 @@ After({ tags: '@coverage and not @unit', wrapperOptions: { cleanup: true } }, as
         name: fn.functionName,
         line: entry.source.slice(0, range.startOffset).split('\n').length,
         covered: Boolean(range.count || previous?.covered),
-      });
+      }));
     }
   }
 });
@@ -341,7 +341,7 @@ Before({ tags: 'not @unit and not @smoke', timeout: 30000 }, async function () {
   });
 });
 
-After({ tags: 'not @unit and not @smoke', wrapperOptions: { cleanup: true } }, async function ({ pickle, result }) {
+After({ tags: 'not @unit and not @smoke' }, withoutScenarioBudget(async function ({ pickle, result }) {
   if (result?.status === Status.FAILED && this.browserErrors?.length) {
     console.error(`Browser errors [${pickle.name}]:`, this.browserErrors.join('\n'));
   }
@@ -349,7 +349,7 @@ After({ tags: 'not @unit and not @smoke', wrapperOptions: { cleanup: true } }, a
     for (const page of this.context.pages()) await page.close();
   }
   assert.deepEqual(this.unexpectedRequests, [], 'External requests must have local fixtures');
-});
+}));
 
 Before({ tags: '@coverage and not @unit', timeout: 30000 }, async function () {
   assert.ok(webgpu, 'WebGPU adapter unavailable: 3D scenarios need a GPU-backed browser');

@@ -1,9 +1,15 @@
 import { wrapPromiseWithTimeout } from '@cucumber/cucumber';
 
 export const scenarioTimeout = 30000;
+const cleanupHooks = new WeakSet();
 
-export function withScenarioBudget(code, options) {
-  if (options?.cleanup) return code;
+export function withoutScenarioBudget(code) {
+  cleanupHooks.add(code);
+  return code;
+}
+
+export function withScenarioBudget(code) {
+  if (cleanupHooks.has(code)) return code;
   return async function (...args) {
     if (this.scenarioStarted === undefined) return code.apply(this, args);
     const remaining = scenarioTimeout - (performance.now() - this.scenarioStarted);
