@@ -159,27 +159,35 @@ Then('a native track follows rendered terrain throughout a zoom transition of {i
   this.matterhornDetail.delayColumn = await this.page.evaluate(zoom =>
     Math.floor(map.project(map.getCenter(), zoom).x / 256), initialZoom);
   const zoom = initialZoom + delta;
-  const first = await this.page.evaluate(terrainTrackClearance, zoom);
-  assert.ok(first.animating, 'the check must cover the active zoom animation');
-  for (let i = 0; i < 6; i++) {
-    await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const result = await this.page.evaluate(terrainTrackClearance);
-    assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
-      `track does not follow rendered terrain during zoom ${zoom}: ${JSON.stringify(result)}`);
-    assert.ok(result.red > 20, `track disappeared during zoom ${zoom}: ${JSON.stringify(result)}`);
-    assert.equal(result.levels.length, 1, 'overlapping terrain levels must not occlude the replacement track');
-  }
-  if (delta > 0) {
-    await this.page.waitForFunction(zoom => {
-      const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
-      const requests = [...globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests.values()]
-        .filter(request => request.tile.coords.z === zoom);
-      return requests.some(request => request.tiles) && requests.some(request => !request.tiles);
-    }, zoom);
-    const partial = await this.page.evaluate(terrainTrackClearance);
-    assert.deepEqual(partial.levels, [initialZoom], 'partial replacements must leave the outgoing terrain intact');
-    assert.ok(partial.minGap > 0.8 && partial.maxGap < 1.2 && partial.red > 20,
-      `track detached while only part of the incoming terrain was ready: ${JSON.stringify(partial)}`);
+  // Hold partial terrain until the frame assertions finish, independent of GPU speed.
+  let release;
+  this.matterhornDetail.gate = new Promise(resolve => { release = resolve; });
+  try {
+    const first = await this.page.evaluate(terrainTrackClearance, zoom);
+    assert.ok(first.animating, 'the check must cover the active zoom animation');
+    for (let i = 0; i < 6; i++) {
+      await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const result = await this.page.evaluate(terrainTrackClearance);
+      assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
+        `track does not follow rendered terrain during zoom ${zoom}: ${JSON.stringify(result)}`);
+      assert.ok(result.red > 20, `track disappeared during zoom ${zoom}: ${JSON.stringify(result)}`);
+      assert.equal(result.levels.length, 1, 'overlapping terrain levels must not occlude the replacement track');
+    }
+    if (delta > 0) {
+      await this.page.waitForFunction(zoom => {
+        const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+        const requests = [...globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests.values()]
+          .filter(request => request.tile.coords.z === zoom);
+        return requests.some(request => request.tiles) && requests.some(request => !request.tiles);
+      }, zoom);
+      const partial = await this.page.evaluate(terrainTrackClearance);
+      assert.deepEqual(partial.levels, [initialZoom], 'partial replacements must leave the outgoing terrain intact');
+      assert.ok(partial.minGap > 0.8 && partial.maxGap < 1.2 && partial.red > 20,
+        `track detached while only part of the incoming terrain was ready: ${JSON.stringify(partial)}`);
+    }
+  } finally {
+    release();
+    this.matterhornDetail.gate = null;
   }
   await waitForTerrain(this.page);
   const result = await this.page.evaluate(terrainTrackClearance);
@@ -269,7 +277,7 @@ Given(/^the Matterhorn example is open with (flat )?offline elevation and satell
       if (this.matterhornDetail.delayed && /\/14\/\d+\/\d+\.webp$/.test(route.request().url())) {
         const column = Number(route.request().url().split('/').at(-2));
         if (this.matterhornDetail.delayColumn === undefined || column >= this.matterhornDetail.delayColumn) {
-          await new Promise(resolve => setTimeout(resolve, 3500));
+          await (this.matterhornDetail.gate || new Promise(resolve => setTimeout(resolve, 3500)));
         }
       }
       return route.fulfill({ contentType: 'image/png', body: terrainImage, headers: { 'Access-Control-Allow-Origin': '*' } });

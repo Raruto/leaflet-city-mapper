@@ -313,6 +313,7 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     backend.renderer.uniformData[55] = 0.75;
     drawGeometry(backend, mesh, pass, 'front', 'cw');
     assert.equal(pipelines.at(-1).depthCompare, 'always');
+    assert.equal(activePipeline.depthBiasSlopeScale, 0, 'New unbiased pipelines must reset the shared descriptor');
     const base = offsets.at(-1)[0] / 4;
     assert.equal(backend.renderer.uniformData[base + 22], 0.25);
     assert.deepEqual(Array.from(backend.renderer.uniformData.slice(base + 28, base + 36)), [1, 2, 3, 4, 5, 6, 0.75, 1]);

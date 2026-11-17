@@ -5208,7 +5208,7 @@
     if (texture) material.baseTexture = texture;
     if (mesh) disposeMesh(layer, mesh);
     mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? (terrain ? state.terrainRasterProgram : state.rasterProgram) || nativeProgram(layer, material) : nativeProgram(layer, material));
-    mesh.depthBiasSlopeScale = source instanceof L.Path ? 1 / 16 : 0;
+    mesh.depthBiasSlopeScale = Number(source instanceof L.Path) / 16;
     if (source instanceof L.GridLayer) {
       if (terrain) state.terrainRasterProgram ||= mesh.program;
       else state.rasterProgram ||= mesh.program;
