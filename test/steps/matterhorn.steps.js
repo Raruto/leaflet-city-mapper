@@ -147,7 +147,7 @@ Then('native tracks stay on terrain when basemaps use different latitude origins
   }
 });
 
-Then('a native track follows rendered terrain throughout zoom transitions', { timeout: 30000 }, async function () {
+Then('a native track follows rendered terrain throughout a zoom transition of {int} level', { timeout: 30000 }, async function (delta) {
   await waitForTerrain(this.page);
   await this.page.evaluate(() => {
     window.terrainTrack = new L.Polyline([[45.972, 7.645], [45.980, 7.675]],
@@ -158,34 +158,33 @@ Then('a native track follows rendered terrain throughout zoom transitions', { ti
   const initialZoom = await this.page.evaluate(() => map.getZoom());
   this.matterhornDetail.delayColumn = await this.page.evaluate(zoom =>
     Math.floor(map.project(map.getCenter(), zoom).x / 256), initialZoom);
-  for (const zoom of [initialZoom + 1, initialZoom]) {
-    const first = await this.page.evaluate(terrainTrackClearance, zoom);
-    assert.ok(first.animating, 'the check must cover the active zoom animation');
-    for (let i = 0; i < 6; i++) {
-      await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      const result = await this.page.evaluate(terrainTrackClearance);
-      assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
-        `track does not follow rendered terrain during zoom ${zoom}: ${JSON.stringify(result)}`);
-      assert.ok(result.red > 20, `track disappeared during zoom ${zoom}: ${JSON.stringify(result)}`);
-      assert.equal(result.levels.length, 1, 'overlapping terrain levels must not occlude the replacement track');
-    }
-    if (zoom > initialZoom) {
-      await this.page.waitForFunction(zoom => {
-        const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
-        const requests = [...globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests.values()]
-          .filter(request => request.tile.coords.z === zoom);
-        return requests.some(request => request.tiles) && requests.some(request => !request.tiles);
-      }, zoom);
-      const partial = await this.page.evaluate(terrainTrackClearance);
-      assert.deepEqual(partial.levels, [initialZoom], 'partial replacements must leave the outgoing terrain intact');
-      assert.ok(partial.minGap > 0.8 && partial.maxGap < 1.2 && partial.red > 20,
-        `track detached while only part of the incoming terrain was ready: ${JSON.stringify(partial)}`);
-    }
-    await waitForTerrain(this.page);
+  const zoom = initialZoom + delta;
+  const first = await this.page.evaluate(terrainTrackClearance, zoom);
+  assert.ok(first.animating, 'the check must cover the active zoom animation');
+  for (let i = 0; i < 6; i++) {
+    await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const result = await this.page.evaluate(terrainTrackClearance);
     assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
-      `track does not follow replacement terrain: ${JSON.stringify(result)}`);
+      `track does not follow rendered terrain during zoom ${zoom}: ${JSON.stringify(result)}`);
+    assert.ok(result.red > 20, `track disappeared during zoom ${zoom}: ${JSON.stringify(result)}`);
+    assert.equal(result.levels.length, 1, 'overlapping terrain levels must not occlude the replacement track');
   }
+  if (delta > 0) {
+    await this.page.waitForFunction(zoom => {
+      const layer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+      const requests = [...globals.sceneByLayer.get(layer)._nativeGPU.terrainRequests.values()]
+        .filter(request => request.tile.coords.z === zoom);
+      return requests.some(request => request.tiles) && requests.some(request => !request.tiles);
+    }, zoom);
+    const partial = await this.page.evaluate(terrainTrackClearance);
+    assert.deepEqual(partial.levels, [initialZoom], 'partial replacements must leave the outgoing terrain intact');
+    assert.ok(partial.minGap > 0.8 && partial.maxGap < 1.2 && partial.red > 20,
+      `track detached while only part of the incoming terrain was ready: ${JSON.stringify(partial)}`);
+  }
+  await waitForTerrain(this.page);
+  const result = await this.page.evaluate(terrainTrackClearance);
+  assert.ok(result.samples > 0 && result.minGap > 0.8 && result.maxGap < 1.2,
+    `track does not follow replacement terrain: ${JSON.stringify(result)}`);
 });
 
 Then('a metre-offset track preserves its pixels with terrain depth testing', { timeout: 30000 }, async function () {
@@ -215,10 +214,36 @@ Then('a metre-offset track preserves its pixels with terrain depth testing', { t
       expected++;
       if (actual[i] > 200 && actual[i + 1] < 40 && actual[i + 2] < 40) retained++;
     }
-    return { expected, retained, coverage: retained / expected };
+    const gridLayer = Object.values(map._layers).find(layer => layer instanceof L.TileLayer);
+    const grid = globals.sceneByLayer.get(gridLayer)._nativeGPU;
+    const raised = [];
+    let occluded = 0;
+    try {
+      for (const mesh of grid.meshes.values()) {
+        const attribute = mesh.geometry.attributes.position;
+        raised.push({ mesh, attribute, data: attribute.data.slice() });
+        for (let i = 1; i < attribute.data.length; i += 3) attribute.data[i] += 1000;
+        attribute.needsUpdate = true;
+        mesh.geometry.bounds = null;
+      }
+      const pixels = await nativeChecks.pixels(owner);
+      for (let i = 0; i < reference.length; i += 4) {
+        if (reference[i] > 200 && reference[i + 1] < 40 && reference[i + 2] < 40 &&
+          pixels[i] > 200 && pixels[i + 1] < 40 && pixels[i + 2] < 40) occluded++;
+      }
+    } finally {
+      for (const { mesh, attribute, data } of raised) {
+        attribute.data.set(data);
+        attribute.needsUpdate = true;
+        mesh.geometry.bounds = null;
+      }
+      nativeChecks.render.render(owner);
+    }
+    return { expected, retained, coverage: retained / expected, occluded };
   });
   assert.ok(result.expected > 100, `the reference must contain a visible track: ${JSON.stringify(result)}`);
-  assert.ok(result.coverage > 0.99, `depth quantization fragments the track: ${JSON.stringify(result)}`);
+  assert.ok(result.coverage > 0.99, `terrain depth testing fragments the track: ${JSON.stringify(result)}`);
+  assert.equal(result.occluded, 0, 'Terrain in front of the track must still occlude it');
 });
 
 Given(/^the Matterhorn example is open with (flat )?offline elevation and satellite tiles$/, { timeout: 30000 }, async function (flat) {

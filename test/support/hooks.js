@@ -25,8 +25,8 @@ After(withoutScenarioBudget(function ({ pickle, result }) {
   scenarioTimings.push({
     name: pickle.name, status: result.status,
     seconds: (performance.now() - this.scenarioStarted) / 1000,
-  }));
-});
+  });
+}));
 
 AfterAll(function () {
   console.log('\nSlowest scenarios (including setup and cleanup):');
@@ -54,10 +54,10 @@ After({ tags: '@coverage and not @unit' }, withoutScenarioBudget(async function 
         name: fn.functionName,
         line: entry.source.slice(0, range.startOffset).split('\n').length,
         covered: Boolean(range.count || previous?.covered),
-      }));
+      });
     }
   }
-});
+}));
 
 AfterAll(function () {
   if (!process.env.COVERAGE_3D || !coveredFunctions.size) return;

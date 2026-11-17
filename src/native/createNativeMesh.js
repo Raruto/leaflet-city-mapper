@@ -36,6 +36,8 @@ export function createNativeMesh(state, key, position, color, opacity, texture, 
   mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer
     ? (terrain ? state.terrainRasterProgram : state.rasterProgram) || nativeProgram(layer, material)
     : nativeProgram(layer, material));
+  // Cover one 1/16-pixel rasterization step without lifting the path geometry.
+  mesh.depthBiasSlopeScale = source instanceof L.Path ? 1 / 16 : 0;
   if (source instanceof L.GridLayer) {
     if (terrain) state.terrainRasterProgram ||= mesh.program;
     else state.rasterProgram ||= mesh.program;

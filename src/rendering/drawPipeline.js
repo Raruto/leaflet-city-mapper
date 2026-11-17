@@ -5,7 +5,7 @@ import { alphaBlend } from '../globals/alphaBlend.js';
  * Get or create a cached render pipeline for a mesh and its face/depth settings.
  *
  * @param {Object} renderer Renderer providing the device and color format.
- * @param {Object} mesh Mesh providing the program and ground flag.
+ * @param {Object} mesh Mesh providing the program, ground flag and optional slope bias.
  * @param {GPUCullMode} cullMode Face-culling mode.
  * @param {GPUFrontFace} frontFace Front-face winding.
  *
@@ -17,7 +17,8 @@ export function drawPipeline(renderer, mesh, cullMode, frontFace) {
   // ponytail: self-occlusion during LOD blending needs separate per-LOD depth passes.
   const depthCompare = program.depthTest === false || (mesh.ground && renderer.groundOverlap)
     ? 'always' : 'greater-equal';
-  const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}`;
+  const depthBiasSlopeScale = mesh.depthBiasSlopeScale || 0;
+  const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}${depthBiasSlopeScale ? `:${depthBiasSlopeScale}` : ''}`;
   let pipeline = program.pipelineCache.get(pipelineKey);
   if (!pipeline) {
     pipeline = renderer.device.createRenderPipeline((
@@ -32,6 +33,7 @@ export function drawPipeline(renderer, mesh, cullMode, frontFace) {
       meshPipeline.primitive.frontFace = frontFace,
       meshPipeline.depthStencil.depthWriteEnabled = program.depthWrite,
       meshPipeline.depthStencil.depthCompare = depthCompare,
+      meshPipeline.depthStencil.depthBiasSlopeScale = depthBiasSlopeScale,
       meshPipeline
     ));
     meshPipeline.layout = null;

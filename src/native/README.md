@@ -24,6 +24,9 @@ terrain grid's triangle edges before sampling their elevation. This also drapes
 long segments, fills and stroke widths over slopes, rather than only lifting
 the original track points. A one-metre offset limits z-fighting. Terrain paths
 rebuild on zoom instead of reusing flat stroke anchors.
+Native paths also use a positive, slope-scaled reversed-Z bias of 1/16 pixel
+to cover subpixel rasterization error on software GPUs. This does not move
+their vertices or disable occlusion by nearer terrain and objects.
 During zoom, elevation sampling and subdivision follow rendered terrain meshes,
 including retained outgoing levels, before consulting the raw DEM cache. This
 keeps paths on the displayed surface while replacement tiles are loading.

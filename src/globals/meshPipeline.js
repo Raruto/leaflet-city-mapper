@@ -28,6 +28,7 @@ export const meshPipeline = {
   depthStencil: {
     format: 'depth32float',
     depthWriteEnabled: null,
-    depthCompare: null
+    depthCompare: null,
+    depthBiasSlopeScale: null
   }
 };

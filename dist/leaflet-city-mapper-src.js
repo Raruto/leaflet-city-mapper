@@ -3135,7 +3135,8 @@
     depthStencil: {
       format: "depth32float",
       depthWriteEnabled: null,
-      depthCompare: null
+      depthCompare: null,
+      depthBiasSlopeScale: null
     }
   };
 
@@ -3157,10 +3158,11 @@
   function drawPipeline(renderer, mesh, cullMode, frontFace) {
     const { program } = mesh;
     const depthCompare = program.depthTest === false || mesh.ground && renderer.groundOverlap ? "always" : "greater-equal";
-    const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}`;
+    const depthBiasSlopeScale = mesh.depthBiasSlopeScale || 0;
+    const pipelineKey = `${cullMode}:${frontFace}:${depthCompare}${depthBiasSlopeScale ? `:${depthBiasSlopeScale}` : ""}`;
     let pipeline = program.pipelineCache.get(pipelineKey);
     if (!pipeline) {
-      pipeline = renderer.device.createRenderPipeline((meshPipeline.layout = program.pipelineLayout, meshPipeline.vertex.module = program.vertex, meshPipeline.vertex.buffers = program.vertexBuffers, meshPipeline.fragment.module = program.fragment, meshPipeline.fragment.targets[0].format = renderer.format, meshPipeline.fragment.targets[0].blend = program.transparent ? alphaBlend : void 0, meshPipeline.fragment.targets[0].writeMask = GPUColorWrite.ALL, meshPipeline.primitive.cullMode = cullMode, meshPipeline.primitive.frontFace = frontFace, meshPipeline.depthStencil.depthWriteEnabled = program.depthWrite, meshPipeline.depthStencil.depthCompare = depthCompare, meshPipeline));
+      pipeline = renderer.device.createRenderPipeline((meshPipeline.layout = program.pipelineLayout, meshPipeline.vertex.module = program.vertex, meshPipeline.vertex.buffers = program.vertexBuffers, meshPipeline.fragment.module = program.fragment, meshPipeline.fragment.targets[0].format = renderer.format, meshPipeline.fragment.targets[0].blend = program.transparent ? alphaBlend : void 0, meshPipeline.fragment.targets[0].writeMask = GPUColorWrite.ALL, meshPipeline.primitive.cullMode = cullMode, meshPipeline.primitive.frontFace = frontFace, meshPipeline.depthStencil.depthWriteEnabled = program.depthWrite, meshPipeline.depthStencil.depthCompare = depthCompare, meshPipeline.depthStencil.depthBiasSlopeScale = depthBiasSlopeScale, meshPipeline));
       meshPipeline.layout = null;
       meshPipeline.vertex.module = null;
       meshPipeline.vertex.buffers = null;
@@ -5206,6 +5208,7 @@
     if (texture) material.baseTexture = texture;
     if (mesh) disposeMesh(layer, mesh);
     mesh = createMesh(layer, data, material, 0, source instanceof L.GridLayer ? (terrain ? state.terrainRasterProgram : state.rasterProgram) || nativeProgram(layer, material) : nativeProgram(layer, material));
+    mesh.depthBiasSlopeScale = source instanceof L.Path ? 1 / 16 : 0;
     if (source instanceof L.GridLayer) {
       if (terrain) state.terrainRasterProgram ||= mesh.program;
       else state.rasterProgram ||= mesh.program;

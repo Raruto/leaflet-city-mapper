@@ -220,7 +220,8 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
       createRenderPipeline(descriptor) {
         const pipeline = { vertex: descriptor.vertex.module, fragment: descriptor.fragment.module,
           blend: structuredClone(descriptor.fragment.targets[0].blend), cullMode: descriptor.primitive.cullMode,
-          frontFace: descriptor.primitive.frontFace, depthCompare: descriptor.depthStencil.depthCompare };
+          frontFace: descriptor.primitive.frontFace, depthCompare: descriptor.depthStencil.depthCompare,
+          depthBiasSlopeScale: descriptor.depthStencil.depthBiasSlopeScale };
         pipelines.push(pipeline);
         return pipeline;
       },
@@ -264,7 +265,8 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     geometry.attributes.position.data[0] = 5;
     assert.equal(other.attributes.position.data[0], 0);
     assert.notEqual(geometry.drawRange, other.drawRange);
-    const pass = { setPipeline() {}, setVertexBuffer() {}, setIndexBuffer() {},
+    let activePipeline;
+    const pass = { setPipeline(pipeline) { activePipeline = pipeline; }, setVertexBuffer() {}, setIndexBuffer() {},
       drawIndexed(...args) { draws.push(['indexed', ...args]); }, draw(...args) { draws.push(['plain', ...args]); },
       setBindGroup(index, group, dynamicOffsets) { offsets.push(Array.from(dynamicOffsets)); } };
     const mesh = { program: textured, geometry, worldMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
@@ -292,6 +294,16 @@ Then('rendering allocation scratch preserves GPU descriptors and independent uni
     texture.sampler = {};
     drawGeometry(backend, mesh, pass, 'front', 'cw');
     assert.equal(groups.length, 3, 'Changing sampler replaces bindings');
+    const unbiased = pipelines.at(-1), count = pipelines.length;
+    mesh.depthBiasSlopeScale = 1 / 16;
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(pipelines.length, count + 1, 'Biased paths need a separate cached pipeline');
+    assert.equal(activePipeline.depthBiasSlopeScale, 1 / 16);
+    mesh.depthBiasSlopeScale = 0;
+    drawGeometry(backend, mesh, pass, 'front', 'cw');
+    assert.equal(pipelines.length, count + 1);
+    assert.equal(activePipeline, unbiased);
+    assert.equal(unbiased.depthBiasSlopeScale, 0, 'Shared descriptors must not leak the path bias');
     textured.depthTest = false;
     mesh.ground = true;
     mesh._appearance = 0.25;

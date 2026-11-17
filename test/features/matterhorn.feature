@@ -21,8 +21,13 @@ Feature: Mapterhorn terrain example
   Scenario: Native tracks follow streamed terrain
     Then a native track remains visible on the streamed terrain
 
-  Scenario: Native tracks follow terrain during animated zoom
-    Then a native track follows rendered terrain throughout zoom transitions
+  Scenario Outline: Native tracks follow terrain during animated zoom (<direction>)
+    Then a native track follows rendered terrain throughout a zoom transition of <delta> level
+
+    Examples:
+      | direction | delta |
+      | in        | 1     |
+      | out       | -1    |
 
   Scenario: Changing the basemap after navigation preserves terrain elevation
     Then native tracks stay on terrain when basemaps use different latitude origins
