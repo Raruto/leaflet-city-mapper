@@ -25,3 +25,8 @@ world rather than adding network-dependent setup. Examples:
 Setup and steps share a 30-second scenario budget. Split independent checks
 instead of increasing timeouts; cleanup is exempt. See
 [scenario-budget.js](../support/scenario-budget.js).
+
+[Terrain zoom checks](./matterhorn.steps.js) run each zoom direction separately.
+An explicit request gate holds incoming terrain partially loaded until the
+frame assertions finish, then releases it in `finally`; this must not depend
+on a fixed delay or GPU speed.
