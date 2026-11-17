@@ -25,7 +25,7 @@ function minifyWGSL(source) {
       result += source[i++];
     }
   }
-  return result.replace(/\s+/g, ' ').replace(/\s*([{}()[\],:;@])\s*/g, '$1');
+  return result.replace(/\s+/g, ' ').replace(/\s*([{}()[\],:;@=*+])\s*/g, '$1');
 }
 
 const options = {

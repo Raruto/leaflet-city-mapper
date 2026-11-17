@@ -23,6 +23,7 @@ Then('scenario steps share one deadline without preventing cleanup', async funct
   assert.equal(await withScenarioBudget(action).call(world), 42);
   world.scenarioStarted = performance.now() - scenarioTimeout + 20;
   await assert.rejects(withScenarioBudget(() => new Promise(() => {})).call(world), /30-second budget/);
+  world.scenarioStarted = performance.now() - scenarioTimeout - 1;
   await assert.rejects(withScenarioBudget(action).call(world), /30-second budget/);
 });
 
