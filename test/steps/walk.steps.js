@@ -549,6 +549,8 @@ Then('clearance checks keep the walker outside the reported Paris facade', { tim
     return globals.sceneByLayer.get(buildings)._areas.size > 0 && globals.sceneByLayer.get(buildings)._inflight === 0 &&
       [...globals.sceneByLayer.get(buildings)._areas.values()].every(area => area.done);
   });
+  // Collision only tests meshes marked visible by a rendered frame near the walker.
+  await this.page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
   const end = await this.page.evaluate(start => {
     const context = walk._walk, now = performance.now(), setView = map.setView;
     cancelAnimationFrame(context.frame);
