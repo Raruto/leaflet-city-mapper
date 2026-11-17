@@ -30,6 +30,8 @@ See [test.js](./test.js) and the
 CI and release tests prepare the complementary library from source through
 [prepareIntegration.js](./prepareIntegration.js), avoiding a dependency on
 unpublished CDN versions. See [agent guidance](../AGENTS.md) for local overrides.
+CI uses Node 24, matching the shared release workflow and supporting the
+complementary library's test dependencies.
 
 ## Data and releases
 
